@@ -10,15 +10,15 @@ LASTREL="rv4.8"
 class unimod(object):
   '''Model release info'''
 
-  def __init__(self,tag,year,report,dataset=None):
+  def __init__(self,tag,year,status,dataset=None):
     '''Initialize object using the data provided by one csv row.'''
     self.tag    = tag                 # name/revision/tag
     self.year   = year                # met-year
-    self.report = report              # Status report
+    self.status = status              # Status report
     self.dataset= dataset
 
   def __repr__(self):
-    return "%s(%s): Status %s"%(self.name,self.year,self.report)
+    return "%s (meteo:%s, status:%s): %s"%(self.tag,self.year,self.status,self.dataset)
 
 OpenSource=[
   unimod("rv4.8",2013,2015,"ftp://ftp.met.no/projects/emep/OpenSource/201510/"),
@@ -56,7 +56,6 @@ def parse_arguments():
     help="YEAR's benckmark")
   parser.add_option_group(group)
 
-
   group = OptionGroup(parser, "Data-set options",
     "Get parts of a release dataset")
   group.add_option("-m", "--meteo", const="meteo",
@@ -82,12 +81,17 @@ def parse_arguments():
   return opts,args
 
 if __name__ == "__main__":
-  from operator import attrgetter
   opts,args = parse_arguments()
   for attr in ['tag','status','year']:
-    g=attrgetter(attr)
-    if(g(opts)==None):
+    target=getattr(opts,attr)
+    if(target==None):
       continue
-    print "Search %s = %s" % (attr, g(opts))
-    print [g(rel)==g(opts) for rel in OpenSource]
+    print("Searching %s = %s"%(attr,target))
+    try:
+      dataSet=[getattr(rel,attr)==target for rel in OpenSource].index(True)
+      dataSet=OpenSource[dataSet]
+    except:
+      print("not found")
+    print("Found %s"%dataSet)
+      
 
