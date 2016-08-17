@@ -269,6 +269,6 @@ if __name__ == "__main__":
           print("  Found %-6s:%s"%(key,ds[key]))
 
       if opts.verbose:
-        print("From %s:%s will retrieve:"%(attr,target))
+        print("From %s:%s will download:"%(attr,target))
         for key in ds:
-          print("  %-6s:%r"%(key,ds[key]))
+          print("  %-6s(%s)"%(key,fileSize(sum([x.size for x in ds[key]]))))
