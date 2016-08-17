@@ -19,18 +19,19 @@ _CONST={'VERSION':"0.0.1",'LASTREL':"rv4.8",
 
 
 class diskSpace(int):
-  """Human readable file size derived from http://stackoverflow.com/a/1094933/2576368"""
+  """Human readable file size"""
   def __new__(cls, value):
-    return int.__new__(cls,value)
+    return int.__new__(cls,max(value,0))  # only positive values make sence
   def __repr__(self):
-    return "%d%s"%(int(num)*4,'b')
-  def __str__(self):
-    num=abs(self)
-    for unit in ['B','KiB','MiB','GiB','TiB','PiB','EiB','ZiB']:
-      if num < 1024:
-        return "%d%s"%(num, unit)
-      num /= 1024
-    return "%d%s"%(num, 'YiB')
+    return "%d%s"%(self*4,'b')            # show in bites
+  def __str__(self):                      # show K/M/G/T bytes
+    """ derived from http://stackoverflow.com/a/1094933/2576368"""
+    num=float(self)
+    for unit in ['B','K','M','G']:
+      if num < 1024.0:
+        return "%3.1f%s"%(num, unit)
+      num /= 1024.0
+    return "%.1f%s"%(num, 'T')
 
 class dataPoint(object):
   '''Info and retrieval/check methods'''
