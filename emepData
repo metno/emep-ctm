@@ -3,22 +3,14 @@
 """
 Open Source EMEP/MSC-W model
 simplified access to the source code, input data and benchmark results.
-
-
-Definitions
-  dataPoint(class): single remote file/tarfile
-  dataSet(class):   dataPoint collection with a single local destination
-  relSets(class):   meteo|input|output|source|docs dataSets from a model release
-  catalog(list):    all dataPoints
-  index(dict):      all relSets
 """
 
-_CONST={'VERSION':"0.0.1",'LASTREL':"rv4.8",
+_CONST={'VERSION':"0.0.1",'LASTREL':"rv4.8",'LASTMET':2013,
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
-  'TMPDIR':"./tmp",'DATADIR':'.'}
+  'TMPDIR':"./downloads",'DATADIR':'.'}
 
 
-class diskSpace(int):
+class fileSize(int):
   """Human readable file size"""
   def __new__(cls, value):
     return int.__new__(cls,max(value,0))  # only positive values make sence
@@ -36,222 +28,138 @@ class diskSpace(int):
 class dataPoint(object):
   '''Info and retrieval/check methods'''
 
-  def __init__(self,tag,src,dst='{DATADIR}/{TAG}',byteSize=0,cksum=None):
+  def __init__(self,release,key,year,model,src,dst='',byteSize=0,cksum=None):
     '''Initialize object'''
-    self.tag    = str(tag)            # revision tag
-    self.src    = str(src)            # list source url/file(s)
-    self.dst    = str(dst)            # path for uncompressed files
-    self.size   = diskSpace(byteSize) # disk space required in bytes
-    self.cksum  = str(cksum)          # checksum url/file for uncompressed files
+    self.release= int(release)        # release date (YYYYMM)
+    self.key    = str(key)
+    try: 
+      self.tag  = {'other':'{KEY}{REL}',
+                   'meteo':'{KEY}{YEAR}'}[self.key]
+    except:
+      self.tag  = '{MOD}{KEY}'      # eg 'rv4_8source'
+    try:
+      self.year = int(year)           # met-year
+    except:
+      self.year = None
+    try:
+      self.model= str(model)          # model version
+    except:
+      self.model= None
+    self.src    = str(src)            # single source url/file
+    self.dst    = str(dst)            # path for uncompressed self.dst
+    if len(self.dst)==0:
+      self.dst= '{TMPDIR}/{TAG}'
+    self.size   = fileSize(byteSize)  # self.src file size [bytes]
+    self.cksum  = cksum               # self.src checksum
+    if self.cksum:
+      self.cksum= int(self.cksum)
 
-    # replace _CONST keywords
-    self.src    = self.src.format(TAG=self.tag,**_CONST)
-    self.dst    = self.dst.format(TAG=self.tag,**_CONST)
-    self.cksum  = self.cksum.format(TAG=self.tag,**_CONST)
+    # replace keywords
+    self.tag = self.tag.format(REL=self.release,KEY=self.key,YEAR=self.year,MOD=self.model)
+    self.src = self.src.format(REL=self.release,TAG=self.tag,**_CONST)
+    self.dst = self.dst.format(REL=self.release,TAG=self.tag,**_CONST)
 
   def __str__(self):
-    return "%s (%s)"%(self.tag,self.size)
+    return "%s (%s) --> %s"%(self.tag,self.size,self.dst)
+#   return "%s %s --> %s"%(self,self.src,self.dst)
   def __repr__(self):
-    return "%s (%s)"%(self.dst,self.size)
+    return "%s (%s)"%(self.tag,self.size)
+
+  def __hash__(self):
+    '''find unique self.src occurences'''
+    return hash(repr(self.src))
+  def __eq__(self, other):
+    if isinstance(other, dataPoint):
+      return (self.src == other.src)
+    else:
+      return False
+  def __ne__(self, other):
+    return (not self.__eq__(other))
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
 
-  def __init__(self,tag,year,status,dataset=None,byteSize=None):
-    '''Initialize object'''
-    self.tag    = str(tag)            # revision tag
-#   self.release= int(release)        # release date (YYYYMM)
-    self.year   = year                # met-year
-    self.status = status              # Status report
-    self.dataset= dataset             # [dataPoint,..]
-    self.size   = 0
-    if byteSize:
-      self.size = byteSize or 0
-    elif hasattr(self.dataset,"size"):
-      self.size = self.dataset.size
-    elif isinstance(self.dataset,list):
-      self.size = sum([x.size for x in dataset if hasattr(x,"size")])
-    self.size = diskSpace(self.size)
-      
-
-  def __str__(self):
-    return "%s (meteo:%s, status:%s)"%(self.tag,self.year,self.status)
-  def __repr__(self):
-    return "%s: %s"%(self,self.dataset)
-
-
-class relSets(object):
-  '''Info and retrieval/check methods'''
-
-  def __init__(self,tag,release,year,status,
-    input=None,meteo=None,source=None,docs=None,output=None,other=None,byteSize=None):
+  def __init__(self,tag,release,year,status,dataset=None,byteSize=None):
     '''Initialize object'''
     self.tag    = str(tag)            # revision tag
     self.release= int(release)        # release date (YYYYMM)
-    self.year   = year                # met-year
+    self.year   = year                # met-year(meteo)/status-year(model)
     self.status = status              # Status report
-    self.dataset= {                   # {key:dataSet,..}
-      'input':input,'meteo':meteo,'source':source,
-       'docs':docs,'output':output,'other':other}
+    self.dataset= dataset             # {'input':input,'meteo':meteo,..}
     self.size   = 0
     if byteSize:
       self.size = byteSize or 0
     else:
       self.size = sum([x.size for _,x in self.dataset.items() if hasattr(x,"size")])
-    self.size = diskSpace(self.size)
+    self.size = fileSize(self.size)
 
   def __str__(self):
-    return "%s (meteo:%s, status:%s)"%(self.tag,self.year,self.status)
+    return "%-8s (meteo:%s, status:%s)"%(self.tag,self.year,self.status)
   def __repr__(self):
-    return "%s: %s"%(self,{k:v for k,v in self.dataset.items() if v})
+    return "%s: %s"%(self,{k:"%s"%v for k,v in self.dataset.items() if v})
 #   return "%s: %s"%(self,self.dataset)
 
-archive={
-  '201510':{
-    'source':dataPoint('rv4_8',
-      ['{FTP}/201510/model_code/EMEP_MSC-W_model.rv4.8.OpenSource.tar.gz'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('rv4_8',
-      ['{FTP}/201510/userguide_{TAG}.pdf'],
-      '{DATADIR}/docs/'),
-    'meteo':dataPoint('met2013',
-      ['{FTP}/201510/input_data/meteo/meteo%d.tar.bz2'%i for i in range(201301,201312)],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('rv4_8',
-      ['{FTP}/201510/input_data/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('rv4_8_2013',
-      ['{FTP}/201510/model_results_rv4_8_2013/Base_model_rv4_8_results_NoFF.tar.bz2',
-       '{FTP}/201510/model_results_rv4_8_2013/Base_model_rv4_8_results_withFF.tar.bz2',
-       '{FTP}/201510/model_results_rv4_8_2013/README'],
-      '{DATADIR}/output/{TAG}'),
-    },
-  '201409':{
-    'source':dataPoint('rv4_5',
-      ['{FTP}/201409/model_code/EMEP_MSC-W_model.rv4_5.OpenSource.tar.gz'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('rv4_5',
-      ['{FTP}/201409/userguide_{TAG}.pdf'],
-      '{DATADIR}/docs/'),
-    'meteo':dataPoint('met2012',
-      ['{FTP}/201409/input_data_2012/meteo/meteo%d.tar.bz2'%i for i in range(201201,201212)],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('rv4_5',
-      ['{FTP}/201409/input_data_2012/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('rv4_5_2012',
-      ['{FTP}/201409/model_results_rv4_5_2012/Base_model_rv4_5_results.tar.bz2'],
-      '{DATADIR}/output/{TAG}'),
-    },
-  '201309':{
-    'source':dataPoint('rv4_4',
-      ['{FTP}/201309/model_code/EMEP_MSC-W_model.rv4_4.OpenSource.tar.gz'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('rv4_4',
-      ['{FTP}/201309/userguide_{TAG}.pdf'],
-      '{DATADIR}/docs/'),
-    'meteo':dataPoint('met2011',
-      ['{FTP}/201309/input_data_2011/meteo/meteo%d.tar.bz2'%i for i in range(201101,201112)],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('rv4_4',
-      ['{FTP}/201309/input_data_2011/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('rv4_4_2011',
-      ['{FTP}/201309/model_results_rv4_4_2011/Base_model_rv4_4_results.tar.bz2'],
-      '{DATADIR}/output/{TAG}'),
-#   'output':dataPoint('rv4_4_2010',
-#     ['{FTP}/201309/model_results_rv4_4_2010/Base_model_rv4_4_results.tar.bz2'],
-#     '{DATADIR}/output/{TAG}'),
-    },
-  '201304':{
-    'source':dataPoint('rv4_3',
-      ['{FTP}/201304/model_code/EMEP_MSC-W_model.rv4_3.OpenSource.tar.gz',
-       '{FTP}/201304/README_rv4_3special.txt'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('rv4_3',
-      ['{FTP}/201304/userguide_{TAG}.pdf'],
-      '{DATADIR}/docs/'),
-    'meteo':dataPoint('met2010',
-      ['{FTP}/met2010/meteo%d.tar.bz2'%i for i in range(201001,201012)],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('rv4_3',
-      ['{FTP}/201304/input_data/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('rv4_3_2010',
-      ['{FTP}/201304/model_results_rv4_3_2010/Base_model_rv4_3_results.tar.bz2'],
-      '{DATADIR}/output/{TAG}'),
-#   'tools':dataPoint('NCL_LOCAL',
-#     ['201304/mscw-osrc_ncl.tar.gz'],
-#     '{DATADIR}/tools/{TAG}'),
-    },
-  '201209':{
-    'source':dataPoint('rv4_0',
-      ['{FTP}/201209/model_code/Unified_EMEP_model.tar.bz2'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('rv4_0',
-      ['{FTP}/201209/userguide092012.pdf'],
-      '{DATADIR}/docs/userguide_{TAG}.pdf'),
-    'meteo':dataPoint('met2010',
-      ['{FTP}/met2010/meteo%d.tar.bz2'%i for i in range(201001,201012)],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('rv4_0',
-      ['{FTP}/201209/input_data/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('rv4_0_2010',
-      ['{FTP}/201209/model_results_2010/Base_model_results.tar.bz2'],
-#      '{FTP}/201209/model_results_2010/April_model_results.tar.bz2'],
-      '{DATADIR}/output/{TAG}'),
-    },
-  '201108':{
-    'source':dataPoint('v201106',
-      ['{FTP}/201108/model_code/MSC-W_EMEP_ModelCode.tar.bz2'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('v201106',
-      ['{FTP}/201108/userguide_062011.pdf'],
-      '{DATADIR}/docs/userguide_{TAG}.pdf'),
-    'meteo':dataPoint('met2008',
-      ['{FTP}/201108/input_data/meteo%d.tar.bz2'%i for i in range(200801,200812)],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('v201106',
-      ['{FTP}/201108/input_data/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('v201106_2008',
-      ['{FTP}/201108/model_results_2008/model_results_Base.tar.bz2'],
-#      '{FTP}/201108/model_results_2008/model_results_Jan_01_02.tar.bz2'],
-      '{DATADIR}/output/{TAG}'),
-#   'tools':dataPoint('tools',
-#     ['201108/model_tools/tools.tar.bz2'],
-#     '{DATADIR}/tools/{TAG}'),
-    },
-  '200802':{
-    'source':dataPoint('rv3',
-      ['{FTP}/200802/model_code/Unified_EMEP.tar'],
-      '{DATADIR}/source/Unimod.{TAG}'),
-    'docs':dataPoint('rv3',
-      ['{FTP}/200802/User_Guide_Unified_EMEP_rv3.pdf'],
-      '{DATADIR}/docs/userguide_{TAG}.pdf'),
-    'meteo':dataPoint('met2005',
-      ['{FTP}/201108/input_data/meteo%d.tar.bz2'%i for i in range(200501,200512)]
-     +['{FTP}/200802/input_data/meteo/meteo20060101.nc.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'input':dataPoint('rv3',
-      ['{FTP}/200802/input_data/other/other_input_files.tar.bz2'],
-      '{DATADIR}/input/{TAG}'),
-    'output':dataPoint('rv3_2005',
-      ['200802/model_results_2005/Results_2005.tar.bz2'],
-      '{DATADIR}/output/{TAG}'),
-    },
-}
+def readCatalog(filename,verbose):
+  '''
+  Returns releases read from catalog csv-file
 
-OpenSource=[
-  dataSet('rv4.8'    ,2013,2015,archive['201510']),
-  dataSet('rv4.5'    ,2012,2014,archive['201409']),
-  dataSet('rv4.4'    ,2011,2013,archive['201309']),
-  dataSet('rv4.3'    ,None,None,archive['201304']),
-  dataSet('rv4.0'    ,2010,2012,archive['201209']),
-  dataSet('v.2011-06',2008,None,archive['201108']),
-  dataSet('rv3'      ,2005,None,archive['200802']),
-]
+  Definitions
+    dataPoint(class): single remote file/tarfile
+    dataSet(class):   dataPoints from a model release,
+                      sorted into meteo|input|output|source|docs
+    catalog(list):    all dataPoints
+    index(dict):      catalog sorted into meteo|input|output|source|docs
+    archive(list):    all dataSet
+  '''
+  from os.path import isfile
+  from csv import reader as csvreader
+  
+  if(not isfile(filename)):
+    return []
+  reader = csvreader(open(filename),delimiter=',')
+  next(reader)    # skip header
+
+  catalog = []
+  rels,keys = set(),set()  # unique dataPoint.release/.keys for index(dict)
+  if verbose>2:
+    print("Reading %s"%filename)
+  for row in reader:
+    if row and "".join(row).strip():
+      try:
+        catalog+=[dataPoint(*row)]
+        rels.add(catalog[-1].release)
+        keys.add(catalog[-1].key)
+        if verbose>2:
+          print("  %s"%catalog[-1])
+      except:
+        print("Failed to parse (%s):%r\n"%(filename,row))
+        print(dataPoint(*row))
+        raise
+  if verbose>1:
+    print("%s read(srcs:%d)"%(filename,len(catalog)))
+    
+  if verbose>2:
+    print("Indexing")
+  index=dict.fromkeys(rels)
+  for r in rels:
+    index[r]=dict.fromkeys(keys)
+    for k in keys:
+      index[r][k]=[x for x in catalog if (x.release==r)and(x.key==k)]
+      if verbose>2:
+        print("  index[%s][%s](srcs:%d)"%(r,k,len(index[r][k])))
+  if verbose>1:
+    print("%s index[release:%d][sets:%d]"%(filename,len(rels),len(keys)))
+
+  if verbose>2:
+    print("Compiling releases")
+  for r,v in index.items():
+    index[r]=dataSet(v['source'][0].model,r,v['meteo'][0].year,v['source'][0].year,v)
+    if verbose>2:
+      print("  index[%s]: %s"%(r,index[r]))
+  if verbose>1:
+    print("%s index(release:%d)"%(filename,len(rels)))
+
+  return index
 
 def parse_arguments():
   from optparse import OptionParser,OptionGroup
@@ -270,9 +178,8 @@ Examples:
   Download meteorological input for YEAR ({MET})
     %prog -Y YEAR -m
 """.format(
-  REV="|".join([    x.tag     for x in OpenSource]),
-  MET="|".join([str(x.year)   for x in OpenSource if x.year]),
-  REP="|".join([str(x.status) for x in OpenSource if x.status]))
+  REV="|".join(['rv3','v201106','rv4_0','rv4_3','rv4_4','rv4_5','rv4_8']),
+  MET="|".join(['2005','2008','2010..%d'%_CONST['LASTMET']]))
 
   parser = OptionParser(usage,version=_CONST['VERSION'])
   parser.set_defaults(verbose=1)
@@ -330,6 +237,9 @@ if __name__ == "__main__":
   import sys
   opts,args = parse_arguments()
  
+  catalog=readCatalog('catalog.csv',opts.verbose)
+
+"""
   for attr in ['tag','status','year']:
     target=getattr(opts,attr)
     if(target is None):
@@ -362,3 +272,4 @@ if __name__ == "__main__":
       print("From %s:%s will retrieve:"%(attr,target))
       for key in dataSet:
         print("  %-6s:%r"%(key,dataSet[key]))
+""" 
