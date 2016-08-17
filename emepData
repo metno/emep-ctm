@@ -5,26 +5,40 @@ Open Source EMEP/MSC-W model
 simplified access to the source code, input data and benchmark results.
 
 
-dataPoint(class): single remote file/tarfile
-dataSet(class):   dataPoint collection with a single local destination
-Relase(class):    meteo|input|output|source|docs dataSets from the same model release
-catalog(list):    all dataPoints
-index(dict):      all Relases
+Definitions
+  dataPoint(class): single remote file/tarfile
+  dataSet(class):   dataPoint collection with a single local destination
+  relSets(class):   meteo|input|output|source|docs dataSets from a model release
+  catalog(list):    all dataPoints
+  index(dict):      all relSets
 """
 
 _CONST={'VERSION':"0.0.1",'LASTREL':"rv4.8",
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
   'TMPDIR':"./tmp",'DATADIR':'.'}
 
+
+class size(int):
+  """Human readable file size derived from http://stackoverflow.com/a/1094933/2576368"""
+  def __new__(cls, value):
+    return int.__new__(cls,value)
+  def __str__(self):
+    num=abs(self)
+    for unit in ['B','KiB','MiB','GiB','TiB','PiB','EiB','ZiB']:
+      if num < 1024:
+        return "%d%s" % (num, unit)
+      num /= 1024
+    return "%d%s" % (num, 'YiB')
+
 class dataPoint(object):
   '''Info and retrieval/check methods'''
 
-  def __init__(self,tag,src,dst='{DATADIR}/{TAG}',size=0,cksum=None):
+  def __init__(self,tag,src,dst='{DATADIR}/{TAG}',byteSize=0,cksum=None):
     '''Initialize object'''
     self.tag    = str(tag)            # revision tag
     self.src    = str(src)            # list source url/file(s)
     self.dst    = str(dst)            # path for uncompressed files
-    self.size   = int(size)           # disk space required in bytes
+    self.size   = size(byteSize)      # disk space required in bytes
     self.cksum  = str(cksum)          # checksum url/file for uncompressed files
 
     # replace _CONST keywords
@@ -33,26 +47,61 @@ class dataPoint(object):
     self.cksum  = self.cksum.format(TAG=self.tag,**_CONST)
 
   def __str__(self):
-    return "%s (%d bytes)"%(self.tag,self.size)
+    return "%s (%s)"%(self.tag,self.size)
   def __repr__(self):
-    return "%s (%d bytes)"%(self.dst,self.size)
+    return "%s (%s)"%(self.dst,self.size)
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
 
-  def __init__(self,tag,year,status,dataset=None,size=0):
+  def __init__(self,tag,year,status,dataset=None,byteSize=None):
     '''Initialize object'''
-    self.tag    = tag                 # revision tag
-#   self.date   = date                # release date
+    self.tag    = str(tag)            # revision tag
+#   self.release= int(release)        # release date (YYYYMM)
     self.year   = year                # met-year
     self.status = status              # Status report
-    self.dataset= dataset
-    self.size   = size
+    self.dataset= dataset             # [dataPoint,..]
+    self.size   = 0
+    if byteSize:
+      self.size = byteSize
+    elif hasattr(self.dataset,"size"):
+      self.size = self.dataset.size
+    elif isinstance(self.dataset,list):
+      self.size = sum([x.size for x in dataset if hasattr(x,"size")])
+    self.size = size(self.size)
+      
 
   def __str__(self):
     return "%s (meteo:%s, status:%s)"%(self.tag,self.year,self.status)
   def __repr__(self):
     return "%s: %s"%(self,self.dataset)
+
+
+class relSets(object):
+  '''Info and retrieval/check methods'''
+
+  def __init__(self,tag,release,year,status,
+    input=None,meteo=None,source=None,docs=None,output=None,other=None,byteSize=None):
+    '''Initialize object'''
+    self.tag    = str(tag)            # revision tag
+    self.release= int(release)        # release date (YYYYMM)
+    self.year   = year                # met-year
+    self.status = status              # Status report
+    self.dataset= {                   # {key:dataSet,..}
+      'input':input,'meteo':meteo,'source':source,
+       'docs':docs,'output':output,'other':other}
+    self.size   = 0
+    if byteSize:
+      self.size = byteSize
+    else:
+      self.size = sum([x.size for _,x in self.dataset.items() if hasattr(x,"size")])
+    self.size = size(self.size)
+
+  def __str__(self):
+    return "%s (meteo:%s, status:%s)"%(self.tag,self.year,self.status)
+  def __repr__(self):
+    return "%s: %s"%(self,{k:v for k,v in self.dataset.items() if v})
+#   return "%s: %s"%(self,self.dataset)
 
 archive={
   '201510':{
