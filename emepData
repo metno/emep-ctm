@@ -32,8 +32,9 @@ class dataPoint(object):
     self.dst    = self.dst.format(TAG=self.tag,**_CONST)
     self.cksum  = self.cksum.format(TAG=self.tag,**_CONST)
 
+  def __str__(self):
+    return "%s (%d bytes)"%(self.tag,self.size)
   def __repr__(self):
-#   return "%s(%d bytes): %s"%(self.tag,self.size,self.dst)
     return "%s (%d bytes)"%(self.dst,self.size)
 
 class dataSet(object):
@@ -302,9 +303,9 @@ if __name__ == "__main__":
       sys.exit(-1)
     if opts.verbose>1:
       for key in dataSet:
-        print("  Found %-6s:%s"%(key,dataSet[key].tag))
+        print("  Found %-6s:%s"%(key,dataSet[key]))
 
     if opts.verbose:
       print("From %s:%s will retrieve:"%(attr,target))
       for key in dataSet:
-        print("  %-6s:%s"%(key,dataSet[key]))
+        print("  %-6s:%r"%(key,dataSet[key]))
