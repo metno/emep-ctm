@@ -65,7 +65,7 @@ class dataSet(object):
     self.dataset= dataset             # [dataPoint,..]
     self.size   = 0
     if byteSize:
-      self.size = byteSize
+      self.size = byteSize or 0
     elif hasattr(self.dataset,"size"):
       self.size = self.dataset.size
     elif isinstance(self.dataset,list):
@@ -94,7 +94,7 @@ class relSets(object):
        'docs':docs,'output':output,'other':other}
     self.size   = 0
     if byteSize:
-      self.size = byteSize
+      self.size = byteSize or 0
     else:
       self.size = sum([x.size for _,x in self.dataset.items() if hasattr(x,"size")])
     self.size = diskSpace(self.size)
