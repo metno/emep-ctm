@@ -239,7 +239,6 @@ if __name__ == "__main__":
  
   catalog=readCatalog('catalog.csv',opts.verbose)
 
-"""
   for attr in ['tag','status','year']:
     target=getattr(opts,attr)
     if(target is None):
@@ -248,8 +247,9 @@ if __name__ == "__main__":
     if opts.verbose>1:
       print("Searching %s:%s"%(attr,target))
     try:
-      dataSet=[getattr(x,attr) for x in OpenSource].index(target)
-      dataSet=OpenSource[dataSet]
+      dataSet=[v for _,v in catalog.items() if getattr(v,attr)==target]
+      if len(dataSet)==0:
+        raise
     except:
       print("No datasets found for --%s=%s"%(attr,target))
       sys.exit(-1)
@@ -258,18 +258,17 @@ if __name__ == "__main__":
 
     if opts.verbose>1:
       print("Searching datasets:%s"%(opts.data))
-    try:
-      dataSet=dataSet.dataset
-      dataSet={key:dataSet[key] for key in opts.data}
-    except:
-      print("No datasets found for --%s=%s"%(attr,target))
-      sys.exit(-1)
-    if opts.verbose>1:
-      for key in dataSet:
-        print("  Found %-6s:%s"%(key,dataSet[key]))
+    for ds in dataSet:
+      try:
+        ds={key:ds.dataset[key] for key in opts.data}
+      except:
+        print("No datasets found for --%s=%s"%(attr,target))
+        sys.exit(-1)
+      if opts.verbose>1:
+        for key in ds:
+          print("  Found %-6s:%s"%(key,ds[key]))
 
-    if opts.verbose:
-      print("From %s:%s will retrieve:"%(attr,target))
-      for key in dataSet:
-        print("  %-6s:%r"%(key,dataSet[key]))
-""" 
+      if opts.verbose:
+        print("From %s:%s will retrieve:"%(attr,target))
+        for key in ds:
+          print("  %-6s:%r"%(key,ds[key]))
