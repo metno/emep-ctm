@@ -139,7 +139,7 @@ class dataPoint(object):
     """derived from http://stackoverflow.com/a/22776/2576368"""
     from os.path import isfile,dirname,isdir
     from os import makedirs
-    import urllib2
+    from urllib2 import urlopen
   
     if(isfile(self.dst)):
       if(verbose):
@@ -152,7 +152,7 @@ class dataPoint(object):
       if (not isdir(d))and(d!=''):
         makedirs(d)
       
-      u = urllib2.urlopen(self.src)
+      u = urlopen(self.src)
       with open(self.dst,'wb') as f:
         block = 1024*8        #   8K
         bigFile=1024*1024*128 # 128M
@@ -172,6 +172,23 @@ class dataPoint(object):
               printProgress(n,ntot,barLength=50)
         if verbose and bigFile and ntot%128!=0:
           printProgress(ntot,ntot,barLength=50)
+          
+  def check(self,verbose=True):
+    from os.path import isfile
+    from hashlib import md5
+    if not isfile(self.dst):
+      return False
+
+    if(verbose):
+      print("%-8s %s"%('Check',self))
+
+    with open(self.dst) as f:
+      if self.md5sum!=md5(f.read()).hexdigest():
+        if(verbose):
+          print("%-8s %s"%('  md5/=',self.md5sum))
+        return False
+      return True
+
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
@@ -420,8 +437,10 @@ if __name__ == "__main__":
       sys.exit(0)
     
   for x in down:
-    x.download(opts.verbose)
+    if not x.check(opts.verbose>1):
+      x.cleanup(opts.verbose>1)
 
+    x.download(opts.verbose)
     if opts.cleanup:
       x.cleanup(opts.verbose)
 
