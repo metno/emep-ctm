@@ -117,50 +117,56 @@ def readCatalog(filename,verbose):
     index(dict):      catalog sorted into meteo|input|output|source|docs
     archive(list):    all dataSet
   '''
-  from os.path import isfile
   from csv import reader as csvreader
   
-  if(not isfile(filename)):
-    print("Catalog file not found: '%s'"%filename)
+  try:
+    f=open(filename)
+  except IOError as e:
+    print "Failed to open '%s'.\n%s."%(filename,e.strerror)
     sys.exit(-1)
 
-  reader = csvreader(open(filename),delimiter=',')
-  next(reader)    # skip header
-  catalog = []
+  reader = csvreader(f,delimiter=',')
+  next(reader)              # skip header
+  catalog = []              # list all src files (1 file per row)
+  rels,keys = set(),set()   # unique dataPoint.release/.keys for indexing
 
-  rels,keys = set(),set()  # unique dataPoint.release/.keys for index(dict)
   if verbose>2:
     print("Reading %s"%filename)
   for row in reader:
-    if row and "".join(row).strip():
+    if row and "".join(row).strip():  # skip empty lines
       try:
-        catalog+=[dataPoint(*row)]
-        rels.add(catalog[-1].release)
-        keys.add(catalog[-1].key)
+        catalog+=[dataPoint(*row)]    # list all src files
+        rels.add(catalog[-1].release) # unique releases
+        keys.add(catalog[-1].key)     # unique keys (meteo,source,&c)
         if verbose>2:
           print("  %s"%catalog[-1])
       except:
-        print("Failed to parse (%s):%r\n"%(filename,row))
+        print("Failed to parse (%s): %r"%(filename,row))
         print(dataPoint(*row))
         raise
   if verbose>1:
     print("%s read(srcs:%d)"%(filename,len(catalog)))
+  f.close()
     
+  index=dict.fromkeys(rels) # index[releases][keys:meteo,source,&c]
   if verbose>2:
     print("Indexing")
-  index=dict.fromkeys(rels)
-  for r in rels:
+  for r in rels:            # r:release
     index[r]=dict.fromkeys(keys)
-    for k in keys:
+    for k in keys:          # k:meteo,source,&c
       index[r][k]=[x for x in catalog if (x.release==r)and(x.key==k)]
       if verbose>2:
         print("  index[%s][%s](srcs:%d)"%(r,k,len(index[r][k])))
   if verbose>1:
     print("%s index[release:%d][sets:%d]"%(filename,len(rels),len(keys)))
 
+  # repack index from dict({key:dataPoint,}) to dict(dataSet)
   if verbose>2:
     print("Compiling releases")
-  for r,v in index.items():
+  for r,v in index.items(): 
+    # pack index[r] into a dataSet object
+    #   before index[r]:{meteo:dataPoint,source:dataPoint,..}
+    #   after  index[r]:dataSet (with search metadata)
     index[r]=dataSet(v['source'][0].model,r,v['meteo'][0].year,v['source'][0].year,v)
     if verbose>2:
       print("  index[%s]: %s"%(r,index[r]))
