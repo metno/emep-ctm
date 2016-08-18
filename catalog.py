@@ -15,6 +15,115 @@ _CONST={
   'DATADIR':'.'           # base path for datasets
 }
 
+def parse_arguments():
+  from optparse import OptionParser,OptionGroup
+  from sys      import argv as args
+
+  usage = """usage: %prog [options]
+
+Examples:
+
+  Retrieve release dataset for revision REV ({REV})
+    %prog -R REV          
+
+  Get Only the source code and user guide for revision REV
+    %prog -R REV -sd
+
+  Download meteorological input for YEAR ({MET})
+    %prog -Y YEAR -m
+""".format(
+  REV="|".join(['rv3','v201106','rv4_0','rv4_3','rv4_4','rv4_5','rv4_8']),
+  MET="|".join(['2005','2008','2010..%d'%_CONST['LASTMET']]))
+
+  parser = OptionParser(usage,version=_CONST['VERSION'])
+  parser.set_defaults(verbose=1)
+  parser.add_option("-q", "--quiet",
+    action="store_false", dest="verbose",
+    help="don't print status messages to stdout")
+  parser.add_option("-v", "--verbose",
+    action="count", dest="verbose",
+    help="Increase verbosity")
+  parser.add_option("--catalog", default=_CONST['CSV'],
+    action="store", type="string", dest="catalog",
+    help="Override dataset cataloque path/file (default:%default)")
+
+  group = OptionGroup(parser, "Release options",
+    "Select a release dataset")
+  group.add_option("-R","--revision",
+    type="string", metavar="REV",
+    action="store", dest="tag",
+    help="revision REV")
+  group.add_option("-S","--status",
+    type="int", metavar="YEAR",
+    action="store", dest="status",
+    help="YEAR's status report")
+  group.add_option("-Y","--year",
+    type="int", metavar="YEAR",
+    action="store", dest="year",
+    help="Meteorological/run YEAR")
+  parser.add_option_group(group)
+
+  group = OptionGroup(parser, "Dataset options",
+    "Get parts of a release dataset")
+  group.add_option("-m", "--meteo", const="meteo",
+    action="append_const", dest="data",
+    help="get meteorology input")
+  group.add_option("-i", "--input", const="input",
+    action="append_const",dest="data",
+    help="get other input")
+  group.add_option("-o", "--output",const="output",
+    action="append_const", dest="data",
+    help="get model benckmark")
+  group.add_option("-s", "--source",const="source",
+    action="append_const", dest="data",
+    help="get source code for benckmark")
+  group.add_option("-d", "--docs",const="docs",
+    action="append_const", dest="data",
+    help="get corresponding user guide")
+  parser.add_option_group(group)
+
+  group = OptionGroup(parser, "Download options","")
+  group.add_option("--yes", default=True,
+    action="store_false", dest="ask",
+    help="Don't ask before start downloading/unpacking")
+  group.add_option("--outpath",
+    action="store", dest="outpath",
+    help="Override output (dataset) directory")
+  group.add_option("--tmppath",
+    action="store", dest="tmppath",
+    help="Override temporary (download) directory")
+  group.add_option("--cleanup", default=False,
+    action="store_true", dest="cleanup",
+    help="Remove ALL temporary (download) files")
+  parser.add_option_group(group)
+ 
+  opts,args = parser.parse_args(args[1:])
+  if(all(getattr(opts,attr) is None for attr in ['tag','status','year'])):
+    opts.tag=_CONST['LASTREL']
+  if opts.data==None :
+    opts.data=["meteo","input","output","source","docs"]
+  if opts.outpath:
+    _CONST['DATADIR']=opts.outpath
+  if opts.tmppath:
+    _CONST['TMPDIR']=opts.tmppath
+  return opts,args
+
+def userConsent(question,ask=True,default='yes'):
+  from sys import version_info as version
+  while ask:
+    q={'y':"%s [Y]/n:"%question,'n':"%s y/[N]:"%question}
+    q.update({'yes':q['y'],'no':q['n']})
+    if version[0]>2:  # Python3.x
+      data = input(q[default.lower()])
+    else:             # Python2.x
+      data = raw_input(q[default.lower()])
+    if data.lower() == '':
+      data = default
+    if data.lower() in ('y','yes'):
+      return True
+    elif data.lower() in ('n','no'):
+      return False
+
 # Print iterations progress
 # http://stackoverflow.com/a/34325723/2576368
 def printProgress(iteration,total,prefix='',suffix='',decimals=2,barLength=100):
@@ -117,7 +226,6 @@ class dataPoint(object):
     from os import remove,rmdir
     if not isfile(self.dst):
       return
-
     if(verbose):
       print("%-8s %s"%('Cleanup',self))
 
@@ -134,51 +242,12 @@ class dataPoint(object):
       else:
         print(e)
         raise
-      
-  def download(self,verbose=True):
-    """derived from http://stackoverflow.com/a/22776/2576368"""
-    from os.path import isfile,dirname,isdir
-    from os import makedirs
-    from urllib2 import urlopen
-  
-    if(isfile(self.dst)):
-      if(verbose):
-        print("%-8s %s"%('Found',self))
-    else:
-      if(verbose):
-        print("%-8s %s"%('Download',self))
 
-      d=dirname(self.dst)
-      if (not isdir(d))and(d!=''):
-        makedirs(d)
-      
-      u = urlopen(self.src)
-      with open(self.dst,'wb') as f:
-        block = 1024*8        #   8K
-        bigFile=1024*1024*128 # 128M
-        bigFile=(self.size>bigFile)
-        if verbose and bigFile:
-          n=0
-          ntot = self.size/block
-          printProgress(n,ntot,barLength=50)
-        while True:
-          buffer = u.read(block)
-          if not buffer:
-            break
-          f.write(buffer)
-          if verbose and bigFile:
-            n+=1
-            if(n%128==0):     # 8K*128=1M
-              printProgress(n,ntot,barLength=50)
-        if verbose and bigFile and ntot%128!=0:
-          printProgress(ntot,ntot,barLength=50)
-          
   def check(self,verbose=True):
     from os.path import isfile
     from hashlib import md5
     if not isfile(self.dst):
       return False
-
     if(verbose):
       print("%-8s %s"%('Check',self))
 
@@ -189,6 +258,58 @@ class dataPoint(object):
         return False
       return True
 
+  def download(self,verbose=True):
+    """derived from http://stackoverflow.com/a/22776/2576368"""
+    from os.path import isfile,dirname,isdir
+    from os import makedirs
+    from urllib2 import urlopen
+    if(isfile(self.dst)):
+      if(verbose>1):
+        print("%-8s %s"%('Found',self))
+      return
+    if(verbose):
+      print("%-8s %s"%('Download',self))
+
+    d=dirname(self.dst)
+    if (not isdir(d))and(d!=''):
+      makedirs(d)
+    
+    u = urlopen(self.src)
+    with open(self.dst,'wb') as f:
+      block = 1024*8        #   8K
+      bigFile=1024*1024*128 # 128M
+      bigFile=(self.size>bigFile)
+      if verbose and bigFile:
+        n=0
+        ntot = self.size/block
+        printProgress(n,ntot,barLength=50)
+      while True:
+        buffer = u.read(block)
+        if not buffer:
+          break
+        f.write(buffer)
+        if verbose and bigFile:
+          n+=1
+          if(n%128==0):     # 8K*128=1M
+            printProgress(n,ntot,barLength=50)
+      if verbose and bigFile and ntot%128!=0:
+        printProgress(ntot,ntot,barLength=50)
+
+  def unpack(self,verbose=True,inspect=False):
+    from os.path import isfile
+    from tarfile import is_tarfile,open
+    if not isfile(self.dst) or not is_tarfile(self.dst):
+      return
+    if(verbose):
+      print("%-8s %s"%('Unpack',self))
+
+    with open(self.dst) as f:      
+      if userConsent('See the contents first?',inspect,'no'):
+        print f.list(verbose=(verbose>1))
+        if not userConsent('Do you wish to proceed?',inspect):
+          print("OK, skipping file")
+          return
+   
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
@@ -283,100 +404,6 @@ def readCatalog(filename,verbose=1):
 
   return index
 
-def parse_arguments():
-  from optparse import OptionParser,OptionGroup
-  from sys      import argv as args
-
-  usage = """usage: %prog [options]
-
-Examples:
-
-  Retrieve release dataset for revision REV ({REV})
-    %prog -R REV          
-
-  Get Only the source code and user guide for revision REV
-    %prog -R REV -sd
-
-  Download meteorological input for YEAR ({MET})
-    %prog -Y YEAR -m
-""".format(
-  REV="|".join(['rv3','v201106','rv4_0','rv4_3','rv4_4','rv4_5','rv4_8']),
-  MET="|".join(['2005','2008','2010..%d'%_CONST['LASTMET']]))
-
-  parser = OptionParser(usage,version=_CONST['VERSION'])
-  parser.set_defaults(verbose=1)
-  parser.add_option("-q", "--quiet",
-    action="store_false", dest="verbose",
-    help="don't print status messages to stdout")
-  parser.add_option("-v", "--verbose",
-    action="count", dest="verbose",
-    help="Increase verbosity")
-  parser.add_option("--catalog", default=_CONST['CSV'],
-    action="store", type="string", dest="catalog",
-    help="Override dataset cataloque path/file (default:%default)")
-
-  group = OptionGroup(parser, "Release options",
-    "Select a release dataset")
-  group.add_option("-R","--revision",
-    type="string", metavar="REV",
-    action="store", dest="tag",
-    help="revision REV")
-  group.add_option("-S","--status",
-    type="int", metavar="YEAR",
-    action="store", dest="status",
-    help="YEAR's status report")
-  group.add_option("-Y","--year",
-    type="int", metavar="YEAR",
-    action="store", dest="year",
-    help="Meteorological/run YEAR")
-  parser.add_option_group(group)
-
-  group = OptionGroup(parser, "Dataset options",
-    "Get parts of a release dataset")
-  group.add_option("-m", "--meteo", const="meteo",
-    action="append_const", dest="data",
-    help="get meteorology input")
-  group.add_option("-i", "--input", const="input",
-    action="append_const",dest="data",
-    help="get other input")
-  group.add_option("-o", "--output",const="output",
-    action="append_const", dest="data",
-    help="get model benckmark")
-  group.add_option("-s", "--source",const="source",
-    action="append_const", dest="data",
-    help="get source code for benckmark")
-  group.add_option("-d", "--docs",const="docs",
-    action="append_const", dest="data",
-    help="get corresponding user guide")
-  parser.add_option_group(group)
-
-  group = OptionGroup(parser, "Download options","")
-  group.add_option("--yes", default=True,
-    action="store_false", dest="ask",
-    help="Don't ask before start downloading")
-  group.add_option("--outpath",
-    action="store", dest="outpath",
-    help="Override output (dataset) directory")
-  group.add_option("--tmppath",
-    action="store", dest="tmppath",
-    help="Override temporary (download) directory")
-  group.add_option("--cleanup", default=False,
-    action="store_true", dest="cleanup",
-    help="Remove ALL temporary (download) files")
-  parser.add_option_group(group)
- 
-  opts,args = parser.parse_args(args[1:])
-  if(all(getattr(opts,attr) is None for attr in ['tag','status','year'])):
-    opts.tag=_CONST['LASTREL']
-  if opts.data==None :
-    opts.data=["meteo","input","output","source","docs"]
-  if opts.outpath:
-    _CONST['DATADIR']=opts.outpath
-  if opts.tmppath:
-    _CONST['TMPDIR']=opts.tmppath
-  
-  return opts,args
-
 if __name__ == "__main__":
   import sys
   opts,args = parse_arguments()
@@ -425,22 +452,16 @@ if __name__ == "__main__":
     print("Queue download: %6s %s"%(
       fileSize(sum([x.size for x in down])),'Total'))
 
-  while opts.ask:
-    if sys.version_info[0]>2: # Python3.x
-      data = input("Do you wish to proceed? [Y]/n:")
-    else:                     # Python2.x
-      data = raw_input("Do you wish to proceed? [Y]/n:")
-    if data.lower() in ('y','yes',''):
-      break
-    elif data.lower() in ('n','no'):
-      print("OK, bye")
-      sys.exit(0)
+  if not userConsent('Do you wish to proceed?',opts.ask):
+    print("OK, bye")
+    sys.exit(0)
     
   for x in down:
     if not x.check(opts.verbose>1):
       x.cleanup(opts.verbose>1)
 
     x.download(opts.verbose)
+    x.unpack(opts.verbose,opts.ask)
     if opts.cleanup:
       x.cleanup(opts.verbose)
 
