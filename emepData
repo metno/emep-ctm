@@ -302,14 +302,19 @@ if __name__ == "__main__":
           print("Queue download: %6s %s"%(
             fileSize(sum([x.size for x in ds[key]])),ds[key][0].tag))
 
-  down=list(set(down))  # unique files, for total size
+  down=list(set(down))  # unique files, for single download and total size
   if opts.verbose:
     print("Queue download: %6s %s"%(
       fileSize(sum([x.size for x in down])),'Total'))
+
   while opts.ask:
-    data = raw_input("Do you wish to proceed? [Y]/n:")
+    if sys.version_info[0]>2: # Python3.x
+      data = input("Do you wish to proceed? [Y]/n:")
+    else:                     # Python2.x
+      data = raw_input("Do you wish to proceed? [Y]/n:")
     if data.lower() in ('y','yes',''):
       break
     elif data.lower() in ('n','no'):
       print("OK, bye")
       sys.exit(0)
+
