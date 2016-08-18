@@ -15,6 +15,28 @@ _CONST={
   'DATADIR':'.'           # base path for datasets
 }
 
+# Print iterations progress
+# http://stackoverflow.com/a/34325723/2576368
+def printProgress(iteration,total,prefix='',suffix='',decimals=2,barLength=100):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : number of decimals in percent complete (Int)
+        barLength   - Optional  : character length of bar (Int)
+    """
+    from sys import stdout
+    filledLength    = int(round(barLength * iteration / float(total)))
+    percents        = round(100.00 * (iteration / float(total)), decimals)
+    bar             = '█' * filledLength + '-' * (barLength - filledLength)
+    stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+    stdout.flush()
+    if iteration == total:
+      stdout.write('\n')
+      stdout.flush()
 
 class fileSize(int):
   """Human readable file size"""
@@ -105,17 +127,19 @@ class dataPoint(object):
       if d!='':
         rmdir(d)
     except OSError as e:
-      if e.errno==1:  # directory was not empty
+      if e.errno==1:  # opperation not permited (permissions?)
+        pass
+      if e.errno==39: # directory was not empty
         pass
       else:
         print(e)
         raise
       
   def download(self,verbose=True):
+    """derived from http://stackoverflow.com/a/22776/2576368"""
     from os.path import isfile,dirname,isdir
     from os import makedirs
-    from urllib import urlretrieve as retrieve
-    from time import sleep
+    import urllib2
   
     if(isfile(self.dst)):
       if(verbose):
@@ -128,16 +152,26 @@ class dataPoint(object):
       if (not isdir(d))and(d!=''):
         makedirs(d)
       
-      attempts = 0
-      while attempts < 3:
-        try:
-          retrieve(self.src,self.dst)
-          break
-        except IOError as e:
-          attempts+=1
-          if(verbose):
-            print("%-8s %s"%('  Fail#%d'%attempts,e.strerror))
-          sleep(30)   # wait 50s before traying again
+      u = urllib2.urlopen(self.src)
+      with open(self.dst,'wb') as f:
+        block = 1024*8        #   8K
+        bigFile=1024*1024*128 # 128M
+        bigFile=(self.size>bigFile)
+        if verbose and bigFile:
+          n=0
+          ntot = self.size/block
+          printProgress(n,ntot,barLength=50)
+        while True:
+          buffer = u.read(block)
+          if not buffer:
+            break
+          f.write(buffer)
+          if verbose and bigFile:
+            n+=1
+            if(n%128==0):     # 8K*128=1M
+              printProgress(n,ntot,barLength=50)
+        if verbose and bigFile and ntot%128!=0:
+          printProgress(ntot,ntot,barLength=50)
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
