@@ -36,6 +36,8 @@ class dataPoint(object):
 
   def __init__(self,release,key,year,model,src,dst='',byteSize=0,cksum=None):
     '''Initialize object'''
+    from os.path import basename
+    
     self.release= int(release)        # release date (YYYYMM)
     self.key    = str(key)
     try: 
@@ -53,8 +55,8 @@ class dataPoint(object):
       self.model= None
     self.src    = str(src)            # single source url/file
     self.dst    = str(dst)            # path for uncompressed self.dst
-    if len(self.dst)==0:
-      self.dst= '{TMPDIR}/{TAG}'
+    if self.dst=='':
+      self.dst= '{TMPDIR}/{TAG}/'
     self.size   = fileSize(byteSize)  # self.src file size [bytes]
     self.cksum  = cksum               # self.src checksum
     if self.cksum:
@@ -64,12 +66,18 @@ class dataPoint(object):
     self.tag = self.tag.format(REL=self.release,KEY=self.key,YEAR=self.year,MOD=self.model)
     self.src = self.src.format(REL=self.release,TAG=self.tag,**_CONST)
     self.dst = self.dst.format(REL=self.release,TAG=self.tag,**_CONST)
+    if basename(self.dst)=='':
+      self.dst+=basename(self.src)
 
   def __str__(self):
-    return "%s (%s) --> %s"%(self.tag,self.size,self.dst)
+    return "%-14s %6s %s"%(self.tag,self.size,self.dst)
+#   return "%s (%s) --> %s"%(self.tag,self.size,self.dst)
 #   return "%s %s --> %s"%(self,self.src,self.dst)
   def __repr__(self):
-    return "%s (%s)"%(self.tag,self.size)
+    from os.path import basename
+    return "%6s %s"%(self.size,basename(self.dst))
+#   return "%6s %s"%(self.size,self.tag)
+#   return "%s (%s)"%(self.tag,self.size)
 
   def __hash__(self):
     '''find unique self.src occurences'''
@@ -81,6 +89,55 @@ class dataPoint(object):
       return False
   def __ne__(self, other):
     return (not self.__eq__(other))
+
+  def cleanup(self,verbose=True):
+    from os.path import isfile,dirname
+    from os import remove,rmdir
+    if not isfile(self.dst):
+      return
+
+    if(verbose):
+      print("%-8s %s"%('Cleanup',self))
+
+    try:
+      remove(self.dst)
+      d=dirname(self.dst)
+      if d!='':
+        rmdir(d)
+    except OSError as e:
+      if e.errno==1:  # directory was not empty
+        pass
+      else:
+        print(e)
+        raise
+      
+  def download(self,verbose=True):
+    from os.path import isfile,dirname,isdir
+    from os import makedirs
+    from urllib import urlretrieve as retrieve
+    from time import sleep
+  
+    if(isfile(self.dst)):
+      if(verbose):
+        print("%-8s %s"%('Found',self))
+    else:
+      if(verbose):
+        print("%-8s %s"%('Download',self))
+
+      d=dirname(self.dst)
+      if (not isdir(d))and(d!=''):
+        makedirs(d)
+      
+      attempts = 0
+      while attempts < 3:
+        try:
+          retrieve(self.src,self.dst)
+          break
+        except IOError as e:
+          attempts+=1
+          if(verbose):
+            print("%-8s %s"%('  Fail#%d'%attempts,e.strerror))
+          sleep(30)   # wait 50s before traying again
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
@@ -105,7 +162,7 @@ class dataSet(object):
     return "%s: %s"%(self,{k:"%s"%v for k,v in self.dataset.items() if v})
 #   return "%s: %s"%(self,self.dataset)
 
-def readCatalog(filename,verbose):
+def readCatalog(filename,verbose=1):
   '''
   Returns releases read from catalog csv-file
 
@@ -135,7 +192,7 @@ def readCatalog(filename,verbose):
   for row in reader:
     if row and "".join(row).strip():  # skip empty lines
       try:
-        catalog+=[dataPoint(*row)]    # list all src files
+        catalog+=[dataPoint(*row)]
         rels.add(catalog[-1].release) # unique releases
         keys.add(catalog[-1].key)     # unique keys (meteo,source,&c)
         if verbose>2:
@@ -254,7 +311,7 @@ Examples:
     help="Override temporary (download) directory")
   group.add_option("--cleanup", default=False,
     action="store_true", dest="cleanup",
-    help="Remove temporary (download) files")
+    help="Remove ALL temporary (download) files")
   parser.add_option_group(group)
  
   opts,args = parser.parse_args(args[1:])
@@ -323,4 +380,10 @@ if __name__ == "__main__":
     elif data.lower() in ('n','no'):
       print("OK, bye")
       sys.exit(0)
+    
+  for x in down:
+    x.download(opts.verbose)
+
+    if opts.cleanup:
+      x.cleanup(opts.verbose)
 
