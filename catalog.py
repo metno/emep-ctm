@@ -56,7 +56,7 @@ class fileSize(int):
 class dataPoint(object):
   '''Info and retrieval/check methods'''
 
-  def __init__(self,release,key,year,model,src,dst='',byteSize=0,cksum=None):
+  def __init__(self,release,key,year,model,src,dst='',byteSize=0,md5sum=None):
     '''Initialize object'''
     from os.path import basename
     
@@ -80,9 +80,9 @@ class dataPoint(object):
     if self.dst=='':
       self.dst= '{TMPDIR}/{TAG}/'
     self.size   = fileSize(byteSize)  # self.src file size [bytes]
-    self.cksum  = cksum               # self.src checksum
-    if self.cksum:
-      self.cksum= int(self.cksum)
+    self.md5sum  = md5sum             # self.src checksum
+    if self.md5sum:
+      self.md5sum= str(self.md5sum)
 
     # replace keywords
     self.tag = self.tag.format(REL=self.release,KEY=self.key,YEAR=self.year,MOD=self.model)
@@ -351,8 +351,12 @@ Examples:
   opts,args = parser.parse_args(args[1:])
   if(all(getattr(opts,attr) is None for attr in ['tag','status','year'])):
     opts.tag=_CONST['LASTREL']
-  if(opts.data==None):
+  if opts.data==None :
     opts.data=["meteo","input","output","source","docs"]
+  if opts.outpath:
+    _CONST['DATADIR']=opts.outpath
+  if opts.tmppath:
+    _CONST['TMPDIR']=opts.tmppath
   
   return opts,args
 
