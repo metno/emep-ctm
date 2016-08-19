@@ -373,6 +373,13 @@ contains
    ! Observation frequently don't have PAR, but instead have global radiation.
    ! We scale the modelled global radiation (solar) by the observed, and
    ! distribute Idrctt and Idrctn according to this.
+
+   ! This routine is from  a stand-alone version of the drydep, so not used
+   ! in Unimod. The subroutine is retained in order to keep the standalone 
+   ! and Unimod code the same
+
+          Scale = -999 ! gfortran compilation gives a warning that scale is 
+                       ! not set unless  ObsRad > 0.0 
       
           if ( ObsRad > 0.0 ) Scale =  ObsRad/(Idrctt+Idfuse)
 

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,7 +33,6 @@
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ! DESCRIPTION 
 ! Routine to cross check the mass balance of the model
-! Cleanup, May 2007, SV
 ! 29/10/02 - output formatting and descriptions improved, ds.
 ! 1/10/01 - code for derived fields removed. MY_MASS_PRINT ADDED, ds
 ! Oct, 2001 - ** new ** mass budget method by jej
@@ -41,28 +40,30 @@
 ! section at end
 !_____________________________________________________________________________
 
- use My_DryDep_ml, only : NDRYDEP_ADV, Dep 
- use My_MassBudget_ml,only : MY_MASS_PRINT ! Species to be printed
+!! use DryDep_ml, only : NDRYDEP_ADV, DDepMap , DryDep_Budget
 
- use GenChemicals_ml, only : species       ! species identifier
- use GenSpec_adv_ml,  only : NSPEC_ADV     ! No. species (long-lived)
- use GenSpec_shl_ml,  only : NSPEC_SHL     ! No. species (shorshort-lived)
+ use ChemChemicals_ml, only : species       ! species identifier
+ use ChemSpecs_tot_ml,  only : NSPEC_TOT     ! No. species (long-lived)
+ use ChemSpecs_adv_ml,  only : NSPEC_ADV     ! No. species (long-lived)
+ use ChemSpecs_shl_ml,  only : NSPEC_SHL     ! No. species (shorshort-lived)
  use Chemfields_ml ,  only : xn_adv        ! advective flag
  use GridValues_ml ,  only : carea,xmd     ! cell area, 1/xm2 where xm2 is 
                                            ! the area factor in the middle 
                                            ! of the cell 
  use Io_ml         ,  only : IO_RES        ! =25
- use Met_ml        ,  only : ps            ! surface pressure  
+ use MetFields_ml  ,  only : ps            ! surface pressure  
  use ModelConstants_ml,                 &
                       only : KMAX_MID   &  ! Number of levels in vertical
+                            ,MasterProc &  ! Master processor
                             ,NPROC      &  ! No. processors
                             ,PT         &  ! Pressure at top
-                            ,ATWAIR        ! Mol. weight of air(Jones,1992)
+                            ,ATWAIR     &  ! Mol. weight of air(Jones,1992)
+                            ,TXTLEN_NAME&
+                            ,EXTENDEDMASSBUDGET
  use Par_ml,          only : MAXLIMAX   & 
                             ,MAXLJMAX   &  
                             ,li0,li1    &
                             ,lj0,lj1    &
-                            ,me   &
                             ,limax,ljmax&
                             ,gi0, gj0   &
                             ,GIMAX,GJMAX
@@ -96,6 +97,12 @@ private
    INTEGER STATUS(MPI_STATUS_SIZE),INFO
    real    MPIbuff(NSPEC_ADV*KMAX_MID)
 
+! Some work arrays used in Aqueous_ml and (in future) DryDry
+! Use tot index for convenience
+  real, public, save, dimension(NSPEC_TOT) ::   &
+      wdeploss, & 
+      ddeploss
+
 ! The following parameters are used to check the global mass budget:
 ! Initialise here also.
 
@@ -113,11 +120,9 @@ private
       amax = -2.0   &  ! maximum concentration in field -2
      ,amin =  2.0      ! minimum concentration in field  2
 
-  logical, private, parameter :: DEBUG = .false.
-
   public :: Init_massbudget
   public :: massbudget
-  public :: DryDep_Budget
+!  public :: DryDep_Budget
 
 contains
 
@@ -147,11 +152,11 @@ contains
       CALL MPI_ALLREDUCE(MPIbuff, sumint , NSPEC_ADV, &
       MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO) 
 
-    if(me == 0)then
+    if(MasterProc.and.EXTENDEDMASSBUDGET)then
          do n = 1,NSPEC_ADV
-	   if(sumint(n) >  0. ) then
-             write(IO_RES,"(a15,i2,4x,e10.3)") "Initial mass",n,sumint(n) 
-             write(6,"(a15,i2,4x,e10.3)") "Initial mass",n,sumint(n) 
+       if(sumint(n) >  0. ) then
+             write(IO_RES,"(a15,i4,4x,e10.3)") "Initial mass",n,sumint(n) 
+             write(6,"(a15,i4,4x,e10.3)") "Initial mass",n,sumint(n) 
            end if
          enddo
     end if
@@ -171,13 +176,11 @@ contains
                                                  ! nn - Total no. of short
                                                  ! lived and advected species
                                                  ! info - printing info
-  integer :: ispec, ifam                         ! Species and family index
+  integer :: ifam                                ! family index
   real, dimension(NSPEC_ADV,KMAX_MID) ::  sumk   ! total mass in each layer
-  character(len=12)  :: spec_name                ! Species name
   integer, parameter :: NFAMILIES = 3            ! No. of families         
   character(len=8), dimension(NFAMILIES), save :: family_name = &
            (/ "Sulphur ", "Nitrogen", "Carbon  " /)
-  integer ispec_name
 
   real, dimension(NFAMILIES) ::family_init  & ! initial total mass of 
                                               ! species family
@@ -191,18 +194,17 @@ contains
                               ,family_input & ! total family mass input
                               ,family_fracmass  ! mass fraction (should be 1.0)
 
-  real, dimension(NSPEC_ADV) :: xmax, xmin, & ! min and max value for the 
-					      ! individual species
-                                sum_mass,   & ! total mass of species
-                                frac_mass,  & ! mass budget fraction (should 
-					      ! be one) for groups of species
-     			gfluxin, gfluxout,  & ! flux in  and out
-				 gtotem,    & ! total emission
-			gtotddep, gtotwdep, & ! total dry and wet deposition
-				  gtotldep, & ! local dry deposition
-				  gtotox      ! oxidation of SO2 
+  real, dimension(NSPEC_ADV) :: &
+        xmax, xmin, & ! min and max value for the individual species
+        sum_mass,   & ! total mass of species
+        frac_mass,  & ! mass budget fraction (should=1) for groups of species
+        gfluxin, gfluxout,  & ! flux in  and out
+        gtotem,    & ! total emission
+        gtotddep, gtotwdep, & ! total dry and wet deposition
+        gtotldep, & ! local dry deposition
+        gtotox      ! oxidation of SO2 
 
-  real :: totdiv,helsum,ammfac, natoms
+  real :: totdiv,helsum, natoms
 
     sum_mass(:)     = 0.
     frac_mass(:)    = 0.
@@ -297,10 +299,10 @@ contains
     end do
 
 
-   if (me == 0 ) then
+   if ( MasterProc ) then   ! printout from node 0
 
     do n = 1,NSPEC_ADV
-      if (gtotem(n) > 0.0 ) write(6,*)          &
+      if (gtotem(n) > 0.0 .and. EXTENDEDMASSBUDGET) write(6,*)   &
                            'tot. emission of species ',n,gtotem(n)
     end do
 
@@ -313,6 +315,7 @@ contains
     family_ddep(:) = 0.
     family_wdep(:) = 0.
     family_em(:)   = 0.
+    natoms = 0.0
 
     write(6,*)'++++++++++++++++++++++++++++++++++++++++++++++++'      
 
@@ -375,25 +378,20 @@ contains
 
    end if
 
-  if (me == 0) then     ! printout from node 0
+  if ( MasterProc .and. EXTENDEDMASSBUDGET) then     ! printout from node 0
 
      !/.. now use species array which is set in My_MassBudget_ml
-
-    do nn = 1,size ( MY_MASS_PRINT )
-
-      write(6,*)
-      write(IO_RES,*)
-      n = MY_MASS_PRINT(nn)
-      do k = 1,KMAX_MID
-        write(6,950)      n,species(n+NSPEC_SHL)%name, k,sumk(n,k)
-        write(IO_RES,950) n,species(n+NSPEC_SHL)%name, k,sumk(n,k)
-      end do
-    enddo
- 950  format(' Spec ',i3,2x,a12,5x,'k= ',i2,5x,es12.5)
-
-
-     do nn = 1,size ( MY_MASS_PRINT )
-        n = MY_MASS_PRINT(nn)
+     do n = 1,NSPEC_ADV
+        write(6,*)
+        write(IO_RES,*)
+        do k = 1,KMAX_MID
+           write(6,950)      n,species(n+NSPEC_SHL)%name, k,sumk(n,k)
+           write(IO_RES,950) n,species(n+NSPEC_SHL)%name, k,sumk(n,k)
+        end do
+     enddo
+950  format(' Spec ',i3,2x,a12,5x,'k= ',i2,5x,es12.5)
+     
+     do n = 1,NSPEC_ADV
 
         write(6,*)
         write(6,*)'++++++++++++++++++++++++++++++++++++++++++++++++'      
@@ -415,32 +413,32 @@ contains
     enddo
 !              
 
-   end if  ! me = 0
+   end if  ! MasterProc
 
  end subroutine massbudget
 
 
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-  subroutine DryDep_Budget(i,j,Loss,convfac)
-     !use GenSpec_adv_ml
-
-      real, dimension(NSPEC_ADV), intent(in) :: Loss
-      real, dimension(NSPEC_ADV)             :: DryLoss
- 
-     real, intent(in)  :: convfac
-     integer           :: n,nadv,i,j  ! index in IXADV_  arrays
-
-     DryLoss(:)=Loss(:)* convfac /amk(KMAX_MID)   !molec/cm3->mix ratio 
-
-      do n = 1, NDRYDEP_ADV 
-         nadv    = Dep(n)%adv
-         totddep( nadv ) = totddep (nadv) + DryLoss(nadv) 
-
-      enddo
-  end subroutine DryDep_Budget
-
+!
+!  subroutine DryDep_Budget(i,j,Loss,convfac)
+!     !use ChemSpecs_adv_ml
+!
+!      real, dimension(NSPEC_ADV), intent(in) :: Loss
+!      real, dimension(NSPEC_ADV)             :: DryLoss
+! 
+!     real, intent(in)  :: convfac
+!     integer           :: n,nadv,i,j  ! index in IXADV_  arrays
+!
+!     DryLoss(:)=Loss(:)* convfac /amk(KMAX_MID)   !molec/cm3->mix ratio 
+!
+!      do n = 1, NDRYDEP_ADV 
+!         nadv    = DDepMap(n)%ind
+!         totddep( nadv ) = totddep (nadv) + DryLoss(nadv) 
+!
+!      enddo
+!  end subroutine DryDep_Budget
+!
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
  end module MassBudget_ml
 !--------------------------------------------------------------------------

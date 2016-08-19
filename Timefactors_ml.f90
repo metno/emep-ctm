@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,8 +34,8 @@
 ! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !.......................................................................
-!**    DESCRIPTION:
-!  Calculates emissions temporal variation.
+!  DESCRIPTION:
+!  Calculates emission temporal variation.
 !  Reads monthly and daily (GENEMIS) factors for all emissions from files
 !  Monthly.sox, Daily.sox, Monthly.nox, etc., -> in fac_emm, fac_edd arrays 
 !  For every day, calculates emission factor "timefac" per country, emission 
@@ -47,12 +47,12 @@
 !_____________________________________________________________________________
   use CheckStop_ml, only : CheckStop
   use Country_ml,   only : NLAND
-  use My_Emis_ml,   only : NEMIS, EMIS_NAME
+  use My_Emis_ml,   only : NEMIS_FILES, EMIS_NAME
   use EmisDef_ml,   only : NSECTORS
   use TimeDate_ml,  only:            &  ! subroutine, sets:
                      date,           &  ! date-type definition
                      nmdays, nydays, &  ! days per month (12), days per year
-                     day_of_week,&      ! weekday, 0=sun, 1=thuesday...
+                     day_of_week,&      ! weekday
                      day_of_year        ! day count in year
   use Io_ml,        only :            &
                      open_file,       & ! subroutine
@@ -69,18 +69,19 @@
   !-- time factor stuff: 
 
   real, public, save, &
-     dimension(NLAND,NSECTORS,NEMIS) :: timefac ! overall emission timefactor 
-                                                ! calculated daily
+     dimension(NLAND,NSECTORS,NEMIS_FILES) :: timefac ! overall emission 
+                                                      ! timefactor 
+                                                      ! calculated daily
   real, public, save,  &
-     dimension(NLAND,12,NSECTORS,NEMIS) :: fac_emm  ! Monthly factors
+     dimension(NLAND,12,NSECTORS,NEMIS_FILES) :: fac_emm  ! Monthly factors
   real, public, save,  &
-     dimension(NLAND, 7,NSECTORS,NEMIS) :: fac_edd  ! Daily factors
+     dimension(NLAND, 7,NSECTORS,NEMIS_FILES) :: fac_edd  ! Daily factors
 
   real, public, save, dimension(NSECTORS,0:1):: day_factor  ! Day/night factor 
 
   logical, private, parameter :: DEBUG = .false.
 
-  !/** used for general file calls and mpi routines below **/
+  ! Used for general file calls and mpi routines below
 
   character(len=30), private :: fname2   ! input filename - do not change 
 
@@ -91,15 +92,15 @@ contains
   subroutine timefactors(year)
 
    !.......................................................................
-   !**    DESCRIPTION:
+   !  DESCRIPTION:
    !  Read in monthly and daily factors, -> fac_emm, fac_edd arrays
    !  The input files are Monthly.sox, Daily.sox, Monthly.nox, etc.
    !  Sets the day/night variation in day_factor
    !
-   !      D. Simpson,    3/2/99
+   !  D. Simpson,    3/2/99
    !.......................................................................
 
-  !--Input
+  !-- Input
   integer, intent(in) :: year
 
   !-- Outputs -  module's fac_emm, fac_edd, day_factor, etc.
@@ -107,15 +108,15 @@ contains
   !-- local
   integer ::  inland, insec     ! Country and sector value read from femis
   integer ::  i, ic, isec, n, idd, iday, mm, mm2 ! Loop and count variables
-  integer ::  iemis              ! emission count variables
+  integer ::  iemis             ! emission count variables
 
-  integer :: weekday         ! 1=monday, 2=tuesday etc.
-  real    :: xday, sumfac    ! used in interpolation, testing
+  integer :: weekday            ! 1=monday, 2=tuesday etc.
+  real    :: xday, sumfac       ! used in interpolation, testing
   character(len=100) :: errmsg
 
 
-!/** Factor giving nighttime  emission ratio. 
-! ** note this is hard-coded with NSECTORS=11. Checked in code
+! Factor giving nighttime  emission ratio. 
+! Note this is hard-coded with NSECTORS=11. 
 
    real, parameter, dimension(NSECTORS) ::  & 
         DAY_NIGHT = (/      & 
@@ -128,7 +129,7 @@ contains
                      , 0.5  &! 7.  Road transport
                      , 0.8  &! 8.  Other transport
                      , 1.0  &! 9.  Waste
-                     , 1.0  &! 10. Agriculture
+                     , 0.6  &! 10. Agriculture
                      , 1.0  &! 11. Nature
                      /)
 
@@ -142,11 +143,11 @@ contains
 
 
 !  #################################
-!  *** 1) Read in Monthly factors
+!  1) Read in Monthly factors
 
    fac_emm(:,:,:,:) = 1.0
 
-   do iemis = 1, NEMIS
+   do iemis = 1, NEMIS_FILES
 
        fname2 = "MonthlyFac." // trim ( EMIS_NAME(iemis) )
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
@@ -172,11 +173,11 @@ contains
 
 
 ! #################################
-!CCC*** 2) Read in Daily factors
+! 2) Read in Daily factors
 
   fac_edd(:,:,:,:) = 1.0
 
-  do iemis = 1, NEMIS
+  do iemis = 1, NEMIS_FILES
 
        fname2 = "DailyFac." // trim ( EMIS_NAME(iemis) )
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
@@ -205,20 +206,19 @@ contains
        close(IO_TIMEFACS)
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2
 
-  enddo  ! NEMIS
+  enddo  ! NEMIS_FILES
 
 ! #######################################################################
-!cccc  3) Normalise the monthly-daily factors. This is needed in order to
-!         account for leap years (nydays=366) and for the fact that different
-!         years have different numbers of e.g. saturdays/sundays. 
-!         Here we execute the same interpolations which are later done
-!         in "NewDayFactors", and scale efac_mm if necessary
+! 3) Normalise the monthly-daily factors. This is needed in order to
+!    account for leap years (nydays=366) and for the fact that different
+!    years have different numbers of e.g. Saturdays/Sundays. 
+!    Here we execute the same interpolations which are later done
+!    in "NewDayFactors", and scale efac_mm if necessary.
 
 
-  write(unit=6,fmt=*) "Time factor interpolation "
-  write(unit=6,fmt=*) "for nmdays(2) = ", nmdays(2), " gives nydays= ", nydays
+  write(unit=6,fmt="(a,I6,a,I5)")" Time factors normalisation: ",nydays,' days in ',year 
 
-  do iemis = 1, NEMIS
+  do iemis = 1, NEMIS_FILES
        n = 0
        do isec = 1, NSECTORS
            do ic = 1, NLAND
@@ -230,10 +230,10 @@ contains
 
                    weekday=day_of_week (year,mm,idd)
 
-                   if ( weekday == 0 ) weekday = 7  ! restores sunday to 7
+                   if ( weekday == 0 ) weekday = 7  ! restores Sunday to 7
 
                    mm2 = mm + 1 
-                   if( mm2  > 12 ) mm2 = 1      ! December+1 => January
+                   if( mm2  > 12 ) mm2 = 1          ! December+1 => January
 
                    xday = real(idd-1) /real(nmdays(mm))
 
@@ -277,12 +277,12 @@ contains
 !#########################################################################
 !
 ! Day/night factors are set from parameter DAY_NIGHT in emisdef_ml
-!     daytime = 2 - nightime :
+! daytime = 2 - nightime :
 
   day_factor(:,0)  =  DAY_NIGHT(:)             ! Night
   day_factor(:,1) = 2.0 - day_factor(:,0)      ! Day
 
-!     #################################
+!#################################
 
     if (DEBUG) write(unit=6,fmt=*) "End of subroutine timefactors"
 
@@ -301,19 +301,19 @@ contains
 
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     subroutine NewDayFactors(newdate)
+  
+  ! Calculates the monthly and daily factors for emission temporal variation
+  ! for each country, emission, and sector.  Called at midnight every day.
   !
-  !  Calculates the monthly and daily factors for emission temporal variation
-  !  for each country, emission, and sector.  Called at midnight every day.
-  !
-  !  Uses arays: 
-  !     fac_emm(NLAND,NM,NSECTORS,NEMIS)    ! Jan - Dec.
-  !     fac_edd(NLAND,7,NSECTORS,NEMIS)     ! Monday=1, Sunday=7
+  ! Uses arays: 
+  !     fac_emm(NLAND,NM,NSECTORS,NEMIS_FILES)    ! Jan - Dec.
+  !     fac_edd(NLAND,7,NSECTORS,NEMIS_FILES)     ! Monday=1, Sunday=7
   !
   ! Outputs:
-  !    real timefac(NLAND,NSECTORS,NEMIS)
+  !    real timefac(NLAND,NSECTORS,NEMIS_FILES)
   !
   !...........................................................................
-  !nyear(1) - year of simulation 
+  ! nyear(1) - year of simulation 
   !...........................................................................
 
   type(date), intent(in) :: newdate
@@ -321,7 +321,7 @@ contains
   integer :: iemis          ! index over emissions (so2,nox,..)
   integer :: iland          ! index over countries 
   integer :: nmnd, nmnd2    ! this month, next month.
-  integer :: weekday,nday,n ! 1=monday, 2=tuesday etc.
+  integer :: weekday        ! 1=Monday, 2=Tuesday etc.
   real    :: xday           ! used in interpolation
   integer :: yyyy,dd 
 
@@ -332,7 +332,7 @@ contains
    dd=newdate%day
 
    weekday = day_of_week(yyyy,nmnd,dd)
-   if ( weekday == 0 ) weekday = 7  ! restores sunday to 7
+   if ( weekday == 0 ) weekday = 7  ! restores Sunday to 7
 
 !   Parameters for time interpolation
 
@@ -343,7 +343,7 @@ contains
 
 !   Calculate monthly and daily factors for emissions 
 
-    do iemis = 1, NEMIS
+    do iemis = 1, NEMIS_FILES
       do isec = 1, NSECTORS 
          do iland = 1, NLAND
 

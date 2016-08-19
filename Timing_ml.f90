@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -40,7 +40,7 @@
   ! Code commented out or marked with !SYS is intended for system_clock
   ! Code commented out or marked with !CPU is intended for cpu_time
   !----------------------------------------------------------------------------
-   implicit none     !6z addition
+   implicit none
 
   public :: Init_timing
   public :: Add_2timing   !  Calls Code_timer, adds times and descriptions
@@ -69,8 +69,7 @@
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   subroutine Init_timing()
 
-      integer :: iclktck,iclksec,ierr
-
+!SYS      integer :: iclktck,iclksec,ierr
 !SYS  call system_clock(iclktck,iclksec)   ! SYS
 !SYS  rclksec = 1./float(iclksec)          ! SYS
 
@@ -122,9 +121,11 @@
   subroutine Code_timer(call_time)
 !SYS integer, intent(inout) :: call_time      !SYS
 !SYS call system_clock(call_time)             !SYS
+  include 'mpif.h'
 
     real, intent(inout) :: call_time          !CPU
-    call cpu_time(call_time)                  !CPU
+!    call cpu_time(call_time)                  !CPU
+   call_time=MPI_WTIME()
 
   end subroutine Code_timer
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

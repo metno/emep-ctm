@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,8 +29,9 @@ module LandDefs_ml
  use CheckStop_ml, only : CheckStop
  use Io_ml, only : IO_TMP, open_file, ios, Read_Headers, read_line
  use KeyValue_ml, only :  KeyVal
- use ModelConstants_ml, only : NLANDUSE
- use Par_ml, only : me
+ use LandPFT_ml,  only : PFT_CODES
+ use ModelConstants_ml, only : NLANDUSEMAX, MasterProc, DEBUG_LANDDEFS
+ use SmallUtils_ml, only : find_index
   implicit none
   private
 
@@ -46,6 +47,7 @@ module LandDefs_ml
 ! flux_wheat is an artificial species with constant LAI, SAI, h throughout year,
 ! to allow Fst calculations without knowing details of growing season.
 
+! Language: F-compliant
 
   ! 2 ) Phenology part
   !/*** DESCRIPTION**********************************************************
@@ -56,8 +58,18 @@ module LandDefs_ml
 
  public  :: Init_LandDefs         ! Sets table for LAI, SAI, hveg
  public  :: Growing_season 
+ public  :: Check_LandCoverPresent 
+
+interface Check_LandCoverPresent
+  module procedure Check_LandCoverPresent_Item
+  module procedure Check_LandCoverPresent_Array
+end interface Check_LandCoverPresent
 
  real, public, parameter :: STUBBLE  = 0.01 ! Veg. ht. out of season
+ integer, public :: NLanduse_DEF ! No. of landuse categories actually defined
+ integer, public, parameter :: NLANDUSE_EMEP=19 !No. of categories defined 
+                                                !in EMEP grid (per April 2009)
+ integer, public, save :: iLC_grass    ! Used with clover outputs
 
  !/*****   Data to be read from Phenology_inputs.dat:
 
@@ -65,6 +77,7 @@ module LandDefs_ml
      character(len=15) :: name
      character(len=9) :: code
      character(len=3) :: type   ! Ecocystem type, see headers
+     character(len=5) :: LPJtype   ! Simplified LPJ assignment
      real    ::  hveg_max
      real    ::  Albedo
      integer ::  eNH4         ! Possible source of NHx
@@ -76,13 +89,19 @@ module LandDefs_ml
      real    ::  LAImax       ! Max value of LAI
      integer ::  SLAIlen      ! Length of LAI growth periods
      integer ::  ELAIlen      ! Length of LAI decline periods
+     real    ::  BiomassD     ! Dry biomass density g/m2(ground area)
+     real    ::  Eiso         ! Emission potential isoprene, ug/g/h
+     real    ::  Emtl         ! Emission potential m-terpenes, light
+     real    ::  Emtp         ! Emission potential m-terpenes, pool
   end type land_input
                                                !##############
-  type(land_input), public, dimension(NLANDUSE) :: LandDefs
+  type(land_input), public, dimension(NLANDUSEMAX) :: LandDefs
                                                !##############
   type(land_input), private :: LandInput
 
   type, public :: land_type
+     logical :: has_lpj ! if LPJ LAI/BVOC data to be used
+     integer :: pft    ! for assignment to equivalent PFT
      logical :: is_forest
      logical :: is_conif
      logical :: is_decid
@@ -93,14 +112,13 @@ module LandDefs_ml
      logical :: is_veg
      logical :: is_bulk  ! Bulk-surface resistance used 
      logical :: is_iam   ! Fake species for IAM outputs 
+     logical :: is_clover ! Fake species for clover
+     logical :: flux_wanted ! usually IAM, set by My_Derived
   end type land_type
                                                !##############
-  type(land_type), public,  dimension(NLANDUSE) :: LandType
+  type(land_type), public,  dimension(NLANDUSEMAX) :: LandType
                                                !##############
      
-
-  logical, private, parameter :: MY_DEBUG = .false.    ! helps with extra printouts
-
 
 contains
 !=======================================================================
@@ -132,19 +150,21 @@ contains
   subroutine Init_LandDefs(wanted_codes)
   !=======================================================================
       !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-      character(len=*), dimension(:) :: wanted_codes   ! From Inputs-Landuse
-      character(len=20), dimension(14) :: Headers
+      ! Reads file Inputs_LandDefs.csv and extracts land-defs. Checks that
+      ! codes match the "wanted_codes" which have been set in Inputs-Landuse
+      character(len=*), dimension(:), intent(in) :: wanted_codes
+      character(len=20), dimension(25) :: Headers
       character(len=200) :: txtinput  ! Big enough to contain one input record
       type(KeyVal), dimension(2) :: KeyValues ! Info on units, coords, etc.
       character(len=50) :: errmsg, fname
-      integer :: iL, n, NHeaders, NKeys
+      integer :: n, NHeaders, NKeys
 
 
       ! Read data
 
 
       fname = "Inputs_LandDefs.csv"
-      if ( me == 0 ) then
+      if ( MasterProc ) then
          call open_file(IO_TMP,"r",fname,needed=.true.)
          call CheckStop(ios,"open_file error on " // fname )
       end if
@@ -160,14 +180,24 @@ contains
        n = 0     
        do
             call read_line(IO_TMP,txtinput,ios)
-            if ( ios /= 0 ) exit   ! likely end of file
-            if ( txtinput(1:1) == "#" ) cycle
+            if ( ios /= 0 ) then
+                 exit   ! likely end of file
+            end if
+            if ( txtinput(1:1) == "#" ) then
+                 cycle
+            end if
             read(unit=txtinput,fmt=*,iostat=ios) LandInput
             call CheckStop ( ios, fname // " txt error:" // trim(txtinput) )
             n = n + 1
            !############################
             LandDefs(n) = LandInput
            !############################
+            if ( DEBUG_LANDDEFS .and. MasterProc ) then
+                 !write(*,"(a)") trim(txtinput)
+                 write(unit=*,fmt="(a,i3,a,a,f7.3,f10.3)") "LANDDEFS N ", n, &
+                   trim(LandInput%name), trim(LandInput%code),&
+                    LandDefs(n)%LAImax, LandDefs(n)%Emtp
+            end if
 
         !/ Set any input negative values to physical ones (some were set as -1)
 
@@ -175,26 +205,76 @@ contains
            LandDefs(n)%LAImax   = max( LandDefs(n)%LAImax,   0.0)
 
 
-            if ( MY_DEBUG .and. me == 0 ) write(*,*) "LANDPHEN match? ", n, &
-                   LandInput%name, LandInput%code, wanted_codes(n)
+            if ( DEBUG_LANDDEFS .and. MasterProc ) then
+                 write(*,"(a)") trim(txtinput)
+                 write(unit=*,fmt=*) "LANDPHEN match? ", n, &
+                   LandInput%name, trim(LandInput%code), trim(wanted_codes(n)),&
+                 len(trim(LandInput%code)), len(trim(wanted_codes(n)))
+            end if
             call CheckStop(  LandInput%code, wanted_codes(n), "MATCHING CODES in LandDefs")
 
             LandType(n)%is_water  =  LandInput%code == "W" 
             LandType(n)%is_ice    =  LandInput%code == "ICE" 
             LandType(n)%is_iam    =  LandInput%code(1:4) == "IAM_" 
+            LandType(n)%is_clover =  LandInput%code(1:2) == "CV" 
+            LandType(n)%flux_wanted = LandType(n)%is_iam  ! default
 
             LandType(n)%is_forest =  &
                 ( LandInput%type == "ECF" .or. LandInput%type == "EDF" )
+            LandType(n)%has_lpj   =  &
+                ( LandInput%type /= "NOLPJ" )
+            LandType(n)%pft = find_index( LandDefs(n)%LPJtype, PFT_CODES)
+            if ( DEBUG_LANDDEFS .and. MasterProc ) then
+                 write(unit=*,fmt=*) "LANDPFT  match? ", n, &
+                   LandInput%name, LandInput%code, wanted_codes(n), LandType(n)%pft
+            end if
             LandType(n)%is_conif = ( LandInput%type == "ECF"  )
             LandType(n)%is_decid = ( LandInput%type == "EDF"  )
             LandType(n)%is_crop  = ( LandInput%type == "ECR"  )
             LandType(n)%is_seminat  = ( LandInput%type == "SNL"  )
             LandType(n)%is_bulk   =  LandInput%type == "BLK" 
-            LandType(n)%is_veg    =  LandInput%type /= "U" .and. &
-                  LandInput%hveg_max > 0.01   ! Excludes water, ice, desert 
+            LandType(n)%is_veg    =  LandInput%code /= "U" .and. &
+                  LandInput%hveg_max > 0.01   ! Excludes water, ice_nwp, desert 
+            if( LandInput%code(1:2) == "GR" ) iLC_grass =  n ! for use with clover
        end do
-       if ( me == 0 ) close(unit=IO_TMP)
+       if ( MasterProc ) then 
+             close(unit=IO_TMP)
+       end if
 
   end subroutine Init_LandDefs
+ !=========================================================================
+  function Check_LandCoverPresent_Item( descrip, txt, write_condition) result(ind)
+    character(len=*),intent(in) :: descrip
+    character(len=*),intent(in) :: txt
+    logical, intent(in) :: write_condition
+    integer :: ind
+
+          if( trim(txt) == "Grid") then  ! Grid is a special case
+             ind = 0
+          else
+             ind = find_index(  txt, LandDefs(:)%code )
+          !if( DEBUG ) print *, "LC-CHECKING", descrip, txt, ind
+          end if
+          if( ind < 0 .and.  write_condition .and. MasterProc ) write(*,*) &
+                descrip // "NOT FOUND!! Skipping : " //  txt
+  end function Check_LandCoverPresent_Item
+ !=========================================================================
+  function Check_LandCoverPresent_Array( descrip, n, txt, write_condition) result(ind)
+    character(len=*),intent(in) :: descrip
+    integer, intent(in) :: n
+    character(len=*),dimension(:),intent(in) :: txt
+    logical, intent(in) :: write_condition
+    integer :: ind
+
+          if( trim(txt(n)) == "Grid") then  ! Grid is a special case
+             ind = 0
+          else
+             ind = find_index(  txt(n), LandDefs(:)%code )
+          end if
+          !if( DEBUG ) print *, "LC-CHECKING", descrip, n, txt(n), ind
+          if( ind < 0 .and.  write_condition .and. MasterProc ) write(*,*) &
+                descrip // "NOT FOUND!! Skipping : " //  txt(n)
+  end function Check_LandCoverPresent_Array
+ !=========================================================================
 
 end module LandDefs_ml

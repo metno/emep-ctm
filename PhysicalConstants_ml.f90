@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -48,10 +48,9 @@ implicit none
 
   real, public, parameter  ::    &
        GRAV    = 9.807           &   ! Gravity, m s-2
+    ,  EARTH_RADIUS = 6.37e6     &   ! 
     ,  CP      = 1004.0          &   ! Specific heat at const. pressure
-    ,  R       = 287.0           &   ! Gas constants J K-1 kg-1 = RGAS_KG
-    ,  KAPPA   = R/CP            &   
-    !ds apr2005 ,  XKAP    = R/CP            &
+    ,  KAPPA   = RGAS_KG/CP      &   
     ,  KARMAN  = 0.41            &   ! Von Karman  (=0.35 elsehwere in code!)
     ,  PI      = 3.141592653589793238462643383279 & ! www.verbose.net/Pi.html
     ,  DEG2RAD = PI/180.0        &   ! COnverts degrees to radians
@@ -60,6 +59,10 @@ implicit none
     ,  BOLTZMANN = 1.380e-23     &   ! Boltzmann'c constant[J/deg/molec]
     ,  FREEPATH  = 6.5e-8        &   ! Mean Free Path of air [m]
     ,  VISCO     = 1.46e-5           ! Air viscosity [m2/s]   (was NU)
+
+
+! Converts from mol/cm3 to nmole/m3
+  real, public, parameter :: NMOLE_M3 = 1.0e6*1.0e9/AVOG  
 
 ! Some definitions for daylight, in terms of zenith angle and cos(zen):
 ! (calculated from criteria that DAY_COSZEN > 1.0e-10 as daytime)
@@ -76,7 +79,8 @@ implicit none
    real, public, parameter  :: &
        PRANDTL = 0.71,            &   ! Prandtl number (see Garratt, 1992)
        Sc_H20  = 0.6,             &   ! Schmidt number for water
-    CHARNOCK = 0.032   ! Charnock's alpha:
+    CHARNOCK = 0.0144  !  From Garratt for k=0.41
+    !CHARNOCK = 0.032   ! Charnock's alpha:
                        ! see Nordeng (1986), p.31, 
                        ! Nordeng(1991), JGR, 96, no. C4, pp. 7167-7174.
                        ! In the second of these publications, Nordeng uses

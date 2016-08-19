@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -107,8 +107,12 @@ module Micromet_ml
 !   PsiH   = integral flux-gradient stability function for heat 
 !...
 
-    Ra = log(z2/z1) - PsiH(z2*Linv) + PsiH(z1*Linv)
-    Ra = Ra/(Karman*uStar)
+    if ( z1 > z2 ) then
+      Ra = -999.0
+    else
+      Ra = log(z2/z1) - PsiH(z2*Linv) + PsiH(z1*Linv)
+      Ra = Ra/(Karman*uStar)
+    end if
 
   end function AerRes
 

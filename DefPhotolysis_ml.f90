@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,9 +42,9 @@
 !-------------------------------------------------------------------------------
 
    use CheckStop_ml,      only: CheckStop
-   use GridValues_ml    , only : gb
+   use GridValues_ml    , only : glat
    use Io_ml,           only : IO_DJ, open_file, ios
-   use Met_ml           , only : cc3d,cc3dmax,z_bnd
+   use MetFields_ml           , only : cc3d,cc3dmax,z_bnd
    use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, NPROC
    use Par_ml      ,    only : me,MAXLIMAX,MAXLJMAX
    use LocalVariables_ml, only : Grid  ! => izen
@@ -59,7 +59,7 @@
    real, public, dimension(NRCPHOT,KCHEMTOP:KMAX_MID), &
         save :: rcphot       ! photolysis rates    -   main output
 
-   real, public, save :: sum_rcphot     ! was jej's sum1, for debug only
+   real, public, save :: sum_rcphot     !  for debug only
    logical, public, parameter :: DEBUG_DJ = .false.
 
    integer, parameter, private ::  &
@@ -86,6 +86,7 @@
       IDCH3COY = 10 , IDHCOHCO = 11 , IDRCOHCO = 12 , &
       IDNO3    = 13 , IDN2O5   = 14 , IDCH3O2H = 15 , &
       IDHO2NO2 = 16 , IDACETON = 17
+    integer, public, parameter ::  IDRCOCHO  = IDRCOHCO ! Just tmp
 
  !/ subroutines: 
 
@@ -242,7 +243,6 @@
                ,iclcat    ! cloud type
 
         real clear        ! clear sky fraction
-        real sum1
 
 !---- assign photolysis rates ------------------------------------------------
 
@@ -290,12 +290,11 @@
 
               end if  ! base<CLOUDTOP
             end if   ! end cc3dmax
-4732        continue
 
 
 
 
-            la = max(1,int(0.1*gb(i,j)-2.0001))
+            la = max(1,int(0.1*glat(i,j)-2.0001))
 
             if(iclcat == 0)then
               do k = KCHEMTOP,KMAX_MID
