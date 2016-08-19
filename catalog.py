@@ -10,6 +10,7 @@ _CONST={
   'LASTREL':"rv4_8",      # last model release
   'LASTMET':2013,         # last met-year released
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
+  'GIT':"https://github.com/metno/emep-ctm/archive",
   'CSV':'/catalog.csv',  # list all files from all releases
   'TMPDIR':"./downloads", # temp path for downloads
   'DATADIR':'.'           # base path for datasets
@@ -210,8 +211,8 @@ class dataPoint(object):
 
     # replace keywords
     self.tag = self.tag.format(REL=self.release,KEY=self.key,YEAR=self.year,MOD=self.model)
-    self.src = self.src.format(REL=self.release,TAG=self.tag,**_CONST)
-    self.dst = self.dst.format(REL=self.release,TAG=self.tag,**_CONST)
+    self.src = self.src.format(REL=self.release,TAG=self.tag,MOD=self.model,**_CONST)
+    self.dst = self.dst.format(REL=self.release,TAG=self.tag,MOD=self.model,**_CONST)
     if basename(self.dst)=='':
       self.dst+=basename(self.src)
 
