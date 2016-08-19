@@ -10,7 +10,7 @@ _CONST={
   'LASTREL':"rv4_8",      # last model release
   'LASTMET':2013,         # last met-year released
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
-  'GIT':"https://github.com/metno/emep-ctm/archive",
+  'GIT':"https://github.com/metno/emep-ctm/",
   'CSV':'/catalog.csv',  # list all files from all releases
   'TMPDIR':"./downloads", # temp path for downloads
   'DATADIR':'.'           # base path for datasets
