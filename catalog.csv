@@ -14,9 +14,9 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo200512.tar.bz2,,907495321,cb6a688d675e84d9c192f14cd333eed5
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo20060101.nc.bz2,,29770706,d1c3e94c49d105b59e4fa33489937f7a
 200802,input,2005,rv3,{FTP}/{REL}/input_data/other/other_input_files.tar.bz2,,73892522,7c326759bc3ff3f27e233e5cf302e5d1
-200802,source,,rv3,{GIT}/{MOD}.tar.gz,,1464320,49514354b30130cd4c40d6e98626f29d
+200802,source,,rv3,{GIT}/archive/{MOD}.tar.gz,,1464320,49514354b30130cd4c40d6e98626f29d
 200802,output,2005,rv3,{FTP}/{REL}/model_results_2005/Results_2005.tar.bz2,,1173422080,2d29825f95f5bd93198b53cbcb762761
-200802,docs,,rv3,{FTP}/{REL}/User_Guide_Unified_EMEP_rv3.pdf,,225560,8c6561c19735c6654a784c1d94a3ea7c
+200802,docs,,rv3,{GIT}/releases/download/{MOD}/User_Guide.pdf,,225560,8c6561c19735c6654a784c1d94a3ea7c
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200801.tar.bz2,,1090680882,fc654223a4f69ca5a06adff732c7ddbb
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200802.tar.bz2,,1016757296,57f0e4b986f075d5f72b04e979d76c2f
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200803.tar.bz2,,1108621353,d8ec7e9851aca3da13e37189ecbe61fd
