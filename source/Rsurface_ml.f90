@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,36 +26,36 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
 module Rsurface_ml
-
-use CheckStop_ml,        only: CheckStop
-use CoDep_ml,            only : CoDep_factors, RgsS_dry, RgsS_wet, &
-                                 humidity_fac, Rns_NH3
+use LandDefs_ml,       only : LandDefs
+use CheckStop_ml,      only : CheckStop
+use CoDep_ml,          only : CoDep_factors, humidity_fac, Rns_NH3, Rns_SO2
 use DO3SE_ml,          only : g_stomatal, do3se
 
 use LocalVariables_ml, only : iL, L, G => Grid
   ! L (local) provides  t2C, rh, LAI, SAI, hveg, ustar, 
   !      PARsun,PARshade,LAIsunfrac, RgsO, RgsS, is_water, is_forest
-  ! G (Grid)  provides snow, so2nh3ratio, 
+  ! G (Grid)  provides snow, sdepth so2nh3ratio, 
 
+use ModelConstants_ml, only: DEBUG_RSUR
 use Radiation_ml, only : CanopyPAR
-
-use Wesely_ml,  only  :Wesely_tab2 &  ! Wesely Table 2 for 14 gases
-   ,WES_HNO3, WES_NH3,DRx    ! Indices and Ratio of diffusivities to ozone
+use TimeDate_ml,  only : current_date
+use Wesely_ml,    only : Wesely_tab2 &  ! Wesely Table 2 for 14 gases
+   ,WES_HNO3, WES_NH3,DRx,WES_SO2    ! Indices and Ratio of diffusivities to ozone
+use MetFields_ml, only : foundsdepth, foundice
 implicit none
 private
 
 public   :: Rsurface
 
-real, public, save :: Rinc, RigsO, GnsO
-logical, private, parameter :: MY_DEBUG = .false.
+
+real, public, save :: Rinc, RigsO, GnsO, RgsS  !hf CoDep 
 
  
     
 contains
 ! =======================================================================
 
-
-  subroutine Rsurface(DRYDEP_CALC,Rsur_dry,Rsur_wet,errmsg,debug_flag) 
+  subroutine Rsurface(i,j,DRYDEP_CALC,Gns,Rsur,errmsg,debug_arg,fsnow) 
 ! =======================================================================
 !
 !     Description
@@ -100,7 +100,7 @@ contains
 ! Structure of routine
 !
 !  1. Calculate:
-!        Rlow             low-temperature correction
+!        lowTcorr         low-temperature correction
 !        Rinc             in-canopy resistance
 !        Rsur(HNO3)  
 !        Gsto(O3)         stomatal conductance (if LAI > 0)
@@ -108,7 +108,6 @@ contains
 !       FOR EACH remaining gas (icmp is used as an index, since cmp is assumed 
 !                               to  abbreviate "component".):
 !  2. Calculate ground surface resistance, Rgs
-!              if (LAI<0.1) go to 4  (for snow/ice/water...)
 !  3. if (LAI>0.1)  calculate Gext
 !  4. Calculate Rsur(icmp)
 !       END
@@ -117,22 +116,23 @@ contains
 
 !......................................
 ! Input:
-
+    integer, intent(in) :: i,j
     integer, dimension(:), intent(in) :: &
          DRYDEP_CALC   ! Array with Wesely indices of gases wanted
 
 ! Output:
 
-   real,dimension(:),intent(out) :: Rsur_dry   !  Rs  for dry surfaces 
-   real,dimension(:),intent(out) :: Rsur_wet   !  Rs  for wet surfaces
+   real,dimension(:),intent(out) :: Rsur   
+   real,dimension(:),intent(out) :: Gns   
+
    character(len=*), intent(out) :: errmsg
 ! Optional
-    logical, intent(in), optional :: debug_flag
+    logical, intent(in), optional :: debug_arg
+    logical :: debug_flag = .false.
 
 
  ! external resistance for Ozone
   real, parameter :: RextO =  2500.0   ! gives Gext=0.2 cm/s for LAI=5
-
 
 ! Here, "Gext=0.2cm/s" refers to the external conductance, G_ext, where 
 ! G_ext=LAI/R_ext. In many studies, it has been assumed 
@@ -154,16 +154,42 @@ contains
         ,leafy_canopy           ! For LAI>0, only when green
     real, parameter :: SMALLSAI= 0.05  ! arbitrary value but small enough
     real :: Hstar, f0           ! Wesely tabulated Henry's coeff.'s, reactivity
-    real :: Rlow                ! adjustment for low temperatures (Wesely,
-                                ! 1989, p.1296, left column) 
-!In Local    real :: Rinc       ! In-canopy adjustment
-    real :: Rgs_dry, Rgs_wet    !  
+    real :: Rgs    !  
+    real :: GigsO
+    real :: RsnowS, RsnowO !surface resistance for snow_flag, S and O3
+    real :: lowTcorr !low temperature correction  
+    real :: lowT     !low temperature correction for HNO3  
+    real ::  GnsS
+    real,  intent(out) :: fsnow ! the output is max(fsnow,fice)
+    real :: fice !fraction ice_nwp cover
+    real :: Sdmax  !max snowdepth (fsnow =1)
 
-    real ::  GnsS_dry, GnsS_wet, Gns_dry, Gns_wet
 
+   if ( present(debug_arg) ) debug_flag = debug_arg
 
 ! START OF PROGRAMME: 
     errmsg = "ok"
+    Sdmax = max( L%hveg/10.0, 0.01) !meters
+    fsnow = 2.0 *G%sdepth/Sdmax
+
+!Treat ice in the same way as snow
+    fice=0.01*G%ice_nwp !from percent to fraction
+    fsnow = max(fsnow,fice) !if snow_flag, ice_nwp probably has snow_flag
+                            !but it might be ice without snow..
+    fsnow = min(fsnow,1.0)  
+    fsnow = max(fsnow,0.0)
+
+    if (L%is_ice) fsnow=1.0 !ice_nwp in Landuse
+                            !to ensure it is treated
+                            !same way as met input
+                            !and not Ggs from table
+   
+
+    if ( DEBUG_RSUR .and. debug_flag ) then
+        write(*,"(a,i4,6f8.4)") "IN RSUR snow_flag ", &
+           current_date%hour,  L%hveg, Sdmax, G%ice_nwp, G%sdepth, fsnow
+    end if
+
 
     canopy       = ( L%SAI > SMALLSAI ) ! - can include grass
     leafy_canopy = ( L%LAI > SMALLSAI ) ! - can include grass
@@ -171,27 +197,43 @@ contains
   !===========================================================================
   !/**  Adjustment for low temperatures (Wesely, 1989, p.1296, left column)
 
-    Rlow = 1000.0*exp(-L%t2C - 4.0)
+    lowTcorr = exp(0.2*(-1 -L%t2C))!Zhang,2003 & Erisman 1994
+    lowTcorr = min(2.0,lowTcorr)   !Zhang,2003 & Erisman 1994
+    lowTcorr = max(1.0,lowTcorr)   !Zhang,2003 & Erisman 1994
+                                   !effectivelluy means that it will only
+                                   !kick in for T<-1
+
+! Rsnow for sulphur and O3, Erisman, 1994 + Zhang, 2003. Also used for ice. 
+    RsnowS = 70.0*(2.0 -L%t2C) !Used for snow_flag and ice_nwp
+    if (L%t2C < -1.0) RsnowS = 700.0 !700 from Cadle,1985
+    RsnowS = min(700.0,RsnowS) !Erisman 1994=500,very low.. Puts to 2000
+    RsnowS = max(70.0,RsnowS)  !Erisman 1994. 70 above 1 degree
+
+    RsnowO = 2000.0 !same for snow_flag, ice_nwp, water. Later corrected with lowTcorr
+                    !as recommended by Juha-Pekka
+
 
   !===========================================================================
-  !/** get CEH humidity factor and RgsS_dry and RgsS_wet:
+  ! Get Rns_SO2
 
-    call CoDep_factors(G%so2nh3ratio,L%t2C,L%rh,L%is_forest,debug_flag)
+       call CoDep_factors(G%so2nh3ratio24hr,G%so2nh3ratio,&
+              L%t2C,L%rh,L%is_forest, debug_flag)
 
 
 !##############   1. Calculate In-Canopy Resistance, Rinc    ################
 
   !/** For canopies:
-  !/** Calculate stomatal conductance if daytime and LAI > 0
+  !/** Calculate stomatal conductance if daytime and LAI > 0 and snowdepth
+  !    less than 1m above vegetation (1m chosen arbitrary)
 
- 
-   if( leafy_canopy  .and. G%Idirect > 0.001 ) then  ! Daytime 
+   !g_sto 0 when snow covering canopy
+   if( leafy_canopy  .and. G%Idirect > 0.001 .and. G%sdepth< (1.0 +Sdmax) ) then  ! Daytime 
 
         call CanopyPAR(L%LAI, G%coszen, G%Idirect, G%Idiffuse, &
                     L%PARsun, L%PARshade, L%LAIsunfrac)
 
 
-        call g_stomatal(iL)
+        call g_stomatal(iL, debug_flag )
 
    else
         L%g_sun = 0.0
@@ -199,39 +241,57 @@ contains
 
    end if ! leafy canopy and daytime
 
-if ( MY_DEBUG .and. present(debug_flag) ) then
-  if ( debug_flag )  then
-    write(*,*) "IN RSUR gsto ", leafy_canopy,  G%Idirect,  L%g_sto
-  end if
-end if
+   if ( DEBUG_RSUR .and. debug_flag ) then
+       write(*,"(a,5i5,i3,L2,2f10.4)") "IN RSUR gsto ", &
+              current_date, iL, leafy_canopy, G%Idirect,  L%g_sto
+   end if
 
+!Need to find a way to define vegetation outside growing season - Rns_SO2 and NH3 should be used here as well
 
   !/** Calculate Rinc, Gext 
-  !       (use multiplication for snow, since snow=0 or 1)
 
-   if(  canopy ) then   
+     if(  canopy ) then   
 
          Rinc = 14.0 * L%SAI * L%hveg  / L%ustar    ! Erisman's b.LAI.h/u*
 
-         RgsS_dry = RgsS_dry  + Rlow  + G%snow * 2000.0
-         RgsS_wet = RgsS_wet  + Rlow  + G%snow * 2000.0
+        ! for now, use CEH stuff for canopies,and soils (canopies ouside 
+        ! growing season)
+        ! keep Ggs for non-canopy
 
-        ! for now, use CEH stuff for canopies, keep Ggs for non-canopy
+        GnsS = (1.-fsnow)/(Rns_SO2 * lowTcorr) + fsnow/RsnowS 
+        RgsS = 1./GnsS
 
-         GnsS_dry = 1.0 /  RgsS_dry       ! For SO2, dry, low NH3 region
-         GnsS_wet = 1.0 /  RgsS_wet   ! For SO2, wet, low NH3 region
+  
+     elseif  ( L%is_veg ) then ! vegetation outside growing season
 
-   else   ! No canopy present
+        Rinc = 0.0
+        GnsS = (1.-fsnow)/(Rns_SO2 * lowTcorr) + fsnow/RsnowS 
+        RgsS = 1./GnsS
+
+
+     else   ! No canopy or soil present
 
         Rinc = 0.0
 
         !/ Here we preserve the values from the ukdep_gfac table
         !  giving higher deposition to water, less to deserts
 
-        RgsS_dry = do3se(iL)%RgsS + Rlow  + G%snow * 2000.0
-        RgsS_wet = RgsS_dry    ! Hard to know what's best here
-      
-   end if !  canopy
+        GnsS = (1.-fsnow)/(do3se(iL)%RgsS * lowTcorr) + fsnow/RsnowS 
+        RgsS = 1./GnsS
+
+     end if !  canopy
+
+        !snow treated as in Zhang 2003
+        !But Zhang wse 2*fsnow for ground surface because Sdmax(snow depth when total coverage is assumed)
+        !for soils under vegetation is assumed to stay snow covered longer than 'the leafs'
+        !but - we have underlying surfaces only for O3 and for simplicity we treat them equally
+        !RECONSIDER THIS ESPECIALLY BASED ON SATELITTES
+
+        !no snow corrections (or low temperature) for Rinc 
+        !RgsO 'corrected for snow' and low temp
+        !as adviced by Juha-Pekka
+        GigsO=  (1.-fsnow)/do3se(iL)%RgsO   + fsnow/RsnowO
+        RigsO = lowTcorr/GigsO +  Rinc
 
 
 !####   2. Calculate Surface Resistance, Rsur, for HNO3 and Ground Surface 
@@ -239,10 +299,9 @@ end if
 
    !/ Ozone values....
 
-     !!xRgsO  = do3se(lu)%RgsO + Rlow  + snow * 2000.0
-     !!GnsO   = SAI/RextO + 1.0/( xRgsO + Rinc ) ! (SAI=0 if no canopy)
-     RigsO  = Rinc + do3se(iL)%RgsO + Rlow  + G%snow * 2000.0
-     GnsO   = L%SAI/RextO + 1.0/ RigsO     ! (SAI=0 if no canopy)
+        !RextO corrected for low temp
+        !as adviced by Juha-Pekka
+     GnsO   = L%SAI/(RextO * lowTcorr) + 1.0/ RigsO     ! (SAI=0 if no canopy)
 
 
 !.........  Loop over all required gases   ................................
@@ -253,11 +312,15 @@ end if
      !-------------------------------------------------------------------------
 
      !  code obtained from Wesely during 1994 personal communication
-     !  but changed (ds) to allow Vg(HNO3) to exceed Vg(SO2)
+     !  but changed to allow Vg(HNO3) to exceed Vg(SO2)
+     !  lowT based on: Rc=10scm-1 for -5, Rc=50scm-1 at -18 in Johanson&Granat, 1986
 
         if ( iwes == WES_HNO3 ) then
-            Rsur_dry(icmp)  = max(1.0,Rlow)
-            Rsur_wet(icmp)  = Rsur_dry(icmp)
+            lowT= -L%t2C *2.0
+            Rsur(icmp)  = max(10.0,lowT) !not so affected by snow_flag, e.g. Erisman 1994,table 6,
+           ! - reimplement Vg limitation for HNO3. 10 cm/s max is enough anyway!
+           ! Rsur(icmp)  = max(1.0,lowT) !Cadle,1985
+
             cycle GASLOOP
         end if
 
@@ -272,6 +335,7 @@ end if
                           
 
      !   Use SAI to test for snow, ice, water, urban ...
+
 
        if ( canopy  ) then   
 
@@ -289,50 +353,48 @@ end if
 
            if ( DRYDEP_CALC(icmp) == WES_NH3 ) then
 
-             Gns_dry = 1.0/Rns_NH3               !/** r_water  from CoDep_ml
-             Gns_wet =  Gns_dry
+               Gns(icmp) = (1.-fsnow)/(Rns_NH3 * lowTcorr) + fsnow/RsnowS 
+           else
 
-           else  ! Not NH3
-
-               Gns_dry = 1.0e-5*Hstar*GnsS_dry + f0 * GnsO   ! OLD SO2!
-               Gns_wet = 1.0e-5*Hstar*GnsS_wet + f0 * GnsO 
-
-             !.. and allow for partially wet surfaces at high RH, even for Gns_dry
-
-               Gns_dry = Gns_dry * (1.0-humidity_fac) + Gns_wet * humidity_fac
+               Gns(icmp) = 1.0e-5*Hstar*GnsS + f0 * GnsO   ! OLD SO2!
+           end if
 
 
-           end if  ! NH3 test
-
-           Rsur_dry(icmp) = 1.0/( L%LAI*DRx(iwes) *L%g_sto + Gns_dry  )
-           Rsur_wet(icmp) = 1.0/( L%LAI*DRx(iwes) *L%g_sto + Gns_wet  )
+           Rsur(icmp) = 1.0/( L%LAI*DRx(iwes) *L%g_sto + Gns(icmp)  )
 
       ! write(*,"(a20,2i3,3g12.3)")  "RSURFACE Gs  (i): ", iL, icmp, GnsO, Gns_dry, Gns_wet
 
-       else   ! Non-Canopy modelling:
+      elseif (L%is_veg) then !vegetation outside growing season
 
-           Rgs_dry = 1.0/(1.0e-5*Hstar/RgsS_dry + f0/do3se(iL)%RgsO)  ! Eqn. (9)
-           Rgs_wet = 1.0/(1.0e-5*Hstar/RgsS_wet + f0/do3se(iL)%RgsO)  ! Eqn. (9)
+           if ( DRYDEP_CALC(icmp) == WES_NH3 ) then
 
-           Rsur_dry(icmp)   = Rgs_dry
-           Rsur_wet(icmp)   = Rgs_wet
-      ! write(*,"(a20,2i3,3g12.3)")  "RSURFACE Rgs (i): ", iL, icmp, Rgs_dry, Rgs_wet
+               Gns(icmp) = (1.-fsnow)/(Rns_NH3 * lowTcorr) + fsnow/RsnowS 
+           else 
+               Gns(icmp) = 1.0e-5*Hstar*GnsS + f0 * GnsO   ! OLD SO2!
+           end if
 
-       end if  ! end of canopy tests 
+           Rsur(icmp) = 1.0/Gns(icmp)  
+
+      else   ! Non-Canopy modelling:
+           Gns(icmp) = 1.0e-5*Hstar*GnsS + f0*GnsO
+           Rgs = 1.0/Gns(icmp)  ! Eqn. (9) !hf was  f0/do3se(iL)%RgsO
+           Rsur(icmp)   = Rgs
+
+      end if  ! end of canopy tests 
+
 
       ! write(*,"(a20,2i3,3g12.3)")  "RSURFACE Rsur(i): ", iL, icmp, Rsur_dry(icmp), Rsur_wet(icmp)
+
 
   end do GASLOOP
 
 
-   if ( MY_DEBUG ) then
-     if ( present(debug_flag) ) then
+   if ( DEBUG_RSUR ) then
        if ( debug_flag ) then 
-      write(*,*)  "RSURFACE DRYDEP_CALC", size(DRYDEP_CALC), DRYDEP_CALC(1)
-      write(*,*)  "RSURFACE iL, LAI, SAI, LOGIS ", iL, L%LAI, L%SAI, &
-                       L%is_forest, L%is_water, canopy, leafy_canopy
-      write(*,"(a20,i3,4g12.3)")  "RSURFACE xed Gs", iL, do3se(iL)%RgsO,do3se(iL)%RgsS, Rlow, Rinc
-       end if
+      write(*,"(a,2i4)")  "RSURFACE DRYDEP_CALC", size(DRYDEP_CALC), DRYDEP_CALC(1)
+      write(*,"(a,i3,2f7.3,5L2)")  "RSURFACE iL, LAI, SAI, LOGIS ", iL, L%LAI, L%SAI, &
+                       L%is_forest, L%is_water, L%is_veg, canopy, leafy_canopy
+      write(*,"(a,i3,4g12.3)")  "RSURFACE xed Gs", iL, do3se(iL)%RgsO,do3se(iL)%RgsS, lowTcorr, Rinc
      end if
    end if
  end subroutine Rsurface

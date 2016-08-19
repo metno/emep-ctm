@@ -1,8 +1,8 @@
 ! <GridAllocate_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
 !          Chemical transport Model>
-!*****************************************************************************! 
+!*************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -24,12 +24,12 @@
 !* 
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*************************************************************************! 
 module GridAllocate_ml
 !____________________________________________________________________
 !
- ! GridAllocate subroutines:   GridAllocate_ij, GridAllocate_rarray
- !  + Self_Test
+ ! GridAllocate subroutines:  GridAllocate_ij, GridAllocate_rarray
+ !                            + Self_Test
  !
  ! Some gridded arrays have several data values for the same i,j coordinate
  ! associated with dfferent land or emission codes, e.g.
@@ -37,7 +37,7 @@ module GridAllocate_ml
  !  e.g. i=2, j=2, code =  4, data = 1.2
  !       i=2, j=2, code = 12, data = 2.3
  !       i=2, j=2, code = 87, data = 0.3
-
+ !
  ! Or, for each i,j, we may have row inputs for lots of possible codes,
  ! e.g. for landuse types with say 17 possibilities
  !
@@ -47,9 +47,9 @@ module GridAllocate_ml
  ! This routine "compresses" the data for grid i,j into two arrays, 
  ! such that:
  !            ngridc(i,j) = 3    ! Number of data points in coord i,j
- !            gridc(i,j,1)  = 4
- !            gridc(i,j,2)  = 12
- !            gridc(i,j,3)  = 87
+ !            gridc(i,j,1) = 4
+ !            gridc(i,j,2) = 12
+ !            gridc(i,j,3) = 87
  !     
  !-- Checks if a country "code" (or landuse type, lu) whose data has just 
  !   been read in has already been found within the given grid square.
@@ -81,9 +81,8 @@ module GridAllocate_ml
 
    interface GridAllocate
       module procedure  GridAllocate_ij     ! Call for one i,j value 
-      module procedure  GridAllocate_rarray  ! Call with full real arrays
+      module procedure  GridAllocate_rarray ! Call with full real arrays
    end interface GridAllocate
-
 
 
   !========================================
@@ -91,7 +90,7 @@ module GridAllocate_ml
   !========================================
 
   subroutine GridAllocate_ij(label,i,j,code,ncmax,ic,&
-                           ncmaxfound,gridc,ngridc)
+                             ncmaxfound,gridc,ngridc)
 
      character(len=*), intent(in) :: label   ! Type of data
      integer, intent(in) :: i,j
@@ -103,10 +102,10 @@ module GridAllocate_ml
      integer, dimension(:,:,:), intent(inout) :: gridc   ! Land-codes
      integer, dimension(:,:),   intent(inout) ::ngridc   ! No. countries
 
-     integer :: nc, icc            ! local variables
+     integer :: nc, icc  ! local variables
      character(len=100) :: errmsg
 
-       nc=ngridc(i,j)       ! nc = no. countries known so far
+       nc=ngridc(i,j)    ! nc = no. countries known so far
 
        do icc = 1,nc
           if( gridc(i,j,icc) == code ) then
@@ -123,7 +122,8 @@ module GridAllocate_ml
               write(unit=*,fmt=*) "XXX GridAlloc_ij:"//label , icc,ic, code
           end do
        
-          write(unit=errmsg,fmt=*) "me", me, " i ", i, " j ", j, " iglob ", i_fdom(i), j_fdom(j)
+          write(unit=errmsg,fmt=*) "me", me, " i ", i, " j ", j, &
+                                   " iglob ", i_fdom(i), j_fdom(j)
           call CheckStop( "GridAlloc ncmax ERROR" // label // errmsg )
 
        end if
@@ -145,16 +145,16 @@ module GridAllocate_ml
     !  See comments above for explanation. This routine was designed for 
     !  the full array as input, e.g. landuse(:,:,17)
  
-     character(len=*), intent(in) :: label   ! Type of data
+     character(len=*), intent(in) :: label ! Type of data
      integer, intent(in)  :: ncmax         ! Max. no countries (lu) allowed
      integer, intent(out) :: ncmaxfound    ! No. countries found 
 
-     real, dimension(:,:,:), intent(in)     :: fulldata  ! Full data-set
-     real, dimension(:,:,:), intent(out)    :: data   ! Reduced data-set
-     integer, dimension(:,:,:), intent(out) :: gridc   ! Land-codes
-     integer, dimension(:,:),   intent(out) ::ngridc   ! No. countries
+     real, dimension(:,:,:), intent(in)     :: fulldata ! Full data-set
+     real, dimension(:,:,:), intent(out)    :: data     ! Reduced data-set
+     integer, dimension(:,:,:), intent(out) :: gridc    ! Land-codes
+     integer, dimension(:,:),   intent(out) :: ngridc   ! No. countries
 
-     integer :: i,j, nc, ic, icc, code        ! local variables
+     integer :: i,j, nc, ic, icc, code     ! local variables
      real    :: dat
 
      ncmaxfound = 0
@@ -163,9 +163,9 @@ module GridAllocate_ml
      gridc(:,:,:) = 0
 
      do i = 1, size(fulldata, 1)
-      do j = 1, size(fulldata, 2)
+       do j = 1, size(fulldata, 2)
 
-         GRIDLOOP: do code = 1, size(fulldata, 3)   ! e.g. 1 .. 17 for landuse
+         GRIDLOOP: do code = 1, size(fulldata, 3) ! e.g. 1 .. 17 for landuse
 
              dat = fulldata(i,j,code)
              if ( dat == 0.0 ) then
@@ -179,7 +179,7 @@ module GridAllocate_ml
                    data(i,j,icc) = data(i,j,icc) + dat
                    cycle GRIDLOOP        ! Yep, go onto to next k
                endif
-            enddo
+             enddo
   
            ! Nope, must be new. Add to ngridc and gridc:
             ngridc(i,j) = ngridc(i,j) + 1 
@@ -201,7 +201,7 @@ module GridAllocate_ml
                            (data(i,j,icc),icc=1,ncmaxfound)
             endif
          end do GRIDLOOP 
-      end do ! j
+       end do ! j
      end do ! i
 
   end subroutine GridAllocate_rarray
@@ -209,12 +209,12 @@ module GridAllocate_ml
   subroutine Self_Test()
     !+ Tests this module
 
-     integer, parameter :: NCMAX=3   ! Max. no codes allowed
+     integer, parameter :: NCMAX=3 ! Max. no codes allowed
      integer :: i=2,j=1
      integer :: ic, icc, iland     ! Indices
-     integer :: ncmaxfound    ! No. countries found so far
+     integer :: ncmaxfound         ! No. countries found so far
      integer, dimension(2,2,NCMAX) :: land   ! Land-codes
-     integer, dimension(2,2)   ::nland   ! No. countries
+     integer, dimension(2,2)   ::nland    ! No. countries
      real, dimension(2,2,10)   :: cover   !  some landuse data, perhaps
      real, dimension(2,2,NCMAX):: ccover  !  compressed array from cover
 
@@ -258,10 +258,9 @@ module GridAllocate_ml
      cover(1,1,3)  =  3.0
 
      call GridAllocate("TEST-array",ncmax, ncmaxfound,&
-                cover, ccover, land,nland)
+                        cover, ccover, land,nland)
      print *, "ERROR IN Self_Test 3 SHOULD NOT GET HERE"
 
   end subroutine Self_Test
 
 end module GridAllocate_ml
-

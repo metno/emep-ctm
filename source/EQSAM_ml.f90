@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -146,7 +146,7 @@ real,parameter         :: GF1=0.25,GF2=0.50,GF3=0.40,GF4=1.00   ! exponents of A
 !______________________________________________
 integer,parameter                 :: NPAIR=10
 !
-integer                           :: ii,il,IHYST, k, iopt
+integer                           :: ii,IHYST, k, iopt
 !integer,intent(in)                :: nca,nco,imax,loop,ipunit
 !integer,intent(inout)             :: iopt
 !______________________________________________
@@ -159,7 +159,7 @@ real                              :: ZFLAG,ZKAN,ZKAC,PH,COEF,GAMAAN,HPLUS,AKW,XK
 real                              :: TNH4,TSO4,TNO3,TNa,TCl,TPo,TCa,TMg
 real                              :: PNH4,PSO4,PNO3,PCl,PNa,GNO3,GNH3,GSO4,GHCl
 real                              :: ASO4,ANO3,ANH4,ACl,ANa,SNH4,SSO4,SNO3,SCl,SNa
-real                              :: WH2O,PM,PMs,PMt,RINC,DON,RATIONS,GR,NO3P,NH4P
+real                              :: WH2O,PMt,RINC,DON,RATIONS,GR,NO3P,NH4P !PM,PMs,
 !_______________________________________________
 !real,dimension(imax,nca),intent(in)  :: yi
 !real,dimension(imax,nco),intent(out) :: yo
@@ -180,7 +180,9 @@ DATA ZW(1:NPAIR) / 0.67,   1.0,  1.0,   1.0,  1.0,  1.0,  0.5,   1.0,   1.0,   1
 ! RHD / MRHD values as of ISORROPIA / SCAPE (T=298.15K)
 DATA RHDA(1:8) / 0.32840, 0.4906, 0.6183, 0.7997, 0.67500, 0.5000, 0.4000, 0.0000/
 ! Temp. coeff.
-DATA RHDE(1:8) / -1860.0, -431.0, 852.00, 80.000, 262.000, 3951.0, 384.00, 0.0000/ 
+DATA RHDE(1:8) / -1860.0, -431.0, 852.00, 80.000, 262.000, 3951.0, 384.00, 0.0000/
+
+logical, parameter :: HYSTERESIS_HISTORY = .false.
 !_____________________________________________________________________________________
  IOPT = 1  ! METASTABLE aerosols
 
@@ -264,10 +266,10 @@ w1=0.;w2=0.        ! init/reset
       RHDZ(:)=RHDX(:)
       
 ! ACCOUNT FOR VARIOUS AMMOMIUM/SODIUM SULFATE SALTS ACCORDING TO MEAN VALUE AS OF ISORROPIA
-      GG=2.0                     ! (Na)2SO4/(NH4)2SO4 is PREFFERED SPECIES FOR SULFATE DEFICIENT CASES
+      GG=2.0            ! (Na)2SO4/(NH4)2SO4 is PREFFERED SPECIES FOR SULFATE DEFICIENT CASES
       IF(ZFLAG.EQ.3.) THEN
-         IF(RH.LE.RHDZ(7)) THEN      ! MIXTURE OF (NH4)2SO4(s) & NH4HSO4(s) & (NH4)3H(SO4)2(s) 
-            GG=1.677                 !  (Na)2SO4 &  NaHSO4
+         IF(RH.LE.RHDZ(7)) THEN    ! MIXTURE OF (NH4)2SO4(s) & NH4HSO4(s) & (NH4)3H(SO4)2(s) 
+            GG=1.677               !  (Na)2SO4 &  NaHSO4
 !           GG=1.5
          ELSEIF(RH.GT.RHDZ(7).AND.RH.LE.RHDZ(5)) THEN ! MAINLY (Na)2SO4/(NH4)2SO4(s) & (NH4)3H(SO4)2(s)
             GG=1.75
@@ -485,6 +487,7 @@ w1=0.;w2=0.        ! init/reset
 !   1 = NACl,  2 = (NA)2SO4, 3 = NANO3,  4 = (NH4)2SO4,  5 = NH4NO3, 6 = NH4CL,   7 = 2H-SO4
 !   8 = NH4HSO4,   9 = NAHSO4, 10 = (NH4)3H(SO4)2
 !
+      WH2O = 1.0e-6   !  small initial value 
       IF(ZFLAG.EQ.1.) WH2O = ASO4/M0( 2) + ANO3/M0(3) +  ACl/M0(6)
       IF(ZFLAG.EQ.2.) WH2O = ASO4/M0( 4) + ANO3/M0(5) +  ACl/M0(6)
       IF(ZFLAG.EQ.3.) WH2O = ASO4/M0( 8) + ANO3/M0(5) +  ACl/M0(6)
@@ -500,19 +503,20 @@ w1=0.;w2=0.        ! init/reset
       ZIONIC= 0.
 
 !hf&pw      IF(WH2O.GT.0.) THEN            
-      IF(WH2O.GT.1.0e-2) THEN            
+      IF(WH2O.GT.1.0e-6) THEN            
 
          ! CALCULATE AUTODISSOCIATION CONSTANT (KW) FOR WATER
 
-         AKW=XKW*RH*WH2O*WH2O                         ! H2O <==> H+ + OH- with kw [mol^2/kg^2]
-         AKW=AKW**0.5                                 ! [OH-] = [H+] [mol]
+         AKW=XKW*RH*WH2O*WH2O                  ! H2O <==> H+ + OH- with kw [mol^2/kg^2]
+         AKW=AKW**0.5                          ! [OH-] = [H+] [mol]
 
          ! Calculate hydrogen molality [mol/kg], i.e. H+ of the ions:
-         !                                   Na+, NH4+, NO3-, Cl-, SO4--, HH-SO4- [mol/kg(water)]
+         !           Na+, NH4+, NO3-, Cl-, SO4--, HH-SO4- [mol/kg(water)]
          !                                   with [OH-] = kw/[H+]
 
          HPLUS = (-ANa/WH2O-ANH4/WH2O+ANO3/WH2O+ACl/WH2O+GG*ASO4/WH2O+GG*GSO4/WH2O+ & 
-            SQRT(( ANa/WH2O+ANH4/WH2O-ANO3/WH2O-ACl/WH2O-GG*ASO4/WH2O-GG*GSO4/WH2O)**2+XKW/AKW*WH2O))/2.
+            SQRT(( ANa/WH2O+ANH4/WH2O-ANO3/WH2O-ACl/WH2O-GG*ASO4/WH2O-GG*GSO4/WH2O)**2 &
+                  +XKW/AKW*WH2O))/2.
 
          ! Calculate pH
 
@@ -521,8 +525,8 @@ w1=0.;w2=0.        ! init/reset
          ! Calculate ionic strength [mol/kg]
 
          ZIONIC=0.5*(ANa+ANH4+ANO3+ACl+ASO4*GG*GG+GSO4*GG*GG+XKW/AKW*WH2O*WH2O)
-         ZIONIC=ZIONIC/WH2O                                           ! ionic strength [mol/kg]
-!        ZIONIC=min(ZIONIC,200.0)                                     ! limit for output
+         ZIONIC=ZIONIC/WH2O                            ! ionic strength [mol/kg]
+!        ZIONIC=min(ZIONIC,200.0)                      ! limit for output
 !        ZIONIC=max(ZIONIC,0.0)
 
       ENDIF ! AQUEOUS PHASE 
@@ -584,49 +588,51 @@ w1=0.;w2=0.        ! init/reset
       WH2O = WH2O * 1.e9                   ! convert aerosol water from [kg/m^3] to [ug/m^3]
       IF(WH2O.LT.1.e-3) WH2O=0.
 
-! UPDATE HISTORY RH FOR HYSTERESIS (ONLINE CALCULATIONS ONLY)
-
-!st      RH_HIST=2.                                             ! wet
-!st      IF(WH2O.EQ.0.) RH_HIST=1.                              ! dry
+! UPDATE HISTORY RH FOR HYSTERESIS (ONLINE CALCULATIONS ONLY) - not tested here!!!!
+     if  (HYSTERESIS_HISTORY) then
+      RH_HIST=2.                                     ! wet
+      IF(WH2O.EQ.0.) RH_HIST=1.                      ! dry
 
 ! Approximate the pH (for test purposes only)
-!st      PH    = 7.
-!st      HPLUS = 0.
-!st      IF(WH2O.GT.0.)  HPLUS=(2.*TSO4+ANO3+ACl-ANH4-ANa)/WH2O*1000.  ! hydrogen ion concentration [mol/l]
-!st      IF(HPLUS.GT.0.) PH=-ALOG10(HPLUS)                             ! aerosol pH 
+      PH    = 7.
+      HPLUS = 0.
+      IF(WH2O.GT.0.) &
+       HPLUS=(2.*TSO4+ANO3+ACl-ANH4-ANa)/WH2O*1000.  ! hydrogen ion concentration [mol/l]
+      IF(HPLUS.GT.0.) PH=-ALOG10(HPLUS)              ! aerosol pH 
 
-!st      ZIONIC=0.
-!st      IF(WH2O.GT.0.) ZIONIC=0.5*(ANa+ANH4+ANO3+ACl+ASO4*4.)  ! ionic strength [moles/kg]
-!st      ZIONIC=ZIONIC*1.e3/WH2O
-!st      ZIONIC=min(ZIONIC,200.0)                               ! limit for output
-!st      ZIONIC=max(ZIONIC,0.0)
+      ZIONIC=0.
+      IF(WH2O.GT.0.) ZIONIC=0.5*(ANa+ANH4+ANO3+ACl+ASO4*4.)  ! ionic strength [moles/kg]
+      ZIONIC=ZIONIC*1.e3/WH2O
+      ZIONIC=min(ZIONIC,200.0)                               ! limit for output
+      ZIONIC=max(ZIONIC,0.0)
 
-!st      GAMAAN=0.0
-!st      IF(WH2O.GT.0.) GAMAAN = GAMA**GF1                      ! activity coefficient (NH4NO3)
-!st      GAMAAN=min(GAMAAN,1.0)                                 ! focus on 0-1 scale
-!st      GAMAAN=max(GAMAAN,0.0)
+      GAMAAN=0.0
+      IF(WH2O.GT.0.) GAMAAN = GAMA**GF1             ! activity coefficient (NH4NO3)
+      GAMAAN=min(GAMAAN,1.0)                        ! focus on 0-1 scale
+      GAMAAN=max(GAMAAN,0.0)
 
-!st      RINC = 1.
-!st      IF(PMt.GT.0.)   RINC = (WH2O/PMt+1)**(1./3.)           ! radius increase due to water uptake
-!st      IF(RINC.EQ.0.)  RINC = 1.
+      RINC = 1.
+      IF(PMt.GT.0.)   RINC = (WH2O/PMt+1)**(1./3.)  ! radius increase due to water uptake
+      IF(RINC.EQ.0.)  RINC = 1.
 
-!st      RATIONS = 0.
-!st      IF(PSO4.GT.0.) RATIONS = PNO3/PSO4                     ! nitrate / sulfate mol ratio
+      RATIONS = 0.
+      IF(PSO4.GT.0.) RATIONS = PNO3/PSO4            ! nitrate / sulfate mol ratio
 
-!st      GR = 0.
-!st      IF(GNO3.GT.0.) GR = GNH3/GNO3                          ! gas ratio = residual NH3 / residual HNO3   [-]
+      GR = 0.
+      IF(GNO3.GT.0.) GR = GNH3/GNO3                 ! gas ratio=residual NH3/residual HNO3[-]
 
-!st      DON = 0.
-!st      IF((PNO3+2.*PSO4).GT.0.) DON = 100.*PNH4/(PNO3+2.*PSO4)! degree of neutralization by ammonia : 
-                                                                ! ammonium / total nitrate + sulfate  [%]
-!st      NO3P = 0.
-!st      IF(TNO3.GT.0.) NO3P = 100.*PNO3/TNO3                   ! nitrate partitioning = nitrate/total nitrate[%]
+      DON = 0.
+      IF((PNO3+2.*PSO4).GT.0.) DON = 100.*PNH4/(PNO3+2.*PSO4) ! degree of neutralization
+                                      ! by ammonia : ammonium / total nitrate + sulfate  [%]
+      NO3P = 0.
+      IF(TNO3.GT.0.) NO3P = 100.*PNO3/TNO3          ! nitrate partitioning=nitrate/total nitrate[%]
 
-!st      NH4P = 0.
-!st      IF(TNH4.GT.0.) NH4P = 100.*PNH4/TNH4                   ! ammonium partitioning = ammonium/total ammonium[%]
+      NH4P = 0.
+      IF(TNH4.GT.0.) NH4P = 100.*PNH4/TNH4          ! ammonium partitioning=ammonium/total ammonium[%]
 
-!     KAN   = rks5/(r*temp)**2                           ! Keq of NH3(g)+HNO3(g)---> NH4NO3 (s) 
-                                                         ! [mol^2/kg]/(R[m^3*atm/deg/mole]*T[K])**2 = [m^3*atm/kg]
+!     KAN   = rks5/(r*temp)**2                      ! Keq of NH3(g)+HNO3(g)---> NH4NO3 (s) 
+                                  ! [mol^2/kg]/(R[m^3*atm/deg/mole]*T[K])**2 = [m^3*atm/kg]
+  endif
 !
 ! store aerosol species for diagnostic output:
 !______________________________________________________________

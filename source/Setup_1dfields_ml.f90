@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,12 +35,11 @@
   !
   ! - new aray added to keep o2, m, and for MADE oh, etc
 
-  use ModelConstants_ml,     only :  KMAX_MID, KCHEMTOP, KUPPER
-  use My_Emis_ml,            only :  NRCEMIS, NSS, NBVOC   !NSS=SeaS
-  use GenSpec_tot_ml,        only :  NSPEC_TOT
-  use GenSpec_bgn_ml,        only :  NSPEC_COL
-  use GenRates_rct_ml,       only :  NRCT
-  use GenRates_rcmisc_ml,    only :  NRCMISC
+  use ModelConstants_ml,     only :  KMAX_MID, KCHEMTOP, KUPPER, NBVOC
+  use EmisDef_ml,            only :  NSS, NDU !SeaS, Dust
+  use ChemSpecs_tot_ml,      only :  NSPEC_TOT, FIRST_SEMIVOL, LAST_SEMIVOL
+  use ChemSpecs_shl_ml,      only :  NSPEC_SHL
+  use Chemfields_ml,         only :  NSPEC_COL
   implicit none
   private
 
@@ -57,18 +56,38 @@
    real, public, dimension(NSPEC_TOT,KCHEMTOP:KMAX_MID), save :: &
                    xn_2d            ! Concentrations [molecules/cm3]  
 
-   real, public, dimension(NRCEMIS,KCHEMTOP:KMAX_MID), save :: rcemis   !emissions
-   real, public, dimension(NRCT   ,KCHEMTOP:KMAX_MID), save :: rct    ! T-dependant
-   real, public, dimension(NRCMISC,KCHEMTOP:KMAX_MID), save :: rcmisc ! T,M,H2O-dependant
-   real, public, dimension(NBVOC ,KCHEMTOP:KMAX_MID), save   :: rcbio  !  Biogenic emissions
-   real, public, dimension(KCHEMTOP:KMAX_MID), save   :: rc_Rn222  ! 210Pb emissions, ds Pb210
-   real, public, dimension(NSS,KCHEMTOP:KMAX_MID),     save :: rcss   ! Sea salt emissions
+! For semivolatiles we track the farction as gas and particle- used for SOA
+! We use NSPEC_TOT to allow us to write Fpart for FFUEL and WOOD also -
+! these may be semivol one day.
+   !real, public, dimension(FIRST_SOA:LAST_SOA,KCHEMTOP:KMAX_MID), save :: &
+   real, public, dimension(NSPEC_TOT,KCHEMTOP:KMAX_MID), save :: &
+                   Fgas  = 1.0     &! Fraction as gas-phase
+                  ,Fpart = 0.0      ! Fraction as gas-phase
+
+ !Emissions in column. We assume that these only involve advected species
+   real, public, dimension(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID), save ::&
+         rcemis   !emissions
+
+  ! We define a column array for isoprene and terpene for use in
+  ! the chemical solver. All values except for k=KMAX_MID will
+  ! remain zero however
+
+  ! Emission arrays:
+   real, public, dimension(NBVOC,KCHEMTOP:KMAX_MID), save :: rcbio = 0.0 ! BVOC
+  !FUTURE real, public, dimension(KCHEMTOP:KMAX_MID), save   :: rcnh3 
+   real, public, dimension(KCHEMTOP:KMAX_MID), save   :: rc_Rn222 = 0.0  ! 210Pb
+   real, public, dimension(NSS,KCHEMTOP:KMAX_MID), save :: rcss = 0.0  ! Sea salt
+   real, public, dimension(NDU,KCHEMTOP:KMAX_MID), save :: rcwbd = 0.0 ! windblown dust
 
    real, public, dimension(KCHEMTOP:KMAX_MID), save :: &
           rh                  & ! RH (fraction, 0-1)
          ,amk                 & ! M - atmospheric conc.
+         ,o2, n2              & ! oxygen, nitrogen
+         ,h2o                 & ! water
          ,temp                & ! temperature
+         ,tinv                & ! inverse temp
          ,pp                     !pressure
+
    integer, public, dimension(KCHEMTOP:KMAX_MID), save :: &
           itemp                  ! int of temperature
 

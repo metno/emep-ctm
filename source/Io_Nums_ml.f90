@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,6 +46,7 @@ implicit none
    ,IO_SITES    = 8   &! sites module, first for input(c)
    ,IO_MYTIM    = 20  &! Unimod.f90(c)-output mytim.out 
    ,IO_RES      = 25  &! o3mod,massbud(o) 
+   ,IO_DEBUG    = 26  &! keep open, use where needed
    ,IO_TMP      = 27   ! General IO number (files *must* be type (c))
 
 
@@ -62,10 +63,8 @@ implicit none
    ,IO_JOST     = 49  &! newjostinit(c) - read  global mixing ratios
    ,IO_GLOBBC   = 49  &! read  global mixing ratios e.g. Logan
    ,IO_GLOBBC2  = 91  &! read  global mixing ratios e.g. h2o2
-   ,IO_INFIELD  = 50  &! infield.F(c) -reads fil000xx  
    ,IO_DO3SE    = 51  &! for DO3SE inputs(c)
-   ,IO_ROUGH    = 52  &! inpar.f -reads roughn. class  
-   ,IO_SNOW     = 53  &! newmonth(c): for snow
+   ,IO_ROUGH    = 52  &! inpar.f -reads roughn. class   for landsea masl
    ,IO_VOLC     = 54  &
    ,IO_DJ       = 55  &! readdiss.f(c) - inp. solar r.
    ,IO_AIRCR    = 66  &! phyche.f(c) - write aircraft conc.
@@ -75,6 +74,10 @@ implicit none
    ,IO_EMIS     = 84  &! Used for femis , emis_split(c)
    ,IO_TIMEFACS = 85  &! Used for monthly
    ,IO_NEST     = 88  &!   
-   ,IO_DMS      = 90   !  Emissions(c): for DMS 
+   ,IO_DMS      = 90  &!  Emissions(c): for DMS 
+   ,IO_NH3      = 92  &! hb NH3emis
+   ,IO_CLAY     = 92  &! clay
+   ,IO_SAND     = 93  &! sand
+   ,IO_NH3_DEB  = 99   ! hb NH3emis
 
 end module Io_Nums_ml

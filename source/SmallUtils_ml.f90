@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -31,7 +31,7 @@ module SmallUtils_ml
 ! -- small utility provides routines to process text strings,
 !    find array indices, write arrays.
 !
-! Dave Simpson, 1999-2007
+! Dave Simpson, 1999-2011
 ! Language: F-complaint, except system calls in Self_Test
 ! (Can be run with F is test-input file created manually
 !  and system calls commented out, as here)
@@ -54,20 +54,20 @@ module SmallUtils_ml
   character(len=*), public, parameter :: NOT_SET_STRING = "NOT_SET"
 
   interface find_index
-     module procedure find_index_c   ! For character arrays
-     module procedure find_index_i   ! For integer arrays
+    module procedure find_index_c   ! For character arrays
+    module procedure find_index_i   ! For integer arrays
   end interface find_index
 
 contains
 
-  !===========================================================================
+!===========================================================================
 
-  subroutine wordsplit(text,nword_max,wordarray,nwords,errcode)
-  !**************************************************************
-  !   Subroutine takes in a character string and splits it into
-  !   a word-array, of length nwords        
-  !   Both spaces and commas are treated as seperators
-  !**************************************************************
+subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator)
+!**************************************************************
+!   Subroutine takes in a character string and splits it into
+!   a word-array, of length nwords
+!   Both spaces and commas are treated as seperators
+!**************************************************************
 
  !-- arguments
   character(len=*), intent(in) ::  text       ! to be split
@@ -76,216 +76,239 @@ contains
   character(len=*), dimension(:), intent(out) :: wordarray
   integer,          intent(out) :: nwords      ! No. words found
   integer,          intent(out) :: errcode      ! No. words found
+  character(len=1), optional, intent(in) ::  separator  ! additional separators
 
   !-- local
   logical   :: wasinword   ! true if we are in or have just left a word
   integer   :: i, is, iw
-  character(len=1) ::  c
+  character(len=1) ::  c,s
 
   errcode = 0
   wasinword = .false.   !To be safe, with spaces at start of line
   is = 0 ! string index
   iw = 1 ! Word index
+  s=' '
+  if(present(separator))s=separator
   wordarray(1) = ""
 
   do i = 1, len_trim(text)
-      c = text(i:i)
-      if( c /= " " .and. c /= "," ) then
-          is = is + 1
-          wordarray(iw)(is:is) = c
-          wasinword = .true.
-      else 
-         if ( wasinword ) then
-             iw = iw + 1
-             wordarray(iw) = ""
-             wasinword = .false.
-             is = 0
-         endif
-      endif
+    c = text(i:i)
+    if( c /= " " .and. c /= "," .and. c /= ":" .and. c /= s ) then
+      is = is + 1
+      wordarray(iw)(is:is) = c
+      wasinword = .true.
+    elseif ( wasinword ) then
+      iw = iw + 1
+      wordarray(iw) = ""
+      wasinword = .false.
+      is = 0
+    endif
   enddo
   nwords = iw
-  if (  nwords >= nword_max ) then
-	errcode = 2
-      print *, "ERROR in WORDSPLIT : Problem at ", text
-      print *,"Too many words"
+  if (  nwords > nword_max ) then
+    errcode = 2
+    print *, "ERROR in WORDSPLIT : Problem at ", text
+    print *,"Too many words"
   endif
 
- end subroutine wordsplit
+end subroutine wordsplit
 
- !============================================================================
-  function LenArray(a,notset) result (N)
-    !+ Counts number of elements in a which are not equal to notset string
-    character(len=*), dimension(:), intent(in) :: a
-    character(len=*), intent(in) :: notset
-    integer :: N, i
+!============================================================================
+function LenArray(a,notset) result (N)
+  !+ Counts number of elements in a which are not equal to notset string
+  character(len=*), dimension(:), intent(in) :: a
+  character(len=*), intent(in) :: notset
+  integer :: N, i
 
-    N=0
-    do i = 1,  size(a)
-       if ( index(a(i),notset) > 0  ) then
-           exit
-       end if
-       N=N+1
-    end do
-  end function LenArray
- !============================================================================
-  subroutine AddArray(new,old,notset)
-    !+ Adds elements from new array to old array
-    character(len=*), dimension(:), intent(in) :: new
-    character(len=*), dimension(:), intent(inout) :: old
-    character(len=*), intent(in) :: notset
-    integer :: N, i
+  N=0
+  do i = 1, size(a)
+    if ( index(a(i),notset) > 0  ) exit
+    N=N+1
+  enddo
+end function LenArray
+!============================================================================
+subroutine AddArray(new,old,notset,errmsg)
+  !+ Adds elements from new array to old array
+  character(len=*), dimension(:), intent(in) :: new
+  character(len=*), dimension(:), intent(inout) :: old
+  character(len=*), intent(in) :: notset
+  character(len=*), intent(inout) :: errmsg
+  integer :: N, i
+  errmsg = "ok"
 
-    N = LenArray(old,notset) ! Find last set element
-    do i = 1,  size(new)
-       N = N + 1
-       !print *, "ADDING A ", i, N, new(i)
-       old(N) = new(i)
-    end do
-  end subroutine AddArray
- !============================================================================
-  subroutine WriteArray(list,NList,txt,io_num)
-    character(len=*), dimension(:), intent(in) :: list
-    integer, intent(in) :: Nlist
-    character(len=*), intent(in) :: txt   ! Some descriptive text
-    integer, intent(in), optional :: io_num
-    integer :: io, i
+  N = LenArray(old,notset) ! Find last set element
+  do i = 1,  size(new)
+    N = N + 1
+    if ( N > size(old) ) then
+      errmsg = "ERROR: Array Exceeded! "
+      return
+    endif
+    old(N) = new(i)
+  enddo
+end subroutine AddArray
+!============================================================================
+subroutine WriteArray(list,NList,txt,io_num)
+  character(len=*), dimension(:), intent(in) :: list
+  integer, intent(in) :: Nlist
+  character(len=*), intent(in) :: txt   ! Some descriptive text
+  integer, intent(in), optional :: io_num
+  integer :: io, i
 
-     io = 6
-     if ( present(io_num) ) then
-        io = io_num
-     end if
+  io = 6
+  if ( present(io_num) ) io = io_num
 
-     if ( NList > size(list) ) then
-       write(unit=*,fmt=*) "WRITEARRAY PROBLEM Nlist, size(List) ", &
-                 Nlist, size(list)
-       return
-     end if
-     do i = 1, Nlist
-       write(unit=io,fmt=*) txt, i, list(i)
-     end do 
-  end subroutine WriteArray
- !============================================================================
- ! A series of find_index routines, for character (c) and integer (i) arrays:
- !============================================================================
- function find_index_c(wanted, list)  result(Index)
-    character(len=*), intent(in) :: wanted
-    character(len=*), dimension(:), intent(in) :: list
+  if ( NList > size(list) ) then
+    write(unit=*,fmt=*) "WRITEARRAY PROBLEM Nlist, size(List) ", &
+              Nlist, size(list), trim(txt)
+    return
+  endif
+  do i = 1, Nlist
+    write(unit=io,fmt=*) txt, i, list(i)
+  enddo
+end subroutine WriteArray
+!============================================================================
+! A series of find_index routines, for character (c) and integer (i) arrays:
+!============================================================================
+function find_index_c(wanted, list, debug)  result(Index)
+  character(len=*), intent(in) :: wanted
+  character(len=*), dimension(:), intent(in) :: list
+  logical, intent(in), optional :: debug
 !  Output:
-    integer ::   Index 
+  integer ::   Index
 
-    integer :: n_match ! Count for safety
-    integer :: n
+  character(len=*), parameter :: &
+             debug_fmt="('debug find_index ',I0,':',A,A2,A)"
+  logical :: debug_print
+  integer :: n_match ! Count for safety
+  integer :: n
 
-    n_match  = 0
-    Index =  NOT_FOUND
+  n_match  = 0
+  Index =  NOT_FOUND
+  debug_print=.false.;if(present(debug))debug_print=debug
 
-    do n = 1, size(list)
+  do n = 1, size(list)
+    if ( wanted == list(n) ) then
+      Index = n
+      n_match = n_match + 1
+      if(debug_print) &
+      print debug_fmt,n,trim(list(n)),"==",trim(wanted)
+    elseif ( debug_print ) then
+      print debug_fmt,n,trim(list(n)),"/=",trim(wanted)
+    endif
+  enddo
 
-         if ( wanted == list(n)  ) then
-            Index = n
-            n_match = n_match + 1
-         end if
-    end do
+  if ( n_match >  1 ) then !! Too many!
+    n_match = -1 * n_match
+  endif
+end function find_index_c
 
-    if ( n_match >  1 ) then !! Too many!
-            n_match = -1 * n_match
-    end if
-  end function find_index_c
-
- !============================================================================
- function find_index_i(wanted, list)  result(Index)
-    integer, intent(in) :: wanted
-    integer, dimension(:), intent(in) :: list
+!============================================================================
+function find_index_i(wanted, list, debug)  result(Index)
+  integer, intent(in) :: wanted
+  integer, dimension(:), intent(in) :: list
+  logical, intent(in), optional :: debug
 !  Output:
-    integer ::   Index       ! 
+  integer ::   Index       !
 
-    integer :: n_match ! Count for safety
-    integer :: n
+  character(len=*), parameter :: &
+             debug_fmt="('debug find_index ',I0,':',I0,A2,I0)"
+  logical :: debug_print
+  integer :: n_match ! Count for safety
+  integer :: n
 
-    n_match  = 0
-    Index =  NOT_FOUND
+  n_match  = 0
+  Index =  NOT_FOUND
+  debug_print=.false.;if(present(debug))debug_print=debug
 
-    do n = 1, size(list)
+  do n = 1, size(list)
+    if ( wanted == list(n)  ) then
+      Index = n
+      n_match = n_match + 1
+      if(debug_print) &
+      print debug_fmt,n,list(n),"==",wanted
+    elseif ( debug_print ) then
+      print debug_fmt,n,list(n),"/=",wanted
+    endif
+  enddo
 
-         if ( wanted == list(n)  ) then
-            Index = n
-            n_match = n_match + 1
-         end if
-    end do
-
-    if ( n_match >  1 ) then !! Too many!
-            n_match = -1 * n_match
-    end if
-
-  end function find_index_i
+  if ( n_match >  1 ) then !! Too many!
+    n_match = -1 * n_match
+  endif
+end function find_index_i
 
 !=======================================================================
- function find_indices(wanted, list)  result(Indices)
-    character(len=*), dimension(:), intent(in) :: wanted
-    character(len=*), dimension(:), intent(in) :: list
+ function find_indices(wanted, list, debug)  result(Indices)
+  character(len=*), dimension(:), intent(in) :: wanted
+  character(len=*), dimension(:), intent(in) :: list
+  logical, intent(in), optional :: debug
 !  Output:
-    integer, dimension(size(wanted)) ::   Indices 
+  integer, dimension(size(wanted)) ::   Indices
 
-    integer :: w, n
+  character(len=*), parameter :: &
+             debug_fmt="('debug find_indices ',I0,':',A,A2,I0,':',A)"
+  logical :: debug_print
+  integer :: w, n
 
-    Indices(:) = NOT_FOUND
+  Indices(:) = NOT_FOUND
+  debug_print=.false.;if(present(debug))debug_print=debug
 
-    do w = 1, size(wanted)
-      do n = 1, size(list)
+  do w = 1, size(wanted)
+    do n = 1, size(list)
+      if ( wanted(w) == list(n) ) then
+        Indices(w) = n
+        if(debug_print) &
+        print debug_fmt,n,trim(list(n)),"==",w,trim(wanted(w))
+      elseif ( debug_print ) then
+        print debug_fmt,n,trim(list(n)),"/=",w,trim(wanted(w))
+      endif
+    enddo
+  enddo
+end function find_indices
 
-         if ( trim ( wanted(w) ) == trim ( list(n) )  ) then
-            Indices(w) = n
-         end if
-      end do
-    end do
+!============================================================================
+subroutine Self_test()
 
-  end function find_indices
-
- !============================================================================
-  subroutine Self_test()
-
-    character(len=100) :: text = "Here is a line,split by spaces: note, commas don't work"
-    character(len=5), dimension(5) :: headers = (/ "yy", "mm", &
-                                                     "dd", "x1", "zz" /)
-    character(len=5), dimension(3) :: wanted1 = (/ "yy", "x1", "zz" /)
-    character(len=6), dimension(2) :: wanted2 = (/ " yy", "x1 " /)
-    character(len=6), dimension(2) :: wanted3 = (/ "zz  ", "yy  " /)
-    character(len=16), dimension(6) :: wantedx  = NOT_SET_STRING
-    integer, parameter :: NWORD_MAX = 99
-    character(len=20), dimension(NWORD_MAX) :: words
-    integer :: nwords, errcode
+  character(len=100) :: text = "Here is a line,split by spaces: note, commas don't work"
+  character(len=5), dimension(5) :: headers = (/ "yy", "mm", "dd", "x1", "zz" /)
+  character(len=5), dimension(3) :: wanted1 = (/ "yy", "x1", "zz" /)
+  character(len=6), dimension(2) :: wanted2 = (/ " yy", "x1 " /)
+  character(len=6), dimension(2) :: wanted3 = (/ "zz  ", "yy  " /)
+  character(len=16), dimension(6) :: wantedx  = NOT_SET_STRING
+  character(len=100) :: errmsg
+  integer, parameter :: NWORD_MAX = 99
+  character(len=20), dimension(NWORD_MAX) :: words
+  integer :: nwords, errcode
   
-   print "(/,a)", "1) Self-test - wordsplit ================================="
-    call wordsplit(text,NWORD_MAX,words,nwords,errcode)
+  print "(/,a)", "1) Self-test - wordsplit ================================="
+  call wordsplit(text,NWORD_MAX,words,nwords,errcode)
 
-    print *, "Found ", nwords, "words"
-    print *, "Words: ", words(1:nwords)
+  print *, "Found ", nwords, "words"
+  print *, "Words: ", words(1:nwords)
 
-    print "(a)", "Note - need exact text:"
-    print *, "Index of spaces is ", find_index("spaces",words)
-    print *, "Index of spaces: is ", find_index("spaces:",words)
+  print "(a)", "Note - need exact text:"
+  print *, "Index of spaces is ", find_index("spaces",words)
+  print *, "Index of spaces: is ", find_index("spaces:",words)
 
-   print "(/,a)", "2) Self-test - find_indices ================================="
+  print "(/,a)", "2) Self-test - find_indices ================================="
 
-    print *, wanted1, " Indices => ", find_indices(wanted1,headers)
-    print "(a)", "Note - trailing blanks ok, leading blanks cause error:"
-    print *, wanted2, " Indices => ", find_indices(wanted2,headers)
-    print *, wanted3, " Indices => ", find_indices(wanted3,headers)
+  print *, wanted1, " Indices => ", find_indices(wanted1,headers)
+  print "(a)", "Note - trailing blanks ok, leading blanks cause error:"
+  print *, wanted2, " Indices => ", find_indices(wanted2,headers)
+  print *, wanted3, " Indices => ", find_indices(wanted3,headers)
 
-   print "(/,a)", "2) Self-test - WriteArray   ================================="
+  print "(/,a)", "2) Self-test - WriteArray   ================================="
     
-    call WriteArray(wanted1,size(wanted1),"Testing wanted1 array")
-   print "(a)", "  (Should write headers array (first 4 elements) to fort.77) "
-    call WriteArray(headers,4,"Testing headers array",77)
+  call WriteArray(wanted1,size(wanted1),"Testing wanted1 array")
+  print "(a)", "  (Should write headers array (first 4 elements) to fort.77) "
+  call WriteArray(headers,4,"Testing headers array",77)
 
-   print "(/,a)", "4) Self-test - AddArray   ================================="
+  print "(/,a)", "4) Self-test - AddArray   ================================="
     
-    !call AddArray(wanted1,wanted2)
-    wantedx(1) =  "first  "
-    wantedx(2) =  "second  "
-    call AddArray(wanted1,wantedx,NOT_SET_STRING)
-    call WriteArray(wantedx,size(wantedx),"Testing AddArray")
+  !call AddArray(wanted1,wanted2,errmsg)
+  wantedx(1) =  "first  "
+  wantedx(2) =  "second  "
+  call AddArray(wanted1,wantedx,NOT_SET_STRING,errmsg)
+  call WriteArray(wantedx,size(wantedx),"Testing AddArray")
+end subroutine Self_test
 
-
-  end subroutine Self_test
 end module SmallUtils_ml

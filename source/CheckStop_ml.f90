@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -71,8 +71,7 @@ module CheckStop_ml
     ! INFO is the error message from MPI
 
       if ( errmsg /= "ok" ) then
-        write(*,*) "StopAll Called with", errmsg
-        write(*,*) "MPI_ABORT!!"
+        write(*,*) "ERROR: ", trim(errmsg)
         call MPI_ABORT(MPI_COMM_WORLD,9,INFO)
       end if
   end subroutine StopAll
@@ -84,7 +83,7 @@ module CheckStop_ml
       character(len=*), intent(in) :: errmsg
 
       if ( errmsg /= "ok" ) then
-        write(*,*) "CheckStop_ok Called with:  errmsg ", errmsg
+        !write(*,*) "CheckStop_ok Called with:  errmsg ", errmsg
         call StopAll(errmsg)
       end if
   end subroutine CheckStop_ok
@@ -94,7 +93,7 @@ module CheckStop_ml
       character(len=*), intent(in) :: infomsg
 
       if ( errmsg /= "ok" ) then
-        write(*,*) "CheckStop_ok Called with:  errmsg ", errmsg
+        !write(*,*) "CheckStop_ok Called with:  errmsg ", errmsg
         write(*,*) "                          infomsg ", infomsg
         call StopAll(errmsg)
       end if
@@ -106,7 +105,7 @@ module CheckStop_ml
 
       if ( int1 /= 0 ) then
         write(*,*) "CheckStopl_int1 Called with:    int1 ", int1
-        write(*,*) "                             infomsg ", infomsg
+        !write(*,*) "                             infomsg ", infomsg
         call StopAll(infomsg)
       end if
   end subroutine CheckStop_int1
@@ -117,7 +116,7 @@ module CheckStop_ml
 
       if ( int1 /= int2 ) then
         write(*,*) "CheckStopl_int2 Called with: int1 ", int1, " int2 ", int2
-        write(*,*) "                             infomsg ", infomsg
+        !write(*,*) "                             infomsg ", infomsg
         call StopAll(infomsg)
       end if
   end subroutine CheckStop_int2
@@ -127,7 +126,7 @@ module CheckStop_ml
 
       if ( trim(str1) /= trim(str2) ) then
         write(*,*) "CheckStopl_str2 Called with: str1 ", str1, " str2 ", str2
-        write(*,*) "                             infomsg ", infomsg
+        !write(*,*) "                             infomsg ", infomsg
         call StopAll(infomsg)
       end if
   end subroutine CheckStop_str2
@@ -137,8 +136,8 @@ module CheckStop_ml
       character(len=*), intent(in) :: infomsg
 
       if ( is_error ) then
-        write(*,*) "CheckStopl_TF   Called with: logical ", is_error
-        write(*,*) "                             infomsg ", infomsg
+        !write(*,*) "CheckStopl_TF   Called with: logical ", is_error
+        !write(*,*) "                             infomsg ", infomsg
         call StopAll(infomsg)
       end if
   end subroutine CheckStop_TF

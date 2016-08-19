@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,29 +46,34 @@
   ! variable timestep (Peter Wind)
   !=======================================================================!
  
-
     use Aqueous_ml,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3   
     use Biogenics_ml,      only: BIO_ISOP, BIO_TERP
     use CheckStop_ml,      only: CheckStop
     use DefPhotolysis_ml         ! => IDHNO3, etc.
+    use EmisDef_ml,        only: QSSFI, QSSCO, QSSGI
     use Emissions_ml,      only: KEMISTOP    
-    use GenSpec_tot_ml           ! => NSPEC_TOT, O3, NO2, etc.
-    use GenSpec_bgn_ml           ! => IXBGN_  indices and xn_2d_bgn values
-    use GenRates_rct_ml,   only: set_night_rct, ONLY_NIGHT
-    use ModelConstants_ml, only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv
-    use My_Aerosols_ml,    only: SEASALT
-    use My_Emis_ml                        ! => QRCNO, etc.
-    use OrganicAerosol_ml, only: Fgas
-    use Par_ml,            only: me, MAXLIMAX, MAXLJMAX  ! me for TEST
+    use ChemGroups_ml,     only: RO2_POOL, RO2_GROUP
+    use ChemSpecs_tot_ml           ! => NSPEC_TOT, O3, NO2, etc.
+    use Chemfields_ml, only : NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn 
+    use ChemRates_rct_ml,   only: rct
+    use ChemRates_rcmisc_ml,only: rcmisc
+    use GridValues_ml,     only : GRIDWIDTH_M
+    use Io_ml,             only : IO_LOG, datewrite
+    use ModelConstants_ml, only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv, &
+                                 DebugCell, MasterProc, DEBUG_SOLVER,       &
+                                 DEBUG_DRYRUN, USE_SEASALT
+    use Par_ml,            only: me, MAXLIMAX, MAXLJMAX
+    use PhysicalConstants_ml, only:  RGAS_J
     use Setup_1dfields_ml, only: rcemis,        & ! photolysis, emissions
-                                 rcbio,         & ! biogenic emis
                                  rc_Rn222,      & ! Pb210
-                                 rct, rcmisc,   & ! reaction rate coeffients
                                  xn_2d,         & 
                                  rh,            & 
-                                 rcss,amk         ! Sea salt emission rate
-    use N2O5_hydrolysis_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4,&
-                                 f_Riemer! to weight the hydrolysis of N2O5 with NO3,SO4 mass
+                                 Fgas,   & ! fraction in gas-phase, for SOA
+                                 rcss,amk,      & ! Sea salt emission rate
+                                 !FUTURE rcnh3,         & ! NH3emis
+                                 rcbio            ! bvoc
+ use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
+    use ChemFunctions_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
   implicit none
 
   private
@@ -77,17 +82,22 @@
   INCLUDE 'mpif.h'
 
   integer::  STATUS(MPI_STATUS_SIZE),INFO
-  integer, parameter:: nchemMAX=12
+     integer, parameter:: nchemMAX=15
+  integer, parameter:: NUM_INITCHEM=5    ! Number of initial time-steps with shorter dt
+  real, save::         DT_INITCHEM=20.0  ! shorter dt for initial time-steps, reduced for 
+  integer, parameter  :: EXTRA_ITER = 1    ! Set > 1 for even more iteration
+
 
 contains
 
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
-  subroutine chemistry(i,j)
+  subroutine chemistry(i,j,debug_flag)
 
     !.. In
     integer, intent(in) ::  i,j       ! Coordinates (needed for Dchem)
+    logical, intent(in) :: debug_flag
 
     real, dimension(NSPEC_TOT,KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX), save :: &
                     Dchem=0.0  ! Concentration increments due to chemistry
@@ -102,8 +112,7 @@ contains
     integer, save ::  nchem         ! No chem time-steps
     real    ::  dt2 
     real    ::  P, L                ! Production, loss terms
-    real    :: psd_h2o2 ! Pseudo H2O2 concentration (lower when high so2)
-    real    :: xextrapol, L1,L2,P1,P2,C1,C2,DIVID    !help variable
+    real    :: xextrapol   !help variable
 
     ! Concentrations : xold=old, x=current, xnew=predicted
     ! - dimensioned to have same size as "x" 
@@ -119,7 +128,15 @@ contains
 !======================================================
 
     if ( first_call ) then
-       call makedt(dti,nchem,coeff1,coeff2,cc,dt_advec)
+       call makedt(dti,nchem,coeff1,coeff2,cc)
+       if ( MasterProc ) then
+           write(IO_LOG,"(a,i4)") 'Chem dts: nchemMAX: ', nchemMAX
+           write(IO_LOG,"(a,i4)") 'Chem dts: nchem: ', nchem
+           write(IO_LOG,"(a,i4)") 'Chem dts: NUM_INITCHEM: ', NUM_INITCHEM
+           write(IO_LOG,"(a,f7.2)") 'Chem dts: DT_INITCHEM: ', DT_INITCHEM
+           write(IO_LOG,"(a,i4)") 'Chem dts: EXTRA_ITER: ', EXTRA_ITER
+           if(DEBUG_DRYRUN) write(*,*) "DEBUG_DRYRUN Solver"
+       end if
        first_call = .false.
     endif
 
@@ -133,12 +150,8 @@ contains
     toiter(6:KEMISTOP-1)      = 2    ! Medium and cloud levels 
     toiter(KEMISTOP:KMAX_MID) = 3    ! Near-ground, emis levels
 
-
-
-    !** Comments: Only NO2+O3->H+ +NO3- at night time 
-    !   and in the8 lowest layers and if rh>0.5
-
-    if (ONLY_NIGHT) call set_night_rct(rct,rh,i,j)  ! Only for ACID version
+   ! to get better accuracy if wanted (at CPU cost)
+    toiter = toiter * EXTRA_ITER  
 
 
     !** Establishment of initial conditions:
@@ -176,11 +189,46 @@ contains
              xnew(:) = CPINIT
           end where
 
-          !== Here comes all chemical reactions
+!== Here comes all chemical reactions
+!=============================================================================
+          if ( DEBUG_DRYRUN ) then
+            ! Skip fast chemistry
+          else
 
-            include 'My_Reactions.inc' 
+            do iter = 1, toiter(k)
+!
+! The chemistry is iterated several times, more close to the ground than aloft.
+! For some reason, it proved faster for some compilers to include files as given below
+! with the if statements, than to use loops.
+!Just add some comments:
+!At present the "difference" between My_FastReactions and My_SlowReactions
+!is that in My_Reactions the products do not reacts chemically at all,
+!and therefore do not need to be iterated.  We could have another class
+!"slowreactions", which is not iterated or fewer times. This needs some
+!work to draw a proper line ......
 
-       end do 
+                !if(k>=KCHEMTOP)then
+
+                   !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                   include 'CM_Reactions1.inc'
+                   !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+                !endif
+                !if(k>=6)then
+                !   include 'My_FastReactions.inc'
+                !endif
+                !if(k>=KEMISTOP)then
+                !   include 'My_FastReactions.inc'
+                !endif
+            end do !! End iterations
+          ! Just before SO4, look after slower? species
+          end if ! DEBUG_DRYRUN 
+
+          !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+           include 'CM_Reactions2.inc'
+          !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+       end do ! ichem 
  
        !*************************************
        !     End of integration loop        *
@@ -192,6 +240,11 @@ contains
             Dchem(:,k,i,j) = (xnew(:) - xn_2d(:,k))*dt_advec_inv
             xn_2d(:,k) = xnew(:)
 
+        if (debug_flag.and.k==KMAX_MID) then
+          write(*,"(a,2i4,3es10.3)") "SOLVER ", C5H8, BIO_ISOP,&
+             RCEMIS(C5H8,K), RCBIO(BIO_ISOP,K), xn_2d(C5H8,k)
+        end if
+
     enddo ! End of vertical k-loop
 
   end subroutine chemistry
@@ -200,7 +253,7 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-subroutine  makedt(dti,nchem,coeff1,coeff2,cc,dt_tot)
+subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 
 !=====================================================================
 ! Makes coefficients for two-step (written by Peter Wind, Febr. 2003)
@@ -214,52 +267,48 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc,dt_tot)
 
  implicit none
 
- real, intent(in) :: dt_tot
  real, dimension(nchemMAX),intent(out) :: dti,coeff1,coeff2,cc
  integer,                  intent(out) :: nchem
 
- real    :: ttot,dt_first,dt_max,dtleft,tleft,step,dt(nchemMAX)
+ real    :: ttot,step,dt(nchemMAX)
+ real :: dt_init   ! time (seconds) with initially short time-steps
  integer :: i,j
 !_________________________
 
-  nchem=12 !number of chemical timesteps inside dt_advec
+  nchem=nchemMax !number of chemical timesteps inside dt_advec
 
-!/ Used only for 50km resolution and dt_advec=1200 seconds:
-!.. timesteps from 6 to 12
-  dt=(dt_advec-100.0)/(nchem-5)
-!.. first five timesteps 
-  dt(1)=20.0
-  dt(2)=20.0
-  dt(3)=20.0
-  dt(4)=20.0
-  dt(5)=20.0
+   dt_init = NUM_INITCHEM*DT_INITCHEM
+
+ ! - put special cases here:
+  !NOT NEEDED? if(GRIDWIDTH_M>60000.0)nchem=15
 
 !/ ** For smaller scales, but not tested
-   if(dt_advec<520.0)then
-      nchem=5+int((dt_advec-100.0)/60.0)
-      dt=(dt_advec-100.0)/(nchem-5)
-      dt(1)=20.0
-      dt(2)=20.0
-      dt(3)=20.0
-      dt(4)=20.0
-      dt(5)=20.0
-   endif
-   if(dt_advec<=100.)then
-      nchem=int(dt_advec/20.0)+1
+  if(dt_advec<620.0) nchem = NUM_INITCHEM +int((dt_advec- dt_init) / dt_init )
+
+!/ Used for >21km resolution and dt_advec>520 seconds:
+!.. timesteps from 6 to nchem
+
+   dt=(dt_advec - dt_init )/(nchem-NUM_INITCHEM) 
+
+   dt(1:NUM_INITCHEM)=DT_INITCHEM     !.. first five timesteps 
+
+   if(dt_advec<= dt_init )then
+      nchem=int(dt_advec/DT_INITCHEM)+1
       dt=(dt_advec)/(nchem)
    endif
 !/ **
 
-   call CheckStop(dt_advec<20.0,"Error in Solver/makedt: dt_advec too small!")
-
-   call CheckStop(nchem>nchemMAX,"Error in Solver/makedt: nchemMAX too small!")
+   call CheckStop(dt_advec<DT_INITCHEM, &
+        "Error in Solver/makedt: dt_advec too small!")
+   call CheckStop(nchem>nchemMAX,&
+        "Error in Solver/makedt: nchemMAX too small!")
 
    nchem=min(nchemMAX,nchem)
 
-    if(me == 0) then
+    if( MasterProc ) then
 
-      write(*,*)'Number of timesteps in Solver: ',nchem
-      27 format('timestep ',I,F13.6,' total: ',F13.6)
+      write(*,*)'Number of chemistry timesteps within one dt_advec: ',nchem
+      27 format(' chem timestep ',I3,F13.6,' total: ',F13.6)
 
       ttot=0.0
       do i=1,nchem

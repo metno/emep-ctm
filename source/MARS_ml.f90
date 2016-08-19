@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -24,13 +24,19 @@
 !* 
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
+ 
 module MARS_ml
+ ! -----------------------------------------------------------------------
+ ! Calculates gas-aerosol equilibrium for SO4, HNO3-NO3 and NH3-NH4 system
+ ! Made available by Frank Binkowski (originally from EPA's RPM model)
+ ! Presently not in use, EQSAM is used for inorganic equilibrium stuff
+ !------------------------------------------------------------------------
 
- use Io_ml,           only : ios
- use Aero_water_ml,   only:  Awater
- use ModelConstants_ml, only : NPROC
- use Par_ml,          only : me
+ use Io_ml,              only : ios
+ use MARS_Aero_water_ml, only:  Awater
+ use ModelConstants_ml,  only : NPROC
+ use Par_ml,             only : me
  implicit none
  private
 
@@ -166,7 +172,7 @@ module MARS_ml
 !c   F.Binkowski 8/1/97    Chenged minimum sulfate from 0.0 to 1.0e-6 i.e.
 !c                         1 picogram per cubic meter
 !C   I.Ackermann 2/23/98   modification for solving precision problems
-!C			  on workstations
+!C        	  on workstations
 !C   I.Ackermann 2/25/99   changed logic as follows:
 !c                         If iterations fail, initial values of nitrate
 !c                          are retained.
@@ -334,7 +340,7 @@ module MARS_ml
       real        MINSO4           ! Minimum value of sulfate laerosol concentration
        parameter( MINSO4 = 1.0E-6 / MWSO4 ) 
       real        MINNO3
-       parameter( MINNO3 = 1.0E-6 / MWNO3 )	!2/25/99 IJA
+       parameter( MINNO3 = 1.0E-6 / MWNO3 )    !2/25/99 IJA
 !st      real        FLOOR
 !st       parameter( FLOOR = 1.0E-30) ! minimum concentration       
 !2/25/99 IJA
@@ -441,9 +447,9 @@ module MARS_ml
 !...  ammonia than sulfate, otherwise send to low ammonia case.
 
        IF (TNH4 > TSO4) THEN
-         RATIO = 5.0		!this is a high ammonia case with low sulfur
+         RATIO = 5.0        !this is a high ammonia case with low sulfur
        ELSE
-         RATIO = 1.		!this is a low ammonia case with low sulfur
+         RATIO = 1.        !this is a low ammonia case with low sulfur
        END IF
  
       END IF 
@@ -748,7 +754,7 @@ module MARS_ml
           A0 = - (T21 * RK2SA * RKNWET                      &
              + RK2SA * RKNWET * ZSO4 + RK2SA * RKNA * TNO3 )   
          
-          CALL CUBIC ( A2, A1, A0, NR, CRUTES,deb )
+          CALL CUBIC ( A2, A1, A0, NR, CRUTES )
        
 !...Code assumes the smallest positive root is in CRUTES(1)
  
@@ -824,20 +830,19 @@ module MARS_ml
 !>-------------------------------------------------------------------------------<
 !<------------------------------------------------------------------------------->
 
-      subroutine cubic(a2,a1,a0,nr,crutes,deb)
+      subroutine cubic(a2,a1,a0,nr,crutes)
 
   !.. subroutine  to find the roots of a cubic equation / 3rd order polynomial
   !.. formulae can be found in numer. recip.  on page 145
   !..  kiran  developed  this version on 25/4/1990
-  !..  dr. francis binkowski modified the routine on 6/24/91, 8/7/97
-!=======
+  !..  Dr. Francis Binkowski modified the routine on 6/24/91, 8/7/97
+  !--------------------------------------------------------------
 
       implicit none
 
       real, intent(in)     :: a2,a1,a0
       integer, intent(out) :: nr      
       real, intent(out)    :: crutes(3)
-      logical, intent(in)  :: deb
 !.. local
       real ::  qq,rr,a2sq,theta, sqrt3, one3rd
       real ::  dum1,dum2,part1,part2,part3,rrsq,phi,yy1,yy2,yy3
@@ -846,9 +851,9 @@ module MARS_ml
       data sqrt3/1.732050808/, one3rd/0.333333333/
 !=======
 
-	  a2sq=a2*a2
-	  qq=(a2sq-3.*a1)/9.
-	  rr=( a2*(2.*a2sq - 9.*a1) + 27.*a0 )/54.
+      a2sq=a2*a2
+      qq=(a2sq-3.*a1)/9.
+      rr=( a2*(2.*a2sq - 9.*a1) + 27.*a0 )/54.
 ! CASE 1 THREE real ROOTS or  CASE 2 ONLY ONE real ROOT
       dum1=qq*qq*qq 
       rrsq=rr*rr
@@ -863,7 +868,7 @@ module MARS_ml
             crutes(2) = 0.0
             crutes(3) = 0.0
             nr = 0            
-		   stop 
+           stop 
          end if
          theta=acos(rr/phi)/3.0
          costh = cos(theta)
@@ -904,7 +909,7 @@ module MARS_ml
       end if
 
    end subroutine cubic
-	
+    
 !>-------------------------------------------------------------------------------<
 !<------------------------------------------------------------------------------->
 
@@ -996,12 +1001,7 @@ module MARS_ml
       INTEGER    XSTAT3       ! Special  error
       PARAMETER (XSTAT3 = 3)
       INTEGER ERRMARK
-      INTEGER IDUM
-      INTEGER JDUM
-      INTEGER LAYER
-
       INTEGER IA2
-
       CHARACTER*120 XMSG
 
 !...........PARAMETERS and their descriptions:

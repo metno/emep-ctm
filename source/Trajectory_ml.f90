@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,159 +38,154 @@ module Trajectory_ml
   ! and should be updated before use.                              !
   !----------------------------------------------------------------!
 
+  use My_Outputs_ml,      only : NADV_FLIGHT, FLIGHT_ADV !ds - added
+  use Chemfields_ml  ,    only : xn_adv
+  use ChemSpecs_adv_ml
+  use GridValues_ml ,     only : glon, glat
+  use Io_ml,              only : IO_AIRCR
+  use MetFields_ml,             only : z_bnd,z_mid
+  use ModelConstants_ml , only : dt_advec,PPBINV,KMAX_BND,NPROC
+  use Par_ml   ,          only : gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG,me
+  use TimeDate_ml,        only : current_date
+  implicit none
+  private
+  
+  public trajectory_init
+  public trajectory_in
+  public trajectory_out
 
- use My_Outputs_ml,      only : NADV_FLIGHT, FLIGHT_ADV !ds - added
- use Chemfields_ml  ,    only : xn_adv
- use GenSpec_adv_ml
- use GridValues_ml ,     only : gl, gb
- use Io_ml,              only : IO_AIRCR
- use Met_ml,             only : z_bnd,z_mid
- use ModelConstants_ml , only : dt_advec,PPBINV,KMAX_BND,NPROC
- use Par_ml   ,          only : gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG,me
- use TimeDate_ml,        only : current_date
- implicit none
- private
+  INCLUDE 'mpif.h'
+  INTEGER STATUS(MPI_STATUS_SIZE),INFO
+  integer, private, save :: iimax, iii
+  integer, private, save ::  fapos(2,999)
+  real, private, save ::  kfalc(999), rhour(999)
 
- public trajectory_init
- public trajectory_in
- public trajectory_out
-
- INCLUDE 'mpif.h'
- INTEGER STATUS(MPI_STATUS_SIZE),INFO
- integer, private, save :: iimax, iii
- integer, private, save ::  fapos(2,999)
- real, private, save ::  kfalc(999), rhour(999)
-
- contains
+contains
 
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	subroutine trajectory_init
-	implicit none
+  subroutine trajectory_init
+    implicit none
+    
+    iii = 1
+    rhour(1) = 1.
+    rhour(2) = 0.
+    
+  end subroutine trajectory_init
 
-	iii = 1
-	rhour(1) = 1.
-	rhour(2) = 0.
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	end subroutine trajectory_init
+  subroutine trajectory_in
 
-   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	subroutine trajectory_in
-
-        character*20 falc
-	logical tra_exist
-
-	integer ii,info
-
+    character*20 falc
+    logical tra_exist
+    integer ii,info
 
   !  Here month and day where trajectory is expected is hardcoded. 
-	if(current_date%month == 6) then
-	  if(current_date%day == 1 .or. current_date%day == 16 ) then
-		if(me == 0)then
-		  write(falc,fmt='(''tra9606'',i2.2,''.pos'')') 	&
-			current_date%day
-		  inquire(file=falc,exist=tra_exist)
-		  write(6,*)'trajectory exists?',tra_exist
-		  if(.not.tra_exist)goto 912
-		  open(IO_AIRCR,file=falc,status='unknown')
-		  ii = 0
-		  do while (.true.)
-		    ii = ii + 1
-		    read(IO_AIRCR,*,end=701) rhour(ii), fapos(1,ii), 	&
-			fapos(2,ii), kfalc(ii)
-		  end do
-701		  continue
-		  iimax = ii
-		  rhour(iimax+1) = 0.
-		  write(6,*) 'falcon positions  ',iimax
-		  write(6,*) (rhour(ii),			&
-			fapos(1,ii), fapos(2,ii),kfalc(ii),ii=1,5)
-		  close(IO_AIRCR)
-		  open(IO_AIRCR,file='aircraft.dat',position='append')
-		  write(IO_AIRCR,*) 'month and day ',current_date%month	&
-			,current_date%day
-		  close(IO_AIRCR)
-		endif
-		iii = 1
-!su	read on node 0
+    if(current_date%month == 6) then
+       if(current_date%day == 1 .or. current_date%day == 16 ) then
+          if(me == 0)then
+             write(falc,fmt='(''tra9606'',i2.2,''.pos'')') &
+                   current_date%day
+             inquire(file=falc,exist=tra_exist)
+             write(6,*)'trajectory exists?',tra_exist
+             if(.not.tra_exist)goto 912
+             open(IO_AIRCR,file=falc,status='unknown')
+             ii = 0
+             do while (.true.)
+                ii = ii + 1
+                read(IO_AIRCR,*,end=701) rhour(ii), fapos(1,ii), &
+                     fapos(2,ii), kfalc(ii)
+             end do
+701          continue
+             iimax = ii
+             rhour(iimax+1) = 0.
+             write(6,*) 'falcon positions  ',iimax
+             write(6,*) (rhour(ii),                 &
+                  fapos(1,ii), fapos(2,ii),kfalc(ii),ii=1,5)
+             close(IO_AIRCR)
+             open(IO_AIRCR,file='aircraft.dat',position='append')
+             write(IO_AIRCR,*) 'month and day ',current_date%month&
+                  ,current_date%day
+             close(IO_AIRCR)
+          endif
+          iii = 1
 
-912		continue
+!su    read on node 0
+912       continue
+!su    now distribute
+          CALL MPI_BCAST( iimax ,4*1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
+          CALL MPI_BCAST( rhour ,8*iimax+1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
+          CALL MPI_BCAST( kfalc ,8*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
+          CALL MPI_BCAST( fapos ,4*2*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
+!su    all distributed
+       endif
+    endif
 
-!su	now distribute
+    return
+  end subroutine trajectory_in
 
-  CALL MPI_BCAST( iimax ,4*1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-  CALL MPI_BCAST( rhour ,8*iimax+1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-  CALL MPI_BCAST( kfalc ,8*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-  CALL MPI_BCAST( fapos ,4*2*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-!su	all distributed
-	  endif
-	endif
+  subroutine trajectory_out
 
-	return
-	end subroutine trajectory_in
-
-   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	subroutine trajectory_out
-
-	real ttt, dtmil
-
-	integer ii,jj,k,jjj,info
-        integer :: i
+    real ttt, dtmil
+    integer ii,jj,k,jjj,info
+    integer :: i
 
 !    trajectory positions
-!	if(me == 0) write(6,*) 'for tidsjekk',current_date%hour	&
-!			,dt_advec,(rhour(ii),ii=1,5)
+!    if(me == 0) write(6,*) 'for tidsjekk',current_date%hour    &
+!        	,dt_advec,(rhour(ii),ii=1,5)
 
-	dtmil = dt_advec/60./60.
-	ttt = current_date%hour+current_date%seconds/3600.
-	if (rhour(2) > rhour(1) 			&
-		.and. ttt+dtmil > rhour(1)) then
-	  do jjj = 1,10
-	    if(me == 0) write(6,*) 'inne i tidsjekk',	&
-			iii,jjj,ttt,rhour(iii),rhour(iii+1),dt_advec,dtmil
+    dtmil = dt_advec/60./60.
+    ttt = current_date%hour+current_date%seconds/3600.
+    if (rhour(2) > rhour(1)     &
+         .and. ttt+dtmil > rhour(1)) then
+       do jjj = 1,10
+          if(me == 0) write(6,*) 'inne i tidsjekk',    &
+               iii,jjj,ttt,rhour(iii),rhour(iii+1),dt_advec,dtmil
+          
+          if (ttt > rhour(iii)     &
+               .and. ttt < rhour(iii+1)) then
+!su    we have to synchronise the processors, since for next jjj(iii)
+!su    the aircraft can be on another processor !!!!
 
-	    if (ttt > rhour(iii) 		&
-			.and. ttt < rhour(iii+1)) then
-!su	we have to synchronise the processors, since for next jjj(iii)
-!su	the aircraft can be on another processor !!!!
+             CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
 
-              CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
+             if(me == 0) write(6,*) 'inne i tidsjekk2'    &
+                  ,fapos(1,iii),fapos(1,iii), ttt
+             if(gi0+IRUNBEG-1 <= fapos(1,iii) .and.      &
+                  gi1+IRUNBEG-1 >= fapos(1,iii) .and.   &
+                  gj0+JRUNBEG-1 <= fapos(2,iii) .and.   &
+                  gj1+JRUNBEG-1 >= fapos(2,iii)) then
+                write(6,*) 'inne i tidsjekk3',me,kfalc(iii)
+                ii = fapos(1,iii) - gi0-IRUNBEG+2
+                jj = fapos(2,iii) - gj0-JRUNBEG+2
+                do k = 1,KMAX_BND-1
+                   if(z_bnd(ii,jj,k) > kfalc(iii) .and.     &
+                        z_bnd(ii,jj,k+1) < kfalc(iii)) then
+                      write(6,*) 'inne i tidsjekk4',me,kfalc(iii)
+                      open(IO_AIRCR,file='aircraft.dat'     &
+                           ,position='append')
+!ds uni.1: remove IXADV_O3 and replace by loop over FLIGHT_ADV
+                      write(IO_AIRCR,*) ttt                 &
+                           ,( xn_adv( FLIGHT_ADV(i),ii,jj,k)*PPBINV,& 
+                           i=1, NADV_FLIGHT),k,z_mid(ii,jj,k),&
+                           glat(ii,jj),glon(ii,jj)
+                      close(IO_AIRCR)
+                   end if
+                end do
+             end if
+             iii = iii + 1
+          end if
+          ttt = ttt + dtmil*0.1
+       end do
+    end if
+     
+    return
+  end subroutine trajectory_out
 
-	      if(me == 0) write(6,*) 'inne i tidsjekk2'	&
-			,fapos(1,iii),fapos(1,iii), ttt
-	      if(gi0+IRUNBEG-1 <= fapos(1,iii) .and. 	&
-			gi1+IRUNBEG-1 >= fapos(1,iii) .and.	&
-			gj0+JRUNBEG-1 <= fapos(2,iii) .and. 	&
-			gj1+JRUNBEG-1 >= fapos(2,iii)) then
-		write(6,*) 'inne i tidsjekk3',me,kfalc(iii)
-		ii = fapos(1,iii) - gi0-IRUNBEG+2
-		jj = fapos(2,iii) - gj0-JRUNBEG+2
-            do k = 1,KMAX_BND-1
-              if(z_bnd(ii,jj,k) > kfalc(iii) .and.       &
-                  z_bnd(ii,jj,k+1) < kfalc(iii)) then
-		    write(6,*) 'inne i tidsjekk4',me,kfalc(iii)
-		    open(IO_AIRCR,file='aircraft.dat'	&
-				,position='append')
-		!ds uni.1: remove IXADV_O3 and replace by loop over FLIGHT_ADV
-		    write(IO_AIRCR,*) ttt				&
-			,( xn_adv( FLIGHT_ADV(i),ii,jj,k)*PPBINV, i=1, NADV_FLIGHT)  &
-                  ,k,z_mid(ii,jj,k), gb(ii,jj),gl(ii,jj)
-		    close(IO_AIRCR)
-		  end if
-		end do
-	      end if
-	      iii = iii + 1
-	    end if
-	    ttt = ttt + dtmil*0.1
-	  end do
-	end if
-
-	return
-	end subroutine trajectory_out
-   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 end module Trajectory_ml
 

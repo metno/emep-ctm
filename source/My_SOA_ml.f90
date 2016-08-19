@@ -1,8 +1,8 @@
-! <OrganicAerosol_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <SOA_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,35 +26,19 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
 module OrganicAerosol_ml
-   !
-   ! DUMMY module for now, as the SOA part of the EMEP model is still
-   ! in research phase, and changes quite frequently. The 
-   ! Calculates the amount of condensible species in the gas and aerosol
-   ! phases. 
-   !
-   ! When implemented, we use the 
-   ! methodology from Andersson-Sk\"old and Simpson, 2000, Secondary Organic
-   ! Aerosol Formation in Northern Europe: a Model Study, J. Geophys. Res
-   ! 106(D7), 7357-7374, and
-   ! Simpson,D., Yttri, K.E.,Klimont, Z. ,Kupiainen, K.,Caseiro, A.,
-   !  Gelencser, A.,Pio,  C.,Legrand, M. ,Yttri, K.E., Modeling Carbonaceous 
-   !  Aerosol over Europe. Analysis of the CARBOSOL and EMEP EC/OC campaigns,
-   !  J. Geophys. Res., 112, D23S14, doi:10.1029/2006JD008158.
-   !
-   ! Usage: call OrganicAerosol from Runchem, after setup of 1d-fields
-   ! finished.  The subroutine initialises itself on the first call
-   ! and thereafter modifies two external variables:
-   !   xn(SOA,k) : the concentrations of SOA 
-   !   Fgas(X,k) : The fraction of X which is gas and not aeorosl
-   !
-   ! Dave Simpson, August 2001  - 2007
+
+   !--------------------------------------------------------------------------
+   ! This module is fake - for initial 2011 public-domain ozone model only, pending
+   ! decision as to which SOA scheme to release as default.
+   ! Contact David.Simpson@met.no for more information if interested in SOA
+   ! schemes
    !--------------------------------------------------------------------------
    use ModelConstants_ml,    only : CHEMTMIN, CHEMTMAX, &
                                     K2 => KMAX_MID, K1 => KCHEMTOP
    use PhysicalConstants_ml, only : AVOG
    use Setup_1dfields_ml,    only : itemp, xn => xn_2d
-   use GenChemicals_ml,      only : species   ! for molwts
-   use GenSpec_tot_ml,  A1 => FIRST_SOA , A2 => LAST_SOA
+   use ChemChemicals_ml,      only : species   ! for molwts
+   use ChemSpecs_tot_ml,  A1 => FIRST_SEMIVOL , A2 => LAST_SEMIVOL
    implicit none
 
    !/-- subroutines
@@ -62,14 +46,17 @@ module OrganicAerosol_ml
 
 
    !/-- public
+
+    logical, public, parameter :: ORGANIC_AEROSOLS = .false.
     real, public, dimension(A1:A2,K1:K2), save :: Fgas  ! Fraction in gas-phase
 
    contains
    !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
    !+ Driver routine for Secondary Organic Aerosol  module
 
-   subroutine OrganicAerosol(debug_flag)
-   logical, intent(in) :: debug_flag  ! for debugging purposes only
+   subroutine OrganicAerosol(i,j,debug_flag)
+     integer, intent(in) :: i,j
+     logical, intent(in) :: debug_flag  ! for debugging purposes only
 
      ! empty 
 
@@ -77,3 +64,4 @@ module OrganicAerosol_ml
 
 end module OrganicAerosol_ml
 !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+

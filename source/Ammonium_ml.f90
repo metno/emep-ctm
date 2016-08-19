@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,12 +36,12 @@ module Ammonium_ml
  !     new values of ammonium sulphate (AMSU), NH3, HNO3, SO4 and 
  !     ammonium nitrate (AMNI).
  !
- !     Dec 2002 hf Routine change to treat SO4-NH3-HNO3-aNO3-aNH4 system instead
+ !     Dec 2002 Routine change to treat SO4-NH3-HNO3-NO3_f-NH4_f system instead
  !     This makes code flexible with regards to which eq solver you choos: 
  !     Ammonium, MARS or EQSAM.
  !     In principle, this is exactly the same as using the old indices,
- !     however, SO4 which goes into the chemical solver is now the total sulphate,
- !     whereas with the old indices it was only free sulphate.
+ !     however, SO4 which goes into the chemical solver is now the total 
+ !     sulphate, whereas with the old indices it was only free sulphate.
  !----------------------------------------------------------------------------
  !
  use ModelConstants_ml   , only : CHEMTMIN, CHEMTMAX   &! Temp. range
@@ -51,16 +51,12 @@ module Ammonium_ml
  implicit none
  private
 
-
  !/- subroutines:
  public   :: ammonium          ! Sets up most tables
 
  private  :: tabulate         ! Sets up most tables, and calls tab_rct_rates
  private  :: setup_ammonium   ! setup data for 1d column calculation
  private  :: calc_ammonium    ! Equilibrium distribution of NH4-SO4-NO3
-
- !/Wanted?
- !hf moved logical, public, parameter :: INORGANIC_AEROSOLS = .true.
 
  !/- Outputs: - updated xn_2d concentrations after equilibrium
 
@@ -73,8 +69,6 @@ module Ammonium_ml
                   ,tab_MozP1   &  ! Mozurkewich P1 value for Kaq
                   ,tab_MozP2   &  ! Mozurkewich P2 value for Kaq
                   ,tab_MozP3   ! &  ! Mozurkewich P3 value for Kaq
-!                 ,tab_vav_n2o5   ! avg. molecular speed N2O5 
-				! Might move elsewhere
 
    logical, private, save :: my_first_call = .true.
 
@@ -83,14 +77,13 @@ module Ammonium_ml
 
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
  subroutine ammonium()
-    integer :: i,j ! for print-out only
 
    real, dimension(KCHEMTOP:KMAX_MID)  ::  rcnh4 ! equilib. value
                                                       !was :  miscrc(ICRCNH3,k)
 
      if ( my_first_call ) then
         call tabulate()
-     	my_first_call = .false.
+         my_first_call = .false.
      endif
 
      call setup_ammonium(rcnh4)
@@ -117,7 +110,6 @@ module Ammonium_ml
     !   relative humidity of deliquescence for ammonium nitrate
     !   Ref:  Mozurkewich (1993)  - Journal???
     !   Units : fraction 0-1
-    !   (MADE/MACHO notes  : was miscrcit(ICRHD,it)
 
        tab_rhdel(:) = exp( 618.3/t(:) - 2.551 )
 
@@ -125,12 +117,11 @@ module Ammonium_ml
     !    Equilibrium constant (Kp):  NH3 + HNO3  <-------> NH4NO3   
     !    Ref: Mozurkewich (1993)
     !    Units : (molecule/cm3)^2 for Kp
-    !   (MADE/MACHO notes  : was miscrcit(ICRS,it)
     !
     !      lnKp = 118.87 - 24084.0/T - 6.025* ln(T)
     !
-    ! st: documentation has + 24084!
-    ! c.f. Seinfeld, eqn 9.91, p.532 - suggests minus, if it is relevant?
+    ! nb: older documentation had + 24084!
+    ! c.f. Seinfeld, eqn 9.91, p.532 
 
        tab_Kp_amni(:) = exp( 118.87 - 24084.0/t(:)-6.025*alog(t(:)) )
 
@@ -138,7 +129,6 @@ module Ammonium_ml
     !    temp. dependant constrants for calcolating dissos. rate 
     !    for  the formation of ammonium nitrate  
     !    Ref: Mozurkewich (1993)
-    !   (MADE/MACHO notes  : was miscrcit(ICXK1,it)..miscrcit(ICXK_3,it)
     !    n.b. EMEP report 2/98 had 2446 in P3, but 24.46 is correct
 
        tab_MozP1(:) = exp( -135.94 +  8763.0/t(:) + 19.12*alog( t(:) ) )
@@ -160,7 +150,6 @@ module Ammonium_ml
    !
    ! Units :  Kp, Kaq : (molecules cm-3)^2
    !          rc      ????
-   ! MADE/MACHO notes.. ds- replaced xk by Kp, miscrc(ICRCNH3) by rc...??
    !--------------------------------------------------------------------------
  use Setup_1dfields_ml   , only : rh, amk, itemp
 
@@ -169,22 +158,21 @@ module Ammonium_ml
     real, dimension(KCHEMTOP:KMAX_MID) ::    &
                roappm                     &  ! density in ppm?
               ,humd,humdsqrt,humdsqrt2       ! humd = 1-rh
-   !!          rhd, Kp                    &  ! deliq. rh, Kp
 
-      rhd(:) =  tab_rhdel( itemp(:) )   ! was: miscrcit(ICRHD,itk)
+      rhd(:) =  tab_rhdel( itemp(:) )
 
-      Kp(:)  =  tab_Kp_amni( itemp(:) ) ! was: miscrcit(ICRS,itk)
+      Kp(:)  =  tab_Kp_amni( itemp(:) )
 
-!hf Initialize rcnh4 to tab_Kp_amni,need roappm
+! Initialize rcnh4 to tab_Kp_amni,need roappm
       roappm(:) = amk(:)*PPB
       rcnh4(:)  =  tab_Kp_amni( itemp(:) )*roappm(:)* roappm(:)
 
 !  The lines below are a CPU-efficient way of calculating the
-!  power of 1.75  for  Mozurkewich Kp, suggested by  su.
+!  power of 1.75  for  Mozurkewich Kp
 
-      where ( rh >= rhd ) !  old: if(rh(k) >= rhd) then
+      where ( rh >= rhd )
 
-        humd = 1.0001 - rh                  ! ds why not 1.0?
+        humd = 1.0001 - rh
         humdsqrt = sqrt(humd)
         humdsqrt2 = sqrt(humdsqrt)*humdsqrt
         Kp = (   tab_MozP1(itemp) &
@@ -192,11 +180,8 @@ module Ammonium_ml
                + tab_MozP3(itemp)*humd*humd  ) *humd*humdsqrt2*Kp
 
         roappm = amk*PPB
-        rcnh4  = Kp * roappm * roappm   ! old misrc(ICRCNH3,k)
+        rcnh4  = Kp * roappm * roappm 
 
-!hf BUG      elsewhere
-
-!hf BUG        rcnh4 = 0.0
       end where
 
 
@@ -207,64 +192,53 @@ module Ammonium_ml
      !   Calculates the distribution of NH3, (NH4)1.5SO4, NH4NO3
      !   - needs more text...
      !   nov 2002 hf Changed from NH3-AMSU-AMNI-HNO3
-     !                       to   NH3-aNH4-aNO3-HNO3
+     !                       to   NH3-aNH4-pNO3_f-HNO3
      !   in order to have same structure as with EQSAM and MARS 
      !-------------------------------------------------------------------------
 
- use GenSpec_tot_ml      , only : SO4, aNH4,aNO3, NH3, HNO3
+ use ChemSpecs_tot_ml      , only : SO4, NH4_f, NO3_f, NH3, HNO3
  use Setup_1dfields_ml   , only :  xn => xn_2d
 
    real, dimension(KCHEMTOP:KMAX_MID)  ::  rcnh4 ! equilib. value
-   real, dimension(KCHEMTOP:KMAX_MID) :: eqnh3, delteq   !ds, delt
+   real, dimension(KCHEMTOP:KMAX_MID) :: eqnh3, delteq
    real, dimension(KCHEMTOP:KMAX_MID) :: freeSO4
 
-     freeSO4(:)=xn(SO4,:)-((xn(aNH4,:)-xn(aNO3,:))*2./3.) !hf Sulfate not in form 
-                                                          !of (NH4)1.5SO4 or NH4NO3
+   ! Sulfate not in form of (NH4)1.5SO4 or NH4NO3:
+     freeSO4(:)=xn(SO4,:)-((xn(NH4_f,:)-xn(NO3_f,:))*2./3.) 
      freeSO4(:)=max(0.0,freeSO4(:))
 
 
-     where ( 1.5*freeSO4(:) >  xn(NH3,:) ) ! free SO4 (not in amsu form) in excess of NH3
+     where ( 1.5*freeSO4(:) >  xn(NH3,:) ) ! free SO4 (not in Amm.S form) in excess of NH3
 
+            xn(NH4_f,:) = xn(NH4_f,:) +  xn(NH3,:) !hf
 
-            !hf amsu xn(AMSU,:) = xn(AMSU,:) +  xn(NH3,:)*2./3.
-
-            xn(aNH4,:) = xn(aNH4,:) +  xn(NH3,:) !hf
-
-            !hf amsu xn(SO4,:) = xn(SO4,:)    - xn(NH3,:)*2./3.
 
             xn(NH3,:) = 0.
 
      elsewhere !NH3 in excess
 
-
-           !hf amsu     xn(AMSU,:) = xn(AMSU,:) + xn(SO4,:)
-
-            xn(aNH4,:) = xn(aNH4,:) + freeSO4(:)*1.5 !hf
+            xn(NH4_f,:) = xn(NH4_f,:) + freeSO4(:)*1.5 !hf
 
             xn(NH3,:) = xn(NH3,:)   - freeSO4(:)*1.5
-
-            !hf amsu    xn(SO4,:) = 0.
 
               
      ! The equilibrium concentration of NH3 is:
      eqnh3 = (xn(NH3,:) - xn(HNO3,:))*0.5   & 
                 + sqrt( 0.25*(xn(NH3,:) -xn(HNO3,:))**2 + rcnh4 )+1.
-                                                      !ds - why +1 here?
-     !hf eqnh3 er i størrelsesorden 10^20.
+
+     ! eqnh3  of order 10^20.
 
      delteq     = eqnh3 - xn(NH3,:)
-     !hf amsu     delteq     = min(delteq,xn(AMNI,:))   ! ds - used to have delt here
-     !hf amsu     xn(AMNI,:) = xn(AMNI,:) - delteq
-     delteq     = min(delteq,xn(aNO3,:))
+     delteq     = min(delteq,xn(NO3_f,:))
 
-     xn(aNO3,:) = xn(aNO3,:) - delteq !hf
+     xn(NO3_f,:) = xn(NO3_f,:) - delteq
 
      xn(NH3,:)  = xn(NH3,:)  + delteq
      xn(HNO3,:) = xn(HNO3,:) + delteq
 
-     delteq     = min(delteq,xn(aNH4,:))!in  theory not necessary, 
-                                        !but numerics make very small neg value possible
-     xn(aNH4,:)  = xn(aNH4,:)  - delteq !hf amsu
+     delteq     = min(delteq,xn(NH4_f,:))!in  theory not necessary, 
+                      !but numerics make very small neg value possible
+     xn(NH4_f,:)  = xn(NH4_f,:)  - delteq !hf amsu
 
      end where
 
