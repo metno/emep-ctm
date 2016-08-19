@@ -1,0 +1,53 @@
+#
+#
+PROG =	Unimod
+
+###################################################
+
+include Makefile.SRCS
+
+###################################################
+
+LIBS =  -lnetcdf
+INCL = -I/home/ntnu/usrlocal/netcdf/netcdf-3.6.1/include
+LLIB = -L/home/ntnu/usrlocal/netcdf/netcdf-3.6.1/lib -L/usr/lib
+
+F90 = mpxlf90_r 
+F90FLAGS = -q64 -qrealsize=8 -O3 -qarch=pwr5 -qtune=pwr5 $(INCL)
+LDFLAGS = -q64 -qrealsize=8 -O3 -qarch=pwr5 -qtune=pwr5
+
+
+LD = $(F90)
+
+
+.SUFFIXES: $(SUFFIXES)  .f90
+
+.f90.o:
+	$(F90) $(F90FLAGS) -c $<
+
+.f.o:	
+	$(F90) $(F90FLAGS) -c $<
+
+
+# Include the dependency-list created by makedepf90 below
+all:  $(PROG)
+
+include .depend
+
+#
+depend .depend:
+	/home/ntnu/mifahik/local/bin/makedepf90  $(SRCS) \
+	-o $(PROG) \
+	-l "$(F90) $(LDFLAGS) $(LLIB) -o $(PROG) $(FOBJ) $(INCL) $(LIBS)" > .depend
+
+clean: diskclean touchdepend depend
+
+diskclean:
+	rm -f $(PROG) *.o *.mod
+
+touchdepend:
+	touch .depend
+
+
+##########################################################
+
