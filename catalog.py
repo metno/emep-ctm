@@ -7,16 +7,17 @@ simplified access to the source code, input data and benchmark results.
 
 _CONST={
   'VERSION':"0.0.1",      # script version
-  'LASTREL':"rv4.8",      # last model release
+  'LASTREL':"rv4_8",      # last model release
   'LASTMET':2013,         # last met-year released
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
-  'CSV':'./catalog.csv',  # list all files from all releases
+  'CSV':'/catalog.csv',  # list all files from all releases
   'TMPDIR':"./downloads", # temp path for downloads
   'DATADIR':'.'           # base path for datasets
 }
 
 def parse_arguments():
   from optparse import OptionParser,OptionGroup
+  from os.path import dirname
   from sys      import argv as args
 
   usage = """usage: %prog [options]
@@ -43,7 +44,7 @@ Examples:
   parser.add_option("-v", "--verbose",
     action="count", dest="verbose",
     help="Increase verbosity")
-  parser.add_option("--catalog", default=_CONST['CSV'],
+  parser.add_option("--catalog", default=dirname(__file__)+_CONST['CSV'],
     action="store", type="string", dest="catalog",
     help="Override dataset cataloque path/file (default:%default)")
 
@@ -109,20 +110,34 @@ Examples:
   return opts,args
 
 def userConsent(question,ask=True,default='yes'):
+  """Ask user for confirmation"""
   from sys import version_info as version
-  while ask:
-    q={'y':"%s [Y]/n:"%question,'n':"%s y/[N]:"%question}
-    q.update({'yes':q['y'],'no':q['n']})
-    if version[0]>2:  # Python3.x
-      data = input(q[default.lower()])
-    else:             # Python2.x
-      data = raw_input(q[default.lower()])
-    if data.lower() == '':
+
+  # format question   
+  q={'y':"%s [Y]/n:"%question,'n':"%s y/[N]:"%question}
+  q.update({'yes':q['y'],'no':q['n']})
+  try:
+    question=q[default.lower()]
+  except:
+    print("Unsuported option: userConsent(..,default='%s')"%default)
+
+  # valid answers
+  answer={'y':True,'yes':True,'n':False,'no':False}
+
+  # ask until you get a valid answer
+  while True:
+    if not ask:         # take the default
+      print(question+default)
       data = default
-    if data.lower() in ('y','yes'):
-      return True
-    elif data.lower() in ('n','no'):
-      return False
+    elif version[0]>2:  # Python3.x
+      data = input(question)
+    else:               # Python2.x
+      data = raw_input(question)
+
+    # use default when user replies ''
+    data = len(data) and data.lower() or default.lower()
+    if data in answer:
+      return answer[data]
 
 # Print iterations progress
 # http://stackoverflow.com/a/34325723/2576368
@@ -243,7 +258,7 @@ class dataPoint(object):
         print(e)
         raise
 
-  def check(self,verbose=True):
+  def check(self,verbose=True,cleanup=False):
     from os.path import isfile
     from hashlib import md5
     if not isfile(self.dst):
@@ -253,6 +268,8 @@ class dataPoint(object):
 
     with open(self.dst) as f:
       if self.md5sum!=md5(f.read()).hexdigest():
+        if(cleanup):    # remove broken file
+          self.cleanup(verbose)
         if(verbose):
           print("%-8s %s"%('  md5/=',self.md5sum))
         return False
@@ -260,13 +277,13 @@ class dataPoint(object):
 
   def download(self,verbose=True):
     """derived from http://stackoverflow.com/a/22776/2576368"""
-    from os.path import isfile,dirname,isdir
+    from os.path import dirname,isdir
     from os import makedirs
     from urllib2 import urlopen
-    if(isfile(self.dst)):
-      if(verbose>1):
-        print("%-8s %s"%('Found',self))
+    # check if file exists/md5sum, remove file if fail md5sum
+    if self.check(verbose>2,cleanup=True):
       return
+
     if(verbose):
       print("%-8s %s"%('Download',self))
 
@@ -296,20 +313,34 @@ class dataPoint(object):
         printProgress(ntot,ntot,barLength=50)
 
   def unpack(self,verbose=True,inspect=False):
-    from os.path import isfile
     from tarfile import is_tarfile,open
-    if not isfile(self.dst) or not is_tarfile(self.dst):
+    from os.path import isdir,basename
+    from os import makedirs
+    from shutil import copyfile
+    if not self.check(verbose>2):
       return
-    if(verbose):
-      print("%-8s %s"%('Unpack',self))
-
-    with open(self.dst) as f:      
-      if userConsent('See the contents first?',inspect,'no'):
-        print f.list(verbose=(verbose>1))
-        if not userConsent('Do you wish to proceed?',inspect):
-          print("OK, skipping file")
-          return
-   
+      
+    if is_tarfile(self.dst):
+      print("%-8s %s"%('Untar',self))
+      with open(self.dst,'r') as f:      
+        if userConsent('See the contents first?',inspect,'no'):
+          print f.list(verbose=(verbose>1))
+          if not userConsent('Do you wish to proceed?',inspect):
+            print("OK, skipping file")
+            return
+        d="%s/"%(_CONST['DATADIR'])
+        if (not isdir(d))and(d!=''):
+          makedirs(d)
+        f.extractall(d)
+    else:
+      d="%s/%s/"%(_CONST['DATADIR'],self.key)
+      f=d+basename(self.dst)
+      if(verbose>1):
+        print("%-8s %s"%('Copy',f))
+      d="%s/%s/"%(_CONST['DATADIR'],self.key)
+      if (not isdir(d))and(d!=''):
+        makedirs(d)
+      copyfile(self.dst,f)
 
 class dataSet(object):
   '''Info and retrieval/check methods'''
@@ -448,18 +479,14 @@ if __name__ == "__main__":
             fileSize(sum([x.size for x in ds[key]])),ds[key][0].tag))
 
   down=list(set(down))  # unique files, for single download and total size
-  if opts.verbose:
-    print("Queue download: %6s %s"%(
-      fileSize(sum([x.size for x in down])),'Total'))
 
+  print("Queue download: %6s %s"%(
+    fileSize(sum([x.size for x in down])),'Total'))
   if not userConsent('Do you wish to proceed?',opts.ask):
     print("OK, bye")
     sys.exit(0)
     
   for x in down:
-    if not x.check(opts.verbose>1):
-      x.cleanup(opts.verbose>1)
-
     x.download(opts.verbose)
     x.unpack(opts.verbose,opts.ask)
     if opts.cleanup:
