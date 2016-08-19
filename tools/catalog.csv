@@ -14,7 +14,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo200512.tar.bz2,,907495321,cb6a688d675e84d9c192f14cd333eed5
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo20060101.nc.bz2,,29770706,d1c3e94c49d105b59e4fa33489937f7a
 200802,input,2005,rv3,{FTP}/{REL}/input_data/other/other_input_files.tar.bz2,,73892522,7c326759bc3ff3f27e233e5cf302e5d1
-200802,source,,rv3,{GIT}/archive/{MOD}.tar.gz,,1464320,49514354b30130cd4c40d6e98626f29d
+200802,source,,rv3,{GIT}/archive/{MOD}.tar.gz,,337124,49514354b30130cd4c40d6e98626f29d
 200802,output,2005,rv3,{FTP}/{REL}/model_results_2005/Results_2005.tar.bz2,,1173422080,2d29825f95f5bd93198b53cbcb762761
 200802,docs,,rv3,{GIT}/releases/download/{MOD}/User_Guide.pdf,,225560,8c6561c19735c6654a784c1d94a3ea7c
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200801.tar.bz2,,1090680882,fc654223a4f69ca5a06adff732c7ddbb
@@ -30,11 +30,11 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200811.tar.bz2,,1070358563,d597352bb830184f66bddc5f2b63f1d4
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200812.tar.bz2,,1134409502,e6bda52f8b00eee69251834e4b2ef395
 201108,input,2008,v201106,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,112183117,b6e0f2021a539793e01043ff4a2d2cb7
-201108,source,,v201106,{FTP}/{REL}/model_code/MSC-W_EMEP_ModelCode.tar.bz2,,370521,2d5d3d43731a2c1844d0f4c3ddbec161
+201108,source,,v201106,{GIT}/archive/{MOD}.tar.gz,,741890,72bc654b9412f3e18ec5962c84522e2b
 201108,output,2008,v201106,{FTP}/{REL}/model_results_2008/model_results_Base.tar.bz2,,4988678844,02a9284ddc295948ef4300d72a24507b
 201108,output,2008,v201106,{FTP}/{REL}/model_results_2008/model_results_Jan_01_02.tar.bz2,,32745137,cd5e9f95c39c2f8ed93ea5da4e35bead
 201108,other,,,{FTP}/{REL}/model_tools/tools.tar.bz2,,2849,cf01ad5c0b866174fe6e96fc93296838
-201108,docs,,v201106,{FTP}/{REL}/userguide_062011.pdf,,360271,745f35eb41e26b30b327d66fb28dac2c
+201108,docs,,v201106,{GIT}/releases/download/{MOD}/User_Guide.pdf,,360271,745f35eb41e26b30b327d66fb28dac2c
 201209,meteo,2010,,{FTP}/met2010/meteo201001.tar.bz2,,1121901868,4228c41223e842bc3bbc019d32242ac0
 201209,meteo,2010,,{FTP}/met2010/meteo201002.tar.bz2,,1017434990,8c166a7d74627885ea9c430c66bf1fb6
 201209,meteo,2010,,{FTP}/met2010/meteo201003.tar.bz2,,1118511102,aa641c0c01f929d7d068f1dc41301898
