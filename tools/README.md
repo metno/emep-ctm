@@ -41,8 +41,6 @@ Options:
 
     -R REV, --revision=REV
                         revision REV
-    -S YEAR, --status=YEAR
-                        YEAR's status report
     -Y YEAR, --year=YEAR
                         Meteorological/run YEAR
 
