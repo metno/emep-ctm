@@ -69,7 +69,7 @@ please acknowledge EMEP/MSC-W in any use of these data.
 [readme43]: ftp://ftp.met.no/projects/emep/OpenSource/201304/README_rv4_3special.txt
 [src40]:    ftp://ftp.met.no/projects/emep/OpenSource/201209/
 [src201106]:ftp://ftp.met.no/projects/emep/OpenSource/201108/
-[src40]:    ftp://ftp.met.no/projects/emep/OpenSource/200802/
+[src30]:    ftp://ftp.met.no/projects/emep/OpenSource/200802/
 
 **Previous releases (YYYYMM - date of release):**
 * [OpenSource rv4.5 (201409)][src45].
@@ -77,7 +77,7 @@ please acknowledge EMEP/MSC-W in any use of these data.
 * [OpenSource rv4.3 (201304)][src43] *read the file [README_rv4_3special.txt][readme43]*.
 * [OpenSource rv4.0 (201209)][src40].
 * [OpenSource v.2011-06 (201108)][src201106].
-* [OpenSource rv3 (200802)][src40].
+* [OpenSource rv3 (200802)][src30].
 
 Please read the updated EMEP MSC-W model User Guide available
 for each releaseon respective ftp site.
