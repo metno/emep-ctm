@@ -1,9 +1,8 @@
-! <GridValues_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!***************************************************************************! 
-!* 
-!*  Copyright (C) 2007-2012 met.no
-!* 
+! <GridValues_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,281 +10,261 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!***************************************************************************! 
-
+!*****************************************************************************!
 Module GridValues_ml
 
-  !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
-  !
-  !  Define parameters and variables associated with 3-D grid and its
-  !  geography.
-  !
-  ! History: 
-  ! March - changed folllwing Steffen's optimisation/correction of sigma_mid.
-  ! January 2001 : Created by ds from old defconstants, made enough changes
-  ! to get this into F90, and to make x,y inputs to the position subroutine,
-  ! but the basic equations are untouched.
-  ! October 2001 hf added call to ReadField (which now does global2local)
-  ! Nov. 2001 - tidied up a bit (ds). Use statements moved to top of module
-  !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+!CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+!
+!  Define parameters and variables associated with 3-D grid and its
+!  geography.
+!
+! History: 
+! March - changed folllwing Steffen's optimisation/correction of sigma_mid.
+! January 2001 : Created by ds from old defconstants, made enough changes
+! to get this into F90, and to make x,y inputs to the position subroutine,
+! but the basic equations are untouched.
+! October 2001 hf added call to ReadField (which now does global2local)
+! Nov. 2001 - tidied up a bit (ds). Use statements moved to top of module
+!CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
-  use CheckStop_ml,    only : CheckStop,StopAll
-  use Functions_ml,    only : great_circle_distance
-  use Io_Nums_ml,       only: IO_LOG
+use CheckStop_ml,           only: CheckStop,StopAll
+use Functions_ml,           only: great_circle_distance
+use Io_Nums_ml,             only: IO_LOG,IO_TMP
+use MetFields_ml 
+use ModelConstants_ml,      only: &
+  KMAX_BND, KMAX_MID, & ! vertical extent
+  DEBUG,              & ! DEBUG%GRIDVALUES
+  MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN,&
+  PT,Pref,NMET,METSTEP,USE_EtaCOORDINATES
+use Par_ml, only : &
+  MAXLIMAX,MAXLJMAX,  & ! max. possible i, j in this domain
+  limax,ljmax,        & ! actual max.   i, j in this domain
+  li0,li1,lj0,lj1,    & ! for debugging TAB
+  GIMAX,GJMAX,        & ! Size of rundomain
+  IRUNBEG,JRUNBEG,    & ! start of user-specified domain
+  gi0,gj0,            & ! full-dom coordinates of domain lower l.h. corner
+  gi1,gj1,            & ! full-dom coordinates of domain uppet r.h. corner
+  me,                 & ! local processor
+  parinit
+use PhysicalConstants_ml,     only: GRAV, PI ! gravity, pi
+use TimeDate_ml,              only: current_date,date,Init_nmdays,nmdays,startdate
+use TimeDate_ExtraUtil_ml,    only: nctime2idate,date2string
+use InterpolationRoutines_ml, only: inside_1234
 
-  use MetFields_ml 
-  use ModelConstants_ml,    only : KMAX_BND, KMAX_MID  &! vertical extent
-       ,DEBUG_i, DEBUG_j  &    ! full-domain coordinate of debug-site
-       ,DEBUG_GRIDVALUES  &
-       ,MasterProc        &
-       ,NPROC, IIFULLDOM,JJFULLDOM, RUNDOMAIN&
-       ,PT, Pref          &
-       ,NMET, METSTEP
-  use Par_ml, only : &
-       MAXLIMAX,MAXLJMAX & ! max. possible i, j in this domain
-       ,limax,ljmax        & ! actual max.   i, j in this domain
-       ,li0,li1,lj0,lj1    & ! for debugging TAB
-        ,GIMAX,GJMAX       & ! Size of rundomain
-       ,IRUNBEG,JRUNBEG    & ! start of user-specified domain
-       ,gi0,gj0     & ! full-dom coordinates of domain lower l.h. corner
-       ,gi1,gj1     & ! full-dom coordinates of domain uppet r.h. corner
-       ,me          & ! local processor
-      , parinit
-  use PhysicalConstants_ml, only : GRAV, PI ! gravity, pi
-  use TimeDate_ml,          only : current_date, date,Init_nmdays,nmdays,startdate
-  use TimeDate_ExtraUtil_ml,only : nctime2idate,date2string
-  use InterpolationRoutines_ml,only: inside_1234
+implicit none
+private
 
-  implicit none
-  private
+!-- contains subroutine:
+public :: DefGrid ! => GRIDWIDTH_M, map-factor stuff, calls other routines
+public :: DefDebugProc ! =>  sets debug_proc, debug_li, debug_lj
+public :: ij2lbm  ! polar stereo grid to longitude latitude
+public :: lb2ijm  ! longitude latitude to grid in polar stereo
+public :: ij2ijm  ! polar grid1 to polar grid2
+public :: lb2ij   ! longitude latitude to (i,j) in any grid projection
+public :: ij2lb   ! polar stereo grid to longitude latitude
 
-  !-- contains subroutine:
+public :: GlobalPosition
+private :: Position ! => lat(glat), long (glon)
+public :: coord_in_gridbox,  &  ! Are coord (lon/lat) is inside gridbox(i,j)?
+          coord_in_processor    ! Are coord (lon/lat) is inside local domain?
 
-  Public :: DefGrid ! => GRIDWIDTH_M, map-factor stuff, calls other routines
-  Public :: DefDebugProc ! =>  sets debug_proc, debug_li, debug_lj
-  Public :: ij2lbm  ! polar stereo grid to longitude latitude
-  Public :: lb2ijm  ! longitude latitude to grid in polar stereo
-  Public :: ij2ijm  ! polar grid1 to polar grid2
-  Public :: lb2ij   ! longitude latitude to (i,j) in any grid projection
-  Public :: ij2lb  ! polar stereo grid to longitude latitude
+public :: GridRead,Getgridparams
+private :: Alloc_GridFields
+private :: GetFullDomainSize
 
-  Public :: GlobalPosition
-  private :: Position ! => lat(glat), long (glon)
-  Public :: coord_in_gridbox,  &  ! Are coord (lon/lat) is inside gridbox(i,j)?
-       coord_in_processor    ! Are coord (lon/lat) is inside local domain?
+!** 1) Public (saved) Variables from module:
+INCLUDE 'mpif.h'
+INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
-  public :: GridRead,Getgridparams
-  private :: Alloc_GridFields
-  private :: GetFullDomainSize
+real, public, save :: &
+  xp, yp,     & ! Coordinates of North pole (from infield)
+  fi,         & ! projections rotation angle around y axis (from infield)
+  AN,         & ! Distance on the map from pole to equator (No. of cells)
+  GRIDWIDTH_M,& ! width of grid at 60N, in meters (old "h")(from infield)
+  ref_latitude  ! latitude at which projection is true (degrees)
 
-  !** 1) Public (saved) Variables from module:
-  INCLUDE 'mpif.h'
-  INTEGER STATUS(MPI_STATUS_SIZE),INFO
+!Rotated_Spherical grid prarameters
+real, public, save :: grid_north_pole_latitude,grid_north_pole_longitude,&
+                      dx_rot,dx_roti,x1_rot,y1_rot
 
-  real, public, save :: &
-       xp, yp  &   ! Coordinates of North pole (from infield)
-       , fi      &   ! projections rotation angle around y axis (from infield)
-       , AN      &   ! Distance on the map from pole to equator (No. of cells)
-       ,GRIDWIDTH_M &! width of grid at 60N, in meters (old "h")(from infield)
-       ,ref_latitude ! latitude at which projection is true (degrees)
+!/ Variables to define full-domain (fdom) coordinates of local i,j values,
+!  and reciprocal variables.
+integer, public, allocatable, save, dimension(:) :: &
+  i_fdom,j_fdom,&       ! fdom coordinates of local i,j
+  i_local,j_local       ! local coordinates of full-domain i,j
 
-  !Rotated_Spherical grid prarameters
-  real, public, save :: grid_north_pole_latitude,grid_north_pole_longitude
-  real, public, save :: dx_rot,dx_roti,x1_rot,y1_rot
+!Parameters for Vertical Hybrid coordinates:
+real, public, save,allocatable,  dimension(:) ::  &
+  A_bnd,B_bnd,&         ! first [Pa],second [1] constants at layer boundary
+                        ! (i.e. half levels in EC nomenclature)
+  A_bnd_met,B_bnd_met,&         ! first [Pa],second [1] constants at layer boundary
+                        ! (i.e. half levels in EC nomenclature)
+  A_mid,B_mid,&         ! first [Pa],second [1] constants at middle of layer
+                        ! (i.e. full levels in EC nomenclature)
+  dA,dB,&               ! A_bnd(k+1)-A_bnd(k) [Pa],B_bnd(k+1)-B_bnd(k) [1]
+                        ! P = A + B*PS; eta = A/Pref + B
+  Eta_bnd,Eta_mid,&     ! boundary,midpoint of eta layer 
+  sigma_bnd,sigma_mid   ! boundary,midpoint of sigma layer
 
-  !/ Variables to define full-domain (fdom) coordinates of local i,j values. 
+real, public, save,allocatable,  dimension(:) ::  carea    ! for budgets?
 
-  integer, public, allocatable, save, dimension(:) :: i_fdom !fdom coordinates
-  integer, public, allocatable, save, dimension(:) :: j_fdom !of local i,j
+real, public, save,allocatable,  dimension(:,:) :: &
+  glon     ,glat    ,&  ! longitude,latitude of gridcell centers
+  gl_stagg ,gb_stagg,&  ! longitude,latitude of gridcell corners 
+      !NB: gl_stagg, gb_stagg are here defined as the average of the four
+      !    surrounding gl gb.
+      !    These differ slightly from the staggered points in the (i,j) grid. 
+  glat_fdom,glon_fdom   ! latitude,longitude of gridcell centers
 
-  ! and reverse:
-  integer, public, allocatable, save,dimension(:) :: i_local  !local coordinates
-  integer, public, allocatable, save,dimension(:) :: j_local  !of full-domain i,j
+real, public, save :: gbacmax,gbacmin,glacmax,glacmin
 
-  !Parameters for Vertical Hybrid coordinates:
-  real, public, save,allocatable,  dimension(:) ::  &
-       A_bnd !Unit Pa.  first constant, defined at layer boundary
-  ! (i.e. half levels in EC nomenclature)
-  real, public, save,allocatable,  dimension(:) ::  &
-       B_bnd !Unit 1.  second constant, defined at layer boundary
-  ! (i.e. half levels in EC nomenclature)
-  real, public, save,allocatable,  dimension(:) ::  &
-       A_mid !Unit Pa.  first constant, defined at middle of layer
-  ! (i.e. full levels in EC nomenclature)
-  real, public, save,allocatable,  dimension(:) ::  &
-       B_mid !Unit 1.  second constant, defined at middle of layer
-  ! (i.e. full levels in EC nomenclature)
-  real, public, save,allocatable,  dimension(:) ::  &
-       dA !Unit Pa.  A_bnd(k+1)-A_bnd(k) 
-  real, public, save,allocatable,  dimension(:) ::  &
-       dB !Unit 1.  B_bnd(k+1)-B_bnd(k) 
-  ! P = A + B*PS
-  ! eta = A/Pref + B
-  real, public, save,allocatable,  dimension(:) ::  &
-       Eta_bnd ! sigma, layer boundary 
-  real, public, save,allocatable,  dimension(:) ::  &
-       Eta_mid ! sigma, layer boundary 
+! EMEP grid definitions (old and official)
+real, public, parameter :: &
+  xp_EMEP_official=8.,yp_EMEP_official=110.0,fi_EMEP=-32.0,&
+  ref_latitude_EMEP=60.0,GRIDWIDTH_M_EMEP=50000.0,&
+  an_EMEP=237.7316364, &! = 6.370e6*(1.0+0.5*sqrt(3.0))/50000.
+  xp_EMEP_old=43.0,yp_EMEP_old=121.0
 
-  real, public, save,allocatable,  dimension(:) ::  &
-       sigma_bnd ! sigma, layer boundary 
+!/** Map factor stuff:
+real, public, save,allocatable, dimension(:,:) ::  &
+  xm_i,     & ! map-factor in i direction, between cell j and j+1
+  xm_j,     & ! map-factor in j direction, between cell i and i+1
+  xm2,      & ! xm*xm: area factor in the middle of a cell (i,j)
+  xmd,      & ! 1/xm2  
+  xm2ji,xmdji
 
-  real, public, save,allocatable,  dimension(:) ::  &
-       sigma_mid   ! sigma layer midpoint
+!/** Grid Area
+real, public, save,allocatable, dimension(:,:) :: GridArea_m2
 
-  real, public, save,allocatable,  dimension(:) ::  carea    ! for budgets?
+integer, public, save :: &
+  debug_li=-99, debug_lj=-99         ! Local Coordinates of debug-site
+logical, public, save :: debug_proc  ! Processor with debug-site
 
-  real, public, save,allocatable,  dimension(:,:) :: &
-       glon       &         !longitude of gridcell centers
-       ,glat                 !latitude  of gridcell centers
-  real, public, save,allocatable,  dimension(:,:) :: &
-       gl_stagg   &         !longitude of gridcell corners 
-       ,gb_stagg             !latitude  of gridcell corners
-  !NB: gl_stagg, gb_stagg are here defined as the average of the four
-  !    surrounding gl gb.
-  !    These differ slightly from the staggered points in the (i,j) grid. 
+character(len=100),public  :: projection
+integer, public, parameter :: MIN_ADVGRIDS = 5 !minimum size of a subdomain
+integer, public :: Poles(2)       ! Poles(1)=1 if North pole is found, Poles(2)=1:SP
+integer, public :: Pole_Singular  ! Pole_included=1 or 2 if the grid include
+                                  ! at least one pole and has lat lon projection
+logical, public :: Grid_Def_exist
 
-  real, public, allocatable,  dimension(:,:) :: &
-       glat_fdom, &         !latitude of gridcell centers
-       glon_fdom            !longitude of gridcell centers
-
-
-  real, public, save :: gbacmax,gbacmin,glacmax,glacmin
-
-  ! EMEP grid definitions (old and official)
-  real, public, parameter :: xp_EMEP_official=8.&
-       ,yp_EMEP_official=110.0&
-       ,fi_EMEP=-32.0&
-       ,ref_latitude_EMEP=60.0&
-       ,GRIDWIDTH_M_EMEP=50000.0&
-       ,an_EMEP = 237.7316364 &! = 6.370e6*(1.0+0.5*sqrt(3.0))/50000.
-       ,xp_EMEP_old =  43.0&
-       ,yp_EMEP_old = 121.0
-
-
-  !/** Map factor stuff:
-
-  real, public, save,allocatable, dimension(:,:) ::  &
-       xm_i     & ! map-factor in i direction, between cell j and j+1
-       ,xm_j     & ! map-factor in j direction, between cell i and i+1
-       ,xm2      & ! xm*xm: area factor in the middle of a cell (i,j)
-       ,xmd        ! 1/xm2  
-
-  real, public, save,allocatable, dimension(:,:) ::  &
-       xm2ji  &
-       ,xmdji
-
-  !/** Grid Area
-
-  real, public, save,allocatable, dimension(:,:) :: GridArea_m2
-
-  integer, public, save :: &
-       debug_li=-99, debug_lj=-99         ! Local Coordinates of debug-site
-  logical, public, save :: debug_proc  ! Processor with debug-site
-
-  character (len=100),public::projection
-  integer, public, parameter :: MIN_ADVGRIDS = 5 !minimum size of a subdomain
-  integer, public :: Poles(2) !Poles(1)=1 if North pole is found, Poles(2)=1:SP
-  integer, public :: Pole_Singular !Pole_included=1 or 2 if the grid include at least one pole and has lat lon projection
-  logical, public :: Grid_Def_exist
-
+character(len=230), public  :: filename_vert
+integer, allocatable, public :: k1_met(:),k2_met(:)
+real, allocatable, public :: x_k1_met(:)
+logical, public, save ::  External_Levels_Def=.false.
+integer, public, save :: KMAX_MET !number of vertical levels from the meteo files
 
 contains
 
+subroutine GridRead(meteo,cyclicgrid)
+!   the subroutine reads the grid parameters (projection, resolution etc.)
+!   defined by the meteorological fields
+!
+  implicit none
 
-  subroutine GridRead(cyclicgrid)
+  character(len=*),intent(in):: meteo   ! template for meteofile
+  integer,  intent(out)      :: cyclicgrid
+  integer                    :: nyear,nmonth,nday,nhour,k
+  integer                    :: KMAX,MIN_GRIDS
+  character(len=len(meteo))  :: filename !name of the input file
+  logical :: Use_Grid_Def=.false.!Experimental for now
 
-    !   the subroutine reads the grid parameters (projection, resolution etc.)
-    !   defined by the meteorological fields
-    !
+  nyear=startdate(1)
+  nmonth=startdate(2)
+  nday=startdate(3)
+  nhour=0
+  current_date = date(nyear, nmonth, nday, nhour, 0 )
+  call Init_nmdays( current_date )
 
-    implicit none
-
-    integer,  intent(out)      :: cyclicgrid
-    integer                    :: nyear,nmonth,nday,nhour,k
-    integer                    :: KMAX,MIN_GRIDS
-    character (len = 100),save :: filename !name of the input file
-    character (len=230) :: txt
-    logical :: Use_Grid_Def=.false.!Experimental for now
-
-    nyear=startdate(1)
-    nmonth=startdate(2)
-    nday=startdate(3)
-    nhour=0
-    current_date = date(nyear, nmonth, nday, nhour, 0 )
-    call Init_nmdays( current_date )
-
-    !*********initialize grid parameters*********
-    filename='Grid_Def.nc'
-    inquire(file=filename,exist=Grid_Def_exist)
-    Grid_Def_exist=Grid_Def_exist.and.Use_Grid_Def
-    if(Grid_Def_exist)then
+  !*********initialize grid parameters*********
+  filename='Grid_Def.nc'
+  inquire(file=filename,exist=Grid_Def_exist)
+  Grid_Def_exist=Grid_Def_exist.and.Use_Grid_Def
+  if(Grid_Def_exist)then
     if(MasterProc)write(*,*)'Found Grid_Def! ',trim(filename)
-    else
+  else
     if(MasterProc.and.Use_Grid_Def)write(*,*)'Did not found Grid_Def ',trim(filename)
-56  FORMAT(a5,i4.4,i2.2,i2.2,a3)
-    write(filename,56)'meteo',nyear,nmonth,nday,'.nc'
-    endif
-    if(MasterProc)write(*,*)'reading domain sizes from ',trim(filename)
+!56 FORMAT(a5,i4.4,i2.2,i2.2,a3)
+!   write(filename,56)'meteo',nyear,nmonth,nday,'.nc'
+    filename = date2string(meteo,startdate)
+  endif
+  if(MasterProc)write(*,*)'reading domain sizes from ',trim(filename)
 
-    call GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,Pole_Singular,projection)
+  call GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX_MET,Pole_Singular,projection)
+! call CheckStop(KMAX_MID/=KMAX,"vertical cordinates not yet flexible")
 
-!    call CheckStop(KMAX_MID/=KMAX,"vertical cordinates not yet flexible")
+  filename_vert='Vertical_levels.txt'
+  inquire(file=filename_vert,exist=External_Levels_Def)!done by all procs
+  if(External_Levels_Def)then
+     !define own vertical coordinates
+     !Must use eta coordinates
+     USE_EtaCOORDINATES=.true.
+     if(me==0)then !onlyme=0 read the file
+        write(*,*)'Define vertical levels from ',trim(filename_vert)
+        write(*,*)'using eta coordinates '
+        open(IO_TMP,file=filename_vert,action="read")
+        read(IO_TMP,*)KMAX_MID
+        write(*,*)KMAX_MID, 'vertical levels '
+      endif
+      CALL MPI_BCAST(KMAX_MID ,4*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+!      External_Levels_Def=.true.
+  else
+     KMAX_MID=KMAX_MET
+  endif
+  KMAX_BND=KMAX_MID+1
 
-    KMAX_MID=KMAX
-    KMAX_BND=KMAX_MID+1
+  allocate(A_bnd(KMAX_BND),B_bnd(KMAX_BND))
+  allocate(A_mid(KMAX_MID),B_mid(KMAX_MID))
+  allocate(dA(KMAX_MID),dB(KMAX_MID))
+  allocate(sigma_bnd(KMAX_BND),sigma_mid(KMAX_MID),carea(KMAX_MID))
+  allocate(Eta_bnd(KMAX_BND),Eta_mid(KMAX_MID))
 
-    allocate(A_bnd(KMAX_BND),B_bnd(KMAX_BND))
-    allocate(A_mid(KMAX_MID),B_mid(KMAX_MID))
-    allocate(dA(KMAX_MID),dB(KMAX_MID))
-    allocate(sigma_bnd(KMAX_BND),sigma_mid(KMAX_MID),carea(KMAX_MID))
-    allocate(Eta_bnd(KMAX_BND),Eta_mid(KMAX_MID))
+  allocate(i_local(IIFULLDOM))
+  allocate(j_local(JJFULLDOM))
+  allocate(glat_fdom(IIFULLDOM,JJFULLDOM))!should be removed from code
+  allocate(glon_fdom(IIFULLDOM,JJFULLDOM))!should be removed from code
 
-    allocate(i_local(IIFULLDOM))
-    allocate(j_local(JJFULLDOM))
-    allocate(glat_fdom(IIFULLDOM,JJFULLDOM))!should be removed from code
-    allocate(glon_fdom(IIFULLDOM,JJFULLDOM))!should be removed from code
-
-     !set RUNDOMAIN default values where not defined
-    if(RUNDOMAIN(1)<1)RUNDOMAIN(1)=1
-    if(RUNDOMAIN(2)<1)RUNDOMAIN(2)=IIFULLDOM
-    if(RUNDOMAIN(3)<1)RUNDOMAIN(3)=1
-    if(RUNDOMAIN(4)<1)RUNDOMAIN(4)=JJFULLDOM
-    if(MasterProc)then
+  !set RUNDOMAIN default values where not defined
+  if(RUNDOMAIN(1)<1)RUNDOMAIN(1)=1
+  if(RUNDOMAIN(2)<1)RUNDOMAIN(2)=IIFULLDOM
+  if(RUNDOMAIN(3)<1)RUNDOMAIN(3)=1
+  if(RUNDOMAIN(4)<1)RUNDOMAIN(4)=JJFULLDOM
+  if(MasterProc)then
     55 format(A,I5,A,I5)
-       write(*,55) 'FULLDOMAIN has sizes ',IIFULLDOM,' X ',JJFULLDOM
-       write(IO_LOG,55)'FULLDOMAIN has sizes ',IIFULLDOM,' X ',JJFULLDOM
-       write(*,55)'RUNDOMAIN  x coordinates from ',RUNDOMAIN(1),' to ',RUNDOMAIN(2)
-       write(IO_LOG,55)'RUNDOMAIN  x coordinates from ',RUNDOMAIN(1),' to ',RUNDOMAIN(2)
-       write(*,55)'RUNDOMAIN  y coordinates from ',RUNDOMAIN(3),' to ',RUNDOMAIN(4)
-       write(IO_LOG,55)'RUNDOMAIN  y coordinates from ',RUNDOMAIN(3),' to ',RUNDOMAIN(4)
-    endif
+    write(*,55)     'FULLDOMAIN has sizes ',IIFULLDOM,' X ',JJFULLDOM
+    write(IO_LOG,55)'FULLDOMAIN has sizes ',IIFULLDOM,' X ',JJFULLDOM
+    write(*,55)     'RUNDOMAIN  x coordinates from ',RUNDOMAIN(1),' to ',RUNDOMAIN(2)
+    write(IO_LOG,55)'RUNDOMAIN  x coordinates from ',RUNDOMAIN(1),' to ',RUNDOMAIN(2)
+    write(*,55)     'RUNDOMAIN  y coordinates from ',RUNDOMAIN(3),' to ',RUNDOMAIN(4)
+    write(IO_LOG,55)'RUNDOMAIN  y coordinates from ',RUNDOMAIN(3),' to ',RUNDOMAIN(4)
+  endif
 
 
-    MIN_GRIDS=5
-    call parinit(MIN_GRIDS,Pole_Singular)     !subdomains sizes and position
+  MIN_GRIDS=5
+  call parinit(MIN_GRIDS,Pole_Singular)     !subdomains sizes and position
 
-    call Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
+  call Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
 
-    call Alloc_GridFields(GIMAX,GJMAX,MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND)
+  call Alloc_GridFields(GIMAX,GJMAX,MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND)
 
-    call Getgridparams(filename,GRIDWIDTH_M,xp,yp,fi,&
-         ref_latitude,sigma_mid,cyclicgrid)
+  call Getgridparams(filename,GRIDWIDTH_M,xp,yp,fi,&
+       ref_latitude,sigma_mid,cyclicgrid)
 
-
-    if(MasterProc .and. DEBUG_GRIDVALUES)then
+  if(External_Levels_Def.and.me==0)close(IO_TMP)
+ 
+    if(MasterProc .and. DEBUG%GRIDVALUES)then
        write(*,*)'sigma_mid:',(sigma_mid(k),k=1,20)
        write(*,*)'grid resolution:',GRIDWIDTH_M
        write(*,*)'xcoordinate of North Pole, xp:',xp
@@ -410,12 +389,6 @@ contains
     !
     ! This routine is called only once (and is therefore not optimized for speed)
     !
-!    use ChemSpecs_adv_ml,  only: NSPEC_ADV         ! => No. species 
-!    use ChemSpecs_shl_ml,  only: NSPEC_SHL         ! => No. species 
-!    use Chemfields_ml, only:xn_adv, xn_shl, xn_bgn, PM25_water, PM25_water, PM25_water_rh50&
-!         ,AOD,cfac,so2nh3_24hr,Grid_snow&
-!         ,NSPEC_BGN,NSPEC_COL
-
   use netcdf
 
     implicit none
@@ -424,7 +397,7 @@ contains
     real, intent(out) :: GRIDWIDTH_M,xp,yp,fi, ref_latitude,sigma_mid(KMAX_MID)
     integer, intent(out):: cyclicgrid
 
-    integer :: nseconds(1),n1,i,j,k,im,jm,i0,j0
+    integer :: nseconds(1),n1,i,j,k,kk,im,jm,i0,j0
     integer :: ncFileID,idimID,jdimID, kdimID,timeDimID,varid,timeVarID
     integer :: GIMAX_file,GJMAX_file,KMAX_file,ihh,ndate(4)
     !    realdimension(-1:GIMAX+2,-1:GJMAX+2) ::xm_global,xm_global_j,xm_global_i
@@ -432,7 +405,8 @@ contains
     integer :: status,iglobal,jglobal,info,South_pole,North_pole,Ibuff(2)
     real :: ndays(1),x1,x2,x3,x4,P0
     character (len = 50) :: timeunit
- 
+    logical::found_hybrid=.false.
+
     allocate(xm_global(-1:GIMAX+2,-1:GJMAX+2))
     allocate(xm_global_j(-1:GIMAX+2,-1:GJMAX+2))
     allocate(xm_global_i(-1:GIMAX+2,-1:GJMAX+2))
@@ -574,25 +548,70 @@ contains
        endif
 
        status=nf90_inq_varid(ncid = ncFileID, name = "k", varID = varID)
-       if(status /= nf90_noerr)then
-          call check(nf90_inq_varid(ncid = ncFileID, name = "hyam", varID = varID))                 
-          call check(nf90_get_var(ncFileID, varID, A_mid ))
-          call check(nf90_inq_varid(ncid = ncFileID, name = "P0", varID = varID))                 
-          call check(nf90_get_var(ncFileID, varID, P0 ))
-          A_mid=P0*A_mid!different definition in modell and grid_Def
-          call check(nf90_inq_varid(ncid = ncFileID, name = "hybm", varID = varID))                 
-          call check(nf90_get_var(ncFileID, varID,B_mid))
+       if(status /= nf90_noerr.or.External_Levels_Def)then
+          write(*,*)'reading met hybrid levels from ',trim(filename)
+!          call check(nf90_inq_varid(ncid = ncFileID, name = "hyam", varID = varID))                 
+!          call check(nf90_get_var(ncFileID, varID, A_mid ))
+!          A_mid=P0*A_mid!different definition in modell and grid_Def
+!          call check(nf90_inq_varid(ncid = ncFileID, name = "hybm", varID = varID))                 
+!          call check(nf90_get_var(ncFileID, varID,B_mid))
+             call check(nf90_inq_varid(ncid = ncFileID, name = "P0", varID = varID))                 
+             call check(nf90_get_var(ncFileID, varID, P0 ))
+             if(.not.allocated(A_bnd_met))allocate(A_bnd_met(KMAX_MET+1),B_bnd_met(KMAX_MET+1))
+             call check(nf90_inq_varid(ncid = ncFileID, name = "hyai", varID = varID))                 
+             call check(nf90_get_var(ncFileID, varID, A_bnd_met ))
+             A_bnd_met=P0*A_bnd_met!different definition in model and grid_Def
+             call check(nf90_inq_varid(ncid = ncFileID, name = "hybi", varID = varID))                 
+             call check(nf90_get_var(ncFileID, varID, B_bnd_met ))          
+
+          if(External_Levels_Def)then
+             !model levels defined from external text file
+             write(*,*)'reading external hybrid levels from ',trim(filename_vert)
+             P0=Pref
+             do k=1,KMAX_MID+1
+                read(IO_TMP,*)kk,A_bnd(k),B_bnd(k)
+                if(kk/=k)write(*,*)'WARNING: unexpected format for vertical levels ',k,kk
+             enddo        
+          else
+             !vertical model levels are the same as in meteo 
+             A_bnd=A_bnd_met
+             B_bnd=B_bnd_met
+          endif
+          
+          do k=1,KMAX_MID
+             A_mid(k)=0.5*(A_bnd(k)+A_bnd(k+1))
+             B_mid(k)=0.5*(B_bnd(k)+B_bnd(k+1))
+          enddo
           sigma_mid =B_mid!for Hybrid coordinates sigma_mid=B if A*P0=PT-sigma_mid*PT
-          call check(nf90_inq_varid(ncid = ncFileID, name = "hyai", varID = varID))                 
-          call check(nf90_get_var(ncFileID, varID, A_bnd ))
-          A_bnd=P0*A_bnd!different definition in modell and grid_Def
-          call check(nf90_inq_varid(ncid = ncFileID, name = "hybi", varID = varID))                 
-          call check(nf90_get_var(ncFileID, varID, B_bnd ))          
+          
+          write(*,*)"Hybrid vertical coordinates, P at levels boundaries:"
+          do k=1,KMAX_MID+1
+44           FORMAT(i4,10F12.2)
+             write(*,44)k, A_bnd(k)+P0*B_bnd(k)
+          enddo
+!test if the top is within the height defined in the meteo files
+          if(External_Levels_Def.and.(A_bnd(1)+P0*B_bnd(1)<A_bnd_met(1)+P0*B_bnd_met(1)))then
+             write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+P0*B_bnd(1)
+             write(*,*)'Pressure at top defined in meteo files is ',A_bnd_met(1)+P0*B_bnd_met(1)
+             write(*,*)'Pressure at op must be higher (lower altitude) than top defined in meteo '
+             call StopAll('Top level too high! Change values in Vertical_levels.txt')
+          endif
+!test if the levels can cope with highest mountains (400 hPa)
+          do k=1,KMAX_MID
+             if(A_bnd(k+1)+40000*B_bnd(k+1)-(A_bnd(k)+40000*B_bnd(k))<0.0)then
+                write(*,*)'WARNING: hybrid vertical level definition may cause negative level thickness when pressure below 400 hPa '
+                write(*,*)'Pressure at level ',k,' is ',A_bnd(k)+40000*B_bnd(k)
+                write(*,*)'Pressure at level ',k+1,' is ',A_bnd(k+1)+40000*B_bnd(k+1),' (should be higher)'
+                call StopAll('GridValues_ml: possible negative level thickness ')
+             endif
+          enddo
+
+          found_hybrid=.true.
        else
           call check(nf90_get_var(ncFileID, varID, sigma_mid ))
        endif
        call check(nf90_close(ncFileID))
-    endif !me=0
+    endif ! MasterProc
 
 
 
@@ -611,8 +630,8 @@ contains
        sigma_bnd(k) = 2.*sigma_mid(k) - sigma_bnd(k+1)
     enddo
     sigma_bnd(1) = 0.
-
-    if(Grid_Def_exist)then
+    CALL MPI_BCAST(found_hybrid,1,MPI_LOGICAL,0,MPI_COMM_WORLD,INFO)
+    if(found_hybrid.or.Grid_Def_exist)then
        CALL MPI_BCAST(A_bnd,8*(KMAX_MID+1),MPI_BYTE,0,MPI_COMM_WORLD,INFO)
        CALL MPI_BCAST(B_bnd,8*(KMAX_MID+1),MPI_BYTE,0,MPI_COMM_WORLD,INFO)
        CALL MPI_BCAST(A_mid,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
@@ -635,6 +654,8 @@ contains
        Eta_mid(k)=A_mid(k)/Pref+B_mid(k)
     enddo
     Eta_bnd(KMAX_MID+1)=A_bnd(KMAX_MID+1)/Pref+B_bnd(KMAX_MID+1)
+    if(me==0)write(*,*)'External_Levels ',External_Levels_Def
+    if(External_Levels_Def)call make_vertical_levels_interpolation_coeff
 
     CALL MPI_BCAST(xm_global_i(1:GIMAX,1:GJMAX),8*GIMAX*GJMAX,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(xm_global_j(1:GIMAX,1:GJMAX),8*GIMAX*GJMAX,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
@@ -755,7 +776,7 @@ contains
        endif
     enddo
 
-    if(MasterProc .and. DEBUG_GRIDVALUES)write(*,*)'CYCLICGRID:',Cyclicgrid
+    if(MasterProc .and. DEBUG%GRIDVALUES)write(*,*)'CYCLICGRID:',Cyclicgrid
 
     !complete (extrapolate) along the four lateral sides
     do i=1,GIMAX
@@ -922,14 +943,14 @@ contains
     ! projection='Stereographic'
     call Position()
 
-    if ( DEBUG_GRIDVALUES ) then
-       if ( me == 0 ) then
+    if(DEBUG%GRIDVALUES) then
+       if(MasterProc) then
           write(*,800) "GRIDTAB","me","ISM","JSM","gi0","gj0",&
                "li0","li1","lix","MXI",&
                "lj0","lj1","ljx"," MXJ"," ig1"," igX","jg1","jgX"
           write(*,802) "GRIDLL ","me", "mingl"," maxgl"," mingb"," maxgb",&
                " glat(1,1)"," glat(MAX..)"
-       end if
+       endif
 
        write(*,804) "GRIDTAB",me,IRUNBEG,JRUNBEG,gi0,gj0,li0,li1,&
             limax,MAXLIMAX,lj0,lj1,ljmax, MAXLJMAX, i_fdom(1),&
@@ -937,7 +958,7 @@ contains
 
        write(*,806) "GRIDLL ",me, minval(glon), maxval(glon), minval(glat), &
             maxval(glat), glat(1,1), glat(MAXLIMAX,MAXLJMAX)
-    end if
+    endif
 800 format(a10,20a4)
 802 format(a10,a4,10a12)
 804 format(a10,20i4)
@@ -957,7 +978,7 @@ contains
 
     do i = li0, li1
        do j = lj0, lj1
-          if( i_fdom(i) == DEBUG_i .and. j_fdom(j) == DEBUG_j ) then
+          if( i_fdom(i) == DEBUG%IJ(1) .and. j_fdom(j) == DEBUG%IJ(2) ) then
              debug_li = i
              debug_lj = j
              debug_proc = .true.
@@ -965,19 +986,19 @@ contains
        end do
     end do
 
-    if( debug_proc ) write(*,*) "GridValues debug_proc found:", &
+    if(debug_proc) write(*,*) "GridValues debug_proc found:", &
          me, debug_li, debug_lj
-    if ( DEBUG_GRIDVALUES ) then
-       if(me==0) write(*,"(a,2a4,a3,4a4,a2,2a4,4a12)") "GridValues debug:", &
+    if(DEBUG%GRIDVALUES) then
+       if(MasterProc) write(*,"(a,2a4,a3,4a4,a2,2a4,4a12)") "GridValues debug:", &
             "D_i", "D_j", "me", "li0", "li1", "lj0", "lj1", &
             "dp" , "d_li", "d_lj", "i_fdom(li0)","i_fdom(li1)", &
             "j_fdom(lj0)", "j_fdom(lj1)"
 
        write(*,"(a,2i4,i3,4i4,L2,2i4,4i12)") "GridValues debug:", &
-            DEBUG_i, DEBUG_j, me, li0, li1, lj0, lj1, &
+            DEBUG%IJ(1), DEBUG%IJ(2), me, li0, li1, lj0, lj1, &
             debug_proc , debug_li, debug_lj, &
             i_fdom(li0),i_fdom(li1), j_fdom(lj0), j_fdom(lj1)
-    end if
+    endif
 
   end subroutine DefDebugProc
   ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1055,21 +1076,21 @@ contains
     CALL MPI_ALLREDUCE(MPI_IN_PLACE, glacmin  , 1, &
          MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, INFO) 
 
-    if(me==0) write(unit=6,fmt="(a,4f9.2)") &
+    if(MasterProc) write(unit=6,fmt="(a,4f9.2)") &
          " GridValues: max/min for lat,lon ", &
          gbacmax,gbacmin,glacmax,glacmin
 
-    if ( DEBUG_GRIDVALUES ) then
+    if(DEBUG%GRIDVALUES) then
        do j = 1, MAXLJMAX
           do i = 1, MAXLIMAX
-             if ( i_fdom(i) == DEBUG_i .and. j_fdom(j) == DEBUG_j ) then
+             if ( i_fdom(i) == DEBUG%IJ(1) .and. j_fdom(j) == DEBUG%IJ(2) ) then
                 write(*,"(a15,a30,5i4,2f8.2,f7.3)") "DEBUGPosition: ",  &
                      " me,i,j,i_fdom,j_fdom,glon,glat,rp: ", &
                      me, i,j, i_fdom(i), j_fdom(j), glon(i,j), glat(i,j),rp
-             end if
-          end do
-       end do
-    end if
+             endif
+          enddo
+       enddo
+    endif
 
   end subroutine Position
   ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1635,14 +1656,20 @@ subroutine range_check(vname,var,vrange,fatal)
   endif
 endsubroutine range_check
 subroutine coord_check(msg,lon,lat,fix)
+!-------------------------------------------------------------------!
+! lon/lat range check. 
+!   Some longitude range errors can be corrected, when fix=.true.
+!   Latitude range errors are always fatal.
+!-------------------------------------------------------------------!
   character(len=*), intent(in) :: msg
   real, intent(inout) :: lon,lat
   logical :: fix
-  call range_check(trim(msg)//" lat",lat,(/ -90.0, 90.0/),fatal=.not.fix)
+  call range_check(trim(msg)//" lat",lat,(/ -90.0, 90.0/),fatal=.true.)
   call range_check(trim(msg)//" lon",lon,(/-180.0,180.0/),fatal=.not.fix)
   if(fix)then
-    lat=modulo(lat      , 90.0)       ! lat/gb_stagg range  -90 .. 90
+!!  lat=mod   (lat      , 90.0)       ! lat/gb_stagg range  -90 .. 90
     lon=modulo(lon+180.0,360.0)-180.0 ! lon/gl_stagg range -180 .. 180
+    call range_check(trim(msg)//" lon",lon,(/-180.0,180.0/),fatal=.true.)
   endif
 endsubroutine coord_check
 function coord_in_gridbox(lon,lat,iloc,jloc) result(in)
@@ -1656,8 +1683,12 @@ function coord_in_gridbox(lon,lat,iloc,jloc) result(in)
   real    :: xr,yr
   call coord_check("coord_in_gridbox",lon,lat,fix=.true.)
   call lb2ij(lon,lat,xr,yr)
-  i=i_local(nint(xr));j=j_local(nint(yr))
-  in=(i==iloc).and.(j==jloc)
+  i=nint(xr);j=nint(yr)
+  in=(i>=1).and.(i<=IIFULLDOM).and.(j>=1).and.(j<=JJFULLDOM)
+  if(in)then
+    i=i_local(i);j=j_local(j)
+    in=(i==iloc).and.(j==jloc)
+  endif
 endfunction coord_in_gridbox
 function coord_in_processor(lon,lat,iloc,jloc) result(in)
 !-------------------------------------------------------------------!
@@ -1670,8 +1701,12 @@ function coord_in_processor(lon,lat,iloc,jloc) result(in)
   real    :: xr,yr
   call coord_check("coord_in_processor",lon,lat,fix=.true.)
   call lb2ij(lon,lat,xr,yr)
-  i=i_local(nint(xr));j=j_local(nint(yr))
-  in=(i>=1).and.(i<=limax).and.(j>=1).and.(j<=ljmax)
+  i=nint(xr);j=nint(yr)
+  in=(i>=1).and.(i<=IIFULLDOM).and.(j>=1).and.(j<=JJFULLDOM)
+  if(in)then
+    i=i_local(i);j=j_local(j)
+    in=(i>=1).and.(i<=limax).and.(j>=1).and.(j<=ljmax)
+  endif
   if(present(iloc))iloc=i
   if(present(jloc))jloc=j
 endfunction coord_in_processor
@@ -1706,8 +1741,46 @@ endfunction coord_in_processor
     allocate(z_bnd(MAXLIMAX,MAXLJMAX,KMAX_BND))
     allocate(z_mid(MAXLIMAX,MAXLJMAX,KMAX_MID))
 
-
   end subroutine Alloc_GridFields
+
+  subroutine make_vertical_levels_interpolation_coeff
+    !make interpolation coefficients to convert the levels defined in meteo 
+    !into the levels defined in Vertical_levels.txt
+    integer ::i,j,k,k_met
+    real ::p_met,p_mod,p1,p2
+    if(.not. allocated(k1_met))allocate(k1_met(KMAX_MID),k2_met(KMAX_MID),x_k1_met(KMAX_MID))
+
+    if(me==0)then
+
+       !only me=0 has the values for A_bnd_met and B_bnd_met
+       do k=1,KMAX_MID
+          P_mod=A_mid(k)+Pref*B_mid(k)
+          !find the lowest met level higher than the model level 
+          !do k_met=1,KMAX_MET
+          k_met=KMAX_MET-1
+          p_met=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+         do while(p_met>P_mod.and.k_met>0)
+            ! write(*,*)P_mod,p_met
+             k_met=k_met-1
+             p_met=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+          enddo
+          k1_met(k)=k_met
+          k2_met(k)=k_met+1
+          k_met=k1_met(k)
+          p1=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+          k_met=k2_met(k)
+          p2=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+          x_k1_met(k)=(p_mod-p2)/(p1-p2)
+          write(*,77)k, ' interpolated from levels ', k1_met(k),' and ',k2_met(k),P_mod,p1,p2,x_k1_met(k)
+77 format(I4,A,I3,A,I3,13f11.3)
+       enddo
+    endif
+
+    CALL MPI_BCAST(k1_met,4*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+    CALL MPI_BCAST(k2_met,4*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+    CALL MPI_BCAST(x_k1_met,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+
+  end subroutine make_vertical_levels_interpolation_coeff
 
 end module GridValues_ml
 !==============================================================================

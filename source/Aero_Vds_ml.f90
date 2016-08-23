@@ -1,3 +1,29 @@
+! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 !=============================================================================
   module Aero_Vds_ml
 !==============================================================================
@@ -45,11 +71,12 @@
   public  :: Wesely1985
 
   real, public, parameter, dimension(NSIZE) ::   &
-                 ! diam   = (/ 0.33e-6, 4.0e-6, 8.5e-6 /),  &
-                 !Mc: diam   = (/ 0.33e-6, 1.7e-6, 8.5e-6 /),  &
-                  diam   = (/ 0.33e-6, 3.0e-6, 4.0e-6, 4.5e-6 ,22e-6 /),  &
-                 ! sigma  = (/ 1.8, 2.0, 2.2 /),                    &
-                  sigma  = (/ 1.8, 2.0, 2.0, 2.2 ,2.0/),                    &
+!st May 2014          diam   = (/ 0.33e-6, 3.0e-6, 4.0e-6, 4.5e-6 ,22e-6 /),  &
+!st MMD_SS=0.6*MMD_NO3c (Savoie&Prospero, GRL, 9, 1982)
+!st test1                  diam   = (/ 0.33e-6, 3.0e-6, 4.8e-6, 5.0e-6 ,22e-6 /),  &
+!st test2                  diam   = (/ 0.33e-6, 3.0e-6, 4.5e-6, 5.0e-6 ,22e-6 /),  &
+                  diam   = (/ 0.33e-6, 3.0e-6, 4.8e-6, 5.0e-6 ,22e-6 /),  &
+                  sigma  = (/ 1.8, 2.0, 2.0, 2.2 ,2.0/),                  &
                   PMdens = (/ 1600.0, 2200.0, 2200.0, 2600.0, 800.0/) ! kg/m3
 contains
 

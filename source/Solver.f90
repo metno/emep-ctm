@@ -3,7 +3,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -53,18 +53,20 @@
     !ESX use EmisDef_ml,        only: QSSFI, QSSCO, QDUFI, QDUCO, QPOL, &
     !ESX                              QROADDUST_FI, QROADDUST_CO
     use Emissions_ml,      only: KEMISTOP
+    use ChemFunctions_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
     use ChemGroups_ml,     only: RO2_POOL, RO2_GROUP
-    use ChemSpecs_tot_ml           ! => NSPEC_TOT, O3, NO2, etc.
+!CMR    use ChemSpecs_tot_ml           ! => NSPEC_TOT, O3, NO2, etc.
+    use ChemSpecs                  ! => NSPEC_TOT, O3, NO2, etc.
     use Chemfields_ml, only : NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
     use ChemRates_rct_ml,   only: rct
     !ESX use ChemRates_rcmisc_ml,only: rcmisc
     use GridValues_ml,     only : GRIDWIDTH_M
     use Io_ml,             only : IO_LOG, datewrite
     use ModelConstants_ml, only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv, &
-                                 DebugCell, MasterProc, DEBUG_SOLVER,       &
-                                 DEBUG_DRYRUN, USE_SEASALT
+                                 DebugCell, MasterProc, DEBUG, USE_SEASALT
     use Par_ml,            only: me, MAXLIMAX, MAXLJMAX
     use PhysicalConstants_ml, only:  RGAS_J
+    use Precision_ml, only:  dp
     use Setup_1dfields_ml, only: rcemis,        & ! photolysis, emissions
                                  xn_2d,         &
                                  rh,            &
@@ -72,7 +74,6 @@
                                  amk
                                  !FUTURE rcnh3,         & ! NH3emis
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
-    use ChemFunctions_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
   implicit none
 
   private
@@ -103,39 +104,43 @@ contains
 
     logical, save ::  first_call = .true.
 
-    real, parameter ::  CPINIT = 0.0 ! 1.0e-30  ! small value for init
+    real(kind=dp), parameter ::  CPINIT = 0.0 ! 1.0e-30  ! small value for init
 
     !  Local
     integer, dimension(KCHEMTOP:KMAX_MID) :: toiter
     integer ::  k, ichem, iter,n    ! Loop indices
     integer, save ::  nchem         ! No chem time-steps
-    real    ::  dt2
-    real    ::  P, L                ! Production, loss terms
-    real    :: xextrapol   !help variable
+    real(kind=dp)    ::  dt2
+    real(kind=dp)    ::  P, L                ! Production, loss terms
+    real(kind=dp)    :: xextrapol   !help variable
 
     ! Concentrations : xold=old, x=current, xnew=predicted
     ! - dimensioned to have same size as "x"
 
-    real, dimension(NSPEC_TOT)      :: &
+    real(kind=dp), dimension(NSPEC_TOT)      :: &
                         x, xold ,xnew   ! Working array [molecules/cm3]
-    real, dimension(nchemMAX), save :: &
+    real(kind=dp), dimension(nchemMAX), save :: &
                         dti             ! variable timestep*(c+1)/(c+2)
-    real, dimension(nchemMAX), save :: &
+    real(kind=dp), dimension(nchemMAX), save :: &
                         coeff1,coeff2,cc ! coefficients for variable timestep
+    ! Test of precision
+     real(kind=dp) :: pi = 4.0*atan(1.0_dp)
 
 !======================================================
+
 
     if ( first_call ) then
        allocate( Dchem(NSPEC_TOT,KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX))
        Dchem=0.0
        call makedt(dti,nchem,coeff1,coeff2,cc)
        if ( MasterProc ) then
+           write(IO_LOG,*) "PRECISION TEST ", pi
            write(IO_LOG,"(a,i4)") 'Chem dts: nchemMAX: ', nchemMAX
            write(IO_LOG,"(a,i4)") 'Chem dts: nchem: ', nchem
            write(IO_LOG,"(a,i4)") 'Chem dts: NUM_INITCHEM: ', NUM_INITCHEM
            write(IO_LOG,"(a,f7.2)") 'Chem dts: DT_INITCHEM: ', DT_INITCHEM
            write(IO_LOG,"(a,i4)") 'Chem dts: EXTRA_ITER: ', EXTRA_ITER
-           if(DEBUG_DRYRUN) write(*,*) "DEBUG_DRYRUN Solver"
+           if(DEBUG%DRYRUN) write(*,*) "DEBUG%DRYRUN Solver"
        end if
        first_call = .false.
     endif
@@ -192,7 +197,7 @@ contains
 
 !== Here comes all chemical reactions
 !=============================================================================
-          if ( DEBUG_DRYRUN ) then
+          if ( DEBUG%DRYRUN ) then
             ! Skip fast chemistry
           else
 
@@ -227,7 +232,7 @@ contains
           !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
            include 'CM_Reactions2.inc'
           !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-          end if ! DEBUG_DRYRUN
+          end if ! DEBUG%DRYRUN
 
        end do ! ichem
 
@@ -276,10 +281,13 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 
    dt_init = NUM_INITCHEM*DT_INITCHEM
 
- ! - put special cases here:
-  !NOT NEEDED? if(GRIDWIDTH_M>60000.0)nchem=15
+!we require at least one extra iteration (this could easily be changed)
+   call CheckStop(dt_advec<2*DT_INITCHEM, &
+        "Error in Solver/makedt: dt_advec too small!")
 
-!/ ** For smaller scales, but not tested
+ ! - put special cases here:
+
+!/ ** For small scales
   if(dt_advec<620.0) nchem = NUM_INITCHEM +int((dt_advec- dt_init) / dt_init )
 
 !/ Used for >21km resolution and dt_advec>520 seconds:
@@ -295,8 +303,6 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
    endif
 !/ **
 
-   call CheckStop(dt_advec<DT_INITCHEM, &
-        "Error in Solver/makedt: dt_advec too small!")
    call CheckStop(nchem>nchemMAX,&
         "Error in Solver/makedt: nchemMAX too small!")
 

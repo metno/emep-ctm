@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,12 +30,13 @@ module StoFlux_ml
   use DO3SE_ml, only : do3se, nSumVPD, SumVPD_LC
   use Io_Progs_ml, only : current_date, datewrite
   use LandDefs_ml, only : LandType, STUBBLE, iLC_grass
-  use LocalVariables_ml, only : L, Grid, Sub
+  use LocalVariables_ml, only : L, Grid
   use MicroMet_ml, only : AerRes, Wind_at_h
   use ModelConstants_ml, only : NLANDUSEMAX, dt_advec, DEBUG_STOFLUX
   use Par_ml, only : MAXLIMAX, MAXLJMAX
   use PhysicalConstants_ml, only : AVOG, KARMAN
   use SmallUtils_ml, only : find_index
+  use SubMet_ml, only : Sub
   use Wesely_ml, only : WES_O3, Rb_cor
   implicit none
   private

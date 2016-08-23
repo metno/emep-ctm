@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,9 +36,10 @@ module Emergency_ml
 !   erup : emission parameters
 !-----------------------------------------------------------------------!
 use CheckStop_ml,         only: CheckStop
-use ChemChemicals_ml,     only: species
-use ChemSpecs_shl_ml,     only: NSPEC_SHL
-use ChemSpecs_tot_ml,     only: NSPEC_TOT
+use ChemSpecs,            only: NSPEC_TOT, NSPEC_SHL, species
+!CMR use ChemChemicals_ml,     only: species
+!CMR use ChemSpecs_shl_ml,     only: NSPEC_SHL
+!CMR use ChemSpecs_tot_ml,     only: NSPEC_TOT
 use ChemGroups_ml,        only: chemgroups
 use GridValues_ml,        only: xm2,sigma_bnd,GridArea_m2,&
                                 coord_in_processor,coord_in_gridbox
@@ -67,7 +68,7 @@ logical, save ::      &
 
 integer, parameter :: &
   NMAX_VENT = 24, & ! Max number of locations on processor/subdomain
-  NMAX_ERUP = 90    ! Max number of events def (~3 months per location)
+  NMAX_ERUP =360    ! Max number of events def per location (~3 months of 6 hr.records)
 
 integer, save ::   & ! No. of ... found on processor/subdomain
   nvent              = -1,  & ! Emergency locations

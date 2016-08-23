@@ -3,7 +3,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -68,10 +68,12 @@ module DryDep_ml
  use Chemfields_ml , only : cfac, so2nh3_24hr,Grid_snow 
 
 
- use ChemChemicals_ml, only : species
- use ChemSpecs_adv_ml         ! several species needed
- use ChemSpecs_tot_ml, only : NSPEC_TOT, FIRST_SEMIVOL, LAST_SEMIVOL, &
-                               NO2, SO2, NH3, O3
+ use ChemSpecs                ! several species needed
+!CMR  use ChemChemicals_ml, only : species
+!CMR  use ChemSpecs_adv_ml         ! several species needed
+!CMR  use ChemSpecs_shl_ml, only : NSPEC_SHL
+!CMR  use ChemSpecs_tot_ml, only : NSPEC_TOT, FIRST_SEMIVOL, LAST_SEMIVOL, &
+!CMR                                NO2, SO2, NH3, O3
  use DO3SE_ml,         only : do3se
  use EcoSystem_ml,     only : EcoSystemFrac, Is_EcoSystem,  &
                              NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS
@@ -84,16 +86,17 @@ module DryDep_ml
                               ,NLUMAX &  ! Max. no countries per grid
                               ,LandCover   ! Provides codes, SGS, LAI, etc,
  use LandDefs_ml,      only : LandType, LandDefs, STUBBLE
- use LocalVariables_ml,only : Grid, Sub, L, iL ! Grid and sub-scale Met/Veg data
+ use LocalVariables_ml,only : Grid, L, iL ! Grid and sub-scale Met/Veg data
  use MassBudget_ml,    only : totddep
  use MetFields_ml,     only : u_ref, rh2m
  use MetFields_ml,     only : tau, sdepth, SoilWater_deep, th,pzpbl
  use MicroMet_ml,      only : AerRes, Wind_at_h
  use ModelConstants_ml,only : dt_advec,PT,KMAX_MID, KMAX_BND ,&
-                                  DEBUG_i, DEBUG_j, NPROC, &
+                                  NPROC, &
                                   DEBUG_DRYDEP, DEBUG_ECOSYSTEMS, DEBUG_VDS,&
+                                  USES, &
                                   MasterProc, &
-                                  DEBUG_AOT, & !JUST TESTING
+                                  DEBUG, & ! for DEBUG%AOT
                                   ATWAIR, atwS, atwN, PPBINV,&
                                   KUPPER, NLANDUSEMAX
 
@@ -109,9 +112,10 @@ module DryDep_ml
  use StoFlux_ml,  only:   unit_flux, &! = sto. flux per m2
                           lai_flux,  &! = lai * unit_flux
                           Setup_StoFlux, Calc_StoFlux  ! subs
- use ChemSpecs_shl_ml,  only :  NSPEC_SHL
+ use SubMet_ml,            only : Sub
  use TimeDate_ml,       only : daynumber, current_date
  use Wesely_ml         ! ... Init_GasCoeff, DRx, Rb_Cor, ...
+ use ESX_ml,            only : Init_ESX, Run_ESX
 
 
  implicit none
@@ -178,6 +182,10 @@ module DryDep_ml
 
      call Init_DepMap()               ! Maps CDDEP to IXADV
      call Init_GasCoeff()             ! Sets Wesely coeffs.
+
+     if (USES%ESX) then
+       call Init_ESX()
+     end if
 
      nadv = 0
      do n = 1, NDRYDEP_ADV  
@@ -344,7 +352,7 @@ integer :: nglob
      ! -----------------------------------------------------------------!
      ! conver molecules/cm3 to ppb for surface:
       surf_ppb   = PPBINV /amk(KMAX_MID)
-      if ( DEBUG_AOT .and. debug_flag ) write(*,"(a,es12.4)") "CHAMK", surf_ppb
+      if ( DEBUG%AOT .and. debug_flag ) write(*,"(a,es12.4)") "CHAMK", surf_ppb
 
      ! -----------------------------------------------------------------!
 
@@ -636,7 +644,7 @@ integer :: nglob
            c_hveg = xn_2d(FLUX_TOT,KMAX_MID)  &     ! #/cm3 units
                         * ( 1.0-Ra_diff*Vg_ref(n) )
 
-          if ( DEBUG_AOT .and. debug_flag .and. iL==1 ) then
+          if ( DEBUG%AOT .and. debug_flag .and. iL==1 ) then
               !preO3 = xn_2d(FLUX_TOT,KMAX_MID)*surf_ppb
               write(*, "(a,3i3,i5,i3, 3f9.3,2f5.2,9es10.3)") &
                "CHVEG ", imm, idd, ihh, current_date%seconds,  iL, &
@@ -770,7 +778,7 @@ integer :: nglob
                   call CheckStop( lossfrac < 0.1, "ERROR: LOSSFRAC " )
               end if
 
-              if ( DEBUG_AOT .and. debug_flag ) then !FEB2013 testing
+              if ( DEBUG%AOT .and. debug_flag ) then !FEB2013 testing
                 write(*, "(a,3i3,i5,i3, 3f9.3,2f6.2,9es10.3)") &
                  "CHVEGX", imm, idd, ihh, current_date%seconds,  me, &
                   xn_2d(FLUX_TOT,KMAX_MID)*surf_ppb, c_hveg*surf_ppb,&
@@ -844,7 +852,7 @@ integer :: nglob
           end if
         end if
 
-          if ( DEBUG_AOT .and. debug_flag .and. ntot == FLUX_TOT  ) then
+          if ( DEBUG%AOT .and. debug_flag .and. ntot == FLUX_TOT  ) then
               write(*, "(a,3i3,i5,i3,2f9.4,f7.3)") &
                "AOTCHXN ", imm, idd, ihh, current_date%seconds, &
                    iL, xn_2d(FLUX_TOT,KMAX_MID)*surf_ppb, &
@@ -872,6 +880,11 @@ integer :: nglob
 
        call Add_MosaicOutput(debug_flag,i,j,convfac2,&
            DepAdv2Calc, fluxfrac_adv, Deploss ) 
+
+
+      if (USES%ESX) then
+        call Run_ESX()
+      end if
 
 
       !----------------------------------------------------------------

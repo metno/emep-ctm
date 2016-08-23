@@ -1,8 +1,7 @@
-! <Runchem_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,15 +45,14 @@ module RunChem_ml
   use My_Timing_ml,     only: Code_timer, Add_2timing,  &
                               tim_before, tim_after
   use Ammonium_ml,      only: Ammonium
-  use AOD_PM_ml,        only: AOD_Ext    !st.. update , AOD_calc
+  use AOD_PM_ml,        only: AOD_Ext
   use Aqueous_ml,       only: Setup_Clouds, prclouds_present, WetDeposition
   use Biogenics_ml,     only: setup_bio
   use CellMet_ml,       only: Get_CellMet
   use CheckStop_ml,     only: CheckStop
   use Chemfields_ml,    only: xn_adv    ! For DEBUG 
   use Chemsolver_ml,    only: chemistry
-  use ChemSpecs_tot_ml                  ! DEBUG ONLY
-  use ChemSpecs_adv_ml                  ! DEBUG ONLY
+  use ChemSpecs                         ! DEBUG ONLY
   use DefPhotolysis_ml, only: setup_phot
   use DryDep_ml,        only: drydep
   use DustProd_ml,      only: WindDust
@@ -63,13 +61,16 @@ module RunChem_ml
   use MassBudget_ml,    only: emis_massbudget_1d
   use ModelConstants_ml,only: USE_DUST, USE_SEASALT, USE_AOD, USE_POLLEN, & 
                               KMAX_MID, nprint, END_OF_EMEPDAY, nstep,  &
-                              DebugCell, DEBUG => DEBUG_RUNCHEM
+                              USES, & ! need USES%EMISSTACKS 
+                              DEBUG_EMISSTACKS, & ! MKPS
+                              DebugCell, DEBUG    ! RUNCHEM
   use OrganicAerosol_ml,only: ORGANIC_AEROSOLS, OrganicAerosol, &
                               Init_OrganicAerosol, & !FEB2012
                               SOA_MODULE_FLAG   ! ="VBS" or "NotUsed"
-  ! FUTURE use Pollen_ml,        only: Pollen_flux
+  use Pollen_ml,        only: Pollen_flux
   use Par_ml,           only: lj0,lj1,li0,li1, limax, ljmax,  &
                               gi0, gj0, me,IRUNBEG, JRUNBEG  !! for testing
+  use PointSource_ml,    only: pointsources, get_pointsources
   use SeaSalt_ml,       only: SeaSalt_flux
   use Setup_1d_ml,      only: setup_1d, setup_rcemis, reset_3d
                       !FUTURE setup_nh3  ! NH3emis (NMR-NH3 project)
@@ -83,8 +84,8 @@ module RunChem_ml
   public :: runchem
 contains
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-subroutine runchem(numt)
-  integer, intent(in) :: numt      
+subroutine runchem()
+
 !  local
   integer :: i, j
   integer :: errcode
@@ -98,7 +99,6 @@ subroutine runchem(numt)
   nhour  = current_date%hour
 
   Jan_1st    = ( nmonth == 1 .and. nday == 1 )
-  End_of_Run = ( mod(numt,nprint) == 0       )
 
   if(ORGANIC_AEROSOLS.and.first_call) &
     call CheckStop(SOA_MODULE_FLAG == "NotUsed", & ! Just safety
@@ -116,7 +116,7 @@ subroutine runchem(numt)
 
       !****** debug cell set here *******
       debug_flag =  .false.  
-      if(DEBUG.and.debug_proc) then
+      if(DEBUG%RUNCHEM.and.debug_proc) then
         debug_flag = (debug_li==i .and. debug_lj==j) 
         DebugCell = debug_flag
         if(debug_flag) write(*,*) "RUNCHEM DEBUG START!"
@@ -139,8 +139,12 @@ subroutine runchem(numt)
       if(USE_DUST)     &
         call WindDust(i,j,debug_flag)     ! sets rcemis(DUST...)
 
-    ! FUTURE  if(USE_POLLEN) &
-    ! FUTURE      call Pollen_flux(i,j,debug_flag)
+      if ( USES%EMISSTACKS ) then
+         if ( pointsources(i,j) ) call get_pointsources(i,j,DEBUG_EMISSTACKS)
+      end if
+    
+      if(USE_POLLEN) &
+        call Pollen_flux(i,j,debug_flag)
 
       call Setup_Clouds(i,j,debug_flag)
 
@@ -156,7 +160,7 @@ subroutine runchem(numt)
       ! Called every adv step, only updated every third hour
 !FUTURE call setup_nh3(i,j)    ! NH3emis, experimental (NMR-NH3)
 
-      if(DEBUG.and.debug_flag) &
+      if(DEBUG%RUNCHEM.and.debug_flag) &
         call datewrite("Runchem Pre-Chem", (/ rcemis(NO,20), &
           rcemis(C5H8,KMAX_MID), xn_2d(NO,20),xn_2d(C5H8,20) /) )
 
@@ -166,16 +170,16 @@ subroutine runchem(numt)
       call Add_2timing(30,tim_after,tim_before,"Runchem:2nd setups")
       call Add_2timing(27,tim_after,tim_before,"Runchem:setup_1d+rcemis")
 
-!     if(DEBUG.and.debug_flag) &
+!     if(DEBUG%RUNCHEM.and.debug_flag) &
 !       call datewrite("RUNCHEM PRE-CHEM",(/xn_2d(PPM25,20),xn_2d(AER_BGNDOC,20)/))
 !     !-------------------------------------------------
 !     !-------------------------------------------------
 !     !-------------------------------------------------
-      call chemistry(i,j,DEBUG.and.debug_flag)
+      call chemistry(i,j,DEBUG%RUNCHEM.and.debug_flag)
 !     !-------------------------------------------------
 !     !-------------------------------------------------
 !     !-------------------------------------------------
-      if(DEBUG.and.debug_flag)&
+      if(DEBUG%RUNCHEM.and.debug_flag)&
         call datewrite("Runchem Post-Chem",(/xn_2d(NO,20),xn_2d(C5H8,20)/))
       !_________________________________________________
 
@@ -198,7 +202,7 @@ subroutine runchem(numt)
 
       call Add_2timing(32,tim_after,tim_before,"Runchem:ammonium+Drydep")
 
-!     if ( DEBUG .and. debug_flag  ) then
+!     if ( DEBUG%RUNCHEM .and. debug_flag  ) then
 !       write(6,"(a,10es12.3)") "DEBUG_RUNCHEM me RIEMER, aero", &
 !         xn_2d(SO4,20), xn_2d(aNO3,20), xn_2d(aNH4,20),tmpOut1, tmpOut2
 !      !write(6,*) "DEBUG_RUNCHEM me pre WetDep", me, prclouds_present
@@ -214,7 +218,6 @@ subroutine runchem(numt)
 
       !// Calculate Aerosol Optical Depth
       if(USE_AOD)  &
-!st ...update        call AOD_calc(i,j,debug_flag)
         call AOD_Ext(i,j,debug_flag)
 
       !  Calculates PM water: 1. for ambient condition (3D)

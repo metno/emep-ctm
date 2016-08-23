@@ -1,8 +1,7 @@
-! <OutputChem_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <OutputChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,13 +36,13 @@ use My_Outputs_ml,     only: NBDATES, wanted_dates_inst,            &
                              Ascii3D_WANTED
 use Io_ml,             only: IO_WRTCHEM, datewrite
 use ModelConstants_ml, only: nprint, END_OF_EMEPDAY, KMAX_MID, MasterProc&
-                            ,DEBUG => DEBUG_OUTPUTCHEM &
+                            ,DEBUG => DEBUG_OUTPUTCHEM, METSTEP &
                             ,IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_MAX_MAX
 use NetCDF_ml,         only: CloseNetCDF, Out_netCDF
 use OwnDataTypes_ml,   only: Deriv, print_deriv_type
 use Par_ml,            only: MAXLIMAX,MAXLJMAX,GIMAX,GJMAX,     &
-                              IRUNBEG,JRUNBEG
-use TimeDate_ml,       only: current_date, max_day  ! days in month
+                              IRUNBEG,JRUNBEG,me
+use TimeDate_ml,       only: tdif_secs,date,timestamp,make_timestamp,current_date,startdate, max_day, enddate  ! days in month
 use TimeDate_ExtraUtil_ml,only: date2string
 
 
@@ -58,7 +57,7 @@ public :: Output_f3d      ! (iotyp, dim, nav, def, dat)
 
 contains
 
-subroutine Wrtchem(numt)
+subroutine Wrtchem()
 !---------------------------------------------------------------------
 ! DESCRIPTION:
 !   Writes out data fields as NetCDF
@@ -74,7 +73,6 @@ subroutine Wrtchem(numt)
 !   occur at 6am of the 1st day, but this should be over-written
 !   as soon as a full day of data is available).
 !----------------------------------------------------------------------
-  integer, intent(in) ::  numt
 
   real, dimension(MAXLIMAX, MAXLJMAX) :: local_2d  !local 2D array
   real, dimension(GIMAX, GJMAX)       :: glob_2d   !array for whole domain
@@ -83,7 +81,13 @@ subroutine Wrtchem(numt)
   integer :: mm_out, dd_out
   logical :: Jan_1st, End_of_Run
   character(len=30) :: outfilename
+  logical,save :: first_call = .true.
+  TYPE(timestamp)   :: ts1,ts2
+
 !---------------------------------------------------------------------
+
+  if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
+
   nyear  = current_date%year
   nmonth = current_date%month
   nday   = current_date%day
@@ -91,11 +95,16 @@ subroutine Wrtchem(numt)
 
   dd_out = nday
   mm_out = nmonth
-  Jan_1st    = ( nmonth == 1 .and. nday == 1 )
-  End_of_Run = ( mod(numt,nprint) == 0       )
+  Jan_1st    = all((/nyear,nmonth,nday/)==startdate(1:3))
+!  End_of_Run = ( mod(numt,nprint) == 0       )
+
+!this is a bit complicated because it must account for the fact that for instance 3feb24:00 = 4feb00:00 
+  ts1=make_timestamp(current_date)
+  ts2=make_timestamp(date(enddate(1),enddate(2),enddate(3),enddate(4),0))
+  End_of_Run =  (nint(tdif_secs(ts1,ts2))<=0)
 
   if(MasterProc .and. DEBUG) write(6,"(a12,i5,5i4)") "DAILY DD_OUT ",   &
-      numt, nmonth, mm_out, nday, dd_out, nhour
+       nmonth, mm_out, nday, dd_out, nhour
 
   !. END_OF_EMEPDAY = 6am - end of EMEP daily sampling period
   !. Daily outputs are dated with the start of sampling period
@@ -103,7 +112,7 @@ subroutine Wrtchem(numt)
     dd_out = nday - 1     ! only used for daily outputs
 
     if( MasterProc .and. DEBUG) write(6,"(a12,i5,5i4)")&
-      "DAILY SET ", numt, nmonth, mm_out, nday, dd_out, nhour
+      "DAILY SET ",  nmonth, mm_out, nday, dd_out, nhour
 
     if(dd_out == 0) then
       mm_out = nmonth - 1
@@ -113,7 +122,7 @@ subroutine Wrtchem(numt)
       dd_out = max_day(mm_out, nyear)  !  Last day of month
 
       if( MasterProc .and. DEBUG) write(6,"(a12,i5,4i4)") "DAILY FIX ", &
-                      numt, nmonth, mm_out, nday, dd_out
+                       nmonth, mm_out, nday, dd_out
     endif
   endif      ! for END_OF_EMEPDAY <= 7
 
@@ -131,7 +140,7 @@ subroutine Wrtchem(numt)
 
   !== Daily output ====
   if (nhour ==  END_OF_EMEPDAY ) then
-    if (numt > 1 .and. .not.Jan_1st ) &   ! Doesn't write out 1 Jan.
+    if (.not.first_call .and. .not.Jan_1st ) &   ! Doesn't write out 1 Jan. at start
       call Output_fields(IOU_DAY)
     call ResetDerived(IOU_DAY)            ! For daily averaging, reset also 1 Jan.
   endif
@@ -183,6 +192,9 @@ subroutine Wrtchem(numt)
 
     call ResetDerived(IOU_MON)
   endif              ! End of NEW MONTH
+
+  first_call=.false.
+  return
 
 end subroutine Wrtchem
 

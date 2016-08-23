@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,7 +46,7 @@ public :: Init_timing
 public :: Add_2timing   ! Calls Code_timer, adds times and descriptions to arrays
 public :: Output_timing ! Outputs
 
-integer, public, parameter                :: NTIMING=39+7
+integer, public, parameter                :: NTIMING=39+8
 real, public, dimension(NTIMING), save    :: mytimm       ! stores CPU-s
 real, public, dimension(NTIMING), save    :: lastptim     ! for final CPU-s
 character(len=30), public, &
@@ -98,8 +98,8 @@ subroutine Output_timing(io, me,np,nt,nx,ny)
   integer :: n
 
   open(io,file='Timing.out')
-  write(io,"(a40,3i5)") "Timing for No. grids, procs, time-steps",nx*ny,np,nt
-  write( 6,"(a40,3i5)") "Timing for No. grids, procs, time-steps",nx*ny,np,nt
+  write(io,"(a40,I7,2i5)") "Timing for No. grids, procs, time-steps",nx*ny,np,nt
+  write( 6,"(a40,I7,2i5)") "Timing for No. grids, procs, time-steps",nx*ny,np,nt
 
   do n=1,NTIMING
     if((timing(n)=="").and.(mytimm(n)==0.0)) cycle

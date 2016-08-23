@@ -1,8 +1,7 @@
-! <MicroMet_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <MicroMet_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +25,9 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
 module Micromet_ml
-  use ModelConstants_ml, only: FluxPROFILE
+  !ESX - disable the Ln95 for now to avoid dependency. Also, it never worked 
+  !ESX   very well, likely due to problems with large-scale NWP met.
+  !ESX use ModelConstants_ml, only: FluxPROFILE
 !____________________________________________________________________
 ! Miscellaneous collection of "standard" micromet functions
 ! Including PsiM, PsiH, AerRes
@@ -52,6 +53,10 @@ module Micromet_ml
   public :: PsiH
 
   public :: PsiM
+
+  public :: phi_w   !! Added for ESX Leuning work, from J.-P.
+
+  public :: phi_h   !! Added for ESX Leuning work, from J.-P.
 
   public :: Launiainen1995
 
@@ -166,11 +171,11 @@ module Micromet_ml
         x    = sqrt(1.0 - 16.0 * zL)
         stab_h = 2.0 * log( (1.0 + x)/2.0 )
     else             !stable
-        if ( FluxPROFILE == "Ln95" ) then
-           stab_h = -( (1+2*a/3.0*zL)**1.5 + b*(zL-c/d)* exp(-d*zL) + (b*c/d-1) )
-        else 
+        !ESX if ( FluxPROFILE == "Ln95" ) then
+        !ESX    stab_h = -( (1+2*a/3.0*zL)**1.5 + b*(zL-c/d)* exp(-d*zL) + (b*c/d-1) )
+        !ESX else 
            stab_h = -5.0 * zL
-        end if
+        !ESX end if
     end if
 
   end function PsiH
@@ -191,14 +196,42 @@ module Micromet_ml
        x    = sqrt(sqrt(1.0 - 16.0*zL))
        stab_m = log( 0.125*(1.0+x)*(1.0+x)*(1.0+x*x) ) +  PI/2.0 - 2.0*atan(x)
     else             !stable
-        if ( FluxPROFILE == "Ln95" ) then
-           stab_m = -( a*zL + b*(zl-c/d)*exp(-d*zL) + b*c/d)
-        else
+        !ESX if ( FluxPROFILE == "Ln95" ) then
+        !ESX    stab_m = -( a*zL + b*(zl-c/d)*exp(-d*zL) + b*c/d)
+        !ESX else
            stab_m = -5.0 * zL
-        end if
+        !ESX end if
     end if
 
   end function PsiM
+  !--------------------------------------------------------------------
+
+  elemental function phi_h(zL) result (phiH)
+    !  PhiH = flux-gradient stability function for heat 
+    real, intent(in) :: zL   ! surface layer stability parameter, (z-d)/L 
+    real ::  phiH         !
+ 
+    if (zL <  0) then !unstable
+         phiH    = 1.0/sqrt(1.0 - 16.0 * zL)
+    else             !stable
+         phiH = 1.0 + 5 * zL
+    end if
+
+  end function phi_h
+
+!--------------------------------------------------------------------
+  elemental function phi_w(zL) result ( phiW)
+    !  PhiW = flux-gradient stability function for W (water?? Check!)
+    real, intent(in) :: zL   ! surface layer stability parameter, (z-d)/L 
+    real ::  phiW         !
+ 
+    if (zL <  0) then !unstable
+         phiW    = 1.25*(1-3*zL)**0.3333
+    else             !stable
+         phiW    = 1.25*(1 + 0.2*zL)
+    end if
+
+  end function phi_w
 
 !--------------------------------------------------------------------
 subroutine Launiainen1995 (u, z, z0m, z0mh, theta0, theta, invL)
@@ -209,7 +242,6 @@ subroutine Launiainen1995 (u, z, z0m, z0mh, theta0, theta, invL)
   real, intent(in) :: theta0  !pot. temp at surface
   real, intent(in) :: theta   !pot. temp at ref ht.
   real, intent(out) :: invL
-  integer :: k
   real :: zeta  ! z/L
   real :: z0h, logzz0m, Rib
   z0h = z0m/ z0mh

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,9 +41,9 @@
 use CheckStop_ml,           only: CheckStop
 use GridValues_ml,          only: i_local, j_local
 use Io_Nums_ml,             only: IO_TMP, IO_LOG
-use ModelConstants_ml,      only: DEBUG_IOPROG, DEBUG_i, DEBUG_j, DomainName, &
+use ModelConstants_ml,      only: DEBUG, DEBUG, DomainName, &
                                   MasterProc, IIFULLDOM, JJFULLDOM
-use KeyValue_ml,            only: KeyVal, KeyValue, LENKEYVAL
+use KeyValueTypes,            only: KeyVal, KeyValue, LENKEYVAL
 use Par_ml,                 only: me, limax,ljmax
 use SmallUtils_ml,          only: wordsplit, WriteArray
 use TimeDate_ml,            only: date,current_date
@@ -81,15 +81,19 @@ end interface datewrite
 
 contains
 !-------------------------------------------------------------------------
-subroutine PrintLog(txt,OutputProc)
+subroutine PrintLog(txt,OutputProc,ioOption)
   character(len=*), intent(in) :: txt
   logical, intent(in), optional :: OutputProc  !typically MasterProc, me==0
+  integer, intent(in), optional :: ioOption    !use for other files
   logical :: ok2print
+  integer :: io
   ok2print = .true.
   if ( present(OutputProc) ) ok2print = OutputProc
   if ( ok2print) then
+    io = IO_LOG
+    if ( present(ioOption) ) io = ioOption
     write(*,*)  trim(txt)
-    write(IO_LOG,*)  trim(txt)
+    write(io,*)  trim(txt)
   end if
 end subroutine PrintLog
 !-------------------------------------------------------------------------
@@ -133,7 +137,7 @@ subroutine read_line(io_in,txt,status,label,printif)
       call CheckStop ( errmsg // txt )
     endif
 
-    if ( DEBUG_IOPROG ) then ! nb already MasterProc
+    if ( DEBUG%IOPROG ) then ! nb already MasterProc
       if( ok2print ) write(unit=*,fmt="(a,i3,2a,i5,a,a,i4)") &
         "IOREADLINE ", io_in, trim(label2), " Len ", len_trim(txt), &
         "TXT:" //  trim(txt), " Stat ", status
@@ -142,7 +146,7 @@ subroutine read_line(io_in,txt,status,label,printif)
    
   call MPI_BCAST( txt, len(txt), MPI_CHARACTER, 0, MPI_COMM_WORLD,INFO)
   call MPI_BCAST( status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,INFO)
-  if ( DEBUG_IOPROG .and. me==1 ) then
+  if ( DEBUG%IOPROG .and. me==1 ) then
     write(unit=errmsg,fmt=*) "proc(me) ", me, " BCAST_LINE:" // trim(txt)
     write(unit=*,fmt=*) trim(errmsg)
   endif
@@ -163,7 +167,7 @@ subroutine check_file(fname,fexist,needed,errmsg)
   errmsg = "ok"
   inquire(file=fname,exist=fexist)
 
-  if(DEBUG_IOPROG)write(unit=6,fmt=*) "check_file::: ", fname
+  if(DEBUG%IOPROG)write(unit=6,fmt=*) "check_file::: ", fname
   if ( .not. fexist .and. .not. needed ) then
     write(unit=6,fmt=*) "not needed, skipping....." // trim(fname)
     ios = 0
@@ -200,7 +204,7 @@ subroutine open_file(io_num,mode,fname,needed,skip,iostat)
       ios = NO_FILE
     else
       open(unit=io_num,file=fname,status="old",action="read",iostat=ios)
-      if( MasterProc .and. DEBUG_IOPROG) write(unit=6,fmt=*) "File opened: ", fname, ios
+      if( MasterProc .and. DEBUG%IOPROG) write(unit=6,fmt=*) "File opened: ", fname, ios
       ! *** skip header lines if requested ****
       if ( present( skip ) ) then ! Read (skip) some lines at start of file
         do i = 1, skip
@@ -260,7 +264,7 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
   do
     inputline=""
     call read_line(io_num,inputline,ios,"From ReadHeaders")
-    if ( DEBUG_IOPROG .and. MasterProc ) &
+    if ( DEBUG%IOPROG .and. MasterProc ) &
       write(*,"(a3,3i3,i6,a)") "IN ", io_num, me, ios, &
         len_trim(inputline) ,trim(inputline)
     if ( ios /= 0 ) exit  ! End of file
@@ -271,7 +275,7 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
       NKeys = NKeys + 1
       KeyValues(NKeys)%key = key
       KeyValues(NKeys)%value = value
-      if ( MasterProc .and.  DEBUG_IOPROG) &
+      if ( MasterProc .and.  DEBUG%IOPROG) &
         write(unit=*,fmt="(a,i3,a,a,a)") "KEYS LINE NKeys=", &
           NKeys, trim(key), " : ", trim(value)
       cycle
@@ -291,7 +295,7 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
       do i = NHeaders+1, size(Headers)
         Headers(i) = ""   ! Remove trailing txt
       enddo
-      if ( DEBUG_IOPROG .and. MasterProc ) then
+      if ( DEBUG%IOPROG .and. MasterProc ) then
         write(*,*) "Read_Headers sizes: ", size(xHeaders) , NHeaders
         write(*,*) "New inputline ", trim( inputline )
       endif
@@ -312,7 +316,7 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
         enddo
       endif
 
-      if ( MasterProc .and. DEBUG_IOPROG ) then
+      if ( MasterProc .and. DEBUG%IOPROG ) then
         write(*,*) "DATA LINE" // trim(inputline)
         write(*,*)("HEADER CHECK ", i, Headers(i), i = 1, NHeaders)
       endif
@@ -322,7 +326,7 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
       cycle
 
     elseif ( inputline(1:1) == "#" ) then ! Comments
-      if ( MasterProc .and. DEBUG_IOPROG ) &
+      if ( MasterProc .and. DEBUG%IOPROG ) &
         write(unit=*,fmt=*) "COMMENT LINE" // trim(inputline)
       cycle
 
@@ -373,7 +377,7 @@ subroutine Read2D(fname,data2d,idata2d)
   ! The first two columns are assumed for now to be ix,iy, hence:
 
   Headers(1) = Headers(3)
-  if ( DEBUG_IOPROG .and. MasterProc ) then
+  if ( DEBUG%IOPROG .and. MasterProc ) then
     write(*,*) "Read2D Headers" // fname, NHeaders, Headers(1)
 !   call WriteArray(Headers,NHeaders,"Read2D Headers")
   endif
@@ -395,7 +399,7 @@ subroutine Read2D(fname,data2d,idata2d)
     j = j_local(j_fdom)
     if ( i >= 1 .and. i <= limax .and. j >= 1 .and. j <= ljmax  ) then
       Nused = Nused + 1
-      if ( DEBUG_IOPROG .and. i_fdom==DEBUG_i .and. j_fdom==DEBUG_j ) &
+      if ( DEBUG%IOPROG .and. i_fdom==DEBUG%IJ(1) .and. j_fdom==DEBUG%IJ(2) ) &
         write(*,*) "READ TXTINPUT", me, i_fdom, j_fdom," => ",&
               i,j,tmp, Nlines, Nused
       if (present(idata2d)) then
@@ -408,7 +412,7 @@ subroutine Read2D(fname,data2d,idata2d)
 
   if ( MasterProc ) then
     close(IO_TMP)
-    if(DEBUG_IOPROG)write(6,*) fname // " Read2D: me, Nlines, Nused = ", me, Nlines, Nused
+    if(DEBUG%IOPROG)write(6,*) fname // " Read2D: me, Nlines, Nused = ", me, Nlines, Nused
   end if
 end subroutine Read2D
 !-------------------------------------------------------------------------
@@ -433,7 +437,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
   integer :: NHeaders, NKeys, Nlines, ncheck
   logical :: Start_Needed
 
-  if ( DEBUG_IOPROG .and. MasterProc ) &
+  if ( DEBUG%IOPROG .and. MasterProc ) &
     write(*,*) " Starting Read2DN, me ",me, " Ndata ", Ndata
 
   Nlines = 0
@@ -476,7 +480,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
 
   endif ! Start_Needed
   !======================================================================
-   if ( DEBUG_IOPROG .and. MasterProc ) then
+   if ( DEBUG%IOPROG .and. MasterProc ) then
     write(*,*) "Read2DN for ", fname, "Start_Needed ", Start_Needed, " NHeader", NHeaders
     write(*,*)("Read2D Headers" // fname, i, " Len ", len_trim(Headers(i)), &
                " H: ", trim(Headers(i)),i = 1, NHeaders)
@@ -501,7 +505,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
     i = i_local(i_fdom)   ! Convert to local coordinates
     j = j_local(j_fdom)
     if ( i >= 1 .and. i <= limax .and. j >=1 .and. j <= ljmax  ) then
-      if ( DEBUG_IOPROG .and. i_fdom==DEBUG_i .and. j_fdom == DEBUG_j )&
+      if ( DEBUG%IOPROG .and. i_fdom==DEBUG%IJ(1) .and. j_fdom == DEBUG%IJ(2) )&
         write(*,*)"READ TXTINPUT", me, i_fdom, j_fdom, " => ", i,j,tmp(1)
       data2d(i,j,1:Ndata) = tmp(1:Ndata)
     endif ! i,j
@@ -509,7 +513,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
 
   if ( MasterProc ) then
     close(IO_TMP)
-    if(DEBUG_IOPROG)write(6,*) fname // " Read2DN: me, Nlines = ", me, Nlines
+    if(DEBUG%IOPROG)write(6,*) fname // " Read2DN: me, Nlines = ", me, Nlines
   end if
 end subroutine Read2DN
 !-------------------------------------------------------------------------

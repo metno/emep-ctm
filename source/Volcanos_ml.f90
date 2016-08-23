@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,9 +41,10 @@ module Volcanos_ml
 !-----------------------------------------------------------------------!
 
 use CheckStop_ml,         only: CheckStop
-use ChemChemicals_ml,     only: species
-use ChemSpecs_shl_ml,     only: NSPEC_SHL
-use ChemSpecs_tot_ml,     only: NSPEC_TOT, SO2
+!CMR use ChemChemicals_ml,     only: species
+!CMR use ChemSpecs_shl_ml,     only: NSPEC_SHL
+!CMR use ChemSpecs_tot_ml,     only: NSPEC_TOT, SO2
+use ChemSpecs,            only: species, NSPEC_SHL, NSPEC_TOT, SO2
 use ChemGroups_ml,        only: chemgroups
 use EmisDef_ml,           only: VOLCANOES_LL
 use GridValues_ml,        only: GRIDWIDTH_M, xm2, dA, dB,  &
@@ -64,7 +65,7 @@ use TimeDate_ml,          only: nydays,&           ! No. days per year
                                 startdate,enddate,current_date,&
                                 make_timestamp,tdif_secs
 use TimeDate_ExtraUtil_ml,only: date2string,string2date
-use KeyValue_ml,          only: KeyVal
+use KeyValueTypes,          only: KeyVal
 
 implicit none
 private

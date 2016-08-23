@@ -1,8 +1,8 @@
-! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Eulerian
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,6 @@ module LocalVariables_ml
 ! e.g. for a measurement site or for a specific landuse within a grid square
 ! -----------------------------------------------------------------------
 
-use ModelConstants_ml, only: NLANDUSEMAX
 use Wesely_ml,         only: NDRYDEP_CALC
 
 implicit none
@@ -166,7 +165,7 @@ type, public :: SubDat
     ,Gsur,Gns
 end type SubDat
 
-type(SubDat), public, dimension(0:NLANDUSEMAX), save :: Sub
+! MOVED TO Mosaic type(SubDat), public, dimension(0:NLANDUSEMAX), save :: Sub
 type(SubDat), public, save :: L         ! For just one land-class
 type(SubDat), public, save :: ResetSub  ! Keeps NOT_SET values
 end module LocalVariables_ml

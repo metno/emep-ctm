@@ -1,15 +1,42 @@
+! <ExternalBICs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 module ExternalBICs_ml
-! External Boundary and Initial Conditions
-! are set from the value depending on Experimnt Name (EXP_NAME)
-! Nothing in this file needs to be used if EXTERNAL_BIC_SET = .false.
-! in ExternalBICs_config namelist
-use ModelConstants_ml,      only: MasterProc, EXP_NAME, DEBUG=>DEBUG_NEST_ICBC
+! External Boundary and Initial Conditions set according to
+!  ExternalBICs_config namelist
+! Nothing in this file will be used if
+!  EXTERNAL_BIC_SET = .false. in ExternalBICs_config namelist
 use CheckStop_ml,           only: CheckStop
+!CMR use ChemChemicals_ml,       only: species_adv
+!CMR use ChemSpecs_adv_ml,       only: NSPEC_ADV
+use ChemSpecs,              only: NSPEC_ADV, species_adv
 use Io_ml,                  only: PrintLog,IO_NML
-use TimeDate_ExtraUtil_ml,  only: date2string
-use ChemChemicals_ml,       only: species_adv
-use ChemSpecs_adv_ml,       only: NSPEC_ADV
+use ModelConstants_ml,      only: MasterProc, DEBUG=>DEBUG_NEST_ICBC
 use SmallUtils_ml,          only: find_index
+use TimeDate_ExtraUtil_ml,  only: date2string
 implicit none
 
 private
@@ -20,15 +47,18 @@ logical, public, save :: &
   EXTERNAL_BIC_SET = .false., & ! external BC description/setup has been found
   TOP_BC           = .false.    ! BCs include top level
 
-character(len=30),public, save :: &
-  EXTERNAL_BIC_NAME = "DUMMY"
+integer,private, parameter :: &
+  BIC_NAME_LEN=16
+
+character(len=BIC_NAME_LEN),public, save :: &
+  EXTERNAL_BIC_NAME    = "DUMMY",           &
+  EXTERNAL_BIC_VERSION = "use_any"
 
 integer,save, public :: &
   iw=-1, ie=-1, js=-1, jn=-1, kt=-1 ! i West/East bnd; j North/South bnd; k Top
 
-character(len=80),public, save :: &
+character(len=100),public, save :: &
   filename_eta     = 'EMEP_IN_BC_eta.zaxis'
-
 
 character(len=*),public, parameter :: &
   ICBC_FMT="(A24,'=',A24,'*',F7.2,2L2,'=',I3)"
@@ -40,8 +70,8 @@ type, public :: icbc                ! Inital (IC) & Boundary Conditions (BC)
 endtype icbc
 
 type, private :: icbc_desc          ! IC/BC description
-  character(len=16) :: name="none",version="none"
-  integer           :: mapsize=-1
+  character(len=BIC_NAME_LEN) :: name="none",version="none"
+  integer                     :: mapsize=-1
 endtype icbc_desc
 
 type(icbc), dimension(:), public, pointer :: &
@@ -65,7 +95,7 @@ subroutine Config_ExternalBICs()
   integer :: ios
   logical, save     :: first_call=.true.
   NAMELIST /ExternalBICs_config/ &
-    USE_EXTERNAL_BIC,EXTERNAL_BIC_NAME,TOP_BC,filename_eta
+    USE_EXTERNAL_BIC,EXTERNAL_BIC_NAME,EXTERNAL_BIC_VERSION,TOP_BC,filename_eta
 
   if(.not.first_call) return
   rewind(IO_NML)
@@ -91,7 +121,6 @@ subroutine set_extbic(idate)
   integer,intent(in) :: idate(4)
   logical, save     :: first_call=.true.
   integer           :: ydmh=0,ios=0,n=0
-  character(len=16) :: bctype_name='???_???_????'
   type(icbc_desc) :: description
   NAMELIST /ExternalBICs_bc/description,map_bc
 
@@ -109,16 +138,22 @@ subroutine set_extbic(idate)
   if(EXTERNAL_BIC_SET) return
 
 !--- Determine %version to look for
-  select case (EXP_NAME)
-  case("FORECAST")
-   !ydmh=idate(1)*1000000+idate(2)*10000+idate(3)*100+idate(4)
+  select case (EXTERNAL_BIC_VERSION)
+  case("MACC_ENS","FORECAST")
     ydmh=dot_product(idate,nint((/1e6,1e4,1e2,1e0/)))
     select case (ydmh)
-      case(:2011113023);bctype_name='IFS_MOZ_f7kn'  ! Untill 2011-11-30 23:00      
-      case(2011120100:);bctype_name='IFS_MOZ_fkya'  ! from   2011-12-01 00:00
+    case(:2011113023)            ! untill 2011-11-30 23:00      
+      EXTERNAL_BIC_VERSION='IFS_MOZ_f7kn'
+    case(2011120100:2014011423)  ! 2011-12-01 00:00 to 2014-01-14 23:00
+      EXTERNAL_BIC_VERSION='IFS_MOZ_fkya'
+    case(2014011500:)            ! from 2014-01-15 00:00 (available from 2012-09-04)
+!   case(2014030100:)            ! from 2014-03-01 00:00 (available from 2012-09-04)
+      EXTERNAL_BIC_VERSION='IFS_MOZ_fnyp'
     endselect
-  case("EVA2010")      ;bctype_name='IFS_EVA_2010'  ! EVA2010: GRG & AER    
-  case default         ;bctype_name='use_any'
+  case("MACC_EVA","IFS_MACC_EVA")  ! EVA2010/2011: GRG & AER    
+    EXTERNAL_BIC_VERSION='IFS_MACC_EVA'
+  case default
+    EXTERNAL_BIC_VERSION='use_any'
   endselect
 
 !--- Look for a ExternalBICs_bc with the correct %name and %version
@@ -126,11 +161,11 @@ subroutine set_extbic(idate)
   READ_NML: do
     read(IO_NML,NML=ExternalBICs_bc,iostat=ios)
     if(ios/=0) exit READ_NML
-    if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic read_nml bc",&
+    if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic","read_nml bc",&
       trim(description%name)//"/"//trim(description%version)
     EXTERNAL_BIC_SET=&
       EXTERNAL_BIC_NAME==description%name.and.&
-      (bctype_name=='use_any'.or.bctype_name==description%version).and.&
+     (EXTERNAL_BIC_VERSION=='use_any'.or.EXTERNAL_BIC_VERSION==description%version).and.&
       description%mapsize>0
     if(EXTERNAL_BIC_SET)then
       EXTERNAL_BC=>map_bc(1:description%mapsize)
@@ -144,13 +179,13 @@ subroutine set_extbic(idate)
   endif
   if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic", &
     date2string("BCs for YYYY-MM-DD hh type",idate),&
-    trim(EXTERNAL_BIC_NAME)//"/"//trim(bctype_name)
+    trim(EXTERNAL_BIC_NAME)//"/"//trim(EXTERNAL_BIC_VERSION)
 
   do n = 1,size(EXTERNAL_BC%ixadv)
     EXTERNAL_BC(n)%ixadv=find_index(EXTERNAL_BC(n)%spcname,species_adv(:)%name)
     if(EXTERNAL_BC(n)%ixadv<1)then
       EXTERNAL_BC(n)%wanted=.false.
-      if(MasterProc) write(*,DEBUG_FMT) "set_extbic unknow variable",&
+      if(MasterProc) write(*,DEBUG_FMT) "set_extbic","unknow variable",&
         trim(EXTERNAL_BC(n)%spcname)
     endif
   enddo

@@ -1,17 +1,43 @@
+! <CM_ChemRates_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 !>_________________________________________________________<
 
-  module  ChemRates_rct_ml
+module ChemRates_rct_ml
 !-----------------------------------------------------------
 
-   
+ 
   use ChemFunctions_ml       ! => kaero, RiemerN2O5
 
-  use Setup_1dfields_ml      ! => tinv, h2o, m, Fgas
+  use Setup_1dfields_ml ! => tinv, h2o, m, Fgas
   use Setup_1dfields_ml, m=> amk
-  use ChemSpecs_tot_ml         ! => PINALD, .... for FgasJ08
-  use ModelConstants_ml,     only : KMAX_MID,KCHEMTOP,DebugCell,DEBUG_RUNCHEM
-  implicit none
-  private
+  use ChemSpecs_tot_ml  ! => PINALD, .... for FgasJ08
+  use ModelConstants_ml, only: KMAX_MID,KCHEMTOP,DebugCell,DEBUG
+implicit none
+private
 
   !+ Tabulates Rate-coefficients - temperature dependant
 

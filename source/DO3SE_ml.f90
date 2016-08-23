@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,7 +37,7 @@ module DO3SE_ml
 !        ,PARshade => L%PARshade       &!  " " for shade leaves
 !        ,LAIsunfrac => L%LAIsunfrac      ! fraction of LAI in sun
 
-  use ModelConstants_ml, only : NLANDUSEMAX, DEBUG_DO3SE, MasterProc, &
+  use ModelConstants_ml, only : NLANDUSEMAX, DEBUG, MasterProc, &
       USE_SOILWATER
   use SmallUtils_ml,     only : find_index
   use TimeDate_ml,       only : current_date, daynumber
@@ -153,14 +153,14 @@ contains
 
             do3se(iLC) = input_do3se  
 
-            if ( DEBUG_DO3SE .and. MasterProc ) then
+            if ( DEBUG%DO3SE .and. MasterProc ) then
                 write(*,*) " DO3SE iLC", iLC,  do3se(iLC)%code, wanted_codes(iLC)
             end if
             if ( do3se(iLC)%VPDcrit > 0.0 ) then
               nSumVPD = nSumVPD + 1
               call CheckStop( nSumVPD > MAXnSumVPD, "DO3SE nSumVPD")
               SumVPD_LC(nSumVPD) = iLC
-              if(DEBUG_DO3SE .and. MasterProc) &
+              if(DEBUG%DO3SE .and. MasterProc) &
                 write(*,*)'VPDlimit ',do3se(iLC)%VPDcrit,' for iLC ',iLC, nSumVPD
             end if
 
@@ -282,14 +282,14 @@ contains
          max( do3se(iLC)%f_min,  L%f_temp * L%f_vpd * L%fSW )
 
 
-   if ( DEBUG_DO3SE .and. debug_flag ) then ! EXTRA
+   if ( DEBUG%DO3SE .and. debug_flag ) then ! EXTRA
        write(*,"(a,5i5,i3,L2,99f10.4)") "IN RSUR gstomatal ", &
               current_date, iLC, USE_SOILWATER, L%PARsun, L%PARshade,&
               do3se(iLC)%g_max, L%g_sto, L%f_env,  L%f_phen, L%f_vpd,&
               L%fSW, L%g_sto * L%f_sun/L%f_light, L%g_sun 
    end if
 
-    if ( DEBUG_DO3SE ) then
+    if ( DEBUG%DO3SE ) then
         needed = (/ L%t2C,L%t2,L%vpd ,L%SWP ,&
                     L%PARsun ,L%PARshade ,L%LAIsunfrac /)
         if ( any( needed(:) < -998.0 )) then

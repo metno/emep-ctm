@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,7 +44,8 @@ module ChemFunctions_ml
  use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID
  use PhysicalConstants_ml,  only : AVOG, RGAS_J, DAY_ZEN
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
- use ChemSpecs_tot_ml,        only : SO4, NO3_f, NH4_f, NO3_c
+!CRM  use ChemSpecs_tot_ml,        only : SO4, NO3_f, NH4_f, NO3_c
+ use ChemSpecs,             only : SO4, NO3_f, NH4_f, NO3_c
   implicit none
   private
 

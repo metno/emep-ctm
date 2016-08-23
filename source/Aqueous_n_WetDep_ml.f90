@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -58,13 +58,14 @@ module Aqueous_ml
 !-----------------------------------------------------------------------
 
   use My_Derived_ml,    only: WDEP_WANTED ! Which outputs wanted!
+  use My_Derived_ml,    only: nWDEP => nOutputWdep ! number WDEP used
   use CheckStop_ml,     only: CheckStop
-  use ChemChemicals_ml, only: species_adv
-  use ChemSpecs_tot_ml
-  use ChemSpecs_adv_ml          ! IXADV_SO2, IXADV_SO4, etc.
-  use ChemSpecs_shl_ml, only: NSPEC_SHL
-  use ChemGroups_ml,    only: ChemGroups,  INDEX_WDEP_SOX_GROUP, &
-                              INDEX_WDEP_RDN_GROUP, INDEX_WDEP_OXN_GROUP
+  use ChemSpecs                 
+!CMR  use ChemSpecs_tot_ml
+!CMR  use ChemSpecs_adv_ml          ! IXADV_SO2, IXADV_SO4, etc.
+!CMR  use ChemSpecs_shl_ml, only: NSPEC_SHL
+!CMR  use ChemChemicals_ml, only: species_adv
+  use ChemGroups_ml,    only: ChemGroups
   use DerivedFields_ml, only: f_2d, d_2d     ! Contains Wet deposition fields
   use GridValues_ml,    only: gridwidth_m,xm2,dA,dB
   use Io_ml,            only: IO_DEBUG, datewrite
@@ -72,14 +73,14 @@ module Aqueous_ml
   use ModelConstants_ml,only: &
       CHEMTMIN, CHEMTMAX      &       ! -> range of temperature
      ,MasterProc              &
-     ,DEBUG => DEBUG_AQUEOUS, DEBUG_MY_WETDEP, DEBUG_pH &
+     ,DEBUG   &  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH &
      ,KMAX_MID                &       ! -> ground, k=20
      ,KUPPER                  &       ! -> top of cloud-chemistry, k=6
      ,KCHEMTOP                &       ! -> top of chemistry, now k=2
      ,dt => dt_advec          &       ! -> model timestep
      ,IOU_INST                &       ! Index: instantaneous values
      ,ATWAIR                           ! -> atw. air
-  use MetFields_ml,       only: pr, roa, z_bnd, cc3d, lwc,cw
+  use MetFields_ml,       only: pr, roa, z_bnd, cc3d, lwc
   use MetFields_ml,       only: ps
   use OrganicAerosol_ml,  only: ORGANIC_AEROSOLS
   use OwnDataTypes_ml,    only: depmap  ! has adv, calc, vg
@@ -295,13 +296,13 @@ subroutine Init_WetDep()
 !####################### gather indices from My_Derived
 ! WDEP_WANTED array, and determine needed indices in d_2d
 
-  nwspec=count(WDEP_WANTED(:)%txt2=="SPEC")
-  nwgrp =count(WDEP_WANTED(:)%txt2=="GROUP")
+  nwspec=count(WDEP_WANTED(1:nWDEP)%txt2=="SPEC")
+  nwgrp =count(WDEP_WANTED(1:nWDEP)%txt2=="GROUP")
   allocate(wetSpec(nwspec),wetGroup(nwgrp),wetGroupUnits(nwgrp),stat=alloc_err)
   call CheckStop(alloc_err, "alloc error wetSpec/wetGroup")
 
   nwspec=0;nwgrp=0
-  do n = 1, size(WDEP_WANTED(:)%txt1)
+  do n = 1, nWDEP ! size(WDEP_WANTED(:)%txt1)
     dname = "WDEP_"//trim(WDEP_WANTED(n)%txt1)
     f2d = find_index(dname,f_2d(:)%name)
     call CheckStop(f2d<1, "AQUEOUS f_2d PROBLEM: "//trim(dname))
@@ -312,7 +313,7 @@ subroutine Init_WetDep()
       WDEP_PREC=f2d
       if(WDEP_PREC>0) then
         iadv=-999;igrp=-999 ! just for printout
-      elseif(DEBUG.and.MasterProc)then
+      elseif(DEBUG%AQUEOUS.and.MasterProc)then
         call CheckStop(WDEP_PREC,find_index(dname,f_2d(:)%name),&
           "Inconsistent WDEP_WANTED/f_2d definition for "//trim(dname))
       endif
@@ -321,7 +322,7 @@ subroutine Init_WetDep()
       if(iadv>0) then
         nwspec = nwspec + 1
         wetSpec(nwspec) = f2d
-      elseif(DEBUG.and.MasterProc)then
+      elseif(DEBUG%AQUEOUS.and.MasterProc)then
         call CheckStop(iadv,find_index(dname,species_adv(:)%name),&
           "Inconsistent WDEP_WANTED/f_2d definition for "//trim(dname))
       endif
@@ -331,14 +332,14 @@ subroutine Init_WetDep()
         nwgrp = nwgrp + 1
         wetGroup(nwgrp) = f2d
         wetGroupUnits(nwgrp) = Group_Scale(igrp,f_2d(f2d)%unit,&
-          debug=DEBUG.and.MasterProc)
-      elseif(DEBUG.and.MasterProc)then
+          debug=DEBUG%AQUEOUS.and.MasterProc)
+      elseif(DEBUG%AQUEOUS.and.MasterProc)then
         call CheckStop(igrp,find_index(dname,chemgroups(:)%name),&
           "Inconsistent WDEP_WANTED/f_2d definition for "//trim(dname))
       endif
     endselect
 
-    if(DEBUG.and.MasterProc)  then
+    if(DEBUG%AQUEOUS.and.MasterProc)  then
       write(*,"(2a,3i5)") "WETPPP ", trim(f_2d(f2d)%name), f2d, iadv, igrp
       if(igrp>0) write(*,*) "WETFGROUP ", nwgrp, wetGroupUnits(nwgrp)%iadv
       if(iadv>0) write(*,*) "WETFSPEC  ", nwspec, iadv
@@ -353,13 +354,13 @@ subroutine Init_WetDep()
     icalc = WDepMap(n)%calc
     iadv  = WDepMap(n)%ind
     nc    = Calc2adv(icalc,0) + 1
-    if(MasterProc.and.DEBUG) write(*,"(a,4i5)") &
+    if(MasterProc.and.DEBUG%AQUEOUS) write(*,"(a,4i5)") &
       "CHECKING WetDep Calc2adv ", n,icalc,iadv,nc
     Calc2adv(icalc,0 ) = nc
     Calc2adv(icalc,nc) = iadv
   enddo
 
-  if(MasterProc.and.DEBUG) then
+  if(MasterProc.and.DEBUG%AQUEOUS) then
     write(*,*) "FINAL WetDep Calc2adv "
     write(*,"(i3,i4,15(1x,a))") (icalc, Calc2adv(icalc,0), &
       (trim(species_adv(Calc2adv(icalc,nc))%name),nc=1,Calc2adv(icalc,0)),&
@@ -389,10 +390,16 @@ subroutine Setup_Clouds(i,j,debug_flag)
   integer :: k
 
 ! Add up the precipitation in the column:
-  pr_acc(KUPPER) = sum ( pr(i,j,1:KUPPER) ) ! prec. from above
-  do k= KUPPER+1, KMAX_MID
-    pr_acc(k) = pr_acc(k-1) + pr(i,j,k)
-    pr_acc(k) = max( pr_acc(k), 0.0 )
+!old defintion:
+!  pr_acc(KUPPER) = sum ( pr(i,j,1:KUPPER) ) ! prec. from above
+!  do k= KUPPER+1, KMAX_MID
+!    pr_acc(k) = pr_acc(k-1) + pr(i,j,k)
+!    pr_acc(k) = max( pr_acc(k), 0.0 )
+!  enddo
+
+!now pr is already defined correctly (>=0)
+  do k= KUPPER, KMAX_MID
+    pr_acc(k) = pr(i,j,k)
   enddo
 
   prclouds_present=(pr_acc(KMAX_MID)>PR_LIMIT) ! --> precipitation at the surface
@@ -440,7 +447,7 @@ subroutine Setup_Clouds(i,j,debug_flag)
   enddo
 
   if(kcloudtop == -1) then
-    if(prclouds_present.and.DEBUG) &
+    if(prclouds_present.and.DEBUG%AQUEOUS) &
       write(*,"(a20,2i5,3es12.4)") "ERROR prclouds sum_cw", &
         i,j, maxval(lwc(i,j,KUPPER:KMAX_MID),1), maxval(pr(i,j,:)), pr_acc(KMAX_MID)
     kcloudtop = KUPPER ! for safety
@@ -452,11 +459,11 @@ subroutine Setup_Clouds(i,j,debug_flag)
 !hf add pres
   call setup_aqurates(b ,cloudwater,incloud,pres)
 
-  if(DEBUG_pH .and. debug_flag .and. incloud(kcloudtop)) then
+  if(DEBUG%pH .and. debug_flag .and. incloud(kcloudtop)) then
 !   write(*,"(a,l1,2i4,es14.4)") "DEBUG_AQ ",prclouds_present, &
 !            kcloudtop, ksubcloud, pr_acc(KMAX_MID)
 
-    write(*,*) "DEBUG_pH ",prclouds_present, &
+    write(*,*) "DEBUG%pH ",prclouds_present, &
               kcloudtop, ksubcloud, (pH(k),k=kcloudtop,ksubcloud-1)
     write(*,*) "CONC (mol/l)",&
       so4_aq(ksubcloud-1),no3_aq(ksubcloud-1),nh4_aq(ksubcloud-1),&
@@ -760,7 +767,7 @@ subroutine WetDeposition(i,j,debug_flag)
 ! calculate concentration after wet deposition and sum up the vertical
 ! column of the depositions for the fully soluble species.
 
-  if(DEBUG.and.debug_flag) write(*,*) "(a15,2i4,es14.4)", &
+  if(DEBUG%AQUEOUS.and.debug_flag) write(*,*) "(a15,2i4,es14.4)", &
      "DEBUG_WDEP2", kcloudtop, ksubcloud, pr_acc(KMAX_MID)
 
   do icalc = 1, NWETDEP_CALC  ! Here we loop over "model" species
@@ -790,16 +797,16 @@ subroutine WetDeposition(i,j,debug_flag)
       enddo ! is
     enddo ! k loop
 
-    if(DEBUG.and.debug_flag.and.pr_acc(20)>1.0e-5) then
+    if(DEBUG%AQUEOUS.and.debug_flag.and.pr_acc(KMAX_MID)>1.0e-5) then
       do k = kcloudtop, KMAX_MID
         write(*,"(a,2i4,a,9es12.2)") "DEBUG_WDEP, k, icalc, spec", k, &
           icalc, trim(species_adv(iadv)%name), vw(k), pr_acc(k), lossfac(k)
       enddo ! k loop
-    endif ! DEBUG
+    endif ! DEBUG%AQUEOUS
 
   enddo ! icalc loop
 
-  d_2d(WDEP_PREC,i,j,IOU_INST) = sum (pr(i,j,:)) * dt ! Same for all models
+  d_2d(WDEP_PREC,i,j,IOU_INST) = pr(i,j,KMAX_MID) * dt ! Same for all models
 
 ! add other losses into twetdep and wdep arrays:
   call WetDep_Budget(i,j,invgridarea,debug_flag)
@@ -825,7 +832,7 @@ subroutine WetDep_Budget(i,j,invgridarea, debug_flag)
     iadv = f_2d(f2d)%index
     d_2d(f2d,i,j,IOU_INST) = wdeploss(iadv) * invgridarea
 
-    if(DEBUG_MY_WETDEP.and.debug_flag) &
+    if(DEBUG%MY_WETDEP.and.debug_flag) &
       call datewrite("WET-PPPSPEC: "//species_adv(iadv)%name,&
         iadv,(/wdeploss(iadv)/))
   enddo
@@ -839,7 +846,7 @@ subroutine WetDep_Budget(i,j,invgridarea, debug_flag)
     wdep = dot_product(wdeploss(gmap%iadv),gmap%uconv(:))
     d_2d(f2d,i,j,IOU_INST) = wdep * invgridarea
 
-    if(DEBUG_MY_WETDEP.and.debug_flag)then
+    if(DEBUG%MY_WETDEP.and.debug_flag)then
       do g=1,size(gmap%iadv)
         iadv=gmap%iadv(g)
         call datewrite("WET-PPPGROUP: "//species_adv(iadv)%name ,&

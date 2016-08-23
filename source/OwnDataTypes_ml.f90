@@ -31,7 +31,8 @@ implicit none
   ! depmap
   ! gtype for species groups, used in CM_ChemSpecs and Derived
 
-  public :: print_deriv_type
+  public :: print_Deriv_type
+  public :: print_Asc2D
   integer, public, parameter :: TXTLEN_DERIV = 34
   integer, public, parameter :: TXTLEN_SHORT = 28
 
@@ -116,20 +117,24 @@ implicit none
     integer :: iotype         ! sets output timing
   endtype
 
+ ! Sentinel values
+  real,    private, parameter :: UNDEF_R = -huge(0.0)
+  integer, private, parameter :: UNDEF_I = -huge(0)
+
   !==================
   !+ Hourly ASCII/NetCDF output type
   type, public:: Asc2D
-    character(len=TXTLEN_DERIV):: name ! Name (no spaces!)
-    character(len=TXTLEN_SHORT):: type ! "ADVppbv" or "ADVugm3" or "SHLmcm3"
+    character(len=TXTLEN_DERIV):: name = "NOTSET"   ! Name (no spaces!)
+    character(len=TXTLEN_SHORT):: type = "NOTSET"  ! "ADVppbv" or "ADVugm3" or "SHLmcm3"
 !   character(len=9) :: ofmt      ! Output format (e.g. es12.4)
-    integer          :: spec      ! Species number in xn_adv or xn_shl array
+    integer          :: spec = UNDEF_I   ! Species number in xn_adv or xn_shl array
                                   ! or other arrays
-    integer          :: ix1,ix2   ! bottom-left,upper-right x
-    integer          :: iy1,iy2   ! bottom-left,upper-right y
-    integer          :: nk        ! number of vertical levels
+    integer          :: ix1 = UNDEF_I,ix2 = UNDEF_I   ! bottom-left,upper-right x
+    integer          :: iy1 = UNDEF_I,iy2 = UNDEF_I   ! bottom-left,upper-right y
+    integer          :: nk = UNDEF_I     ! number of vertical levels
     character(len=TXTLEN_SHORT) :: unit   ! Unit used
-    real             :: unitconv   !  conv. factor
-    real             :: max        ! Max allowed value for output
+    real             :: unitconv = UNDEF_R  !  conv. factor
+    real             :: max      = UNDEF_R        ! Max allowed value for output
   endtype
 
   !==================
@@ -142,6 +147,19 @@ implicit none
   endtype VBST
 
 contains
+!=========================================================================
+subroutine print_Asc2D(w)
+  type(Asc2D), intent(in) :: w  ! wanted
+  write(*,*) "Prints Asc2D type ========================="
+  write(*,"(a,a)")      "Name   :", trim(w%name)
+  write(*,"(a,a)")      "type  :", trim(w%type)
+  write(*,"(a,i4)")     "spec  :", w%spec
+  write(*,"(a,4i5)")    "ix1,ix2,iy1,iy2  :", w%ix1, w%ix2, w%iy1,w%iy2
+  write(*,"(a,a)")      "unit  :", trim(w%unit)
+  write(*,"(a,i4)")     "nk  :", w%nk
+  write(*,"(a,es10.3)") "unitconv  :", w%unitconv
+  write(*,"(a,es10.3)") "max  :", w%max
+end subroutine print_Asc2D
 !=========================================================================
 subroutine print_Deriv_type(w)
   type(Deriv), intent(in) :: w  ! wanted

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -51,24 +51,27 @@ use GridValues_ml,     only : lb2ij, i_fdom, j_fdom &
 use Io_ml,             only : check_file,open_file,ios &
                               , fexist, IO_SITES, IO_SONDES &
                               , Read_Headers,read_line
-use ChemSpecs_adv_ml
-use ChemSpecs_shl_ml,  only : NSPEC_SHL
+!CMR use ChemSpecs_adv_ml
+!CMR use ChemSpecs_shl_ml,  only : NSPEC_SHL
+!CMR use ChemChemicals_ml,  only : species               ! for species names
+use ChemSpecs
 use ChemGroups_ml,     only : OXN_GROUP, PMFINE_GROUP, PMCO_GROUP
-use ChemChemicals_ml,  only : species               ! for species names
+use Met_ml,            only : meteo
 use MetFields_ml,      only : t2_nwp, th, pzpbl  &  ! output with concentrations
                               , z_bnd, z_mid, roa, Kz_m2s, q
 use MetFields_ml,      only : u_xmj, v_xmi, ps
 use ModelConstants_ml, only : NMET,PPBINV,PPTINV, KMAX_MID, MasterProc &
                               ,KMAX_BND,PT,ATWAIR, NPROC, DEBUG => DEBUG_SITES &
                               ,DomainName, RUNDOMAIN, IOU_INST, SOURCE_RECEPTOR
+use NetCDF_ml,         only : Create_CDF_sondes,Out_CDF_sondes
 use Par_ml,            only : li0,lj0,li1,lj1 &
-                              ,GIMAX,GJMAX &
+                              ,GIMAX,GJMAX,IRUNBEG,JRUNBEG&
                               ,GI0,GI1,GJ0,GJ1,me,MAXLIMAX,MAXLJMAX
 use SmallUtils_ml,     only : find_index
 use Tabulations_ml,    only : tab_esat_Pa
 use TimeDate_ml,       only : current_date
 use TimeDate_ExtraUtil_ml,   only : date2string
-use KeyValue_ml,       only : KeyVal, KeyValue, LENKEYVAL
+use KeyValueTypes,       only : KeyVal, KeyValue, LENKEYVAL
 
 implicit none
 private                     ! stops variables being accessed outside
@@ -100,6 +103,7 @@ integer, private, save, allocatable,dimension (:,:) :: sonde_gindex
 integer, public, save, dimension (NSITES_MAX) :: &
         site_x, site_y, site_z      &! local coordinates
        , site_gn                        ! number in global
+real, public, save, dimension (NSITES_MAX) :: Sites_lon= -999, Sites_lat= -999
 
 integer, private, save, dimension (NSITES_MAX) :: &
          site_gx, site_gy, site_gz    ! global coordinates
@@ -107,6 +111,7 @@ integer, private, save, dimension (NSONDES_MAX) ::  &
          sonde_gx, sonde_gy   &        ! global coordinates
        , sonde_x, sonde_y     &        ! local coordinates
        , sonde_gn                       ! number in global
+real, public, save, dimension (NSONDES_MAX) :: Sondes_lon= -999, Sondes_lat= -999, ps_sonde=0.0
 
 ! Values from My_Outputs_ml gives ... =>
 integer, private, parameter :: & ! Total No., without counting levels
@@ -124,6 +129,11 @@ character(len=20), private, save, dimension(NSPC_SONDE) :: sonde_species
 character(len=70), private :: errmsg ! Message text
 integer, private :: d                 ! processor index
 integer, private :: i, n, nloc, ioerr ! general integers
+integer, parameter, private :: Spec_Att_Size=20,N_Spec_Att_MAX=5,NSPECMAX=max(NSPC_SITE,NSPC_SONDE)
+character(len=Spec_Att_Size)  :: Spec_AttributeNames(NSPECMAX,N_Spec_Att_MAX)
+character(len=Spec_Att_Size)  :: Spec_AttributeValues(NSPECMAX,N_Spec_Att_MAX)
+integer, private :: i_Att !Spec attribute index
+integer :: NSpec_Att !number of Spec attributes defined
 
 
 contains
@@ -260,6 +270,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
   ! First, see which sites are within full domain:
 
   n = 0          ! Number of sites found within domain
+
   SITELOOP: do nin = 1, NMAX
 
     if (trim(KeyValue(KeyValues,"Coords"))=='LatLong') then
@@ -271,6 +282,8 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       iy=nint(y)
     else
       call read_line(io_num,txtinput,ios)
+      lon=-999.0
+      lat=-999.0
       if ( ios /= 0 ) exit  ! End of file
       read(unit=txtinput,fmt=*) s,  ix,  iy, lev
     endif
@@ -292,9 +305,19 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
     else
       comment = " ok - inside domain         "
       n = n + 1
+      
       s_gx(n)   = ix
       s_gy(n)   = iy
       s_gz(n)   = lev
+
+      if(trim(fname)=="sites")then
+         if(lon>-990)Sites_lon(n) = lon
+         if(lat>-990)Sites_lat(n) = lat
+      endif
+      if(trim(fname)=="sondes")then
+         if(lon>-990)Sondes_lon(n) = lon
+         if(lat>-990)Sondes_lat(n) = lat
+      endif
 
       s_name(n)  = s !!! remove comments// comment
       if (DEBUG) write(6,"(a,i3,i4,a)") "sitesdef s_name : ", me, n, trim(s_name(n))
@@ -307,7 +330,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
   ! NSITES/SONDES_MAX must be _greater_ than the number used, for safety
 
   call CheckStop(n >= NMAX, &
-      "Error in Sites_ml/Init_sites: increaseNGLOBAL_SITES_MAX!")
+      "Error in Sites_ml/Init_sites: increase NGLOBAL_SITES_MAX!")
 
   if(MasterProc) close(unit=io_num)
 
@@ -409,11 +432,14 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
 
   ! assign local data to out
 
+  i_Att=0
+  NSpec_Att=1 !number of Spec attributes defined
   do i = 1, nlocal_sites
     ix = site_x(i)
     iy = site_y(i)
     iz = site_z(i)
 
+    i_Att=0
     do ispec = 1, NADV_SITE
       if (iz == KMAX_MID ) then ! corrected to surface
         out(ispec,i) = xn_adv( SITE_ADV(ispec) ,ix,iy,KMAX_MID ) * &
@@ -421,11 +447,18 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
       else                      ! Mountain sites not corrected to surface
         out(ispec,i)  = xn_adv( SITE_ADV(ispec) ,ix,iy,iz ) * PPBINV
       endif
+      i_Att=i_Att+1
+      Spec_AttributeNames(i_Att,1)='units'
+      Spec_AttributeValues(i_Att,1)='ppb'
+ 
     enddo
 
 
     do ispec = 1, NSHL_SITE
       out(NADV_SITE+ispec,i)  = xn_shl( SITE_SHL(ispec) ,ix,iy,iz )
+      i_Att=i_Att+1
+      Spec_AttributeNames(i_Att,1)='units'
+      Spec_AttributeValues(i_Att,1)='ppb'
     end do
 
     ! XTRA parameters, usually the temmp or pressure
@@ -436,10 +469,16 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
         select case ( trim(SITE_XTRA_MISC(ispec)) )
           case ( "T2" )
             out(nn,i)   = t2_nwp(ix,iy,1) - 273.15
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='K'
           case ( "th" )
             out(nn,i)   = th(ix,iy,iz,1)
 !         case ( "hmix" )
 !           out(nn,i)   = pzpbl(ix,iy)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='K'
          case default
            call CheckStop("Error, Sites_ml/siteswrt_surf: SITE_XTRA_MISC:"&
                                // trim(SITE_XTRA_MISC(ispec)))
@@ -453,13 +492,19 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
         nn=nn+1
 
         if ( d2index < 1 ) then
-           if( my_first_call) write(*,*) &
+           if(MasterProc .and. my_first_call) write(*,*) &
                  "WARNING: SITES D2D NOT FOUND"//trim(d2code)
            !cycle
+          i_Att=i_Att+1
            out(nn,i)   = -999.9
+          Spec_AttributeNames(i_Att,1)='output'
+          Spec_AttributeValues(i_Att,1)='undefined'!to improve?
         else
            !call CheckStop( d2index<1, "SITES D2D NOT FOUND"//trim(d2code) )
            out(nn,i)   = d_2d(d2index,ix,iy,IOU_INST)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='?'!to improve?
         end if
 
         !May25 call CheckStop( d2index<1, "SITES D2D NOT FOUND"//trim(d2code) )
@@ -473,6 +518,9 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
     endif
   enddo
 
+!
+
+
     my_first_call = .false.
 
   ! collect data into gout on me=0 t
@@ -480,7 +528,7 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
   call siteswrt_out("sites",IO_SITES,NOUT_SITE, FREQ_SITE, &
                      nglobal_sites,nlocal_sites, &
                      site_gindex,site_name,site_gx,site_gy,site_gz,&
-                     site_species,out)
+                     site_species,out,ps_sonde)
 
 end subroutine siteswrt_surf
 !==================================================================== >
@@ -515,6 +563,8 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
     end select
   enddo
 
+  i_Att=0
+  NSpec_Att=1 !number of Spec attributes defined
   do i = 1, nlocal_sondes
     n  = sonde_gn(i)
     ix = sonde_x(i)
@@ -524,17 +574,23 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
     ! collect and print out with ground-level (KMAX_MID) first, hence &
     ! KMAX_MID:KTOP_SONDE:-1 in arrays
     ! first the advected and short-lived species
-
+    i_Att=0
     do ispec = 1, NADV_SONDE    !/ xn_adv in ppb
       out(nn+1:nn+NLEVELS_SONDE,i) = PPBINV *  &
           xn_adv( SONDE_ADV(ispec) , ix,iy,KMAX_MID:KTOP_SONDE:-1)
       nn = nn + NLEVELS_SONDE
+      i_Att=i_Att+1
+      Spec_AttributeNames(i_Att,1)='units'
+      Spec_AttributeValues(i_Att,1)='ppb'
     enddo
 
     do ispec = 1, NSHL_SONDE    !/ xn_shl  in molecules/cm3
       out(nn+1:nn+NLEVELS_SONDE,i) = xn_shl( SONDE_SHL(ispec) , &
           ix,iy,KMAX_MID:KTOP_SONDE:-1)
       nn = nn + NLEVELS_SONDE
+      i_Att=i_Att+1
+      Spec_AttributeNames(i_Att,1)='units'
+      Spec_AttributeValues(i_Att,1)='molecules/cm3'
     enddo
 
     ! then print out XTRA stuff first,
@@ -554,6 +610,9 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
                         ) * roa(ix,iy,k,1)
           enddo !k
           out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='ug/m3'
 
         case ( "PMco" ) !!  PM data converted to ug m-3
           sum_PM(:) = 0.
@@ -563,6 +622,9 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
                       * roa(ix,iy,k,1)
           enddo !k
           out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='ug/m3'
 
         case ( "NOy" )
           sum_NOy(:) = 0.
@@ -570,6 +632,9 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
             sum_NOy(k) = sum(xn_adv(OXN_GROUP-NSPEC_SHL,ix,iy,k))
           enddo
           out(nn+1:nn+KMAX_MID,i) = PPBINV * sum_NOy(KMAX_MID:1:-1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='mix_ratio'
 
         case ( "RH   " )
           do k = 1,KMAX_MID
@@ -580,29 +645,50 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
             rh(k) = min( q(ix,iy,k,1)/qsat(k) , 1.0)
           end do
           out(nn+1:nn+NLEVELS_SONDE,i) =  rh(KMAX_MID:KTOP_SONDE:-1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='fraction'
 
         case ( "z_mid" )
           out(nn+1:nn+NLEVELS_SONDE,i) =  z_mid(ix,iy,KMAX_MID:KTOP_SONDE:-1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='m'
 
         case ( "p_mid" )
           out(nn+1:nn+NLEVELS_SONDE,i) = A_mid(KMAX_MID:KTOP_SONDE:-1) + &
                                     B_mid(KMAX_MID:KTOP_SONDE:-1)*ps(ix,iy,1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='Pa'
 
         case ( "Kz_m2s" )
           out(nn+1:nn+NLEVELS_SONDE,i) =  Kz_m2s(ix,iy,KMAX_MID:KTOP_SONDE:-1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='?/m2/s'
 
         case ( "th" )
           out(nn+1:nn+NLEVELS_SONDE,i) =  th(ix,iy,KMAX_MID:KTOP_SONDE:-1,1)
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='K'
 
         case ( "U" )
           out(nn+1:nn+NLEVELS_SONDE,i) = 0.5 &
              *( u_xmj(ix,iy,KMAX_MID:KTOP_SONDE:-1,1) &
              +u_xmj(ix-1,iy,KMAX_MID:KTOP_SONDE:-1,1) )
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='m/s'
 
         case ( "V" )
           out(nn+1:nn+NLEVELS_SONDE,i) = 0.5 &
              *( v_xmi(ix,iy,KMAX_MID:KTOP_SONDE:-1,1) &
              +v_xmi(ix,iy-1,KMAX_MID:KTOP_SONDE:-1,1) )
+          i_Att=i_Att+1
+          Spec_AttributeNames(i_Att,1)='units'
+          Spec_AttributeValues(i_Att,1)='m/s'
 
         case ( "D3D" )
             call StopAll("D3D Sites out not defined")
@@ -613,6 +699,8 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
 
     enddo ! ispec (NXTRA_SONDE)
 
+    ps_sonde(i)=ps(ix,iy,1)!surface pressure always needed to define the vertical levels
+
   enddo ! i (nlocal_sondes)
 
 
@@ -621,12 +709,12 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
   call siteswrt_out("sondes",IO_SONDES,NOUT_SONDE, FREQ_SONDE, &
                      nglobal_sondes,nlocal_sondes, &
                      sonde_gindex,sonde_name,sonde_gx,sonde_gy,sonde_gy, &
-                     sonde_species,out)
+                     sonde_species,out,ps_sonde)
 
 end subroutine siteswrt_sondes
 !==================================================================== >
 subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
-                        s_gindex,s_name,s_gx,s_gy,s_gz,s_species,out)
+     s_gindex,s_name,s_gx,s_gy,s_gz,s_species,out,ps_sonde)
   ! -------------------------------------------------------------------
   ! collects data from local nodes and writes out to sites/sondes.dat
   ! -------------------------------------------------------------------
@@ -640,9 +728,11 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   integer, intent(in), dimension (:) :: s_gx, s_gy, s_gz    ! coordinates
   character(len=*), intent(in), dimension (:) ::  s_species ! Variable names
   real,    intent(in), dimension(:,:) :: out    ! outputs, local node
+  real,    intent(in), dimension(:) ::  ps_sonde   ! surface pressure local node
 
   ! Local
   real,dimension(nout,nglobal) :: g_out ! for output, collected
+  real,dimension(nglobal) :: g_ps ! for ps, collected
   integer :: nglob, nloc         ! Site indices
   character(len=40)  :: outfile
   character(len=4)   :: suffix
@@ -650,87 +740,270 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   integer ::  type=-1                   ! = 1 for sites, 2 for sondes
   integer, save, dimension(NTYPES):: prev_month = (/ -99, -99 /) ! Initialise
   integer, save, dimension(NTYPES):: prev_year = (/ -99, -99 /) ! Initialise
-  integer :: ii
+  integer :: ii,nn
+
+  integer, parameter :: NattributesMAX=100
+  character(len=100),allocatable  :: SpecName(:)
+  character(len=100),allocatable  :: AttributeNames(:,:)
+  character(len=100),allocatable  :: AttributeValues(:,:),CoordNames(:,:)
+  character(len=100)              :: fileName
+  real,allocatable  :: CoordValues(:,:)
+  integer,allocatable  :: NAttributes(:),NCoords(:)
+  integer  :: Nlevels,ispec,NSPEC,NStations,Ndoublestations
+  real ::Values(KMAX_MID)
+  integer ::i_Att_MPI
 
   select case (fname)
-    case ("sites" )
-      type = 1
-    case ("sondes" )
-      type = 2
-    case default
-      write(6,*) "non-possible tpye in siteswrt_out for ", fname
-      return
+  case ("sites" )
+     type = 1
+  case ("sondes" )
+     type = 2
+  case default
+     write(6,*) "non-possible type in siteswrt_out for ", fname
+     return
   end select
 
-!  if ( MasterProc .and. current_date%month /= prev_month(type)) then
-  if (MasterProc .and. current_date%year /= prev_year(type) ) then
+  write(suffix,fmt="(i4)") prev_year(type)
+  fileName = fname // "_" // suffix // ".nc"!Name of the NetCDF file. Will overwrite any preexisting file
 
-     if ( prev_year(type) > 0 ) close(io_num)  ! Close last-months file
+  !  if ( MasterProc .and. current_date%month /= prev_month(type)) then
+  if (current_date%year /= prev_year(type) & 
+                                !We do not consider midnight as a new year
+       .and.(current_date%month/=1.or.current_date%hour/=0.or.current_date%seconds/=0)&
+       ) then
      prev_year(type) = current_date%year
-
-     ! Open new file for write-out
-
      write(suffix,fmt="(i4)") current_date%year
-     outfile = fname // "_" // suffix // ".csv"
+     fileName = fname // "_" // suffix // ".nc"!Name of the NetCDF file. Will overwrite any preexisting file
 
-     open(file=outfile,unit=io_num,action="write",form='FORMATTED')
+     if (MasterProc  ) then
 
-     write(io_num,"(i3,2x,a,a, 4i4)") nglobal, fname, " in domain",RUNDOMAIN
-     write(io_num,"(i3,a)") f, " Hours between outputs"
+        if ( prev_year(type) > 0 ) close(io_num)  ! Close last-year file
+        prev_year(type) = current_date%year
 
-     do n = 1, nglobal
-        write(io_num,'(a50,3(",",i4))') s_name(n), s_gx(n), s_gy(n),s_gz(n)
-     end do ! nglobal
+        ! Open new file for write-out
 
-     write(io_num,'(i3,a)') size(s_species), " Variables units: ppb"
-     !MV write(io_num,'(a9,<size(s_species)>(",",a))')"site,date",(trim(s_species(i)),i=1,size(s_species))
-     write(io_num,'(9999a)')"site,date", (",", (trim(s_species(i)) ),i=1,size(s_species))
+        write(suffix,fmt="(i4)") current_date%year
+        outfile = fname // "_" // suffix // ".csv"
 
-  endif ! first call
+        open(file=outfile,unit=io_num,action="write",form='FORMATTED')
+
+        write(io_num,"(i3,2x,a,a, 4i4)") nglobal, fname, " in domain",RUNDOMAIN
+        write(io_num,"(i3,a)") f, " Hours between outputs"
+
+        do n = 1, nglobal
+           write(io_num,'(a50,3(",",i4))') s_name(n), s_gx(n), s_gy(n),s_gz(n)
+        end do ! nglobal
+
+        write(io_num,'(i3,a)') size(s_species), " Variables units: ppb"
+        !MV write(io_num,'(a9,<size(s_species)>(",",a))')"site,date",(trim(s_species(i)),i=1,size(s_species))
+        write(io_num,'(9999a)')"site,date", (",", (trim(s_species(i)) ),i=1,size(s_species))
+
+        !defintions of file for NetCDF output
+
+        if(trim(fname)=="sondes")then
+           NLevels = NLEVELS_SONDE !number of vertical levels (counting from surface)
+           NSPEC=NSPC_SONDE!number of species defined for sondes
+        else
+           NLevels = 1
+           NSPEC=NSPC_SITE!number of species defined for sites
+        endif
+
+        NStations = nglobal!number of sondes or sites defined
+
+
+        allocate(SpecName(NSPEC),AttributeNames(0:NStations,NattributesMAX))
+        allocate(AttributeValues(0:NStations,NattributesMAX),CoordNames(0:NStations,NattributesMAX))
+        allocate(CoordValues(0:NStations,NattributesMAX))
+        allocate(NAttributes(0:NStations),NCoords(0:NStations))
+
+        n = 0!index for global attributes. Do not modify this line.
+        NAttributes(n) = 2 !number of global string attributes
+        call CheckStop(NAttributes(n)>NattributesMAX,'NattributesMAX too small')
+        AttributeNames(n,1) = "File_Type"!name of the global attribute. For instance "File_Type"
+        AttributeValues(n,1)= trim(fname)!string for that attribute. For instance "Sondes"
+
+        AttributeNames(n,2) = 'meteo_source'
+        AttributeValues(n,2)= trim(meteo)
+
+        NCoords(n) = 4 !number of real-valued global attributes defined
+        call CheckStop(NCoords(n)>NattributesMAX,'Coords: NattributesMAX too small')
+        CoordNames(n,1) = "Number_of_hours_bewtween_outputs"!name of the global attribute. For instance "Number of hours bewtween outputs"
+        CoordValues(n,1)= 1.0 !value for that attribute. For instance "1.0"
+        CoordNames(n,2) = "Number_of_stations_defined"
+        CoordValues(n,2)= NStations
+        CoordNames(n,3) = "Model_domain_x_size"
+        CoordValues(n,3)= GIMAX
+        CoordNames(n,4) = "Model_domain_y_size"
+        CoordValues(n,4)= GJMAX
+        if(IRUNBEG>1)then
+           NCoords(n) = NCoords(n)+1
+           CoordNames(n,NCoords(n)) = "Model_domain_x_shift_origin"
+           CoordValues(n,NCoords(n))= IRUNBEG
+        endif
+        if(JRUNBEG>1)then
+           NCoords(n) = NCoords(n)+1
+           CoordNames(n,NCoords(n)) = "Model_domain_y_shift_origin"
+           CoordValues(n,NCoords(n))= JRUNBEG
+        endif
+
+        do ispec=1,NSPEC
+           SpecName(ispec)=trim(site_species(ispec))!name of the  species
+        enddo
+
+
+        do n = 1, NStations
+
+           !check to avoid two stations with same name, since this will give problems when writing in 
+           !the netcdf output
+           Ndoublestations=0
+           do nn = n+1, NStations
+              if(trim(s_name(n))==trim(s_name(nn)))then
+                 if(Ndoublestations<1)write(*,*)'ERROR, ', trim(fname),' with same name: '
+                 Ndoublestations=Ndoublestations+1
+                 write(*,*) 'station ',trim(s_name(n)),', number ',n,' and',nn
+              endif
+           enddo
+           call CheckStop(Ndoublestations>0,&
+                "Two stations with identical name. Remove or rename one of them")
+
+           NAttributes(n) = 1 !number of string attributes defined for the variable
+           call CheckStop(NAttributes(n)>NattributesMAX,'NattributesMAX too small')
+           !NB: attribute with index 1 MUST be the name of the station
+           AttributeNames(n,1) = 'Name_of_station'!name of the attribute. For instance "Station_Type"
+           AttributeValues(n,1)= trim(s_name(n))!string for that attribute. For instance "Urban"
+
+
+           if(trim(fname)=="sites")then
+              NCoords(n)=5 !number of real-valued attributes defined for the sondes variable
+           else
+              NCoords(n)=4 !number of real-valued attributes defined for the sites variable
+           endif
+           call CheckStop(NCoords(n)>NattributesMAX,'Coords: NattributesMAX too small')
+
+           CoordNames(n,1) = 'model_x_coordinate'!name of the attribute. For instance "Station_longitude"
+           CoordValues(n,1)= s_gx(n)!value for that attribute. For instance "20.6"
+           CoordNames(n,2) = 'model_y_coordinate'
+           CoordValues(n,2)= s_gy(n)
+           if(trim(fname)=="sites")then
+              CoordNames(n,3) = 'model_level'
+              CoordValues(n,3)= s_gz(n)
+              CoordNames(n,4) = 'site_longitude_coordinate'
+              CoordValues(n,4)= Sites_lon(n)
+              CoordNames(n,5) = 'site_latitude_coordinate'
+              CoordValues(n,5)= Sites_lat(n)
+           endif
+           if(trim(fname)=="sondes")then
+              CoordNames(n,3) = 'sonde_longitude_coordinate'
+              CoordValues(n,3)= Sondes_lon(n)
+              CoordNames(n,4) = 'sonde_latitude_coordinate'
+              CoordValues(n,4)= Sondes_lat(n)
+           endif
+        enddo
+        !take Spec_Attributes from any processor with at least one site/sonde
+        if(i_Att>0.and.i_Att/=NSPEC)then
+           write(*,*)'MISSING species attribute? ',i_Att,NSPEC
+        endif
+        do d = 1, NPROC-1
+           call MPI_RECV(i_Att_MPI, 4*1, MPI_BYTE, d, 746, MPI_COMM_WORLD,STATUS, INFO)
+           if(i_Att_MPI>0)then
+              if(i_Att_MPI/=NSPEC)then
+                 write(*,*)'MISSING species attribute? ',i_Att_MPI,NSPEC
+              endif
+              call MPI_RECV(Spec_AttributeNames, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, &
+                   MPI_BYTE, d, 747, MPI_COMM_WORLD,STATUS, INFO)
+              call MPI_RECV(Spec_AttributeValues, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, &
+                   MPI_BYTE, d, 748, MPI_COMM_WORLD,STATUS, INFO)
+           endif
+        enddo
+
+        call Create_CDF_sondes(fileName,SpecName,NSPEC,NStations,AttributeNames,AttributeValues,&
+             NAttributes,CoordNames,CoordValues,NCoords,Spec_AttributeNames,Spec_AttributeValues,&
+             NSpec_Att,NLevels,debug=.false.)
+
+        deallocate(SpecName,AttributeNames)
+        deallocate(AttributeValues,CoordNames)
+        deallocate(CoordValues)
+        deallocate(NAttributes,NCoords)
+        write(*,*)'Created ',trim(fileName)
+     else
+        !not MasterProc
+        i_Att_MPI=i_Att
+        call MPI_SEND(i_Att_MPI, 4*1, MPI_BYTE, 0, 746, MPI_COMM_WORLD, INFO)
+        if(i_Att>0)then
+           call MPI_SEND(Spec_AttributeNames, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, MPI_BYTE, 0, 747, MPI_COMM_WORLD, INFO)
+           call MPI_SEND(Spec_AttributeValues, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, MPI_BYTE, 0, 748, MPI_COMM_WORLD, INFO)
+        endif
+        prev_year(type) = current_date%year
+     endif ! MasterProc 
+
+  endif ! current_date%year /= prev_year(type)
 
 
 
   if ( .not.MasterProc ) then   ! send data to me=0 (MasterProc)
 
-    call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 346, MPI_COMM_WORLD, INFO)
-    call MPI_SEND(out, 8*nout*nlocal, MPI_BYTE, 0, 347, MPI_COMM_WORLD, INFO)
+     call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 346, MPI_COMM_WORLD, INFO)
+     call MPI_SEND(out, 8*nout*nlocal, MPI_BYTE, 0, 347, MPI_COMM_WORLD, INFO)
+     if(trim(fname)=="sondes")&
+          call MPI_SEND(ps_sonde, 8*nlocal, MPI_BYTE, 0, 347, MPI_COMM_WORLD, INFO)
 
   else ! MasterProc
 
-    ! first, assign me=0 local data to g_out
-    if ( DEBUG ) print *, "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
+     ! first, assign me=0 local data to g_out
+     if ( DEBUG ) print *, "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
 
-    do n = 1, nlocal
-      nglob = s_gindex(0,n)
-      g_out(:,nglob) = out(:,n)
-    enddo ! n
-
-    do d = 1, NPROC-1
-      call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 346, MPI_COMM_WORLD,STATUS, INFO)
-      call MPI_RECV(out, 8*nout*nloc, MPI_BYTE, d, 347, MPI_COMM_WORLD, &
-                    STATUS, INFO)
-      do n = 1, nloc
-        nglob = s_gindex(d,n)
+     do n = 1, nlocal
+        nglob = s_gindex(0,n)
         g_out(:,nglob) = out(:,n)
-      enddo ! n
-    enddo ! d
+        if(trim(fname)=="sondes")g_ps(n) = ps_sonde(n)
+     enddo ! n
 
-    ! some computers print out e.g. "2.23-123" instead of "2.23e-123"
-    ! when numbes get too small. Here we make a correction for this:
-    where( abs(g_out)>0.0 .and. abs(g_out)<1.0e-99 ) g_out = 0.0
+     do d = 1, NPROC-1
+        call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 346, MPI_COMM_WORLD,STATUS, INFO)
+        call MPI_RECV(out, 8*nout*nloc, MPI_BYTE, d, 347, MPI_COMM_WORLD, &
+             STATUS, INFO)
+        if(trim(fname)=="sondes")call MPI_RECV(ps_sonde, 8*nloc, MPI_BYTE, d, &
+             347, MPI_COMM_WORLD, STATUS, INFO)
+        do n = 1, nloc
+           nglob = s_gindex(d,n)
+           g_out(:,nglob) = out(:,n)
+           if(trim(fname)=="sondes")g_ps(nglob) = ps_sonde(n)
+        enddo ! n
+     enddo ! d
 
-    ! Final output
-    do n = 1, nglobal
+     ! some computers print out e.g. "2.23-123" instead of "2.23e-123"
+     ! when numbes get too small. Here we make a correction for this:
+     where( abs(g_out)>0.0 .and. abs(g_out)<1.0e-99 ) g_out = 0.0
 
-!! Massimo Vieno change the ouput style make the output csv
-!! Oct 2012 Formatting changed (DS,AMV) for gfortran compliance
-!! and compactness. 
-         write (io_num,'(a,9999(:,",",es10.3))') & 
-          trim(s_name(n)) // date2string(", DD/MM/YYYY hh:00",current_date),& 
+     ! Final output
+     do n = 1, nglobal
+
+        !! Massimo Vieno change the ouput style make the output csv
+        !! Oct 2012 Formatting changed (DS,AMV) for gfortran compliance
+        !! and compactness. 
+        write (io_num,'(a,9999(:,",",es10.3))') & 
+             trim(s_name(n)) // date2string(", DD/MM/YYYY hh:00",current_date),& 
              ( g_out(ii,n), ii =1, nout ) 
-           ! (The ':' format control item will stop processing once the g_out
-           !  is done, avoiding runtime warnings.)
-    enddo ! n
+        ! (The ':' format control item will stop processing once the g_out
+        !  is done, avoiding runtime warnings.)
+
+     enddo
+
+     if(trim(fname)=="sondes")then
+        NLevels = NLEVELS_SONDE !number of vertical levels (counting from surface)
+        NSPEC=NSPC_SONDE!number of species defined for sondes
+     else
+        NLevels=1
+        NSPEC=NSPC_SITE!number of species defined for sites
+     endif
+     allocate(SpecName(NSPEC))
+
+     do ispec=1,NSPEC
+        SpecName(ispec)=trim(site_species(ispec))!name of the variable for one sites/sonde and species          
+     enddo ! n
+
+     call Out_CDF_sondes(fileName,SpecName,NSPEC,g_out,NLevels,g_ps,debug=.false.)
+     deallocate(SpecName)
 
   endif ! MasterProc
 

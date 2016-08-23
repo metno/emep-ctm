@@ -1,8 +1,9 @@
-! <SmallUtils_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+!> SmallUtils_ml.f90 - MODULE - provides small utility routines to process
+!! test strings and key-valaue pairs
+!! <A component of the EMEP MSC-W Unified Eulerian Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,25 +29,28 @@
 module SmallUtils_ml
 
 !_____________________________________________________________________________
-! -- small utility provides routines to process text strings,
-!    find array indices, write arrays.
-!
-! Dave Simpson, 1999-2011
-! Language: F-complaint, except system calls in Self_Test
-! (Can be run with F is test-input file created manually
-!  and system calls commented out, as here)
-!_____________________________________________________________________________
+!> @brief small utility provides routines to process text strings,
+!!   find array indices, write arrays.
+!!
+!! @author Dave Simpson, 1999-2011
+!! Language: F-complaint
+!<____________________________________________________________________________
   implicit none
 
-  ! -- subroutines in this module:
+  ! -- subroutines in this TEST module:
 
-  public :: wordsplit    !  Splits input text into words
-  public :: LenArray     ! count No. set strings in array
-  public :: AddArray     ! Adds new char array to old
-  public :: WriteArray   ! Writes out char array, one element per line
-  public :: find_index   ! Finds index of item in list 
-  public :: find_indices ! Finds indices of arrays of items in list 
-  public :: Self_Test    ! For testing
+  public :: wordsplit    !> Splits input text into words
+  public :: LenArray     !> count No. set strings in array
+  public :: AddArray     !> Adds new char array to old
+  public :: WriteArray   !! Writes out char array, one element per line
+  public :: find_index   !! Finds index of item in list 
+  public :: find_indices !< Finds indices of arrays of items in list 
+  public :: trims        !> removes all blanks from string
+  public :: num2str      !> converts  numbers to string
+  private :: num2str_i  
+  private :: num2str_r 
+  public :: to_upper     !> Converts string to upper case
+  public :: Self_Test    !< For testing
 
   private :: find_index_c, find_index_i
 
@@ -57,6 +61,11 @@ module SmallUtils_ml
     module procedure find_index_c   ! For character arrays
     module procedure find_index_i   ! For integer arrays
   end interface find_index
+
+  interface num2str
+    module procedure num2str_r   ! For real
+    module procedure num2str_i   ! For integer
+  end interface num2str
 
 contains
 
@@ -131,8 +140,9 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
 end subroutine wordsplit
 
 !============================================================================
+!> LenArray counts number of elements in input array (a)
+!!  which are not equal to notset string
 function LenArray(a,notset) result (N)
-  !+ Counts number of elements in a which are not equal to notset string
   character(len=*), dimension(:), intent(in) :: a
   character(len=*), intent(in) :: notset
   integer :: N, i
@@ -144,8 +154,8 @@ function LenArray(a,notset) result (N)
   enddo
 end function LenArray
 !============================================================================
+!> AddArray adds elements from new array to old array
 subroutine AddArray(new,old,notset,errmsg)
-  !+ Adds elements from new array to old array
   character(len=*), dimension(:), intent(in) :: new
   character(len=*), dimension(:), intent(inout) :: old
   character(len=*), intent(in) :: notset
@@ -183,39 +193,44 @@ subroutine WriteArray(list,NList,txt,io_num)
     write(unit=io,fmt=*) txt, i, list(i)
   enddo
 end subroutine WriteArray
-!============================================================================
-! A series of find_index routines, for character (c) and integer (i) arrays:
-!============================================================================
-function find_index_c(wanted, list, debug)  result(Index)
+!>===========================================================================
+!! A series of find_index routines, for character (c) and integer (i) arrays:
+!!===========================================================================
+function find_index_c(wanted, list, first_only, debug)  result(Index)
   character(len=*), intent(in) :: wanted
   character(len=*), dimension(:), intent(in) :: list
+  logical, intent(in), optional :: first_only
   logical, intent(in), optional :: debug
 !  Output:
   integer ::   Index
 
   character(len=*), parameter :: &
-             debug_fmt="('debug find_index ',I0,':',A,A2,A)"
-  logical :: debug_print
+             debug_fmt="('debug find_index ',I0, i4,':',A,A2,A)"
+  logical :: debug_print, OnlyFirst
   integer :: n_match ! Count for safety
   integer :: n
 
   n_match  = 0
   Index =  NOT_FOUND
   debug_print=.false.;if(present(debug))debug_print=debug
+  OnlyFirst=.false.;if(present(first_only))OnlyFirst=first_only
 
   do n = 1, size(list)
     if ( wanted == list(n) ) then
       Index = n
       n_match = n_match + 1
+      if( OnlyFirst ) return
       if(debug_print) &
-      print debug_fmt,n,trim(list(n)),"==",trim(wanted)
+      print debug_fmt,n,n_match,trim(list(n)),"==",trim(wanted)
     elseif ( debug_print ) then
-      print debug_fmt,n,trim(list(n)),"/=",trim(wanted)
+      print debug_fmt,n,n_match,trim(list(n)),"/=",trim(wanted)
     endif
   enddo
 
   if ( n_match >  1 ) then !! Too many!
     n_match = -1 * n_match
+      if(debug_print) &
+      print *, "debug find_index REVERSE", n_match
   endif
 end function find_index_c
 
@@ -281,7 +296,83 @@ end function find_index_i
     enddo
   enddo
 end function find_indices
+!=======================================================================
+ function trims(str)  result(trimmed)
+  character(len=*), intent(in) :: str
+  character(len=len(str)) :: trimmed
+  character :: c
+  integer :: i
+  
+  trimmed = ''
+  do i = 1, len_trim( str )
+     c = str(i:i)
+     if (  c == ' ' ) cycle
+     trimmed = trim(trimmed) // c
+  end do
 
+ end function trims
+!=======================================================================
+ function num2str_r(x,xfmt)  result(str)
+  real, intent(in) :: x
+  character(len=*), intent(in), optional :: xfmt
+  character(len=19) :: str
+
+  if( present( xfmt ) ) then
+     write(str, xfmt ) x
+     if ( index(str,'*') > 0  ) then
+      print *, "Problem with format", trim(str)
+      write(str, "(es15.3)" ) x
+      print *, "Re-format to ", trim(str)
+     end if
+  else
+     write(str, * ) x
+  end if
+ end function num2str_r
+!============================================================================
+ function num2str_i(n,xfmt)  result(str)
+  integer, intent(in):: n
+  character(len=*), intent(in), optional :: xfmt
+  character(len=19) :: str
+
+  if( present( xfmt ) ) then
+     write(str, xfmt ) n
+     if ( index(str,'*') > 0  ) then
+      print *, "Problem with format", trim(str)
+      write(str, * ) n
+      print *, "Re-format to ", trim(str)
+     end if
+  else
+     write(str, * ) n
+  end if
+ end function num2str_i
+!============================================================================
+!> Function posted by SethMMorton at: 
+!! http://stackoverflow.com/questions/10759375/how-can-i-write-a-to-upper-or-to-lower-function-in-f90
+!> Simpler to understand than use of iachar etc. (see same web side).
+
+Pure Function to_upper (str) Result (string)
+
+!   ==============================
+!   Changes a string to upper case
+!   ==============================
+
+    Implicit None
+    Character(*), Intent(In) :: str
+    Character(LEN(str))      :: string
+
+    Integer :: ic, i
+
+    Character(26), Parameter :: cap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    Character(26), Parameter :: low = 'abcdefghijklmnopqrstuvwxyz'
+
+!   Capitalize each letter if it is lowecase
+    string = str
+    do i = 1, LEN_TRIM(str)
+        ic = INDEX(low, str(i:i))
+        if (ic > 0) string(i:i) = cap(ic:ic)
+    end do
+
+End Function to_upper
 !============================================================================
 subroutine Self_test()
 
@@ -326,6 +417,22 @@ subroutine Self_test()
   wantedx(2) =  "second  "
   call AddArray(wanted1,wantedx,NOT_SET_STRING,errmsg)
   call WriteArray(wantedx,size(wantedx),"Testing AddArray")
+
+
+  print "(/,a)", "4) Self-test - num2str   ================================="
+  print *, "1.23 Without fmt ", trim( num2str( 1.23 ))
+  print *, "1.23e19 Without fmt ", trim( num2str( 1.23e19 ))
+  print *, "1.23e19 With fmt es15.3 ", trim( num2str( 1.23e19, '(es15.3)' ))
+  print *, "1.23e19 With fmt f10.2 ", trim( num2str( 1.23e19, '(f10.2)' ))
+  
+  print "(/,a)", "4) Self-test - to_upper  ================================="
+  print *, "Upper case of AbCd efG is ", trim(to_Upper("AbCd efG"))
+
 end subroutine Self_test
 
 end module SmallUtils_ml
+
+!DSX program tester
+!DSX   use SmallUtils_ml, only : Self_test
+!DSX   call Self_test()
+!DSX end program tester
