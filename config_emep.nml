@@ -1,80 +1,68 @@
+&INPUT_PARA
+  iyr_trend = 2012,
+  runlabel1 = 'Base',
+  runlabel2 = 'Opensource_Setup_2014',
+  startdate = 2012,01,01,000000,
+  enddate   = 2012,01,10,000000,
+  meteo     = 'met/meteoYYYYMMDD.nc',
+&end
 &ModelConstants_config
-!-------- Experiment name -----
-!  EMEPSTD     Standard run & output
-!  EMEP2010    EMEPSTD with Iceland Volcanic Eruption input
-!  TFMM        EMEPSTD, but with INERIS_SNAP & TFMM hourly output
-!------------------------------
   EXP_NAME              = 'EMEPSTD',
   MY_OUTPUTS            = 'EMEPSTD',
-!------------------------------
-  USE_SOILWATER         = T,          ! Uses SMI from meteo data
+  USES%testname         = 'EMEPSTD',
+  USES%FOREST_FIRES     = T,
+  USES%MONTHLY_FF       = F,
+  USES%EMISSTACKS       = F,           ! Reads PointSources file
+  USES%PlumeMethod      = 'PVDI',      ! default PVDI, possible: NILU, ASMI, PVDI
+  USE_SOILWATER         = T,           ! Uses SMI from meteo data
   USE_CONVECTION        = F,
   USE_DEGREEDAY_FACTORS = T,
-  USE_FOREST_FIRES      = F,          ! See the user guide dor details
   USE_SEASALT           = T,
-  USE_AIRCRAFT_EMIS     = F,          ! Needs global file, see user guide
-  USE_LIGHTNING_EMIS    = T,          ! 
-!
-  USE_EURO_SOILNOX      = T,          ! diff for global + Euro runs
-  EURO_SOILNOX_DEPSCALE  = 1.0,   ! Scale, default 1  (see ModelConstants_ml)
-  USE_GLOBAL_SOILNOX    = F,          ! diff for global + Euro runs
-!
-  USE_POLLEN            = F,          ! EXPERIMENTAL. Only works if start Jan 1
+  USE_AIRCRAFT_EMIS     = F,           ! Needs global file, see manual
+  USE_LIGHTNING_EMIS    = T,
+  USE_EURO_SOILNOX      = T,           ! diff for global + Euro runs
+  EURO_SOILNOX_DEPSCALE = 1.0,         ! Scale, default 1  (see ModelConstants_ml)
+  USE_GLOBAL_SOILNOX    = F,           ! diff for global + Euro runs
+  USE_POLLEN            = F,           ! EXPERIMENTAL. Only works if start Jan 1
   DO_SAHARA             = T,
-  USE_ROADDUST          = T,          ! Only EECCA?
-  USE_DUST              = T,          ! Only EECCA?
-  NETCDF_COMPRESS_OUTPUT= T,
-!-------- Can switch on INERIS-type degreeday stuff
-  INERIS_SNAP1          = F,          ! Used for TFMM runs
-  INERIS_SNAP2          = F,          ! Used for TFMM runs
-!------------------------------
-  IS_GLOBAL             = F,          ! Also for EMERGENCY
-  MONTHLY_GRIDEMIS      = F,          ! Also for EMERGENCY
-  MONTHLY_GRIDEMIS      = F,          ! Also for EMERGENCY
-  EMIS_SOURCE           = "emislist", ! "emislist" or CdfFractions
-  EMIS_TEST             = "None",  ! "None" or "CdfSnap" 
+  USE_ROADDUST          = T,
+  USE_DUST              = T,           ! Two different data sets available.  Default is provided
+                                       ! with the input data, 'clay_frac.txt'.  An updated data is 
+                                       ! available on request.  To use this, put "SOIL_TEGEN=.true." 
+                                       ! in ModelConstants_ml.f90.  See user_guide for details. 
+  NETCDF_DEFLATE_LEVEL  = 4,           ! 1-9 GZIP compress, 0 no compress, -1 netcdf3
+  EMIS_SOURCE           = 'emislist',  ! 'emislist' or 'CdfFractions'
+  EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
+  IS_GLOBAL             = F,
+  MONTHLY_GRIDEMIS      = F,
   SELECT_LEVELS_HOURLY  = F,          ! hourly output flag Also for FORECAST, 3DPROFILES
   FORECAST              = F,
   USE_EMERGENCY         = F,          ! Used for FORECASTs usually, EMEP2010
   ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
   USE_AOD               = F,          ! Used for FORECASTs usually
-!
-  BGND_CH4              = -1,    ! Reset CH4 (use ppb). (Use -1 for defaults)
-!_-
-!--- "fake" vegetation for ozone POD calculations
-FLUX_VEGS = "IAM_CR" "IAM_DF" "IAM_MF"  ! do not need all array elements
-!FLUX_VEGS = "IAM_CR" "IAM_DF" "IAM_MF" "CCE_SPRUCE" "CCE_BEECH" "ACE_PINE" "ACE_OAK" "ACE_BEECH" "NEUR_SPRUCE" "NEUR_BIRCH" "MED_OAK", "MED_PINE" "MED_BEECH"  ! Do not need to fill array :-)
+  BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults) 
+  FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF',
+  DEBUG%AOT             = F,
+  DEBUG%FORESTFIRE      = F,
+  DEBUG%GLOBBC          = F,
+  DEBUG%GRIDVALUES      = F,
+  DEBUG%HOURLY_OUTPUTS  = F,
+  DEBUG%PHYCHEM         = F,
+  DEBUG%SETUP_1DBIO     = F,
+  DEBUG%SETUP_1DCHEM    = F,
+  DEBUG%SOA             = F,
+  DEBUG%IJ              = 60, 50      ! Bremen
+  DEBUG%SPEC            = 'OH',
 !-------- Sub domain (x0,x1,y0,y1)
-  RUNDOMAIN =   1, 100,  1, 100,      ! Orig EMEP domain in EECCA (for benchmarks)
-! RUNDOMAIN =  40, 210, 12, 184,      ! SR TNO28 area
-! RUNDOMAIN = 240, 720, 48, 736,      ! TNO07 reduced (15W-45E;30N-73N)
-! RUNDOMAIN = 120, 360, 24, 368,      ! TNO14 reduced (15W-45E;30N-73N)
-! RUNDOMAIN =  60, 180, 12, 184,      ! TNO28 reduced (15W-45E;30N-73N)
-! RUNDOMAIN =  30,  90,  6,  92,      ! TNO56 reduced (15W-45E;30N-73N)
-! RUNDOMAIN =  60, 180, 12, 184,      ! TNO07 test
-! RUNDOMAIN =  70, 110, 72, 110,      ! TNO28 test
-! RUNDOMAIN =  36, 167, 12, 122,      ! EMEP domain in PARLAM
-! RUNDOMAIN =   1, 132,  1, 111,      ! EECCA, rep09
-! RUNDOMAIN =   1, 132,  1, 159,      ! EECCA, rep10
-! RUNDOMAIN =  20, 167,  1, 122,      ! OSPAR/HELCOM domain
-! RUNDOMAIN =  18, 169,  1, 124,      ! OSPAR/HELCOM domain+borders
+!RUNDOMAIN =   36, 100, 50, 150      ! smaller EECCA domain
 &end
 &Nest_config
-!-------- Nesting MODEs
-! Produce netcdf dump of concentrations if wanted, or init. run from such a file
-!   0=do nothing; 1=write; 2=read; 3=read and write;
-!  10=write at end of run; 11=read at start; 12=read at start and write at end (BIC)
-!------------------------------
   MODE             = 0,
 ! NHOURSAVE        = 3,                       ! hours between saves. Fraction of 24
 ! NHOURREAD        = 1,                       ! hours between reads. Fraction of 24
-!-------- File name templates for Nest I/O
-  template_read_3D = 'EMEP_IN.nc',            ! a different path can be set here
-  template_read_BC = 'EMEP_IN.nc',            ! for each of the IO IC/BC files,
-  template_write   = 'EMEP_OUT.nc',           ! if needed.
-! template_read_3D = 'EMEP_IN_IC.nc',         ! YYYY, YY, MM, DD, hh strings
-! template_read_BC = 'EMEP_IN_BC_YYYYMMDD.nc',! will be replaced with numbers
-! template_write   = 'EMEP_OUT_YYYYMMDD.nc',  ! in Nest_ml
+  template_read_3D = 'EMEP_IN.nc',
+  template_read_BC = 'EMEP_IN.nc',
+  template_write   = 'EMEP_OUT.nc',
 !-------- Sub domain for write modes 1,3. Modes 10,12 write full RUNDOMAIN
 ! istart =  60,   ! default RUNDOMAIN(1)+1
 ! jstart =  11,   ! default RUNDOMAIN(3)+1
@@ -82,6 +70,130 @@ FLUX_VEGS = "IAM_CR" "IAM_DF" "IAM_MF"  ! do not need all array elements
 ! jend   =  58,   ! default RUNDOMAIN(4)-1
 &end
 &ExternalBICs_config
-  USE_EXTERNAL_BIC  = F,              ! .false. to deactivate
-  EXTERNAL_BIC_NAME = 'DUMMY',        ! No IC/BC will be read
+&ExternalBICs_config
+  USE_EXTERNAL_BIC     = F,                   ! .true. to deactivate
+  EXTERNAL_BIC_NAME    = 'DUMMY',
+!  EXTERNAL_BIC_NAME    = 'IFS-MOZART',
+!  EXTERNAL_BIC_VERSION = 'MACC_ENS',          ! alias for IFS_MOZ_f7kn|fkya|fnyp
+!  TOP_BC               = T,
+!  filename_eta         = '$filename_eta',
+&end
+&ExternalBICs_bc
+!  description='IFS-MOZART','IFS_MOZ_f7kn',2,  ! name,version,size
+!  map_bc=! emep,external,frac,wanted,found,IXADV,
+!        'O3'    ,'O3_VMR_inst'    ,1.0,T,F,-1,
+!        'NO'    ,'NO_VMR_inst'    ,1.0,T,F,-1,
+&end
+!-------------------- ---------------------------------------------------------
+! Common 2D and 3D outputs. Select here, giving unit, type, etc.
+! typ=MISC, e.g. HMIX, T2m), needs to be defined in Derived_ml
+! Hourly outputs are set in My_Outputs_ml
+!-----------------------------------------------------------------------------
+!  items:
+!         name      Unit   dim  typ   class  freq
+!
+! where freq =  IOU_YEAR=2,IOU_MON=3, IOU_DAY=4,IOU_HOUR=6, IOU_HOUR_MEAN=7
+!         *NOTE* only the day, month, year flags work so far.
+!
+&OutputConcs_config
+OutputConcs=
+      'HMIX'                ,'m'   ,'2d','HMIX'     ,'MISC' ,7,
+      'NO2',          'molec/cm2' ,'k20','COLUMN'   ,'MISC' ,4,
+      'USTAR_NWP'           ,'m/s' ,'2d','USTAR_NWP','MISC' ,7,
+      'Kz_m2s'              ,'m2/s','2d','Kz_m2s'   ,'MISC' ,7,
+      'rh2m'                ,'m'   ,'2d','rh2m'     ,'MISC' ,7,
+      'T2m'                 ,'degC','2d','T2m'      ,'MISC' ,4,
+      'Snow_m'              ,'m'   ,'2d','SNOW'     ,'MISC' ,4,
+      'SURF_ppbC_VOC'       ,'ppb' ,'2d','VOC'      ,'MISC' ,4,
+      'SMI_deep'            ,'-'   ,'2d','SMI_deep' ,'MISC' ,4,
+      'SMI_uppr'            ,'-'   ,'2d','SMI_uppr' ,'MISC' ,4,
+      'SO2'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'NH3'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'HNO3'                ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'NO2'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'NO'                  ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'SO4'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'NO3_F'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'NO3_C'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'NH4_F'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'SEASALT_F'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'SEASALT_C'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'POLLEN_B'            ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'DUST_ROAD_F'         ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'DUST_ROAD_C'         ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'DUST_WB_F'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'DUST_WB_C'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'DUST_SAH_F'          ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'DUST_SAH_C'          ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'O3'                  ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'NO'                  ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'NO2'                 ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'NH3'                 ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'HNO3'                ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'SO2'                 ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'CO'                  ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'HCHO'                ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'C5H8'                ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'OXN'                 ,'ugN' ,'2d','AIR_CONCS','GROUP',4,
+      'NOX'                 ,'ugN' ,'2d','AIR_CONCS','GROUP',4,
+      'RDN'                 ,'ugN' ,'2d','AIR_CONCS','GROUP',4,
+      'TNO3'                ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'SIA'                 ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PMFINE'              ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PM10'                ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PMCO'                ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PPM25'               ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PPM_C'               ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'SS'                  ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'DUST_NAT_F'          ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'DUST_NAT_C'          ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'DUST'                ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PPM25_FIRE'          ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PART_OM_F'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'OMCOARSE'            ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'ECFINE'              ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'ECCOARSE'            ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'PART_OC10'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,3,
+      'PART_OC25'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,3,
+      'PART_ASOA_OC'        ,'ugC' ,'2d','AIR_CONCS','SPEC' ,3,
+      'PART_BSOA_OC'        ,'ugC' ,'2d','AIR_CONCS','SPEC' ,3,
+      'PART_ASOA_OM'        ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'PART_BSOA_OM'        ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'FFIRE_BC'            ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'FFIRE_REMPPM25'      ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'FFIRE_OM'            ,'ug'  ,'2d','AIR_CONCS','SPEC' ,4,
+      'SURF_ug_PM25'        ,'ug'  ,'2d','PM25'      ,'MISC',4,
+      'SURF_ug_PM25X'       ,'ug'  ,'2d','PM25X'     ,'MISC',4,
+      'SURF_ug_PM25X_rh50'  ,'ug'  ,'2d','PM25X_rh50','MISC',4,
+      'SURF_ug_PM25_rh50'   ,'ug'  ,'2d','PM25_rh50' ,'MISC',4,
+      'SURF_ug_PM10_rh50'   ,'ug'  ,'2d','PM10_rh50' ,'MISC',4,
+      'RN222'               ,'ppb' ,'2d','AIR_CONCS','SPEC' ,4,
+      'ASH'                 ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'ASH_F'               ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'ASH_C'               ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+      'ASH_G'               ,'ug'  ,'2d','AIR_CONCS','GROUP',4,
+&end
+&OutputDep_config
+  DDEP_ECOS =
+    'Grid     ', 4,
+    'Conif    ', 3,
+    'Seminat  ', 3,
+    'Water_D  ', 2,
+    'Decid    ', 2,
+    'Crops    ', 2,
+  DDEP_WANTED =
+    'SOX      ', 'GROUP', 'mgS',
+    'OXN      ', 'GROUP', 'mgN',
+    'RDN      ', 'GROUP', 'mgN',
+  WDEP_WANTED =
+    'PREC     ','PREC ','mm '
+    'SOX      ','GROUP','mgS'
+    'OXN      ','GROUP','mgN'
+    'RDN      ','GROUP','mgN'
+    'SO2      ','SPEC ','mgS'
+    'HNO3     ','SPEC ','mgN'
+&end
+&OutputMisc_config
+  COLUMNDAT_WANTED =
+     'NO2     ', 'k20'
 &end

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,18 +26,19 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
 module AOTx_ml
-  use CheckStop_ml, only : checkStop
+  use CheckStop_ml,  only : checkStop
   use Chemfields_ml, only : xn_adv, cfac
-  use ChemSpecs_adv_ml, only : IXADV_O3
+  use ChemSpecs,     only : IXADV_O3
+!CMR   use ChemSpecs_adv_ml, only : IXADV_O3
   use DO3SE_ml  ! SPOD NEG
   use GridValues_ml, only : debug_li, debug_lj, debug_proc, i_fdom, j_fdom
   use Io_Progs_ml,   only : datewrite
   use LandDefs_ml,   only : LandType
   use Landuse_ml,    only : WheatGrowingSeason
-  use LocalVariables_ml, only : L, Grid, Sub
+  use LocalVariables_ml, only : Grid, L
   use MetFields_ml, only: zen
   use ModelConstants_ml, only : dt_advec, KMAX_MID &
-     ,DEBUG_AOT  & 
+     ,DEBUG  & 
      ,PPBINV ! 1.0e9, for conversion from mixing ratio to ppb
   use OwnDataTypes_ml, only : TXTLEN_DERIV, TXTLEN_SHORT
   use Par_ml, only : MAXLIMAX, MAXLJMAX, limax, ljmax, me
@@ -185,18 +186,18 @@ contains
 
   ! the wheat growing season is based upon the latitude function
     if ( vego3_outputs(iO3cl)%defn == "MM" ) then
-        if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
-          write(*,*) 'AOTiO3CL ', iLC, iO3cl, Sub(iLC)%SGS, jday
+        if ( DEBUG%AOT .and. debug_flag .and. present( debug_txt )) then
+          write(*,*) 'AOTiO3CL ', iLC, iO3cl, L%SGS, jday
           write(*,*) 'AOTiO3CLL', LandType(iLC)%is_crop, &
               LandType(iLC)%is_iam, WheatGrowingSeason(i,j) 
         end if
-       if ( jday < Sub(iLC)%SGS .or.  &
-            jday > Sub(iLC)%EGS ) then
+       if ( jday < L%SGS .or.  &
+            jday > L%EGS ) then
           
              return
         end if
 
-      o3 = Sub(iLC)%cano3_ppb   ! canopy top O3 for MM
+      o3 = L%cano3_ppb   ! canopy top O3 for MM
 
     else if ( vego3_outputs(iO3cl)%defn == "EU" ) then
       if (   LandType(iLC)%is_crop .and. &
@@ -208,7 +209,7 @@ contains
       o3 = Grid%surf_o3_ppb 
 
       else 
-         if ( DEBUG_AOT )  call CheckStop("AOT not MM or EU!")
+         if ( DEBUG%AOT )  call CheckStop("AOT not MM or EU!")
     end if
 
   ! Temporary setup - accumulation period for NS Clover for Mills et al paper
@@ -230,7 +231,7 @@ contains
         aot = (o3-X)  ! dt_advec takes care of 3600s elsewhere
 
     end if
-    if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
+    if ( DEBUG%AOT .and. debug_flag .and. present( debug_txt )) then
        call datewrite("AOTxdebug"//trim(debug_txt) // "defn:" // &
          trim(vego3_outputs(iO3cl)%defn), iLC, &
            (/ real(Grid%izen), X,  o3, aot /) )
@@ -277,7 +278,7 @@ contains
            end if
         end do
     end do
-    if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
+    if ( DEBUG%AOT .and. debug_flag .and. present( debug_txt )) then
        o3_ref = xn_adv(IXADV_O3,debug_li,debug_lj,KMAX_MID) * PPBINV
        o3   = o3_ref * cfac(IXADV_O3,debug_li,debug_lj)
        call datewrite("CalcGridAOT:"//debug_txt, (/ zen(debug_li,debug_lj), &
@@ -300,9 +301,8 @@ contains
 
     pod = 0.0
 
-    !FEB2013 if ( Grid%izen >= 90 ) then  !UN or MM use daylight
     if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight
-        if ( DEBUG_AOT .and. debug_flag ) write(*,*) "PODxZen ",&
+        if ( DEBUG%AOT .and. debug_flag ) write(*,*) "PODxZen ",&
            trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, Grid%izen
         return
     end if
@@ -312,14 +312,14 @@ contains
     !   growing season (SGS), notably TC (wheat) which has 55 days.)
 
     if ( VEGO3_OUTPUTS(iO3cl)%RelSGS .eqv. .true. )  then
-      spod = Sub(iLC)%SGS + VEGO3_OUTPUTS(iO3cl)%SAccPeriod
-      epod = Sub(iLC)%SGS + VEGO3_OUTPUTS(iO3cl)%EAccPeriod
+      spod = L%SGS + VEGO3_OUTPUTS(iO3cl)%SAccPeriod
+      epod = L%SGS + VEGO3_OUTPUTS(iO3cl)%EAccPeriod
     else
-      spod = Sub(iLC)%SGS
-      epod = Sub(iLC)%EGS
+      spod = L%SGS
+      epod = L%EGS
     end if
     if ( jday < spod .or. jday > epod ) then
-        if ( DEBUG_AOT .and. debug_flag ) write(*,*) "PODxJday ",&
+        if ( DEBUG%AOT .and. debug_flag ) write(*,*) "PODxJday ",&
            trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, spod, epod
        return
     end if
@@ -328,22 +328,20 @@ contains
     j = Grid%j
     Y = vego3_outputs(iO3cl)%Threshold ! nmole/m2/s
 
-    o3 = Sub(iLC)%cano3_ppb   ! canopy top O3 for MM
+    o3 = L%cano3_ppb   ! canopy top O3 for MM
 
    ! Add fluxes if Y exceeded:
 
-     pod  = max(Sub(iLC)%FstO3 - Y,0.0)
+     pod  = max(L%FstO3 - Y,0.0)
 
 
-    !SPOD if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
-    if ( DEBUG_AOT .and. debug_flag ) then
-        write(6,"(a,L2,3i4)") "PODACC ", VEGO3_OUTPUTS(iO3cl)%RelSGS, &
+    if ( DEBUG%AOT .and. debug_flag ) then
+       write(6,"(a,L2,3i4)") "PODACC ", VEGO3_OUTPUTS(iO3cl)%RelSGS, &
            VEGO3_OUTPUTS(iO3cl)%SAccPeriod, VEGO3_OUTPUTS(iO3cl)%EAccPeriod, &
            jday
-       !SPOD call datewrite("YYY"//trim(debug_txt) // "defn:" // &
        call datewrite("YYY-debug_pod-defn:" // &
          trim(vego3_outputs(iO3cl)%defn), iLC, &
-           (/ real(Grid%izen), Y,  o3, Sub(iLC)%FstO3, pod /) )
+           (/ real(Grid%izen), Y,  o3, L%FstO3, pod /) )
     end if
 
   end subroutine Calc_POD 
@@ -363,20 +361,19 @@ contains
     spod = 0.0
 
     if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight
-    !FEB2013 if ( Grid%izen >= 90 ) then  !UN or MM use daylight
-        !if ( DEBUG_AOT .and. debug_flag ) write(*,*) "SPODxZen ",&
+        !if ( DEBUG%AOT .and. debug_flag ) write(*,*) "SPODxZen ",&
         !   trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, Grid%izen
         return
     end if
 
     ! Start and end of POD accumulation period:
 
-    !if ( DEBUG_AOT .and. debug_flag ) write(*,*) "SPODxJday ",&
-    !       trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, iLC, Sub(iLC)%SGS, Sub(iLC)%EGS
+    !if ( DEBUG%AOT .and. debug_flag ) write(*,*) "SPODxJday ",&
+    !       trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, iLC, L%SGS, L%EGS
 
    ! Outside growing season. We check agsinst f_phen also, since for jday==SGS
    ! deciduous forests get f_phen zero
-    if ( jday < Sub(iLC)%SGS .or. jday > Sub(iLC)%EGS .or. Sub(iLC)%f_phen < 1.0e-5 ) then
+    if ( jday < L%SGS .or. jday > L%EGS .or. L%f_phen < 1.0e-5 ) then
        return
     end if
 
@@ -391,15 +388,15 @@ contains
    ! For crops, we use the simple Table 3.14 from MM, to get from 3m to 1m
     if ( index( VEGO3_OUTPUTS(iO3cl)%name, "crops" )>0 )  fgmax = 2.5 * 0.88/0.95
 
-!if( me==33 .and. i == 10 .and. j == 13 .and.  Sub(iLC)%f_temp < 1.0e-10) then
-!if( debug_flag .and.  Sub(iLC)%f_temp < 1.0e-10) then
+!if( me==33 .and. i == 10 .and. j == 13 .and.  L%f_temp < 1.0e-10) then
+!if( debug_flag .and.  L%f_temp < 1.0e-10) then
 !CAn be too much snow so DO3SE never called!
-!if( me==56.and. Sub(iLC)%f_temp < 1.0e-10) then
+!if( me==56.and. L%f_temp < 1.0e-10) then
 !  write( *,"(a,3i6,L2)") "SUBTEMP NEG"//trim(VEGO3_OUTPUTS(iO3cl)%name), me, i_fdom(i), j_fdom(j), debug_proc
 !  write( *,"(a,6i5)") "SUBTEMP NEGD", current_date%hour, current_date%seconds
-!  write( *,"(a,i8,8f12.3)") "SUBTEMP NEGZ", Grid%izen, Grid%Idirect, Sub(iLC)%f_light
-!  write( *,"(a,6f12.2)") "SUBTEMP NEGF1", Sub(iLC)%f_light, Sub(iLC)%f_temp
-!  write( *,"(a,6f12.2)") "SUBTEMP NEGF2", SUb(iLC)%rh, Sub(iLC)%f_vpd, Sub(iLC)%f_phen , fgmax 
+!  write( *,"(a,i8,8f12.3)") "SUBTEMP NEGZ", Grid%izen, Grid%Idirect, L%f_light
+!  write( *,"(a,6f12.2)") "SUBTEMP NEGF1", L%f_light, L%f_temp
+!  write( *,"(a,6f12.2)") "SUBTEMP NEGF2", SUb(iLC)%rh, L%f_vpd, L%f_phen , fgmax 
 !  write( *,"(a,6f12.2)") "SUBTEMP NEGXY", Grid%latitude, Grid%longitude 
 
 !..3) Calculate  f_temp
@@ -409,10 +406,13 @@ contains
   
   dg  =    ( do3se(iLC)%T_opt - do3se(iLC)%T_min )
   bt  =    ( do3se(iLC)%T_max - do3se(iLC)%T_opt ) / dg
-  dTs = max( do3se(iLC)%T_max - L%t2C, 0.0 )      !CHECK why max?
+  !BUG, no effect dTs = max( do3se(iLC)%T_max - L%t2C, 0.0 )      !CHECK why max?
+  dTs = max( do3se(iLC)%T_max - Grid%t2C, 0.0 )      !CHECK why max?
   tmp = dTs / ( do3se(iLC)%T_max - do3se(iLC)%T_opt )
-  f_temp = ( L%t2C - do3se(iLC)%T_min ) / dg *  tmp**bt
+  !BUG - BUG! f_temp = ( L%t2C - do3se(iLC)%T_min ) / dg *  tmp**bt
+  f_temp = ( Grid%t2C - do3se(iLC)%T_min ) / dg *  tmp**bt
 
+  !BUG f_temp = max( L%f_temp, 0.01 )  ! Revised usage of min value during 2007
   f_temp = max( L%f_temp, 0.01 )  ! Revised usage of min value during 2007
 
 
@@ -420,48 +420,50 @@ contains
 !---------------------------------------
 
  f_vpd = do3se(iLC)%f_min + &
+          !BUG (1.0-do3se(iLC)%f_min) * (do3se(iLC)%VPD_min - L%vpd )/ &
           (1.0-do3se(iLC)%f_min) * (do3se(iLC)%VPD_min - L%vpd )/ &
               (do3se(iLC)%VPD_min - do3se(iLC)%VPD_max )
  f_vpd = min(f_vpd, 1.0)
  f_vpd = max(f_vpd, do3se(iLC)%f_min)
 !  write( *,"(a,6f12.3)") "SUBTEMP RECAL", L%t2, L%rh, L%vpd, Grid%Idirect, f_temp, f_vpd
 
-!  call CheckStop(Sub(iLC)%f_temp < 1.0e-10, "SUBTEMP NEG"//trim(VEGO3_OUTPUTS(iO3cl)%name) )
+!  call CheckStop(L%f_temp < 1.0e-10, "SUBTEMP NEG"//trim(VEGO3_OUTPUTS(iO3cl)%name) )
 !end if
 
 
-    if (DEBUG_AOT .and.  debug_flag ) then
+    if (DEBUG%AOT .and.  debug_flag ) then
       write( *,*) "spod_fenv POS"//trim(VEGO3_OUTPUTS(iO3cl)%name), me, i_fdom(i), j_fdom(j)
       write(*,"(a,i3,i4,2i3,f7.3,i5,2es10.2,10f8.3)") "spod_fenv:", iLC,  &
          jday, current_date%month, current_date%day, &
          current_date%hour + current_date%seconds/3600.0,& 
-         Grid%izen, Sub(iLC)%PARsun, Grid%Idirect,  &
- Sub(iLC)%f_light, Sub(iLC)%f_temp , Sub(iLC)%rh, Sub(iLC)%f_vpd  ,  Sub(iLC)%f_phen
+         Grid%izen, L%PARsun, Grid%Idirect,  &
+         L%f_light, L%f_temp, L%rh,&
+         L%f_vpd, L%f_phen
     end if
-    spod_fenv = Sub(iLC)%f_temp *  Sub(iLC)%f_vpd  *  Sub(iLC)%f_phen * fgmax
-    spod_fenv = max( spod_fenv ,  Sub(iLC)%f_min)
+    spod_fenv = L%f_temp *  L%f_vpd  *  L%f_phen * fgmax
+    spod_fenv = max( spod_fenv ,  L%f_min)
 
     spod = max ( o3 * spod_fenv - Y, 0.0 )
 
-    !if ( DEBUG_AOT .and. debug_flag ) then
-    if (DEBUG_AOT .and.  debug_flag ) then
+    !if ( DEBUG%AOT .and. debug_flag ) then
+    if (DEBUG%AOT .and.  debug_flag ) then
        !write(*,*) "SPODxDATE ", iLC, current_date, SGS(iLC), EGS(iLC)
 
        write(*,"(a,i4,2i3,f6.2,2i4,1x,3f7.2,i3,6f6.2,2x,2f7.2)") "OPOD"//trim(VEGO3_OUTPUTS(iO3cl)%name), &
          jday, current_date%month, current_date%day, &
          current_date%hour + current_date%seconds/3600.0,& 
-         Sub(iLC)%SGS, Sub(iLC)%EGS,&
-         o3, Sub(iLC)%cano3_ppb, o3 * spod_fenv, nint(Y), &
-              Sub(iLC)%f_env,  spod_fenv, Sub(iLC)%f_temp, Sub(iLC)%f_vpd, &
-               Sub(iLC)%f_phen, Sub(iLC)%f_light, spod, Sub(iLC)%FstO3
+         L%SGS, L%EGS,&
+         o3, L%cano3_ppb, o3 * spod_fenv, nint(Y), &
+              L%f_env,  spod_fenv, L%f_temp, L%f_vpd, &
+               L%f_phen, L%f_light, spod, L%FstO3
        !write(*,"(2a,99f8.3)") "SPODxHFFF ", trim(VEGO3_OUTPUTS(iO3cl)%name), &
-       !  Sub(iLC)%f_env,  spod_fenv, Sub(iLC)%f_temp, Sub(iLC)%f_vpd, &
-       !        Sub(iLC)%f_phen, Sub(iLC)%f_light,  Sub(iLC)%f_min
+       !  L%f_env,  spod_fenv, L%f_temp, L%f_vpd, &
+       !        L%f_phen, L%f_light,  L%f_min
        !write(*,"(2a,f8.3,4i4)") "SPODxFGMAX ", trim(VEGO3_OUTPUTS(iO3cl)%name), &
-       !     fgmax, iLC, jday, Sub(iLC)%SGS, Sub(iLC)%EGS
+       !     fgmax, iLC, jday, L%SGS, L%EGS
     end if
 
-    if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
+    if ( DEBUG%AOT .and. debug_flag .and. present( debug_txt )) then
         write(6,"(a,L2,3i4)") "SPODACC ", VEGO3_OUTPUTS(iO3cl)%RelSGS, &
            VEGO3_OUTPUTS(iO3cl)%SAccPeriod, VEGO3_OUTPUTS(iO3cl)%EAccPeriod, &
            jday

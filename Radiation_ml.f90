@@ -1,8 +1,35 @@
+! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 module Radiation_ml
 
-  !+ Collection of routines to calculate radiation terms, also for
-  !  canopies. IMPORTANT - Most routines expect SolarSetup to 
-  !  have been called first.
+  !>
+  !! Collection of routines to calculate radiation terms, also for
+  !! canopies. IMPORTANT - Most routines expect SolarSetup to 
+  !! have been called first.
   !
   !  F-compliant.  Module usable by stand-alone deposition code.
 
@@ -12,26 +39,26 @@ module Radiation_ml
   private
 
   !/ Subroutines:
-  public :: SolarSetup     ! => decl, sindecl, eqt_h, etc., + daytime, solarnoon
-  public :: ZenithAngle    ! => CosZen=cos(Zen), Zen=zenith angle (degrees) 
-  public :: ZenithAngleS   !    (simpler version)
-  public :: ClearSkyRadn   ! => irradiance (W/m2), clear-sky
-  public :: CloudAtten     ! => Cloud-Attenuation factor
-  public :: CanopyPAR      ! => sun & shade PAR  values, and LAIsunfrac
-  public :: ScaleRad       !  Scales modelled radiation where observed values
-                           !  available.
+  public :: SolarSetup    !> => decl, sindecl, eqt_h, etc., + daytime, solarnoon
+  public :: ZenithAngle   !> => CosZen=cos(Zen), Zen=zenith angle (degrees) 
+  public :: ZenithAngleS  !>    (simpler version)
+  public :: ClearSkyRadn  !> => irradiance (W/m2), clear-sky
+  public :: CloudAtten    !> => Cloud-Attenuation factor
+  public :: CanopyPAR     !> => sun & shade PAR  values, and LAIsunfrac
+  public :: ScaleRad      !>  Scales modelled radiation where observed values
+                          !!  available.
 
   !/ Functions:
-  public :: daytime        ! true if zen < 89.9 deg
-  public :: daylength      ! Lenght of day, hours
-  public :: solarnoon      ! time of solarnoon
+  public :: daytime       !> true if zen < 89.9 deg
+  public :: daylength     !> Lenght of day, hours
+  public :: solarnoon     !> time of solarnoon
 
 
   real, public, parameter :: &
-      PARfrac = 0.45,   & ! approximation to fraction (0.45 to 0.5) of total 
-                          ! radiation in PAR waveband (400-700nm)
-      Wm2_uE  = 4.57,   & ! converts from W/m^2 to umol/m^2/s
-      Wm2_2uEPAR= PARfrac * Wm2_uE  ! converts from W/m^2 to umol/m^2/s PAR
+      PARfrac = 0.45,   &           !> approximation to fraction (0.45 to 0.5)
+                        !! of total radiation in PAR waveband (400-700nm)
+      Wm2_uE  = 4.57,   &           !> converts from W/m^2 to umol/m^2/s
+      Wm2_2uEPAR= PARfrac * Wm2_uE  !> converts from W/m^2 to umol/m^2/s PAR
 
 
   ! Some variables which are dependent only on day of year and GMT time
@@ -327,8 +354,8 @@ contains
 
     real, intent(in)  :: LAI       ! leaf area index (m^2/m^2), one-sided
     real, intent(in)  :: sinB      ! B = solar elevation angle; sinB = CosZen
-    real, intent(in)  :: Idrctt, Idfuse
-    real, intent(out) :: PARsun, PARshade
+    real, intent(in)  :: Idrctt, Idfuse     ! Direct, diffuse Radn, W/m2
+    real, intent(out) :: PARsun, PARshade   ! Photosyn
     real, intent(out) :: LAIsunfrac
 
 

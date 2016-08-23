@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -69,8 +69,9 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
   use Derived_ml,       only: num_deriv2d,nav_2d        ! D2D houtly output type
   use DerivedFields_ml, only: f_2d,d_2d          ! D2D houtly output type
   use OwnDataTypes_ml,  only: Asc2D, Deriv
-  use ChemSpecs_shl_ml ,only: NSPEC_SHL          ! Maps indices
-  use ChemChemicals_ml ,only: species            ! Gives names
+  use ChemSpecs,        only: NSPEC_SHL, species
+!CMR  use ChemSpecs_shl_ml ,only: NSPEC_SHL          ! Maps indices
+!CMR  use ChemChemicals_ml ,only: species            ! Gives names
   use GridValues_ml,    only: i_fdom, j_fdom,&   ! Gives emep coordinates
                               debug_proc, debug_li,debug_lj
   use Io_ml,            only: IO_HOURLY
@@ -88,7 +89,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
   use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT
   use Par_ml,           only: MAXLIMAX, MAXLJMAX, GIMAX,GJMAX,        &
                               me, IRUNBEG, JRUNBEG, limax, ljmax
-! FUTURE  use Pollen_ml,        only: heatsum, pollen_left, AreaPOLL
+  use Pollen_ml,        only: heatsum, pollen_left, AreaPOLL
   use TimeDate_ml,      only: current_date
   use TimeDate_ExtraUtil_ml,only : date2string
   use Units_ml,         only: Group_Units
@@ -141,6 +142,8 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
     SRF_TYPE(9)=(/"ADVppbv     ","ADVugXX     ","ADVugXXgroup",&
                   "COLUMN      ","COLUMNgroup ","D2D         ",&
                   "D2D_mean    ","D2D_inst    ","D2D_accum   "/)
+
+  character(len=52) :: errmsg = "ok"
 
   if(NHOURLY_OUT<= 0) then
     if(my_first_call.and.MasterProc.and.DEBUG) &
@@ -211,62 +214,58 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 
   hourly(:,:) = 0.0 ! initialize
 
-  HLOOP: do ih = 0, NHOURLY_OUT
-
-    hr_out_type=trim(hr_out(ih)%type)
+  HLOOP: do ih = 1, NHOURLY_OUT
     hr_out_nk=hr_out(ih)%nk
-    if(any(hr_out_type==SRF_TYPE))hr_out_nk=1
+    if(any(hr_out(ih)%type==SRF_TYPE))hr_out_nk=1
 
     KVLOOP: do k = 1,hr_out_nk
-
       msnr  = 3475 + ih
       ispec = hr_out(ih)%spec
       name  = hr_out(ih)%name
+      hr_out_type=hr_out(ih)%type
       if(debug_flag) &
         write(*,'(a,2i4,1X,a,/a,1X,2a,i3)')"DEBUG DERIV HOURLY", ih, ispec, &
           trim(name),"INTO HOUR TYPE:", &
           trim(hr_out(ih)%type) // " "//trim(hr_out(ih)%name), " nk:", hr_out_nk
 
-      if(any(hr_out_type==(/"COLUMN     " ,"COLUMNgroup"/)))then
+      select case (hr_out_type)
+      case("COLUMN","COLUMNgroup")
         ik=KMAX_MID-hr_out(ih)%nk+1  ! top of the column
         if(ik>=KMAX_MID)ik=1         ! 1-level column does not make sense
-      else
+      case("D2D")
+        ik=KMAX_MID                  ! surface/lowermost level
+        if(f_2d(ispec)%avg)then ! averaged variables        
+!         hr_out_type="D2D_inst"   ! output instantaneous values
+          hr_out_type="D2D_mean"   ! output mean values
+        else                    ! accumulated variables
+          hr_out_type="D2D_accum"
+        endif
+      case("ADVppbv","ADVugXX","ADVugXXgroup","PMwaterSRF",&
+           "D2D_inst","D2D_mean","D2D_accum")
+        ik=KMAX_MID                  ! surface/lowermost level
+      case default
         ik=KMAX_MID-k+1              ! all levels from model bottom are outputed,
         if(debug_flag) write(*,*)"SELECT LEVELS? ", ik, SELECT_LEVELS_HOURLY
         if(SELECT_LEVELS_HOURLY)then ! or the output levels are taken
           ik=LEVELS_HOURLY(k)        ! from LEVELS_HOURLY array (default)
-          hr_out_type=hr_out(ih)%type
           if(debug_flag) write(*,*)"DEBUG SELECT LEVELS", ik, hr_out_type
-          surf_corrected = (ik==0)  ! Will implement cfac
+          surf_corrected = (ik==0)   ! Will implement cfac
           if(debug_flag.and.surf_corrected) &
             write(*,*)"DEBUG HOURLY Surf_correction", ik, k
 !TESTHH QUERY: see below
-          if(ik==0)then
+          select case(ik)
+          case(1:)
+            ik=KMAX_MID-ik+1         ! model level to be outputed
+          case(0)
             ik=KMAX_MID              ! surface/lowermost level
             if(debug_flag) write(*,*)"DEBUG LOWEST LEVELS", ik, hr_out_type
             select case(hr_out_type)
             case("BCVppbv","BCVugXX","BCVugXXgroup")
               hr_out_type(1:3)="ADV" ! ensure surface output
-            case("PMwater")
-              hr_out_type=trim(hr_out_type)//"SRF"
-            case("D2D")
-              if(f_2d(ispec)%avg)then ! averaged variables        
-!               hr_out_type="D2D_inst"   ! output instantaneous values
-                hr_out_type="D2D_mean"   ! output mean values
-              else                    ! accumulated variables
-                hr_out_type="D2D_accum"
-              endif
             endselect
-          else
-!TESTHH QUERY:
-            ik=KMAX_MID-ik+1         ! model level to be outputed
-            select case(hr_out_type)
-            case("ADVppbv","ADVugXX","ADVugXXgroup")
-              ik=KMAX_MID            ! all ADV* types represent surface output
-            endselect
-          endif
+          endselect
         endif
-      endif
+      endselect
 
 
       if(debug_flag) write(*,"(5a,i4)") "DEBUG Hourly MULTI ",&
@@ -410,7 +409,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
         name = "Z_MID"
         unit_conv =  hr_out(ih)%unitconv
         if(surf_corrected)then
-          forall(i=1:limax,j=1:ljmax) hourly(i,j) = 0.0
+          forall(i=1:limax,j=1:ljmax) hourly(i,j) = 3.0*unit_conv
         else
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = z_mid(i,j,ik)*unit_conv
         endif
@@ -467,6 +466,30 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       case("ws_10m")      ! No cfac for surf.variable; Skip Units conv.
         forall(i=1:limax,j=1:ljmax) hourly(i,j) = ws_10m(i,j,1)
    
+      case("heatsum")
+       !hr_out(ih)%unit='degree_days'
+        if(allocated(heatsum))then
+          forall(i=1:limax,j=1:ljmax) hourly(i,j) = heatsum(i,j)
+        else
+          hourly(:,:) = 0.0
+        endif
+
+      case("pollen_left")
+       !hr_out(ih)%unit=''
+        if(allocated(pollen_left))then
+          forall(i=1:limax,j=1:ljmax) hourly(i,j) = pollen_left(i,j)
+        else
+          hourly(:,:) = 0.0
+        endif
+
+      case("pollen_emiss")
+       !hr_out(ih)%unit='grains/m2/h'
+        if(allocated(AreaPOLL))then
+          forall(i=1:limax,j=1:ljmax) hourly(i,j) = AreaPOLL(i,j)
+        else
+          hourly(:,:) = 0.0
+        endif
+
       case("theta")       ! No cfac for surf.variable; Skip Units conv.
         forall(i=1:limax,j=1:ljmax) hourly(i,j) = th(i,j,KMAX_MID,1)
 
@@ -586,7 +609,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
           write(*,*) "xn_ADV is ", xn_adv(ispec,maxpos(1),maxpos(2),KMAX_MID)
           write(*,*) "cfac   is ",   cfac(ispec,maxpos(1),maxpos(2))
         endif
-        call CheckStop("Error, Output_hourly/hourly_out: too big!")
+        errmsg="Error, Output_hourly/hourly_out: too big!"
       endif
 
 !NetCDF hourly output
@@ -613,15 +636,25 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       endselect
     enddo KVLOOP    
   enddo HLOOP
+  ! CF convention: surface pressure to define vertical coordinates.
+  if(NHOURLY_OUT>0.and.NLEVELS_HOURLY>0.and.all(hr_out(:)%name/="PS"))then
+    def1%name='PS'
+    def1%unit='hPa'
+    def1%class='Surface pressure'
+    CDFtype=Real4 ! can be choosen as Int1,Int2,Int4,Real4 or Real8
+    scale=1.
+    call Out_netCDF(IOU_HOUR,def1,2,1,ps(:,:,1)*0.01,scale,CDFtype,ist,jst,ien,jen)     
+  endif
 
 !Not closing seems to give a segmentation fault when opening the daily file
 !Probably just a bug in the netcdf4/hdf5 library.
   call CloseNetCDF
+  call CheckStop(errmsg)
 
 ! Write text file wich contents
   if(.not.(FORECAST.and.MasterProc))return
   i=index(filename,'.nc')-1;if(i<1)i=len_trim(filename)
   open(IO_HOURLY,file=filename(1:i)//'.msg',position='append')
-  write(IO_HOURLY,*)date2string('FFF: YYYY-MM-DD hh',current_date)
+  write(IO_HOURLY,*)date2string('FFFF: YYYY-MM-DD hh',current_date)
   close(IO_HOURLY)
 endsubroutine hourly_out

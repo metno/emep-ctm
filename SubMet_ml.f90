@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,7 +42,7 @@ use BLPhysics_ml, only : MIN_USTAR_LAND
 use CheckStop_ml, only : CheckStop
 use LandDefs_ml,   only: LandType
 use Landuse_ml,    only: LandCover
-use LocalVariables_ml, only: Grid, Sub
+use LocalVariables_ml, only: Grid, SubDat
 use MicroMet_ml, only :  PsiM, AerRes    !functions
 use MicroMet_ml, only :  Launiainen1995
 use ModelConstants_ml, only :  DEBUG_SUBMET &  ! Needs DEBUG_RUNCHEM to get debug_flag
@@ -50,12 +50,14 @@ use ModelConstants_ml, only :  DEBUG_SUBMET &  ! Needs DEBUG_RUNCHEM to get debu
                               , FluxPROFILE &
                               , LANDIFY_MET   &
                               , USE_SOILWATER 
+use ModelConstants_ml, only: NLANDUSEMAX
 use PhysicalConstants_ml, only : PI, RGAS_KG, CP, GRAV, KARMAN, CHARNOCK, T0
 
 implicit none
 private
 
   public :: Get_Submet    ! calculates met. data for sub-grid areas
+  type(SubDat), public, dimension(0:NLANDUSEMAX), save :: Sub
 
 contains
 !=======================================================================
@@ -227,6 +229,8 @@ real :: theta2
     !TEST if ( Grid%Hd > 1  ) NITER = 4  ! more unstable
 
      if ( FluxPROFILE == "Ln95") then !TESTING
+
+        call StopAll("Ln95 disabled for ESX testing. Needs more work anyway")
 
         theta2 = Grid%t2 * T_2_Tpot( Grid%psurf )
         call Launiainen1995( Grid%u_ref, Sub(iL)%z_refd, Sub(iL)%z0, Sub(iL)%z0, &

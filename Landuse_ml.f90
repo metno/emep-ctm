@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !***************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,13 +36,13 @@ use GridValues_ml,  only: glat_fdom, glat    & ! latitude,
                           , debug_proc, debug_li, debug_lj
 use Io_ml,          only: open_file, ios, Read_Headers, Read2DN, IO_TMP &
                          ,IO_DO3SE
-use KeyValue_ml,    only: KeyVal,KeyValue, LENKEYVAL
+use KeyValueTypes,    only: KeyVal,KeyValue, LENKEYVAL
 use LandDefs_ml,    only: Init_LandDefs, LandType, LandDefs, &
                           STUBBLE, Growing_Season,&
                           NLANDUSE_EMEP
                           !APR2013 NLANDUSE_DEF,NLANDUSE_EMEP
 use LandPFT_ml,       only: MapPFT_LAI, pft_lai
-use ModelConstants_ml,only: DEBUG_i, DEBUG_j, NLANDUSEMAX, &
+use ModelConstants_ml,only: DEBUG, NLANDUSEMAX, &
                             SEA_LIMIT, & 
                             USE_PFT_MAPS, DEBUG_LANDPFTS, &
                             FLUX_VEGS,  nFluxVegs, & 
@@ -52,7 +52,7 @@ use NetCDF_ml,      only: ReadField_CDF,printcdf
 use Par_ml,         only: MAXLIMAX, MAXLJMAX, &
                           limax, ljmax, me
 use SmallUtils_ml,  only: wordsplit, find_index, NOT_FOUND, WriteArray
-use TimeDate_ml,    only: daynumber, effectivdaynumber, nydays, current_date
+use TimeDate_ml,    only: effectivdaynumber, nydays, current_date
 
 use netcdf
 use NetCDF_ml, only  : ReadField_CDF,check
@@ -122,7 +122,8 @@ private
 contains
 
  !==========================================================================
-  subroutine InitLanduse()
+  subroutine InitLanduse(daynumber)
+    integer, intent(in) :: daynumber
     logical :: filefound
     integer ::i,j,ilu,lu
     logical :: debug_flag = .false.
@@ -568,13 +569,19 @@ contains
           LandCover(i,j)%fraction(:)  = landuse_data(i,j,:)
           sumfrac = sum( LandCover(i,j)%fraction(:) )
 
-          if (  sumfrac < 0.99 .or. sumfrac > 1.01 ) then
-             write(unit=errmsg,fmt="(a19,3i4,f12.4,8i4)") &
-                  "Land SumFrac Error ", me,  &
-                  i_fdom(i),j_fdom(j), sumfrac, limax,  ljmax, &
-                  i_fdom(1), j_fdom(1), i_fdom(limax), j_fdom(ljmax)
-             call CheckStop(errmsg)
-          end if
+
+            if (  sumfrac < 0.99 .or. sumfrac > 1.01 ) then
+               write(unit=errmsg,fmt="(a19,3i4,f12.4,8i4)") &
+                 "Land SumFrac Error ", me,  &
+                    i_fdom(i),j_fdom(j), sumfrac, limax,  ljmax, &
+                       i_fdom(1), j_fdom(1), i_fdom(limax), j_fdom(ljmax)
+               if(abs(sumfrac-1.0)<0.2.and.abs(glat(i,j))>89.0)then
+                  write(*,*)'WARNING: ',errmsg,sumfrac,glat(i,j)
+               else
+                   write(*,*)'latitude: ',errmsg,glat(i,j)
+                 call CheckStop(errmsg)
+               endif
+             end if
 
        end do  !j
     end do  !i
@@ -587,7 +594,8 @@ contains
   end subroutine ReadLanduse_CDF
 
   !=========================================================================
-  subroutine  SetLandUse()
+  subroutine  SetLandUse(daynumber, month)
+    integer, intent(in) :: daynumber, month
     integer :: i,j,ilu,lu ! indices
     integer, save :: old_month = -1
     integer, save :: old_daynumber = -1
@@ -613,7 +621,7 @@ contains
        !read in data from file
         my_first_call   = .false.
         
-        call InitLanduse()
+        call InitLanduse(daynumber)
 
        ! The DO3SE params are needed for the call to fPhenology
       
@@ -633,8 +641,8 @@ contains
    !PFTs, or from the "older" DO3SE inputs file
 
      if ( USE_PFT_MAPS ) then !- Check for LPJ-derived data -
-         if ( current_date%month /= old_month ) then 
-           call MapPFT_LAI( current_date%month )
+         if ( month /= old_month ) then 
+           call MapPFT_LAI( month )
          end if
      end if
 

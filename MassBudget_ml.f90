@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,9 +33,9 @@ module   MassBudget_ml
 ! Routine to cross check the mass balance of the model
 !_____________________________________________________________________________
 use CheckStop_ml,       only: CheckStop
-use ChemChemicals_ml,   only: species_adv   ! species identifier (advected only)
-use ChemSpecs_adv_ml,   only: NSPEC_ADV     ! No. species (long-lived)
-use ChemSpecs_shl_ml,   only: NSPEC_SHL     ! No. species (shorshort-lived)
+use ChemSpecs,          only: NSPEC_ADV, NSPEC_SHL, species_adv
+!CMR use ChemChemicals_ml,   only: species_adv   ! species identifier (advected only)
+!CMR use ChemSpecs_shl_ml,   only: NSPEC_SHL     ! No. species (shorshort-lived)
 use Chemfields_ml,      only: xn_adv        ! advected species
 use GridValues_ml,      only: carea,xmd, &  ! cell area, 1/xm2 where xm2 is
                                   ! the area factor in the middle of the cell

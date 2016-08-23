@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -45,22 +45,24 @@
 !-----------------------------------------------------------------------------
 
  use Biogenics_ml,         only : EMIS_BioNat, EmisNat  
- use ChemChemicals_ml,     only : species
+!CMR  use ChemChemicals_ml,     only : species
+ use ChemSpecs,            only : species
  use GridValues_ml,        only : glat, glon, i_fdom, j_fdom 
  use Io_Progs_ml,          only : PrintLog
  use Landuse_ml,           only : LandCover, water_fraction
- use LocalVariables_ml,    only : Sub, Grid
+ use LocalVariables_ml,    only : Grid
  use MetFields_ml,         only : u_ref, z_bnd, z_mid, sst,  &
                                   u_ref, foundSST, &
                                    foundws10_met,ws_10m
  use MicroMet_ml,          only : Wind_at_h
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, &
                                   MasterProc, & 
-                                  DEBUG_SEASALT, DEBUG_i,DEBUG_j
+                                  DEBUG_SEASALT
  use Par_ml,               only : MAXLIMAX,MAXLJMAX   ! => x, y dimensions
  use PhysicalConstants_ml, only : CHARNOCK, AVOG ,PI
  use Setup_1dfields_ml,    only : rcemis 
  use SmallUtils_ml,        only : find_index
+ use SubMet_ml,            only : Sub
  use TimeDate_ml,          only : current_date
 
  !-------------------------------------

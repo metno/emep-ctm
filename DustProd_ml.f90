@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -49,14 +49,15 @@
  use Biogenics_ml,         only : EmisNat, EMIS_BioNat
  use CheckStop_ml,         only : CheckStop
  use Functions_ml,         only : ERFfunc
- use ChemChemicals_ml,     only : species
+!CMR use ChemChemicals_ml,     only : species
+ use ChemSpecs,            only : species
  use GridValues_ml,        only : glat, glon, glat_fdom, glon_fdom, i_fdom, j_fdom 
  use GridValues_ml,        only : debug_proc, debug_li, debug_lj
  use Io_ml,                only : PrintLog, datewrite
  use Landuse_ml,           only : LandCover, NLUMAX 
  use Landuse_ml,           only : water_fraction ! DSA12
  use LandDefs_ml,          only:  LandType
- use LocalVariables_ml,    only : Sub, Grid
+ use LocalVariables_ml,    only : Grid
  use MetFields_ml,         only : z_bnd, z_mid, u_ref, ustar_nwp, roa,    &
                                   t2_nwp, sdepth, fh, ps, surface_precip, &
                                   rho_surf, &
@@ -75,6 +76,7 @@
  use Setup_1dfields_ml,    only : rcemis 
  use Setup_1dfields_ml,    only : rh
  use SmallUtils_ml,        only : find_index
+ use SubMet_ml,            only : Sub
  use TimeDate_ml,          only : daynumber
 
 !-----------------------------------------------

@@ -1,8 +1,10 @@
-! <TimeDate_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+!>TimeDate_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
+!!         Chemical transport Model>
+!! MODULE to calculate date-related items, such as day-of-week, Julian
+!! date, etc.
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,6 +41,7 @@ IMPLICIT NONE
 
 !/ Functions ...............
 public :: make_current_date     ! convert timestamp to current_date
+public :: add2current_date      ! Increment current_date
 public :: make_timestamp        ! convert current_date(yyyy,mon,day,hour,secs)
                                 ! to timestamp(jdate,secs)
 public  :: Init_nmdays          ! sets number of days per month, year
@@ -123,6 +126,19 @@ FUNCTION make_current_date (ts) RESULT (cd)
   call get_hms(ts%secs,hh,min,sc)
   cd=date(yy,mm,dd,hh,min*60+sc)
 END FUNCTION make_current_date
+
+subroutine add2current_date (cd,seconds)
+  TYPE(date),INTENT(INOUT)   :: cd
+  real                    :: seconds
+!  TYPE(date)              :: newcd
+  TYPE(timestamp)         :: ts !, ts0
+  ts = make_timestamp (cd)
+!  ts0 = ts
+  call add_secs (ts, seconds)
+!  newcd = make_current_date(ts)
+!print "(a,i4,f8.2,2f12.2,3x,2i6)", "TSOLD ", ts%jdate- ts0%jdate, seconds, ts0%secs, ts%secs, cd%seconds, newcd%seconds
+  cd = make_current_date(ts)
+END subroutine add2current_date
 
 SUBROUTINE dup_timestamp (ts1,ts2)
   TYPE(timestamp),INTENT(IN)   :: ts1

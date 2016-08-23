@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,7 +28,7 @@
 module LandDefs_ml
  use CheckStop_ml, only : CheckStop
  use Io_ml, only : IO_TMP, open_file, ios, Read_Headers, read_line
- use KeyValue_ml, only :  KeyVal
+ use KeyValueTypes, only :  KeyVal
  use LandPFT_ml,  only : PFT_CODES
  use ModelConstants_ml, only : NLANDUSEMAX, MasterProc, DEBUG_LANDDEFS
  use ModelConstants_ml, only :  FLUX_VEGS

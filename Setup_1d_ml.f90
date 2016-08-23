@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,11 +47,12 @@
   use Emissions_ml,          only:  gridrcemis, gridrcroadd, KEMISTOP
   use ForestFire_ml,         only: Fire_rcemis, burning
   use Functions_ml,          only:  Tpot_2_T
-  use ChemChemicals_ml,      only:  species
-  use ChemSpecs_tot_ml,      only:  SO4,C5H8,NO,NO2,SO2,CO
-  use ChemSpecs_adv_ml,      only:  NSPEC_ADV, IXADV_NO2, IXADV_O3, &
-                                    IXADV_SO4, IXADV_NO3_f, IXADV_NH4_F
-  use ChemSpecs_shl_ml,      only:  NSPEC_SHL
+  use ChemSpecs  !,             only:  SO4,C5H8,NO,NO2,SO2,CO,
+!CMR   use ChemChemicals_ml,      only:  species
+!CMR   use ChemSpecs_tot_ml,      only:  SO4,C5H8,NO,NO2,SO2,CO
+!CMR   use ChemSpecs_adv_ml,      only:  NSPEC_ADV, IXADV_NO2, IXADV_O3, &
+!CMR                                     IXADV_SO4, IXADV_NO3_f, IXADV_NH4_F
+!CMR   use ChemSpecs_shl_ml,      only:  NSPEC_SHL
   use ChemRates_rct_ml,      only:  set_rct_rates, rct
   use GridValues_ml,         only:  xmd, GridArea_m2, & 
                                      debug_proc, debug_li, debug_lj,&
@@ -65,20 +66,19 @@
                                   ,zen, Idirect, Idiffuse,z_bnd
   use ModelConstants_ml,     only:   &
      ATWAIR                          &
-    ,DEBUG_SETUP_1DCHEM              &
-    ,DEBUG_SETUP_1DBIO               &
+    ,DEBUG                           &
     ,DEBUG_MASS                      &
+!EXCL    ,USES, MINCONC                   & ! conc.limit if USES%MINCONC
     ,dt_advec                        & ! time-step
     ,PT                              & ! Pressure at top
     ,MFAC                            & ! converts roa (kg/m3 to M, molec/cm3)
-    ,USE_FOREST_FIRES                & !
+    ,USES                            & ! Forest fires so far
 !FUTURE    ,USE_POLLEN                      & ! Pollen
     ,USE_SEASALT                     &
     ,USE_LIGHTNING_EMIS, USE_AIRCRAFT_EMIS              & !
     ,USE_GLOBAL_SOILNOX, USE_DUST, USE_ROADDUST    & !
     ,USE_EMERGENCY,DEBUG_EMERGENCY   & ! Emergency: Volcanic Eruption
-    ,KMAX_MID ,KMAX_BND, KCHEMTOP    & ! Start and upper k for 1d fields
-    ,DEBUG_i, DEBUG_j  !FUTURE , DEBUG_NH3 !NH3emis
+    ,KMAX_MID ,KMAX_BND, KCHEMTOP      ! Start and upper k for 1d fields
   use Landuse_ml,            only: water_fraction, ice_landcover
   use Par_ml,                only:  me,MAXLIMAX,MAXLJMAX & 
                              ,gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG
@@ -110,6 +110,11 @@
   integer, private, parameter :: iROADF=1,  iROADC=2
   integer, private, save :: inat_RDF,  inat_RDC, inat_Rn222
   integer, private, save :: itot_RDF=-999,  itot_RDC=-999, itot_Rn222=-999
+
+ ! Minimum concentration allowed for advected species. Avoids some random
+ ! variations between debugged/normal runs with concs of e.g. 1.0e-23 ppb or
+ ! less. 1.0e-20 ppb is ca. 2.5e-10 molec/cm3 at sea-level, ca. 2.5e-11 at top
+ ! e.g.: MINCONC = 1.0e-29
 
   !DUST_ROAD_F
 
@@ -162,6 +167,10 @@ contains
         do n = 1, NSPEC_ADV
               ispec = NSPEC_SHL + n
               xn_2d(ispec,k) = max(0.0,xn_adv(n,i,j,k)*amk(k))
+!EXp.             ! Avoids tiny numbers that complicate comparisons in DEBUG mode
+!EXp.              if( USES%MINCONC ) then
+!EXp.                if( xn_2d(ispec,k) < MINCONC ) xn_2d(ispec,k) = 0.0
+!EXp.              end if
         end do ! ispec
 
         ! 3)/ Background species ( * CTM2 with units in mix. ratio)
@@ -191,15 +200,15 @@ contains
 
    call set_rct_rates()
 
-  if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
+  if ( DEBUG%SETUP_1DCHEM .and. debug_proc .and.  &
             i==debug_li .and. j==debug_lj .and. &
             current_date%seconds == 0 ) then
-      write(*,"(a,10es10.3)") " DEBUG_SETUP_1DCHEM RCT ", &
+      write(*,"(a,10es10.3)") " DEBUG%SETUP_1DCHEM RCT ", &
             rct(3,KMAX_MID), rct(4,KMAX_MID)
-      write(*,"(a,10es10.3)") " DEBUG_SETUP_1DCHEM XN  ", &
+      write(*,"(a,10es10.3)") " DEBUG%SETUP_1DCHEM XN  ", &
         amk(KMAX_MID),  xn_2d(IXADV_O3+NSPEC_SHL,KMAX_MID), &
           xn_2d(IXADV_NO2+NSPEC_SHL,KMAX_MID)
-      write(*,"(a,10es10.3)") " DEBUG_SETUP_1D-Riemer",&
+      write(*,"(a,10es10.3)") " DEBUG%SETUP_1D-Riemer",&
         xn_2d(IXADV_SO4+NSPEC_SHL,KMAX_MID) &
        ,xn_2d(IXADV_NO3_F+NSPEC_SHL,KMAX_MID)
   end if
@@ -291,7 +300,7 @@ contains
                               + 0.05 * airlig(k,i,j)
 
         enddo
-        if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
+        if ( DEBUG%SETUP_1DCHEM .and. debug_proc .and.  &
                i==debug_li .and. j==debug_lj ) write(*,"(a,10es10.3)") &
                  " DEBUG_SETUP_AIRNOX ", airn(KMAX_MID,i,j),airlig(KMAX_MID,i,j)
 
@@ -306,7 +315,7 @@ contains
                               + 0.05 * airn(k,i,j)
 
         enddo
-        if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
+        if ( DEBUG%SETUP_1DCHEM .and. debug_proc .and.  &
                i==debug_li .and. j==debug_lj ) write(*,"(a,10es10.3)") &
                  " DEBUG_SETUP_AIRNOX ", airn(KMAX_MID,i,j),airlig(KMAX_MID,i,j)
 
@@ -321,7 +330,7 @@ contains
      endif
 
 
-     if ( USE_FOREST_FIRES   ) then
+     if ( USES%FOREST_FIRES   ) then
      if ( burning(i,j)  ) then
 
        call Fire_rcemis(i,j)

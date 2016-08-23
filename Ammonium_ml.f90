@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -196,8 +196,8 @@ module Ammonium_ml
      !   in order to have same structure as with EQSAM and MARS 
      !-------------------------------------------------------------------------
 
- use ChemSpecs_tot_ml      , only : SO4, NH4_f, NO3_f, NH3, HNO3
- use Setup_1dfields_ml   , only :  xn => xn_2d
+ use ChemSpecs,         only : SO4, NH4_f, NO3_f, NH3, HNO3
+ use Setup_1dfields_ml, only :  xn => xn_2d
 
    real, dimension(KCHEMTOP:KMAX_MID)  ::  rcnh4 ! equilib. value
    real, dimension(KCHEMTOP:KMAX_MID) :: eqnh3, delteq

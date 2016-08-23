@@ -180,8 +180,7 @@
         + rct(47,k)* xnew(ISONO3 )  &
         + rct(41,k)* xnew(MVKO2 )  &
         + rct(60,k)* xnew(MACO3 )  &
-        + rct(47,k)* xnew(ISNIR )  &
-        + rct(75,k)* xnew(TERPPEROXY ) 
+        + rct(47,k)* xnew(ISNIR ) 
 
       xnew(HO2)=  ( xold(HO2) + dt2 * P) /(1.0 + dt2*L )
 
@@ -350,6 +349,19 @@
 
       xnew(MACO3)=  ( xold(MACO3) + dt2 * P) /(1.0 + dt2*L )
 
+!-> TERPPEROXY 
+
+      P =   &
+          rct(72,k)*xnew(O3) * xnew(APINENE )  &
+        + rct(73,k)*xnew(OH) * xnew(APINENE )  &
+        + rct(74,k)*xnew(NO3) * xnew(APINENE ) 
+
+      L =  &
+          rct(40,k)*xnew(NO)  &
+        + rct(75,k)*xnew(HO2) 
+
+      xnew(TERPPEROXY)=  ( xold(TERPPEROXY) + dt2 * P) /(1.0 + dt2*L )
+
 !-> O3 
 
       P =   &
@@ -402,8 +414,7 @@
         + rct(40,k)* xnew(ISNIR )  &
         + rct(40,k)* xnew(ISONO3 )  &
         + rct(63,k)* xnew(OP )  &
-        + rct(71,k)* xnew(OH )  &
-        + rct(40,k)* xnew(TERPPEROXY ) 
+        + rct(71,k)* xnew(OH ) 
 
       xnew(NO)=  ( xold(NO) + dt2 * P) /(1.0 + dt2*L )
 
@@ -439,8 +450,7 @@
         + rct(68,k) * xnew(MPAN )  &
         + rcphot(IDHNO3,K) * xnew(HNO3 )  &
         + rcphot(IDNO3,K) * xnew(NO3 )  &
-        + rcemis(NO2,k)  &
-        + rct(40,k) * xnew(TERPPEROXY ) * xnew(NO ) 
+        + rcemis(NO2,k) 
 
       L =  &
           rct(6,k)* xnew(O3 )  &

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,9 +38,10 @@ module Emissions_ml
 
 use Biogenics_ml,     only: SoilNOx, AnnualNdep
 use CheckStop_ml,     only: CheckStop,StopAll
-use ChemSpecs_shl_ml, only: NSPEC_SHL
-use ChemSpecs_tot_ml, only: NSPEC_TOT,NO2
-use ChemChemicals_ml, only: species
+use ChemSpecs,        only: NSPEC_SHL, NSPEC_TOT,NO2, species
+!CMR use ChemSpecs_shl_ml, only: NSPEC_SHL
+!CMR use ChemSpecs_tot_ml, only: NSPEC_TOT,NO2
+!CMR use ChemChemicals_ml, only: species
 use Country_ml,       only: NLAND,Country_Init,Country,IC_NAT,IC_FI,IC_NO,IC_SE
 use Country_ml,       only: EU27, EUMACC2 !CdfSnap
 use EmisDef_ml,       only: &
@@ -85,13 +86,15 @@ use ModelConstants_ml,only: &
     KMAX_MID, KMAX_BND, PT ,dt_advec, &
     EMIS_SOURCE,   &    ! emislist, CdfFractions
     EMIS_TEST,     &    ! CdfSnap or none
+    emis_inputlist, &   !TESTC
     EMIS_OUT,      &    ! output emissions in ASCII or not
     IS_GLOBAL, MONTHLY_GRIDEMIS, &  !NML
     NBVOC,         &    ! > 0 if forest voc wanted
     INERIS_SNAP2 , &    ! INERIS/TFMM HDD20 method
-    DEBUG => DEBUG_EMISSIONS,  MasterProc, & 
-    DEBUG_SOILNOX, DEBUG_EMISTIMEFACS, DEBUG_ROADDUST, DEBUG_I,DEBUG_J, &
+    DEBUG, MYDEBUG => DEBUG_EMISSIONS,  MasterProc, & 
+    DEBUG_SOILNOX, DEBUG_EMISTIMEFACS, DEBUG_ROADDUST, &
     USE_DEGREEDAY_FACTORS, & 
+    USES,  &  ! Gives USES%EMISSTACKS, & ! MKPS
     SEAFIX_GEA_NEEDED, & ! see below
     USE_LIGHTNING_EMIS,USE_AIRCRAFT_EMIS,USE_ROADDUST, &
     USE_EURO_SOILNOX, USE_GLOBAL_SOILNOX, EURO_SOILNOX_DEPSCALE! one or the other
@@ -99,6 +102,7 @@ use NetCDF_ml,        only: ReadField_CDF
 use Par_ml,           only: MAXLIMAX,MAXLJMAX, GIMAX,GJMAX, IRUNBEG,JRUNBEG,&
                             me,limax,ljmax, MSG_READ1,MSG_READ7
 use PhysicalConstants_ml,only: GRAV, AVOG
+use PointSource_ml,      only: readstacks !MKPS
 use Setup_1dfields_ml,only: rcemis   ! ESX
 use SmallUtils_ml,    only: find_index
 use ReadField_ml,     only: ReadField    ! Reads ascii fields
@@ -122,6 +126,7 @@ public :: EmisSet           ! Sets emission rates every hour/time-step
 public :: EmisOut           ! Outputs emissions in ascii
 
 ! The main code does not need to know about the following 
+private :: expandcclist            !  expands e.g. EU27, EUMACC2
 private :: consistency_check       ! Safety-checks
 
 INCLUDE 'mpif.h'
@@ -226,6 +231,7 @@ subroutine Emissions(year)
   integer :: isec             ! loop variables: emission sectors
   integer :: iem,iem2         ! loop variable over pollutants (1..NEMIS_FILE)
   integer :: icc,ncc          ! loop variables over  sources
+  integer :: nin, nex         !  include, exclude numbers for emis_inputlist
   character(len=40) :: fname  ! File name
   character(len=300) :: inputline 
   real    :: tmpclimfactor
@@ -234,6 +240,7 @@ subroutine Emissions(year)
   real, dimension(NEMIS_FILE)       :: emsum ! Sum emis over all countries
   real, dimension(NLAND,NEMIS_FILE) :: sumemis, sumemis_local ! Sum of emissions per country
   real, dimension(NEMIS_FILE) :: sumEU ! Sum of emissions in EU
+
 
   ! Road dust emission potential sums (just for testing the code, the actual emissions are weather dependent!)
   real, dimension(NROAD_FILES)       :: roaddustsum    ! Sum emission potential over all countries
@@ -304,6 +311,8 @@ subroutine Emissions(year)
   call EmisHeights()     ! vertical emissions profile
   KEMISTOP = KMAX_MID - nemis_kprofile + 1
 
+  if( USES%EMISSTACKS ) call readstacks(IO_EMIS)
+
   if(MasterProc) then   !::::::: ALL READ-INS DONE IN HOST PROCESSOR ::::
     write(*,*) "Reading monthly and daily timefactors"
     !=========================
@@ -337,7 +346,7 @@ subroutine Emissions(year)
   ! allocate for me=0 only:
   err1 = 0
   if(MasterProc) then
-    if(DEBUG) write(*,*) "TTT me ", me , "pre-allocate" 
+    if(MYDEBUG) write(*,*) "TTT me ", me , "pre-allocate" 
     allocate(globnland(GIMAX,GJMAX),stat=err1)
     allocate(globland(GIMAX,GJMAX,NCMAX),stat=err2)
     allocate(globemis(NSECTORS,GIMAX,GJMAX,NCMAX),stat=err3)
@@ -386,6 +395,29 @@ subroutine Emissions(year)
   if(my_first_call) then
     sumemis(:,:) =  0.0       ! initialize sums
     ios = 0
+
+ 
+
+
+    if(EMIS_TEST=="CdfSnap") then  ! Expand groups, e.g. EUMACC2
+      do iemis = 1, size( emis_inputlist(:)%name )
+        if ( emis_inputlist(iemis)%name == "NOTSET" ) then
+           emis_inputlist(iemis)%Nlist = iemis - 1
+           if(MasterProc)  write(*,*)"CdfSnap Nlist=", emis_inputlist(iemis)%Nlist
+           exit
+        end if
+
+        call expandcclist( emis_inputlist(iemis)%incl , n)
+        emis_inputlist(iemis)%Nincl = n
+        if(MasterProc) print *, "INPUTNLIST-INCL", iemis, n
+
+        call expandcclist( emis_inputlist(iemis)%excl , n)
+        emis_inputlist(iemis)%Nexcl = n
+        if(MasterProc) print *, "INPUTNLIST-EXCL", iemis, n
+
+      end do ! iemis
+    end if
+
     call femis()              ! emission factors (femis.dat file)
     if(ios/=0) return
     my_first_call = .false.
@@ -393,16 +425,32 @@ subroutine Emissions(year)
   !>============================
 
   do iem = 1, NEMIS_FILE
-    !TESTING NEW SYSTEM, no effect on results so far
-    ! NB SLOW!
+    !TESTING NEW SYSTEM, no effect on results so far !!! NB SLOW !!!
     if(EMIS_TEST=="CdfSnap") then
-     !if ( iem < 3) then
-      ! *************************
-      fname="GriddedSnapEmis_"//trim(EMIS_FILE(iem))//".nc"
-      call EmisGetCdf(iem,fname,incl=EUMACC2) 
-      ! *************************
-      fname="GlobalSnapEmis_"//trim(EMIS_FILE(iem))//".nc"
-      call EmisGetCdf(iem,fname,excl=EUMACC2) 
+
+   do iemis = 1, size( emis_inputlist(:)%name )
+      fname=emis_inputlist(iemis)%name
+      if ( fname == "NOTSET" ) exit
+      n=index(fname,"POLL") -  1 
+      fname = fname(1:n) // trim(EMIS_FILE(iem)) // ".nc"
+
+      nin = emis_inputlist(iemis)%Nincl
+      nex = emis_inputlist(iemis)%Nexcl
+
+      if(MasterProc) write(*,"(a,2i3,a,2i3)") "INPUTLIST:", iem, iemis, trim(fname), nin, nex
+          
+
+      call CheckStop( nin>0 .and. nex > 0, "emis_inputlists cannot have inc and exc")
+      if ( nin > 0 ) then
+          call EmisGetCdf(iem,fname, incl=emis_inputlist(iemis)%incl(1:nin) )
+      else if (  nex > 0 ) then
+          call EmisGetCdf(iem,fname, excl=emis_inputlist(iemis)%excl(1:nex) ) 
+      else
+          call EmisGetCdf(iem,fname)
+       end if
+
+   end do
+
       ! *************************
  
       if(debug_proc) then
@@ -470,7 +518,7 @@ subroutine Emissions(year)
         write(varname,"(A,I2.2)")trim(varname),isec
         call ReadField_CDF('EmisFracs_TNO7.nc',varname,emis_tot(1,1),nstart=1,&
              interpol='mass_conservative',fractions_out=fractions,&
-             CC_out=landcode,Ncc_out=nlandcode,needed=.true.,debug_flag=.true.,&
+             CC_out=landcode,Ncc_out=nlandcode,needed=.true.,debug_flag=.false.,&
              Undef=0.0)
 
         if(debug_proc) write(*,*) "CDFTNO ",me,iem,isec,trim(varname)
@@ -552,7 +600,7 @@ subroutine Emissions(year)
              j<=0 .or. j>GJMAX) cycle READCLIMATEFACTOR
 
           RoadDustEmis_climate_factor(i,j) = tmpclimfactor
-          if(DEBUG_ROADDUST.and.i==DEBUG_i.and.j==DEBUG_j) write(*,*) &
+          if(DEBUG_ROADDUST.and.i==DEBUG%IJ(1).and.j==dEBUG%IJ(2)) write(*,*) &
              "DEBUG RoadDust climate factor (read from file)",&
              RoadDustEmis_climate_factor(i,j)
 
@@ -614,11 +662,11 @@ subroutine Emissions(year)
         call ReadField_CDF('RoadMap.nc',varname,roaddust_emis_pot(1,1,1,iem),&
           nstart=1,interpol='mass_conservative',fractions_out=fractions,&
           CC_out=road_landcode,Ncc_out=road_nlandcode,needed=.true.,&
-          debug_flag=.true.,Undef=0.0)
+          debug_flag=.false.,Undef=0.0)
         if(.not.SMI_defined)then
           varname='SMI1'
           call ReadField_CDF('AVG_SMI_2005_2010.nc',varname,SMI,nstart=1,&
-               interpol='conservative',needed=.true.,debug_flag=.true.)
+               interpol='conservative',needed=.true.,debug_flag=.false.)
           SMI_defined=.true.
         endif
 
@@ -676,11 +724,11 @@ subroutine Emissions(year)
       if(ccsum>0.0 .or. sum(sumcdfemis(ic,:))>0.0) then
         if(EMIS_TEST=="None") then
           write(*,"(i3,1x,a4,3x,30(f12.2,:))")ic, Country(ic)%code, sumemis(ic,:)
+          write(IO_LOG,"(i3,1x,a4,3x,30(f12.2,:))")ic, Country(ic)%code, sumemis(ic,:)
         else
          write(*,"(a,i3,1x,a4,3x,30(f12.2,:))")"ORIG:",ic, Country(ic)%code, sumemis(ic,:)
          write(*,"(a,i3,1x,a4,3x,30(f12.2,:))")"CDFS:",ic, Country(ic)%code, sumcdfemis(ic,:)
         endif
-        write(IO_LOG,"(i3,1x,a4,3x,30(f12.2,:))")ic, Country(ic)%code, sumemis(ic,:)
         if(find_index(Country(ic)%code,EU27(:))>0) sumEU = sumEU + sumemis(ic,:)
       endif
     enddo
@@ -751,7 +799,7 @@ subroutine Emissions(year)
   ! with (nydays*24*60*60)s and (h*h)m2 and multiply by 1.e+3.
   ! The conversion factor then equals 1.27e-14
   tonne_to_kgm2s  = 1.0e3 / (nydays * 24.0 * 3600.0 * GRIDWIDTH_M * GRIDWIDTH_M)
-  if(DEBUG.and.MasterProc) then
+  if(MYDEBUG.and.MasterProc) then
     write(*,*) "CONV:me, nydays, gridwidth = ",me,nydays,GRIDWIDTH_M
     write(*,*) "No. days in Emissions: ", nydays
     write(*,*) "tonne_to_kgm2s in Emissions: ", tonne_to_kgm2s
@@ -764,7 +812,7 @@ subroutine Emissions(year)
   iemCO=find_index("co",EMIS_FILE(:)) ! save this index
   conv = tonne_to_kgm2s
     
-  if(DEBUG.and.debug_proc.and.iemCO>0) &
+  if(MYDEBUG.and.debug_proc.and.iemCO>0) &
     write(*,"(a,2es10.3)") "SnapPre:" // trim(EMIS_FILE(iemCO)), &
       sum(snapemis   (:,debug_li,debug_lj,:,iemCO)), &
       sum(snapemis_flat(debug_li,debug_lj,:,iemCO))
@@ -777,10 +825,10 @@ subroutine Emissions(year)
     snapemis_flat(i,j,fic,iem) = snapemis_flat(i,j,fic,iem) * conv * xm2(i,j)
   endforall
 
-  if(DEBUG.and.debug_proc.and.iemCO>0) &
-    write(*,"(a,2es10.3)") "SnapPos:" // trim(EMIS_FILE(iem)), &
-      sum(snapemis   (:,debug_li,debug_lj,:,iem)), &
-      sum(snapemis_flat(debug_li,debug_lj,:,iem))
+  if(MYDEBUG.and.debug_proc.and.iemCO>0) &
+    write(*,"(a,2es10.3)") "SnapPos:" // trim(EMIS_FILE(iemCO)), &
+      sum(snapemis   (:,debug_li,debug_lj,:,iemCO)), &
+      sum(snapemis_flat(debug_li,debug_lj,:,iemCO))
 
   if(USE_ROADDUST)THEN
     conv = tonne_to_kgm2s
@@ -837,7 +885,40 @@ subroutine Emissions(year)
      call CheckStop(err4, "Allocation error 4 - gridrcroadd0")
   endif
 endsubroutine Emissions
-!***********************************************************************
+!----------------------------------------------------------------------!
+!>
+!! expandcclist converts e.g. EU27 to indivdual countries
+! Only coded for EUMACC2 so far. Should probably use pointers from
+! group names.
+!----------------------------------------------------------------------!
+subroutine expandcclist(xlist, n)
+  character(len=*), dimension(:), intent(inout) :: xlist 
+  integer, intent(out) ::  n
+  character(len=30), dimension(size(xlist)) ::  nlist 
+  integer :: i
+
+    nlist(:) = "-"
+    n = 1
+    CCLIST: do i = 1 , size(xlist)
+!if(MasterProc) print *, "CCNLIST ", me, i, size(xlist), n, xlist(i)
+        select case(xlist(i))
+        case("EUMACC2")
+!if(MasterProc) print *, "NLIST MACC2 ", me, i, size(EUMACC2), n
+             nlist(n:n+size(EUMACC2)-1 ) = (/ EUMACC2 /)
+             n=n+size(EUMACC2)
+        case("-")
+!if(MasterProc) print *, "NLIST ----- ", me, i, n
+             n = n - 1
+             exit CCLIST
+        case default
+!if(MasterProc) print *, "NLIST DEF - ", me, i, n, xlist(i)
+             nlist(n) = xlist(i)
+             n=n+1
+        end select
+    end do CCLIST ! i
+    xlist(1:n) = nlist(1:n) ! overwrites original
+end subroutine expandcclist
+!----------------------------------------------------------------------!
 subroutine consistency_check()
 !----------------------------------------------------------------------!
 !    checks that all the values given so far are consistent
@@ -1162,7 +1243,7 @@ endsubroutine consistency_check
           endif ! ROADDUST
         enddo   ! i
       enddo     ! j
-      if(DEBUG.and.debug_proc) &    ! emis sum kg/m2/s
+      if(MYDEBUG.and.debug_proc) &    ! emis sum kg/m2/s
         call datewrite("SnapSum, kg/m2/s:"//trim(EMIS_FILE(iemCO)), &
               (/ SumSnapEmis(debug_li,debug_lj,iemCO)  /) )
 
@@ -1373,7 +1454,7 @@ subroutine newmonth
 
   ktonne_to_kgm2s = 1.0e6/(nydays*24.*60.*60.*GRIDWIDTH_M*GRIDWIDTH_M)
 
-  if(MasterProc.and.DEBUG) then
+  if(MasterProc.and.MYDEBUG) then
     write(*,*) 'Enters newmonth, mm, ktonne_to_kgm2s = ', &
         current_date%month,ktonne_to_kgm2s
     write(*,*) ' first_dms_read = ', first_dms_read
@@ -1409,7 +1490,7 @@ subroutine newmonth
             flat_landcode(i,j,n) = IQ_DMS   ! country code 35 
             if(n>flat_ncmaxfound) then
               flat_ncmaxfound = n 
-              if (DEBUG) write(6,*)'DMS Increased flat_ncmaxfound to ',n 
+              if (MYDEBUG) write(6,*)'DMS Increased flat_ncmaxfound to ',n 
               call CheckStop( n > FNCMAX, "IncreaseFNCMAX for dms")
             endif
           else  ! We know that DMS lies last in the array, so:
@@ -1421,7 +1502,7 @@ subroutine newmonth
       enddo   ! j
 
       if(first_dms_read) then
-        if(DEBUG) &
+        if(MYDEBUG) &
           write(*,*)'me ',me, ' Increased flat_ncmaxfound to ',flat_ncmaxfound 
         first_dms_read = .false.
       endif
@@ -1526,7 +1607,7 @@ subroutine EmisOut(label, iem,nsources,sources,emis)
   txt = trim(label)//"."//trim(EMIS_FILE(iem))
   msg(:) = 0
 
-  if(DEBUG) write(*,*)"CALLED "//trim(txt),me,&
+  if(MYDEBUG) write(*,*)"CALLED "//trim(txt),me,&
     maxval(emis),maxval(nsources),maxval(sources)
 
   if(MasterProc) then
@@ -1561,7 +1642,7 @@ subroutine EmisOut(label, iem,nsources,sources,emis)
         do icc = 1, ncc
           if(sources(i,j,icc)==iland) then
             locemis(i,j,: ) = emis(:, i,j,icc)
-            if(DEBUG) call CheckStop(any(locemis(i,j,:)< 0.0),"NEG LOCEMIS")
+            if(MYDEBUG) call CheckStop(any(locemis(i,j,:)< 0.0),"NEG LOCEMIS")
           endif
         enddo
       enddo
@@ -1575,7 +1656,7 @@ subroutine EmisOut(label, iem,nsources,sources,emis)
     !/ (Need to be careful, local2global changes local arrays. Hence lemis)
     do isec = 1, NSECTORS
       lemis = locemis(:,:,isec)
-      if(DEBUG) write(*,*) trim(txt)//" lemis ",me,iland,maxval(lemis(:,:))
+      if(MYDEBUG.and.debug_proc) write(*,*) trim(txt)//" lemis ",me,iland,isec,maxval(lemis(:,:))
       call local2global(lemis,gemis,msg)
       if(MasterProc) globemis(:,:,isec) = gemis(:,:) !! for output
     enddo ! isec

@@ -1,3 +1,29 @@
+! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 module Convection_ml
 
 !If subsidence is included, ps3d could actually be any constant (in k), and 
@@ -15,7 +41,8 @@ module Convection_ml
 
 
  use Chemfields_ml,        only  : xn_adv
- use ChemSpecs_adv_ml ,    only  : NSPEC_ADV
+ use ChemSpecs,            only  : NSPEC_ADV
+!CRM  use ChemSpecs_adv_ml ,    only  : NSPEC_ADV
  use ModelConstants_ml,    only  : KMAX_BND,KMAX_MID,PT,Pref
  use MetFields_ml ,        only  : ps,sdot,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
  use GridValues_ml,        only  : dA, dB, sigma_bnd

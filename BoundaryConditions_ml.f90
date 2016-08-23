@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -74,10 +74,11 @@ module BoundaryConditions_ml
 ! -----------------------------------------------------------------------
 
 use CheckStop_ml,      only: CheckStop
-use ChemChemicals_ml         ! provide species names
 use Chemfields_ml,     only: xn_adv, xn_bgn, NSPEC_BGN  ! emep model concs.
-use ChemSpecs_adv_ml         ! provide NSPEC_ADV and IXADV_*
-use ChemSpecs_shl_ml         ! provide NSPEC_SHL
+use ChemSpecs                ! provide NSPEC_ADV and IXADV_*
+!CMR use ChemChemicals_ml         ! provide species names
+!CMR use ChemSpecs_adv_ml         ! provide NSPEC_ADV and IXADV_*
+!CMR use ChemSpecs_shl_ml         ! provide NSPEC_SHL
 use GlobalBCs_ml,      only:  &
    NGLOB_BC                   &  ! Number of species from global-model
   ,GetGlobalData              &  ! Sub., reads global data+vert interp.
@@ -85,7 +86,8 @@ use GlobalBCs_ml,      only:  &
   ,IBC_O3,IBC_HNO3,IBC_PAN,IBC_CO,IBC_C2H6   &
   ,IBC_C4H10, IBC_NO ,IBC_NO2,IBC_NH4_f,IBC_NO3_f,IBC_NO3_c&
   ,IBC_H2O2, IBC_DUST_f, IBC_DUST_c,IBC_SEASALT_F, IBC_SEASALT_C &
-  ,IBC_SEASALT_G ,setgl_actarray
+  ,IBC_SEASALT_G ,setgl_actarray&
+  ,O3fix,trend_o3!temporary
 use GridValues_ml,     only: glon, glat   & ! full domain lat, long
                             ,sigma_mid    & !sigma layer midpoint
                             ,debug_proc, debug_li, debug_lj & ! debugging
@@ -98,7 +100,9 @@ use ModelConstants_ml, only: KMAX_MID  &  ! Number of levels in vertical
                             ,iyr_trend &  ! Used for e.g. future scenarios
                             ,BGND_CH4  &  ! If positive, replaces defaults
                             ,USE_SEASALT & 
-                            ,DEBUG_BCS, DEBUG_i, DEBUG_j, MasterProc, PPB
+                            ,USES,DEBUG  & ! %BCs
+                            ,MasterProc, PPB
+use NetCDF_ml,         only:ReadField_CDF,vertical_interpolate
 use Par_ml,          only: &
    MAXLIMAX, MAXLJMAX, limax, ljmax, me &
   ,neighbor, NORTH, SOUTH, EAST, WEST   &  ! domain neighbours
@@ -215,24 +219,27 @@ contains
     !   bc_adv(NSPEC_ADV,IGLOB,JGLOB,KMAX_MID)
     !   bc_bgn(NSPEC_BGN,IGLOB,JGLOB,KMAX_MID)
 
-    integer  :: iglobact, jglobact, errcode
+    integer  :: iglobact, jglobact, errcode, Nlevel_logan
     integer, save :: idebug=0, itest=1, i_test=0, j_test=0
+    real, allocatable,dimension(:,:,:)   :: O3_logan,O3_logan_emep
+    character(len = 100) ::fileName,varname
+    logical :: NewLogan=.false.! under testing
 
     if (first_call) then
-       if (DEBUG_BCS) write(*,"(a,I3,1X,a,i5)") &
+       if (DEBUG%BCS) write(*,"(a,I3,1X,a,i5)") &
             "FIRST CALL TO BOUNDARY CONDITIONS, me: ", me,  "TREND YR ", iyr_trend
        allocate(misc_bc(NGLOB_BC+1:NTOT_BC,KMAX_MID))
        call My_bcmap(iyr_trend)      ! assigns bc2xn_adv and bc2xn_bgn mappings
        call Set_bcmap()              ! assigns xn2adv_changed, etc.
 
        num_changed = num_adv_changed + num_bgn_changed   !u1
-       if (DEBUG_BCS) write(*, "((A,I0,1X))")           &
+       if (DEBUG%BCS) write(*, "((A,I0,1X))")           &
             "BCs: num_adv_changed: ", num_adv_changed,  &
             "BCs: num_bgn_changed: ", num_bgn_changed,  &
             "BCs: num     changed: ", num_changed
 
     endif ! first call
-    if (DEBUG_BCS) write(*, "((A,I0,1X))")           &
+    if (DEBUG%BCS) write(*, "((A,I0,1X))")           &
          "CALL TO BOUNDARY CONDITIONS, me:", me, &
          "month ", month, "TREND2 YR ", iyr_trend, "me ", me
 
@@ -258,10 +265,10 @@ contains
 !    bc_bgn(:,:,:,:) = 0.0
 
     errcode = 0
-    if (DEBUG_BCS.and.debug_proc) then
+    if (DEBUG%BCS.and.debug_proc) then
        do i = 1, limax
           do j = 1, ljmax
-             if (i_fdom(i)==DEBUG_i.and.j_fdom(j)==DEBUG_j) then
+             if (i_fdom(i)==DEBUG%IJ(1).and.j_fdom(j)==DEBUG%IJ(2)) then
                 i_test = i
                 j_test = j
              endif
@@ -271,7 +278,7 @@ contains
 
     if (first_call) then
        idebug = 1
-       if (DEBUG_BCS) write(*,*) "RESET 3D BOUNDARY CONDITIONS", me
+       if (DEBUG%BCS) write(*,*) "RESET 3D BOUNDARY CONDITIONS", me
        do k = 1, KMAX_MID
           do j = 1, ljmax
              do i = 1, limax
@@ -281,7 +288,7 @@ contains
           enddo
        enddo
     else       
-       if (DEBUG_BCS.and.MasterProc) write(*,*) "RESET LATERAL BOUNDARIES"
+       if (DEBUG%BCS.and.MasterProc) write(*,*) "RESET LATERAL BOUNDARIES"
        do k = 2, KMAX_MID
           do j = lj0, lj1
              !left
@@ -323,44 +330,79 @@ contains
     !== BEGIN READ_IN OF GLOBAL DATA
 
     do ibc = 1, NGLOB_BC
+      
        if (MasterProc) call GetGlobalData(year,month,ibc,bc_used(ibc), &
             iglobact,jglobact,bc_data,io_num,errcode)
-
-       if (DEBUG_BCS.and.MasterProc) &
+       
+       if (DEBUG%BCS.and.MasterProc) &
             write(*, *)'Calls GetGlobalData: year,iyr_trend,ibc,month,bc_used=', &
             year,iyr_trend,ibc,month,bc_used(ibc)
-
+       
        call CheckStop(ibc==1.and.errcode/= 0,&
             "ERRORBCs: GetGlobalData, failed in BoundaryConditions_ml")
-
+       
        !-- If the read-in bcs are required, we broadcast and use:
        if ( bc_used(ibc) > 0 ) then
           CALL MPI_BCAST(bc_data,8*iglobact*jglobact*KMAX_MID,MPI_BYTE,0,&
                MPI_COMM_WORLD,INFO)
-
+          
           ! - set bc_adv: advected species
-!          do i = 1, bc_used_adv(ibc)
-!             iem = spc_used_adv(ibc,i)
-!             iem1 = spc_adv2changed(iem)
-!             bc_adv (iem1,:,:,:) = bc_adv(iem1,:,:,:) &
-!                  + bc_data(:,:,:)*bc2xn_adv(ibc,iem)
-!          enddo
-
+          !          do i = 1, bc_used_adv(ibc)
+          !             iem = spc_used_adv(ibc,i)
+          !             iem1 = spc_adv2changed(iem)
+          !             bc_adv (iem1,:,:,:) = bc_adv(iem1,:,:,:) &
+          !                  + bc_data(:,:,:)*bc2xn_adv(ibc,iem)
+          !          enddo
+          
           ! - set bc_bgn: background (prescribed) species
-!          do i = 1, bc_used_bgn(ibc)
-!             iem = spc_used_bgn(ibc,i)
-!             iem1 = spc_bgn2changed(iem)
-             !             bc_bgn(iem1,:,:,:) = bc_bgn(iem1,:,:,:) &
-             !                  +  bc_data(:,:,:)*bc2xn_bgn(ibc,iem)
-!          enddo
+          !          do i = 1, bc_used_bgn(ibc)
+          !             iem = spc_used_bgn(ibc,i)
+          !             iem1 = spc_bgn2changed(iem)
+          !             bc_bgn(iem1,:,:,:) = bc_bgn(iem1,:,:,:) &
+          !                  +  bc_data(:,:,:)*bc2xn_bgn(ibc,iem)
+          !          enddo
        endif    ! bc_used
-
+       
        !   if (MasterProc) close(io_num)
+
+       if(ibc==IBC_O3 .and. (NewLogan.or.KMAX_MID/=20))then !temporary fix, assumes IBC_O3=1
+!This should have been in GetGlobalData, but GetGlobalData is called only by MasterPoroc.
+!So we overwrite whatever O3 is read in from  GetGlobalData
+          if(Masterproc)write(*,*)'OVERWRITING LOGAN'
+ 
+          !Read Logan BC in pressure coordinates
+          Nlevel_logan=30
+          if(.not.allocated(O3_logan))allocate(O3_logan(Nlevel_logan,MAXLIMAX,MAXLJMAX))
+          if(.not.allocated(O3_logan_emep))allocate(O3_logan_emep(MAXLIMAX,MAXLJMAX,KMAX_MID))
+          filename='Logan_P.nc'!will be put in run.pl in due time
+          varname='O3'
+          call  ReadField_CDF(fileName,varname,O3_logan,nstart=month,kstart=1,kend=Nlevel_logan,interpol='zero_order', &
+              needed=.true.,debug_flag=.true.)
+          CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
+           !interpolate vertically
+          call vertical_interpolate(filename,O3_logan,Nlevel_logan,O3_logan_emep,Masterproc)
+          do k = 1, KMAX_MID
+             do j = 1, ljmax
+                do i = 1, limax
+                   bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)=O3_logan_emep(i,j,k)
+                enddo
+             enddo
+          enddo
+          if(USES%MACEHEADFIX)then
+             !MaceHead correction
+             CALL MPI_BCAST(trend_o3,8,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+             CALL MPI_BCAST(O3fix,8,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+             if(masterProc)write(*,*)'O3fix,trend_o3 ',O3fix,trend_o3
+             bc_data = max(15.0*PPB,bc_data-O3fix)
+             bc_data = bc_data*trend_o3
+          endif
+       endif
 
        if (first_call) then
 
           ! Set 3-D arrays of new BCs
           do n = 1, bc_used_adv(ibc)
+
              iem = spc_used_adv(ibc,n)
              ntot = iem + NSPEC_SHL 
 
@@ -660,7 +702,7 @@ contains
     endif
 
 
-    if (DEBUG_BCS.and.debug_proc.and.i_test>0) then
+    if (DEBUG%BCS.and.debug_proc.and.i_test>0) then
        i = i_test
        j = j_test
        print "(a20,3i4,2f8.2)","DEBUG BCS Rorvik", me, i,j,glon(i,j),glat(i,j)
@@ -671,7 +713,7 @@ contains
        enddo
     endif ! DEBUG
 
-    if (DEBUG_BCS.and.debug_proc) then
+    if (DEBUG%BCS.and.debug_proc) then
        itest = 1
        print *,"BoundaryConditions: No CALLS TO BOUND Cs", first_call,idebug
        !/** the following uses hard-coded  IXADV_ values for testing.
@@ -706,6 +748,7 @@ contains
 !    endif
 
     if (first_call) first_call = .false.
+
   end subroutine BoundaryConditions
 
 subroutine My_bcmap(iyr_trend)
@@ -862,9 +905,9 @@ subroutine Set_bcmap()
     endif
   enddo ! iem
 
-  if (DEBUG_BCS) write(*,*) "TEST SET_BCMAP bc_used: ",&
+  if (DEBUG%BCS) write(*,*) "TEST SET_BCMAP bc_used: ",&
     (bc_used(ibc),ibc=1, NTOT_BC)
-  if (MasterProc.and.DEBUG_BCS) write(*,*)"Finished Set_bcmap: Nbcused is ", sum(bc_used)
+  if (MasterProc.and.DEBUG%BCS) write(*,*)"Finished Set_bcmap: Nbcused is ", sum(bc_used)
 
   allocate(spc_changed2adv(num_adv_changed))
   allocate(spc_changed2bgn(num_bgn_changed))
@@ -953,7 +996,7 @@ subroutine MiscBoundaryConditions(iglobact,jglobact,bc_adv,bc_bgn)
   endif
 
   itest = 1
-  if (DEBUG_BCS.and.debug_proc) write(*,*) "(a50,i4,/,(5es12.4))", &
+  if (DEBUG%BCS.and.debug_proc) write(*,*) "(a50,i4,/,(5es12.4))", &
     "From MiscBoundaryConditions: ITEST (ppb): ",&
     itest, ((bc_adv(spc_adv2changed(itest),1,1,k)/1.0e-9),k=1,20)
 end subroutine MiscBoundaryConditions
@@ -1038,7 +1081,7 @@ subroutine Set_BoundaryConditions(mode,iglobact,jglobact,bc_adv,bc_bgn)
       end do ! j
     end do ! k
    !endforall
-    if ( DEBUG_BCS .and. debug_proc ) then
+    if ( DEBUG%BCS .and. debug_proc ) then
      i=debug_li
      j=debug_lj
      k=KMAX_MID

@@ -1,11 +1,37 @@
+! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-201409 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 module Units_ml
 use CheckStop_ml,     only: CheckStop
-use ChemChemicals_ml, only: species_adv
 use ChemGroups_ml,    only: chemgroups
-use ChemSpecs_adv_ml, only: NSPEC_ADV
-use ChemSpecs_shl_ml, only: NSPEC_SHL
+!CMR use ChemSpecs_adv_ml, only: NSPEC_ADV
+!CMR use ChemSpecs_shl_ml, only: NSPEC_SHL
+!CMR use ChemChemicals_ml, only: species_adv
+use ChemSpecs,        only : NSPEC_ADV, NSPEC_SHL, species_adv
 use ModelConstants_ml,only: PPBINV,ATWAIR,atwS,atwN,MFAC
-!se PhysicalConstants_ml,only: AVOG
 use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT,Asc2D
 use SmallUtils_ml,    only: find_index
 
@@ -68,9 +94,10 @@ type, public :: group_umap
   real,   pointer,dimension(:) :: uconv=>null() ! conversion factor
 endtype group_umap
 
-type(umap), public, save :: unit_map(19)=(/&
+type(umap), public, save :: unit_map(20-1)=(/&
 ! Air concentration
   umap("mix_ratio","mol/mol",1.0),&  ! Internal model unit
+  umap("mass_ratio","kg/kg",1.0/ATWAIR), &  ! mass mixing ratio
   umap("ppb" ,"ppb" ,PPBINV),&
   umap("ppbh","ppb h",s2h  ),&  ! PPBINV already included in AOT calculations
   umap("ug" ,"ug/m3" ,ugXm3),&  ! ug* units need to be further multiplied
@@ -88,7 +115,7 @@ type(umap), public, save :: unit_map(19)=(/&
   umap("uBqh","uBq h/m3",ugXm3),& ! accumulated exposure over 1 hour
   umap("mBq" ,"mBq/m2"  ,mgXm2),& ! deposition
 ! Aerosol optical properties
-  umap("ext" ,"ext550nm",extX),&! ext* units need to be further multiplied...
+! umap("ext" ,"ext550nm",extX),&! ext* units need to be further multiplied...
 ! Coulumn output
   umap("ugm2"   ,"ug/m2",ugXm3),&  ! ug* units need to be further multiplied
   umap("mcm2"   ,"molec/cm2"    ,to_molec_cm2),&
@@ -114,7 +141,7 @@ subroutine Init_Units()
 
  do i=1,size(unit_map)
    select case (unit_map(i)%utxt)
-    case("ug","mg","uBq","uBqh","mBq","ugm2")
+    case("ug","mg","uBq","uBqh","mBq","ugm2","mass_ratio")
       uconv_spec = species_adv%molwt
     case("ugC","mgC")
       uconv_spec = species_adv%carbons
@@ -122,8 +149,9 @@ subroutine Init_Units()
       uconv_spec = species_adv%nitrogens
     case("ugS","mgS")
       uconv_spec = species_adv%sulphurs
-    case("ext")
-      uconv_spec = species_adv%molwt*species_adv%ExtC
+!   case("ext")
+!     uconv_spec = species_adv%molwt*species_adv%ExtC
+!     uconv_spec = species_adv%molwt*Qm_grp(NSPEC_ADV,[1..NSPEC_ADV]+NSPEC_SHL,rh,...)
     case default
       uconv_spec = 1.0
    endselect
@@ -189,7 +217,6 @@ function Group_Scale(igrp,unit,debug) result(gmap)
   call Group_Units_Asc2D(hr_out,gmap%iadv,gmap%uconv,debug,name=gmap%name)
 end function Group_Scale
 
-
 function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(unitscale)
   character(len=*), intent(in) :: txtin
   integer, intent(in) :: iadv  ! species_adv index, used if > 0
@@ -211,8 +238,10 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
     txt=txt(1:2)
   case("micro g/m3")
     txt="ug"
-  case("mol/mol","mole mole-1","mixratio")
+  case("mol/mol","mole mole-1","mixratio","vmr")
     txt="mix_ratio"
+  case("kg/kg","kg kg-1","massratio","mmr")
+    txt="mass_ratio"
   case("ppbv","ppbV")
     txt="ppb"
   endselect
@@ -240,6 +269,6 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
     call CheckStop(iadv,"Units_Scale Error: Unknown iadv.")
   endselect
 
-end function Units_Scale
+endfunction Units_Scale
 
-end module Units_ml
+endmodule Units_ml

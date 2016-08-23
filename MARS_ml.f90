@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,7 +36,7 @@ module MARS_ml
  use CheckStop_ml,       only : CheckStop
  use Io_ml,              only : ios, datewrite
  use MARS_Aero_water_ml, only:  Awater
- use ModelConstants_ml,  only : NPROC, DEBUG_EQUIB
+ use ModelConstants_ml,  only : NPROC, DEBUG
  use Par_ml,             only : me
  implicit none
  private
@@ -556,7 +556,7 @@ module MARS_ml
         ANH4_High = YNH4 * MWNH4
 if(debug_flag) call datewrite("MARS debug ", -1,(/ ASO4_High, ANH4_High, AH2O /) )
 
-if ( DEBUG_EQUIB ) then
+if ( DEBUG%EQUIB ) then
   if( ASO4_High + ANH4_High +  AH2O < 1.0-10 ) then
      call datewrite("MARS failing? ", -1,(/ ASO4_High, ANH4_High, AH2O /) )
      print *, "MARS PROB ", ASO4_High, ANH4_High, AH2O, TSO4_HighA, YNH4
@@ -592,7 +592,7 @@ end if
             !DS IF ( DISC < 0.0 ) THEN
             !dsDSdIF ( DISC < FLOOR ) THEN
             IF ( DISC < 0.0 ) THEN
-if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
+if( DEBUG%EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
               XNO3 = 0.0
               AH2O_High = 1000.0 * WH2O
               YNH4 = TWOSO4
@@ -665,7 +665,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
 
           DISC = BB * BB - 4.0 * AA * CC
 
-          if( DEBUG_EQUIB ) then
+          if( DEBUG%EQUIB ) then
             MAXNNN1 = NNN
             !if( MAXNNN1 > 140) print "(a,i4,9es12.3)", "NNN1 ", NNN, DISC, TNO3, TNH4, TWOSO4
           end if
@@ -675,7 +675,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
           !DS IF ( DISC < 0.0 ) THEN
           !dsDS IF ( DISC < FLOOR ) THEN
           IF ( DISC < 0.0 ) THEN
-if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
+if( DEBUG%EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
             XNO3 = 0.0
             AH2O_High = 1000.0 * WH2O
             YNH4 = TWOSO4
@@ -696,7 +696,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
 
           !DS IF ( AA /= 0.0 ) THEN
           IF ( abs(AA) > FLOOR  ) THEN
-             if( DEBUG_EQUIB .and. debug_flag ) print "(a,9es11.3)", "MARS DEGEN  ",  XNO3, WH2O, DISC, AA, BB, CC
+             if( DEBUG%EQUIB .and. debug_flag ) print "(a,9es11.3)", "MARS DEGEN  ",  XNO3, WH2O, DISC, AA, BB, CC
              DD = SQRT( DISC )
              XXQ = -0.5 * ( BB + SIGN ( 1.0, BB ) * DD )
              RR1 = XXQ / AA
@@ -705,7 +705,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
              !...choose minimum positve root         
              
              IF ( ( RR1 * RR2 ) < 0.0 ) THEN
-                if( DEBUG_EQUIB .and. debug_flag ) print "(a,10es10.3)", "MARS RR1*RR2  ", XNO3, WH2O, DISC, RR1, RR2
+                if( DEBUG%EQUIB .and. debug_flag ) print "(a,10es10.3)", "MARS RR1*RR2  ", XNO3, WH2O, DISC, RR1, RR2
                 XNO3 = MAX( RR1, RR2 )
              ELSE if(MIN( RR1, RR2 )>0.0)then
                 XNO3 = MIN( RR1, RR2 )
@@ -721,14 +721,14 @@ if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
                 !ds ANH4 = YNH4 * MWNH4
                 ANH4_High = min( YNH4 * MWNH4, TMASSNH3)  ! ds added "min"
                 GNH3_High = TMASSNH3 - ANH4_High
-                if( DEBUG_EQUIB .and. debug_flag ) WRITE( *, * ) ' TWO NEG ROOTS '
+                if( DEBUG%EQUIB .and. debug_flag ) WRITE( *, * ) ' TWO NEG ROOTS '
 !                RETURN
                 goto 333
                
              END IF
           ELSE
              XNO3 = - CC / BB   ! AA equals zero here
-if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, BB, CC, XNO3
+if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, BB, CC, XNO3
           END IF
 
           XNO3 = MIN( XNO3, TNO3 )
@@ -881,7 +881,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 !...loop for iteration
  
         DO 1601 NNN = 1, 150
-          if( DEBUG_EQUIB ) then
+          if( DEBUG%EQUIB ) then
             if(NNN > MAXNNN2 ) MAXNNN2 = NNN
             !if( MAXNNN2 > 140) print *, "NNN2 ", NNN, TNO3, TNH4, TWOSO4
           end if
@@ -920,7 +920,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
           ANO3_Low = min( TMASSHNO3, MNA * WH2O * MWNO3)
 ! 2/25/99 IJA
           GNO3_Low = TMASSHNO3 - ANO3_Low
-          if( DEBUG_EQUIB ) then
+          if( DEBUG%EQUIB ) then
              if (GNO3_Low < 0.0 ) call CheckStop("NNN2 GNO3 NEG")
           end if
         

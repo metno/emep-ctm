@@ -312,19 +312,6 @@
 
       xnew(FFIRE_REMPPM25)=  xold(FFIRE_REMPPM25) + dt2 * P
 
-!-> TERPPEROXY 
-
-      P =   &
-          rct(72,k)*xnew(O3) * xnew(APINENE )  &
-        + rct(73,k)*xnew(OH) * xnew(APINENE )  &
-        + rct(74,k)*xnew(NO3) * xnew(APINENE ) 
-
-      L =  &
-          rct(40,k)* xnew(NO )  &
-        + rct(75,k)* xnew(HO2 ) 
-
-      xnew(TERPPEROXY)=  ( xold(TERPPEROXY) + dt2 * P) /(1.0 + dt2*L )
-
 !-> ASOC_NG100 
 
       P =   &
@@ -475,8 +462,8 @@
       P =   &
           0.002833*rct(40,k)*xnew(ISRO2)*xnew(NO)  &
         + 0.0255*rct(47,k)*xnew(ISRO2)*xnew(HO2)  &
-        + 0.08*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 0.715333*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 )  &
+        + 0.08*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 0.715333*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY )  &
         + rct(85,k)*xnew(OH) * xnew(BSOC_UG10 ) 
 
       L =  &
@@ -489,8 +476,8 @@
       P =   &
           0.065167*rct(40,k)*xnew(ISRO2)*xnew(NO)  &
         + 0.085*rct(47,k)*xnew(ISRO2)*xnew(HO2)  &
-        + 0.813333*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 0.612*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 )  &
+        + 0.813333*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 0.612*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY )  &
         + rct(86,k)*xnew(OH) * xnew(BSOC_UG1E2 ) 
 
       L =  &
@@ -503,8 +490,8 @@
       P =   &
           0.0425*rct(40,k)*xnew(ISRO2)*xnew(NO)  &
         + 0.0425*rct(47,k)*xnew(ISRO2)*xnew(HO2)  &
-        + 1.34*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 2.391333*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 )  &
+        + 1.34*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 2.391333*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY )  &
         + rct(87,k)*xnew(OH) * xnew(BSOC_UG1E3 ) 
 
       L =  &
@@ -515,8 +502,8 @@
 !-> BSOC_UG1E3 
 
       P =   &
-          3.333333*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 4.05*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 ) 
+          3.333333*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 4.05*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY ) 
 
       L =  &
           rct(87,k)*xnew(OH) 
@@ -538,8 +525,8 @@
       P =   &
           0.034*rct(40,k)*xnew(ISRO2)*xnew(NO)  &
         + 0.306*rct(47,k)*xnew(ISRO2)*xnew(HO2)  &
-        + 0.672*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 6.009*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 )  &
+        + 0.672*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 6.009*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY )  &
         + 0.9*rct(85,k)*xnew(OH) * xnew(BSOC_UG10 )  &
         + 1.075*rct(89,k)*xnew(OH) * xnew(NON_C_BSOA_UG10 ) 
 
@@ -553,8 +540,8 @@
       P =   &
           0.782*rct(40,k)*xnew(ISRO2)*xnew(NO)  &
         + 1.02*rct(47,k)*xnew(ISRO2)*xnew(HO2)  &
-        + 6.832*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 5.1408*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 )  &
+        + 6.832*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 5.1408*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY )  &
         + 0.9*rct(86,k)*xnew(OH) * xnew(BSOC_UG1E2 )  &
         + 1.075*rct(90,k)*xnew(OH) * xnew(NON_C_BSOA_UG1E2 ) 
 
@@ -568,8 +555,8 @@
       P =   &
           0.51*rct(40,k)*xnew(ISRO2)*xnew(NO)  &
         + 0.51*rct(47,k)*xnew(ISRO2)*xnew(HO2)  &
-        + 11.256*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 20.0872*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 )  &
+        + 11.256*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 20.0872*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY )  &
         + 0.9*rct(87,k)*xnew(OH) * xnew(BSOC_UG1E3 )  &
         + 1.075*rct(91,k)*xnew(OH) * xnew(NON_C_BSOA_UG1E3 ) 
 
@@ -581,8 +568,8 @@
 !-> NON_C_BSOA_UG1E3 
 
       P =   &
-          28.*rct(40,k) * xnew(TERPPEROXY ) * xnew(NO )  &
-        + 34.02*rct(75,k) * xnew(TERPPEROXY ) * xnew(HO2 ) 
+          28.*rct(40,k)*xnew(NO) * xnew(TERPPEROXY )  &
+        + 34.02*rct(75,k)*xnew(HO2) * xnew(TERPPEROXY ) 
 
       L =  &
           rct(91,k)*xnew(OH) 

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -40,11 +40,10 @@ module Trajectory_ml
 
   use My_Outputs_ml,      only : NADV_FLIGHT, FLIGHT_ADV !ds - added
   use Chemfields_ml  ,    only : xn_adv
-  use ChemSpecs_adv_ml
   use GridValues_ml ,     only : glon, glat
   use Io_ml,              only : IO_AIRCR
   use MetFields_ml,             only : z_bnd,z_mid
-  use ModelConstants_ml , only : dt_advec,PPBINV,KMAX_BND,NPROC
+  use ModelConstants_ml , only : dt_advec,PPBINV,KMAX_BND,NPROC, METSTEP
   use Par_ml   ,          only : gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG,me
   use TimeDate_ml,        only : current_date
   implicit none
@@ -80,6 +79,8 @@ contains
     character*20 falc
     logical tra_exist
     integer ii,info
+
+    if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
 
   !  Here month and day where trajectory is expected is hardcoded. 
     if(current_date%month == 6) then

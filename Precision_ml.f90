@@ -1,4 +1,4 @@
-! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <Precision_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-201409 met.no
@@ -24,23 +24,19 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-module DA_3DVar_ml
-use CheckStop_ml,     only: CheckStop
-use ModelConstants_ml,only: ANALYSIS
-implicit none
-contains
-subroutine main_3dvar()
-!-----------------------------------------------------------------------
-! Empty call to 3dvar, for "standrd" model compilation
-!-----------------------------------------------------------------------
-implicit none
-logical, save :: first_call=.true.
-!-----------------------------------------------------------------------
+module Precision_ml
+
+! from KPP system
 !
-!-----------------------------------------------------------------------
-  if(.not.first_call)return
-  call CheckStop(ANALYSIS,&
-    "No 3DVar available. Need to recompile, e.g. make MACC-3DVar")
-  first_call=.false.
-endsubroutine main_3dvar
-endmodule DA_3DVar_ml
+! Definition of different levels of accuracy
+! for REAL variables using KIND parameterization
+!
+! KPP SP - Single precision kind
+  integer, parameter :: sp = selected_real_kind(6,30)
+! KPP DP - Double precision kind
+  integer, parameter :: dp = selected_real_kind(14,300)
+! KPP QP - Quadruple precision kind
+  integer, parameter :: qp = selected_real_kind(18,400)
+
+end module Precision_ml
+

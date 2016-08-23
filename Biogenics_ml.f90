@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-201409 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -56,10 +56,11 @@ module Biogenics_ml
   !---------------------------------------------------------------------------
 
   use CheckStop_ml,      only: CheckStop
-  use ChemChemicals_ml,  only : species
+!CMR   use ChemChemicals_ml,  only : species
+  use ChemSpecs,         only : species
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
   use Io_ml            , only : IO_FORES, open_file, ios, PrintLog, datewrite
-  use KeyValue_ml,       only : KeyVal,KeyValue
+  use KeyValueTypes,     only : KeyVal,KeyValue
   use LandDefs_ml,       only: LandType, LandDefs
   use LandPFT_ml,        only: MapPFT_LAI, pft_lai
   use Landuse_ml,        only : LandCover
@@ -390,11 +391,10 @@ module Biogenics_ml
    end subroutine MergedBVOC
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-  subroutine SetDailyBVOC(daynumber)
+  subroutine SetDailyBVOC()
 
       ! Scales emission potentials for daily LAI changes
 
-      integer, intent(in) :: daynumber
       integer, save :: last_daynumber = -999, alloc_err
       integer :: i, j, nlu, iL, iiL, ibvoc
       real :: LAIfac  ! Multiplies by land-fraction

@@ -1,8 +1,7 @@
-! <TimeDate_ExtraUtil_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <TimeDate_ExtraUtil_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,7 +24,6 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!_____________________________________________________________________________
 MODULE TimeDate_ExtraUtil_ml
 
 use ModelConstants_ml,only: METSTEP, MasterProc, IOU_MON,IOU_DAY,IOU_HOUR_MEAN
@@ -234,6 +232,7 @@ subroutine str2detail(str,fmt,year,month,day,hour,seconds,minute,second,days,&
   if(present(nlat   ))nlat   =str2key(str,fmt,'LAT' )
   if(present(nlev   ))nlev   =str2key(str,fmt,'LL'  )
   if(present(ntme   ))ntme   =str2key(str,fmt,'TTT' )
+! if(present(fstep  ))fstep  =str2key(str,fmt,'FFFF')
   if(present(fstep  ))fstep  =str2key(str,fmt,'FFF' )
   if(present(debug))then
     if(debug) write(*,*)'string2date: ',trim(str),'/',trim(fmt)
@@ -272,6 +271,7 @@ function detail2str(iname,year,month,day,hour,seconds,minute,second,days,&
   if(present(nlat   ))fname=key2str(fname,'LAT' ,nlat  )
   if(present(nlev   ))fname=key2str(fname,'LL'  ,nlev  )
   if(present(ntme   ))fname=key2str(fname,'TTT' ,ntme  )
+  if(present(fstep  ))fname=key2str(fname,'FFFF',fstep )
   if(present(fstep  ))fname=key2str(fname,'FFF' ,fstep )
   if(present(debug))then
     if(debug) write(*,*)'date2string: ',trim(iname),'-->',trim(fname)
@@ -542,4 +542,4 @@ subroutine assign_NTERM(NTERM)
   endif
 end subroutine assign_NTERM
 
-END MODULE TimeDate_ExtraUtil_ml
+ENDMODULE TimeDate_ExtraUtil_ml

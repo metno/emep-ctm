@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2013 met.no
+!*  Copyright (C) 2007-201409 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,8 +44,8 @@ use GridValues_ml,  only: glat_fdom, GlobalPosition
 use Functions_ml,   only: StandardAtmos_kPa_2_km ! for use in Hz scaling
 use GridValues_ml,  only: lb2ij, AN, glat_fdom, glon_fdom,A_mid, B_mid
 use Io_ml,          only: IO_GLOBBC, ios, open_file, PrintLog
-use LocalVariables_ml, only : Sub, Grid
 use ModelConstants_ml, only: PPB, KMAX_MID, Pref, MasterProc, DO_SAHARA, &
+                             USES, DEBUG, & !%GLOBBC, &
                           iyr_trend, IIFULLDOM, JJFULLDOM
 use NetCDF_ml,      only: GetCDF, Read_Inter_CDF
 use Par_ml,         only: GIMAX, GJMAX, IRUNBEG, JRUNBEG
@@ -61,7 +61,7 @@ public :: GetGlobalData         ! Opens, reads bc_data, closes global data
 public :: setgl_actarray
 
 logical, parameter, private :: &
-  DEBUG_GLOBBC = .false., &
+!  DEBUG_GLOBBC = .false., &
   DEBUG_Logan  = .false., &
   DEBUG_HZ     = .false.
 
@@ -122,6 +122,9 @@ end type SIAfac
 integer, save, private  :: iglbeg, iglend, jglbeg, jglend
 ! -----------------------------------------------------------------------
 integer,parameter ::KMAX20=20
+!temporary used by BoundaryConditions
+real,public :: O3fix=0.0
+real,public :: trend_o3=1.0, trend_co, trend_voc
 
 contains
 
@@ -168,21 +171,61 @@ subroutine GetGlobalData(year,month,ibc,used,        &
   integer, allocatable,dimension(:,:), save :: lat5     ! for latfunc below
   real, dimension(NGLOB_BC,6:14), save  :: latfunc  ! lat. function
   real, save ::  twopi_yr, cosfac                   ! for time-variations
-  real, dimension(12) :: macehead_O3
-  real :: O3fix
+  !---------------------------------------------------------------------------
+  ! Mace Head ozone concentrations for backgroudn sectors
+  ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
+  real, dimension(12,1990:2011), parameter :: macehead_year=reshape(&
+   [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
+    36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
+    36.1,37.3,41.8,39.6,41.2,31.5,28.3,30.3,31.3,34.2,36.1,34.9,& !1992
+    37.6,40.4,44.4,42.6,43.4,29.2,28.5,29.6,32.2,37.3,37.3,38.3,& !1993
+    38.6,37.3,45.7,43.8,42.9,35.1,30.8,30.5,33.8,36.5,34.0,37.3,& !1994
+    37.5,37.1,41.6,42.4,41.1,33.1,29.1,28.7,33.7,34.8,35.0,36.0,& !1995
+    37.0,40.1,42.9,44.6,41.3,38.3,29.3,29.4,35.6,38.4,37.8,38.4,& !1996
+    36.2,41.9,41.8,40.4,40.6,34.4,26.2,29.3,31.3,35.2,25.7,39.5,& !1997
+    38.6,42.0,44.6,45.1,44.2,33.0,29.7,32.9,35.7,38.8,39.7,40.4,& !1998
+    39.9,44.5,49.4,45.0,42.8,34.3,29.0,30.0,31.8,36.9,39.6,39.2,& !1999
+    39.5,42.1,41.8,43.8,43.4,34.5,28.0,27.3,33.6,37.4,35.6,35.8,& !2000
+    37.3,38.0,42.2,44.8,42.6,34.9,28.9,29.4,29.9,35.3,37.3,37.5,& !2001
+  ! Preliminary BCs generated using Mace Head CFC and other greenhouse gases
+  ! data to define clean air masses. Data cover all of 2002 and 9 months
+  ! of 2003. What to do for Oct-Dec 2003?
+  ! Could use (1) 2002 data or (2) 10-year average?
+  ! Simmonds paper would support (1), simplicity (2).
+  ! After seeing earlier 2003 plots, chose (2).
+    42.4,44.4,45.5,45.0,45.9,39.8,32.5,28.7,37.7,39.3,40.5,42.3,& !2002
+    39.8,40.1,44.7,45.4,45.7,41.7,33.3,31.0,35.7,37.9,40.9,38.1,& !2003
+    40.8,42.0,48.3,46.6,39.9,31.9,32.4,32.1,33.9,36.7,40.2,39.8,& !2004
+    40.9,41.4,44.1,45.6,42.7,32.9,26.7,30.0,33.2,37.7,39.5,38.0,& !2005
+  ! 2006 and 2007 are calculated with using IE31 O3 data and
+  ! trajectory sectors (based on PARLAM-PS and HIRLAM20 met) for resp. year
+    39.8,42.4,44.2,48.3,41.3,39.0,31.9,29.5,34.8,37.4,41.9,39.9,& !2006
+    40.7,38.2,46.1,46.4,40.9,34.5,31.2,28.8,33.3,36.1,40.6,41.7,& !2007
+  ! 2008 Mace Head correction calculated using IE31 O3 data and
+  ! trajectory sectors (based on HIRLAM20 met) for 2008
+    41.0,45.1,48.0,46.3,44.2,37.1,30.8,31.3,34.3,37.5,37.9,40.0,& !2008
+  ! 2009 to 2011 Mace Head correction calculated using IE31 O3 data and
+  ! trajectory sectors (based on ECMWF met) for respective year
+    37.7,43.3,46.5,46.2,41.6,39.1,31.0,29.0,34.5,34.4,40.5,38.4,& !2009
+    36.8,38.9,43.9,46.4,41.7,35.5,31.0,31.3,35.6,36.7,33.4,33.8,& !2010
+    36.5,42.4,43.3,44.5,40.2,34.6,30.1,30.8,32.0,34.7,37.7,38.1]& !2011
+    ,[12,1-1990+2011])
+  real, dimension(12), parameter :: macehead_default=&
+  ! Defaults from 1998-2010 average
+    (/39.8,41.9,45.4,46.5,43.2,36.2,30.5,30.1,34.1,37.0,39.0,38.5/)
+  real, dimension(12):: macehead_O3=macehead_default
+  !---------------------------------------------------------------------------
   integer :: i, j, k, i0, i1, j1, icount
   real    :: f0, f1             ! interpolation factors
   character(len=30) :: fname    ! input filename
   character(len=99) :: txtmsg   ! error messages
   character(len=30) :: BCpoll   ! pollutant name
-  real :: trend_o3, trend_co, trend_voc
   real,allocatable,save, dimension(:) :: p_kPa, h_km  !Use of standard atmosphere
 
   real :: scale_old, scale_new,iMH,jMH
   logical :: notfound !set true if NetCDF BIC are not found
   real, parameter :: macehead_lat = 53.3 !latitude of Macehead station
   real, parameter :: macehead_lon = -9.9 !longitude of Macehead station
-  logical,parameter :: MACEHEADFIX=.true.
 
 
 !----------------------------------------------------------
@@ -267,28 +310,36 @@ subroutine GetGlobalData(year,month,ibc,used,        &
   SIAtrend%nox =f0*SIAtrends(i0)%nox + f1*SIAtrends(i1)%nox
   SIAtrend%nh4 =f0*SIAtrends(i0)%nh4 + f1*SIAtrends(i1)%nh4
 
-  if (MasterProc.and.first_call) then
-     write(unit=txtmsg,fmt="(a,2i5,3f8.3)") &
-       "BC:trends SOx,NOx,NH3 ", iyr_trend, SIAtrend
-     call PrintLog(txtmsg)
-  end if
+!  if (MasterProc.and.first_call) then
+!     write(unit=txtmsg,fmt="(a,2i5,3f8.3)") &
+!       "BC:trends SOx,NOx,NH3 ", iyr_trend, SIAtrend
+!     call PrintLog(txtmsg)
+!  end if
 
 !================================================================== 
 ! Trends - derived from EMEP report 3/97
 ! adjustment for years outside the range 1990-2000.
 
-  if ( iyr_trend >=  1990 ) then
+!June 2013 svn 2619:
+! Assume O3 increases to 2000, consistent with obs.
+! Keep the 1990 base-year for CO and VOC.
+  select case(iyr_trend)
+  case(2000:)
     trend_o3 = 1.0
     trend_co = 1.0
     trend_voc= 1.0
-  else
-    trend_o3 = exp(-0.01*1.0 *(1990-iyr_trend))
+  case(1990:1999)
+    trend_o3 = exp(-0.01*1.0 *(2000-iyr_trend))
+    trend_co = 1.0
+    trend_voc= 1.0
+  case default
+    trend_o3 = exp(-0.01*1.0 *(2000-iyr_trend))
     trend_co = exp(-0.01*0.85*(1990-iyr_trend)) ! Zander:CO
     trend_voc= exp(-0.01*0.85*(1990-iyr_trend)) ! Zander,1975-1990
-  end if
+  endselect
   if (MasterProc.and.first_call) then
-    write(unit=txtmsg,fmt="(a,i5,3f8.3)") "BC:trends O3,CO,VOC: ", &
-       iyr_trend, trend_o3, trend_co, trend_voc
+    write(unit=txtmsg,fmt="(a,i5,3f8.3,3f9.4)") "BC:trends O3,CO,VOC,SOx,NOx,NH3: ", &
+       iyr_trend, trend_o3, trend_co, trend_voc, SIAtrend%so2, SIAtrend%nox, SIAtrend%nh4
     call PrintLog(txtmsg)
   endif
 
@@ -297,106 +348,16 @@ subroutine GetGlobalData(year,month,ibc,used,        &
   io_num = IO_GLOBBC          ! for closure in BoundCOnditions_ml
 
 !==================================================================
-!=========== BCs Generated from Mace Head Data =======================
-!
-! Mace Head ozone concentrations for backgroudn sectors
-! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
+!=========== BCs Generated from Mace Head Data ====================
 !
 ! Here we use the meteorology year to get a reaslistic O3.
 !      Later we use iyr_trend to adjust for other years, say for 2050.
-
-! For 2010, 2020 "trend" runs  - use 13 yr average as base-O3
+! For 2020 "trend" runs  - use 13 yr average as base-O3 (macehead_default)
 ! then later scale by trend_o3:
-
-  if ( iyr_trend /= year ) then ! use defaults from 1998-2010 average
-    macehead_O3 = (/ 39.8, 41.9, 45.4, 46.5, 43.2, 36.2, &
-                     30.5, 30.1, 34.1, 37.0, 39.0, 38.5 /)
+  if((iyr_trend==year).and.(year>=1990).and.(year<=2011))then
+    macehead_O3=macehead_year(:,year)
   else
-    select case (year)
-    case(1990)
-    macehead_O3 = (/ 35.3, 36.3, 38.4, 43.0, 41.2, 33.4, &
-                     35.1, 27.8, 33.7, 36.2, 28.4, 37.7 /)
-    case(1991)
-    macehead_O3 = (/ 36.1, 38.7, 37.7, 45.8, 38.8, 36.3, &
-                     29.6, 33.1, 33.4, 35.7, 37.3, 36.7/)
-    case(1992)
-    macehead_O3 = (/ 36.1, 37.3, 41.8, 39.6, 41.2, 31.5, &
-                     28.3, 30.3, 31.3, 34.2, 36.1, 34.9/)
-    case(1993)
-    macehead_O3 = (/ 37.6, 40.4, 44.4, 42.6, 43.4, 29.2, &
-                     28.5, 29.6, 32.2, 37.3, 37.3, 38.3/)
-    case(1994)
-    macehead_O3 = (/ 38.6, 37.3, 45.7, 43.8, 42.9, 35.1, &
-                     30.8, 30.5, 33.8, 36.5, 34.0, 37.3/)
-    case(1995)
-    macehead_O3 = (/ 37.5, 37.1, 41.6, 42.4, 41.1, 33.1, &
-                     29.1, 28.7, 33.7, 34.8, 35.0, 36.0/)
-    case(1996)
-    macehead_O3 = (/ 37.0, 40.1, 42.9, 44.6, 41.3, 38.3, &
-                     29.3, 29.4, 35.6, 38.4, 37.8, 38.4/)
-    case(1997)
-    macehead_O3 = (/ 36.2, 41.9, 41.8, 40.4, 40.6, 34.4, &
-                     26.2, 29.3, 31.3, 35.2, 25.7, 39.5/)
-    case(1998)
-    macehead_O3 = (/ 38.6, 42.0, 44.6, 45.1, 44.2, 33.0, &
-                     29.7, 32.9, 35.7, 38.8, 39.7, 40.4/)
-    case(1999)
-    macehead_O3 = (/ 39.9, 44.5, 49.4, 45.0, 42.8, 34.3, &
-                     29.0, 30.0, 31.8, 36.9, 39.6, 39.2/)
-    case(2000)
-    macehead_O3 = (/ 39.5, 42.1, 41.8, 43.8, 43.4, 34.5, &
-                     28.0, 27.3, 33.6, 37.4, 35.6, 35.8/)
-    case(2001)
-    macehead_O3 = (/ 37.3, 38.0, 42.2, 44.8, 42.6, 34.9, &
-                     28.9, 29.4, 29.9, 35.3, 37.3, 37.5/)
-!---------------------------------------------------------------------------
-! Preliminary BCs generated using Mace Head CFC and other greenhouse gases
-! data to define clean air masses. Data cover all of 2002 and 9 months
-! of 2003. What to do for Oct-Dec 2003?
-! Could use (1) 2002 data or (2) 10-year average?
-! Simmonds paper would support (1), simplicity (2).
-! After seeing earlier 2003 plots, chose (2).
-    case(2002)
-    macehead_O3 = (/ 42.4, 44.4, 45.5, 45.0, 45.9, 39.8, &
-                     32.5, 28.7, 37.7, 39.3, 40.5, 42.3 /)
-    case(2003)
-    macehead_O3 = (/ 39.8, 40.1, 44.7, 45.4, 45.7, 41.7, &
-                     33.3, 31.0, 35.7, 37.9, 40.9, 38.1 /)
-    case(2004)
-    macehead_O3 = (/ 40.8, 42.0, 48.3, 46.6, 39.9, 31.9, &
-                     32.4, 32.1, 33.9, 36.7, 40.2, 39.8/)
-    case(2005)
-    macehead_O3 = (/ 40.9, 41.4, 44.1, 45.6, 42.7, 32.9, &
-                     26.7, 30.0, 33.2, 37.7, 39.5, 38.0/)
-! 2006 and 2007 are calculated with using IE31 O3 data and
-! trajectory sectors (based on PARLAM-PS and HIRLAM20 met)
-! for 2006 and 2007, respectively
-    case(2006)
-    macehead_O3 = (/ 39.8, 42.4, 44.2, 48.3, 41.3, 39.0, &
-                     31.9, 29.5, 34.8, 37.4, 41.9, 39.9 /)
-    case(2007)
-    macehead_O3 = (/ 40.7, 38.2, 46.1, 46.4, 40.9, 34.5, &
-                     31.2, 28.8, 33.3, 36.1, 40.6, 41.7 /)
-! 2008 Mace Head correction calculated using IE31 O3 data and
-! trajectory sectors (based on HIRLAM20 met) for 2008
-    case(2008)
-    macehead_O3 = (/ 41.0, 45.1, 48.0, 46.3, 44.2, 37.1, &
-                     30.8, 31.3, 34.3, 37.5, 37.9, 40.0 /)
-! 2009 Mace Head correction calculated using IE31 O3 data and
-! trajectory sectors (based on ECMWF met) for 2009
-    case(2009)
-    macehead_O3 = (/ 37.7, 43.3, 46.5, 46.2, 41.6, 39.1, &
-                     31.0, 29.0, 34.5, 34.4, 40.5, 38.4 /)
-! 2010 Mace Head correction calculated using IE31 O3 data and
-! trajectory sectors (based on ECMWF met) for 2010
-    case(2010)
-    macehead_O3 = (/ 36.8, 38.9, 43.9, 46.4, 41.7, 35.5, &
-                     31.0, 31.3, 35.6, 36.7, 33.4, 33.8 /)
-
-    case default ! from 1998-2010 average
-    macehead_O3 = (/ 39.8, 41.9, 45.4, 46.5, 43.2, 36.2, &
-                     30.5, 30.1, 34.1, 37.0, 39.0, 38.5 /)
-    endselect
+    macehead_O3=macehead_default
   endif
 !=========== Generated from Mace Head Data =======================
 
@@ -428,8 +389,10 @@ subroutine GetGlobalData(year,month,ibc,used,        &
     SpecBC(IBC_NO2  )  = sineconc( 0.1  , 15.0, 0.03, 4.0  , 0.05, 0.04,PPB)
     SpecBC(IBC_PAN  )  = sineconc( 0.20 ,120.0, 0.15, 999.9, 0.20, 0.1 ,PPB)!Kz change vmin
     SpecBC(IBC_CO   )  = sineconc( 125.0, 75.0, 35.0, 25.0 , 70.0, 30.0,PPB)!JEJ-W
-    SpecBC(IBC_SEASALT_F)=sineconc( 0.5  , 15.0,  0.3,  1.6 , 0.01, 0.01,PPB)
-    SpecBC(IBC_SEASALT_C)=sineconc( 3.0  , 15.0,  1.0,  1.6 , 0.01, 0.01,PPB)
+!st 14.05.2014    SpecBC(IBC_SEASALT_F)=sineconc( 0.5  , 15.0,  0.3,  1.6 , 0.01, 0.01,PPB)
+!st 14.05.2014    SpecBC(IBC_SEASALT_C)=sineconc( 3.0  , 15.0,  1.0,  1.6 , 0.01, 0.01,PPB)
+    SpecBC(IBC_SEASALT_F)=sineconc( 0.2  , 15.0,  0.05,  1.6 , 0.01, 0.01,PPB)
+    SpecBC(IBC_SEASALT_C)=sineconc( 1.5  , 15.0,  0.25,  1.6 , 0.01, 0.01,PPB)
     SpecBC(IBC_SEASALT_G)=sineconc( 1.0  , 15.0,  0.5,  1.0 , 0.01, 0.01,PPB)
     SpecBC(IBC_C2H6 )  = sineconc( 2.0  , 75.0, 1.0 , 10.0 , 0.05, 0.05,PPB)
     SpecBC(IBC_C4H10)  = sineconc( 2.0  , 45.0, 1.0 , 6.0  , 0.05, 0.05,PPB)
@@ -466,9 +429,9 @@ subroutine GetGlobalData(year,month,ibc,used,        &
     ! The seasonal var of HNO3 is now assumed to be opposite of aNO3.
 
     ! Consistency check:
-    if (DEBUG_GLOBBC) print *, "SPECBC NGLB ",NGLOB_BC
+    if (DEBUG%GLOBBC) print *, "SPECBC NGLB ",NGLOB_BC
     do i = 1, NGLOB_BC
-      if (DEBUG_GLOBBC) print *,"SPECBC i, hmin ",i,SpecBC(i)%surf,SpecBC(i)%hmin
+      if (DEBUG%GLOBBC) print *,"SPECBC i, hmin ",i,SpecBC(i)%surf,SpecBC(i)%hmin
       if( SpecBC(i)%hmin*SpecBC(i)%conv_fac < 1.0e-17) then
         write(unit=txtmsg,fmt="(A,I0)") "PECBC: Error: No SpecBC set for species ", i
         call CheckStop(txtmsg)
@@ -519,20 +482,20 @@ subroutine GetGlobalData(year,month,ibc,used,        &
       read(IO_GLOBBC,*) bc_rawdata
       close(IO_GLOBBC)
     endif
-    if(DEBUG_GLOBBC)print *,"dsOH READ OZONE3 ",trim(fname),": ",&
-      bc_rawdata(IIFULLDOM/2,JJFULLDOM/2,20)
+    if(DEBUG%GLOBBC)print *,"dsOH READ OZONE3 ",trim(fname),": ",&
+      bc_rawdata(IIFULLDOM/2,JJFULLDOM/2,KMAX_MID)
 
     ! Mace Head adjustment: get mean ozone from Eastern sector
     O3fix=0.0
     icount=0
-    if(MACEHEADFIX)then
+    if(USES%MACEHEADFIX)then
       do j=1,JJFULLDOM
         do i=1,IIFULLDOM
           if(glat_fdom(i,j)<macehead_lat+20.0.and.&
               glat_fdom(i,j)>macehead_lat-25.0.and.&
               glon_fdom(i,j)<macehead_lon     .and.&
               glon_fdom(i,j)>macehead_lon-40.0)then
-              O3fix=O3fix+bc_rawdata(i,j,20)
+              O3fix=O3fix+bc_rawdata(i,j,KMAX_MID)
               icount=icount+1
           endif
         enddo
@@ -542,9 +505,10 @@ subroutine GetGlobalData(year,month,ibc,used,        &
       ! grid coordinates of Mace Head
       call lb2ij(macehead_lon,macehead_lat, iMH,jMH)
 
-      if(DEBUG_GLOBBC) write(*,"(a10,2f7.2,i4,i6,3f8.3)")"O3FIXes ",iMH,jMH, &
-        month,icount,bc_rawdata(nint(iMH),nint(jMH),20)/PPB,&
-        macehead_O3(month),O3fix/PPB
+      if(DEBUG%GLOBBC) write(*,"(a,i4.2,2f7.2,i6,f8.3,a,4f8.3,2L3)")"O3FIXes ",&
+        month,iMH,jMH, icount,bc_rawdata(nint(iMH),nint(jMH),20)/PPB,&
+        " MH: ", macehead_default(month), macehead_O3(month),O3fix/PPB,&
+        trend_O3, USES%MACEHEADFIX, USES%MACEHEAD_AVG
       write(*,"(a,f8.3)")' MaceHead correction for O3: ',-O3fix/PPB
 
     endif
@@ -656,7 +620,7 @@ subroutine GetGlobalData(year,month,ibc,used,        &
     end select
 !================== end select ==================================
 
-  if (DEBUG_GLOBBC) print *,"BCOH FACTOR ", ibc, fname
+  if (DEBUG%GLOBBC) print *,"BCOH FACTOR ", ibc, fname
   call CheckStop(txtmsg)
   if (DEBUG_Logan) then
     print "(a15,3i4,f8.3)","DEBUG:LOGAN: ",ibc, used, month, cosfac
