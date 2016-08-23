@@ -238,14 +238,9 @@ contains
 !..5) Calculate f_swp
 !---------------------------------------
 
-  !/  Use SWP_Mpa to get f_swp. We just need this updated
-  !   once per day, but for simplicity we do it every time-step.
-
-  !ds     f_swp = do3se(iLC)%f_min + &
-  !ds            (1-do3se(iLC)%f_min)*(do3se(iLC)%PWP-L%SWP)/ &
-  !ds                                (do3se(iLC)%PWP-do3se(iLC)%SWP_max)
-  !ds     f_swp = min(1.0,f_swp)
-  ! Aug 2010: use HIRLAM's SW, and simple "DAM" function
+  !/  Soil water effects. We now used the soil-moisture
+  !   index from ECMWF if possible, otherwise some equivalent.
+  !   Once per day, but for simplicity we do it every time-step.
 
   ! ************************************
    if ( USE_SOILWATER ) f_swp =  L%fSW

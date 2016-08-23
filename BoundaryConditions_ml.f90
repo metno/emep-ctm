@@ -78,7 +78,6 @@ use ChemChemicals_ml         ! provide species names
 use Chemfields_ml,     only: xn_adv, xn_bgn, NSPEC_BGN  ! emep model concs.
 use ChemSpecs_adv_ml         ! provide NSPEC_ADV and IXADV_*
 use ChemSpecs_shl_ml         ! provide NSPEC_SHL
-use ChemGroups_ml,     only: SS_GROUP !  Sea-salt special
 use GlobalBCs_ml,      only:  &
    NGLOB_BC                   &  ! Number of species from global-model
   ,GetGlobalData              &  ! Sub., reads global data+vert interp.
@@ -184,192 +183,528 @@ INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
 contains
 
-subroutine BoundaryConditions(year,iyr_trend,month)
-! ---------------------------------------------------------------------------
-! Read in monthly-average global mixing ratios, and if found, collect the
-! data in  bc_adv, bc_bgn arrays for later interpolations
-! NOTES
-! 1.- If mixing ratio by mass the scale by molcular weight)
-! 2.- So far no scaling is done, but this could be done
-!     in Set_bcmap with atomic weights
-! 3.- On the first call, we also run the setup-subroutines
-! 4.- Year is now obtained from the iyr_trend set in run.pl.
-!     This allows, e.g. runs with BCs for 2100 and met of 1990.
-! ---------------------------------------------------------------------------
-  integer, intent(in) :: year         ! "meteorology" year
-  integer, intent(in) :: iyr_trend    ! "trend" year
-  integer, intent(in) :: month
-  integer :: ibc, iem, k, iem1, i, j  ! loop variables
-  integer :: info                     ! used in rsend
-  integer :: io_num                 !  i/o number used for reading global data
-  integer :: alloc_err
+  subroutine BoundaryConditions(year,iyr_trend,month)
+    ! ---------------------------------------------------------------------------
+    ! Read in monthly-average global mixing ratios, and if found, collect the
+    ! data in  bc_adv, bc_bgn arrays for later interpolations
+    ! NOTES
+    ! 1.- If mixing ratio by mass the scale by molcular weight)
+    ! 2.- So far no scaling is done, but this could be done
+    !     in Set_bcmap with atomic weights
+    ! 3.- On the first call, we also run the setup-subroutines
+    ! 4.- Year is now obtained from the iyr_trend set in run.pl.
+    !     This allows, e.g. runs with BCs for 2100 and met of 1990.
+    ! ---------------------------------------------------------------------------
+    integer, intent(in) :: year         ! "meteorology" year
+    integer, intent(in) :: iyr_trend    ! "trend" year
+    integer, intent(in) :: month
+    integer :: ibc, iem, k, iem1, i, j ,n, nadv,ntot ! loop variables
+    integer :: info                     ! used in rsend
+    integer :: io_num                 !  i/o number used for reading global data
+    integer :: alloc_err
+    real    :: bc_fac      ! Set to 1.0, except sea-salt over land = 0.01
+    logical :: bc_seaspec  ! if sea-salt species
 
-  !/ data arrays for boundary data (BCs) - quite large, so NOT saved
-  real, allocatable,dimension(:,:,:)   :: bc_data   ! for one bc species
-  real, allocatable,dimension(:,:,:,:) :: bc_adv,bc_bgn
-! Dimensions correspond to:
-!   bc_data(IGLOB,JGLOB,KMAX_MID)
-!   bc_adv(NSPEC_ADV,IGLOB,JGLOB,KMAX_MID)
-!   bc_bgn(NSPEC_BGN,IGLOB,JGLOB,KMAX_MID)
+    !/ data arrays for boundary data (BCs) - quite large, so NOT saved
+    real, allocatable,dimension(:,:,:)   :: bc_data   ! for one bc species
+!    real, allocatable,dimension(:,:,:,:) :: bc_adv,bc_bgn
+    ! Dimensions correspond to:
+    !   bc_data(IGLOB,JGLOB,KMAX_MID)
+    !   bc_adv(NSPEC_ADV,IGLOB,JGLOB,KMAX_MID)
+    !   bc_bgn(NSPEC_BGN,IGLOB,JGLOB,KMAX_MID)
 
-  integer  :: iglobact, jglobact, errcode
-  integer, save :: idebug=0, itest=1, i_test=0, j_test=0
+    integer  :: iglobact, jglobact, errcode
+    integer, save :: idebug=0, itest=1, i_test=0, j_test=0
 
-  if (first_call) then
-    if (DEBUG_BCS) print "((A,I0,1X))",               &
-      "FIRST CALL TO BOUNDARY CONDITIONS, me: ", me,  &
-      "TREND YR ", iyr_trend
+    if (first_call) then
+       if (DEBUG_BCS) write(*,"(a,I3,1X,a,i5)") &
+            "FIRST CALL TO BOUNDARY CONDITIONS, me: ", me,  "TREND YR ", iyr_trend
 
-    call My_bcmap(iyr_trend)      ! assigns bc2xn_adv and bc2xn_bgn mappings
-    call Set_bcmap()              ! assigns xn2adv_changed, etc.
+       call My_bcmap(iyr_trend)      ! assigns bc2xn_adv and bc2xn_bgn mappings
+       call Set_bcmap()              ! assigns xn2adv_changed, etc.
 
-    num_changed = num_adv_changed + num_bgn_changed   !u1
-    if (DEBUG_BCS) print "((A,I0,1X))",           &
-      "BCs: num_adv_changed: ", num_adv_changed,  &
-      "BCs: num_bgn_changed: ", num_bgn_changed,  &
-      "BCs: num     changed: ", num_changed
+       num_changed = num_adv_changed + num_bgn_changed   !u1
+       if (DEBUG_BCS) write(*, "((A,I0,1X))")           &
+            "BCs: num_adv_changed: ", num_adv_changed,  &
+            "BCs: num_bgn_changed: ", num_bgn_changed,  &
+            "BCs: num     changed: ", num_changed
 
-  endif ! first call
-  if (DEBUG_BCS) print "((A,I0,1X))",             &
-    "CALL TO BOUNDARY CONDITIONS, me:", me, &
-    "month ", month, "TREND2 YR ", iyr_trend, me
+    endif ! first call
+    if (DEBUG_BCS) write(*, "((A,I0,1X))")           &
+         "CALL TO BOUNDARY CONDITIONS, me:", me, &
+         "month ", month, "TREND2 YR ", iyr_trend, "me ", me
 
-  if (num_changed==0) then
-    print *,"BCs: No species requested"
-    return
-  endif
-
-!MUST CONTAIN DECIDED DIMENSION FOR READ-IN DATA
-! iglobac and jglobac are now the actual domains (the chosen domain)
-! given in the same coord as the data we read
-  call setgl_actarray(iglobact,jglobact)
-
-  allocate(bc_data(iglobact,jglobact,KMAX_MID),stat=alloc_err)
-  call CheckStop(alloc_err, "alloc1 failed in BoundaryConditions_ml")
-
-  allocate(bc_adv(num_adv_changed,iglobact,jglobact,KMAX_MID),stat=alloc_err)
-  call CheckStop(alloc_err, "alloc2 failed in BoundaryConditions_ml")
-  bc_adv(:,:,:,:) = 0.0
-
-  allocate(bc_bgn(num_bgn_changed,iglobact,jglobact,KMAX_MID),stat=alloc_err)
-  call CheckStop(alloc_err, "alloc3 failed in BoundaryConditions_ml")
-  bc_bgn(:,:,:,:) = 0.0
-
-  errcode = 0
-  if (DEBUG_BCS.and.debug_proc) then
-    do i = 1, limax
-      do j = 1, ljmax
-        if (i_fdom(i)==DEBUG_i.and.j_fdom(j)==DEBUG_j) then
-          i_test = i
-          j_test = j
-        endif
-      enddo
-    enddo
-  endif
-
- !== BEGIN READ_IN OF GLOBAL DATA
-  do ibc = 1, NGLOB_BC
-    if (MasterProc) call GetGlobalData(year,iyr_trend,month,ibc,bc_used(ibc), &
-                        iglobact,jglobact,bc_data,io_num,errcode)
-
-    if (DEBUG_BCS.and.MasterProc) &
-      print *,'Calls GetGlobalData: year,iyr_trend,ibc,month,bc_used=', &
-        year,iyr_trend,ibc,month,bc_used(ibc)
-
-    call CheckStop(ibc==1.and.errcode/= 0,&
-                   "ERRORBCs: GetGlobalData, failed in BoundaryConditions_ml")
-
-    !-- If the read-in bcs are required, we broadcast and use:
-    if ( bc_used(ibc) > 0 ) then
-      CALL MPI_BCAST(bc_data,8*iglobact*jglobact*KMAX_MID,MPI_BYTE,0,&
-                     MPI_COMM_WORLD,INFO)
-
-      ! - set bc_adv: advected species
-      do i = 1, bc_used_adv(ibc)
-        iem = spc_used_adv(ibc,i)
-        iem1 = spc_adv2changed(iem)
-        bc_adv (iem1,:,:,:) = bc_adv(iem1,:,:,:) &
-                            + bc_data(:,:,:)*bc2xn_adv(ibc,iem)
-      enddo
-
-      ! - set bc_bgn: background (prescribed) species
-      do i = 1, bc_used_bgn(ibc)
-        iem = spc_used_bgn(ibc,i)
-        iem1 = spc_bgn2changed(iem)
-        bc_bgn(iem1,:,:,:) = bc_bgn(iem1,:,:,:) &
-                           +  bc_data(:,:,:)*bc2xn_bgn(ibc,iem)
-      enddo
-    endif    ! bc_used
-   enddo  ! ibc
-
-   if (MasterProc) close(io_num)
-
-   if (first_call) then
-    idebug = 1
-    if (DEBUG_BCS) print *, "RESET 3D BOUNDARY CONDITIONS", me
-
-    ! Set 3-D arrays of new BCs
-    call MiscBoundaryConditions(iglobact,jglobact,bc_adv,bc_bgn)
-    call Set_BoundaryConditions("3d",iglobact,jglobact,bc_adv,bc_bgn)
-  else
-    idebug = idebug + 1
-
-    ! Set lateral (edge and top) arrays of new BCs
-    call MiscBoundaryConditions(iglobact,jglobact,bc_adv,bc_bgn)
-    call Set_BoundaryConditions("lateral",iglobact,jglobact,bc_adv,bc_bgn)
-  endif
-
-
-  if (DEBUG_BCS.and.debug_proc.and.i_test>0) then
-    i = i_test
-    j = j_test
-    print "(a20,3i4,2f8.2)","DEBUG BCS Rorvik", me, i,j,glon(i,j),glat(i,j)
-    print "(a20,3i4)","DEBUG BCS Rorvik DIMS",num_adv_changed,iglobact,jglobact
-    do k = 1, KMAX_MID
-      print "(a20,i4,f8.2)","DEBUG O3  Debug-site ", k, &
-        xn_adv(IXADV_O3,i_test,j_test,k)/PPB
-    enddo
-  endif ! DEBUG
-
-  if (DEBUG_BCS.and.debug_proc) then
-    itest = 1
-    print *,"BoundaryConditions: No CALLS TO BOUND Cs", first_call,idebug
-    !/** the following uses hard-coded  IXADV_ values for testing.
-    !    Remove later **/
-    info = 1   ! index for ozone in bcs
-    print *,"BCs: bc2xn(info,itest) : ", bc2xn_adv(info,itest)
-    do k = KMAX_MID, 1, -1
-      print "(a,2i3,f12.4)","BCs: After Set_3d BOUND: me, itest: " , &
-        me, itest, bc_adv(spc_adv2changed(itest),i_test,i_test,k)/PPB
-    end do
-
-    info = 43   ! index for NO in bcs
-    print *,"BCs: NSPECS: BC, ADV, BG, ", NTOT_BC, NSPEC_ADV, NSPEC_BGN
-    print *,"BCs: Number  of bc_used: ", sum(bc_used)
-    print *,"BCs: limax, ljmax",  limax, ljmax
-
-    if (NSPEC_BGN>0) then
-      do k = KMAX_MID, 1, -1
-        print "(a23,i3,e14.4)","BCs NO :",k,xn_bgn(itest,i_test,j_test,k)/PPB
-      enddo
-    else
-      print "(a)","No SET BACKGROUND BCs"
+    if (num_changed==0) then
+       write(*,*) "BCs: No species requested"
+       return
     endif
-  endif !  DEBUG
 
-  deallocate(bc_data,stat=alloc_err)
-  call CheckStop(alloc_err,"de-alloc1 failed in BoundaryConditions_ml")
-  if (num_adv_changed>0) then
-    deallocate(bc_adv,stat=alloc_err)
-    call CheckStop(alloc_err,"de-alloc2 failed in BoundaryConditions_ml")
-  endif
-  if (num_bgn_changed>0) then
-    deallocate(bc_bgn,stat=alloc_err)
-    call CheckStop(alloc_err,"de-alloc3 failed in BoundaryConditions_ml")
-  endif
+    !MUST CONTAIN DECIDED DIMENSION FOR READ-IN DATA
+    ! iglobac and jglobac are now the actual domains (the chosen domain)
+    ! given in the same coord as the data we read
+    call setgl_actarray(iglobact,jglobact)
 
-  if (first_call) first_call = .false.
-end subroutine BoundaryConditions
+    allocate(bc_data(iglobact,jglobact,KMAX_MID),stat=alloc_err)
+    call CheckStop(alloc_err, "alloc1 failed in BoundaryConditions_ml")
+
+!    allocate(bc_adv(num_adv_changed,iglobact,jglobact,KMAX_MID),stat=alloc_err)
+!    call CheckStop(alloc_err, "alloc2 failed in BoundaryConditions_ml")
+!    bc_adv(:,:,:,:) = 0.0
+
+!    allocate(bc_bgn(num_bgn_changed,iglobact,jglobact,KMAX_MID),stat=alloc_err)
+!    call CheckStop(alloc_err, "alloc3 failed in BoundaryConditions_ml")
+!    bc_bgn(:,:,:,:) = 0.0
+
+    errcode = 0
+    if (DEBUG_BCS.and.debug_proc) then
+       do i = 1, limax
+          do j = 1, ljmax
+             if (i_fdom(i)==DEBUG_i.and.j_fdom(j)==DEBUG_j) then
+                i_test = i
+                j_test = j
+             endif
+          enddo
+       enddo
+    endif
+
+    if (first_call) then
+       idebug = 1
+       if (DEBUG_BCS) write(*,*) "RESET 3D BOUNDARY CONDITIONS", me
+       do k = 1, KMAX_MID
+          do j = 1, ljmax
+             do i = 1, limax
+                xn_adv(:,i,j,k)=0.0
+                xn_bgn(:,i,j,k)=0.0
+             enddo
+          enddo
+       enddo
+    else       
+       if (DEBUG_BCS.and.MasterProc) write(*,*) "RESET LATERAL BOUNDARIES"
+       do k = 2, KMAX_MID
+          do j = lj0, lj1
+             !left
+             do i = 1, li0-1
+                xn_adv(:,i,j,k)=0.0
+                xn_bgn(:,i,j,k)=0.0
+             enddo
+             !right
+             do i = li1+1, limax
+                xn_adv(:,i,j,k)=0.0
+                xn_bgn(:,i,j,k)=0.0
+             enddo
+          enddo
+          !lower
+          do j = 1, lj0-1
+             do i = 1, limax
+                xn_adv(:,i,j,k)=0.0
+                xn_bgn(:,i,j,k)=0.0
+             enddo
+          enddo
+          !upper
+          do j = lj1+1, ljmax
+             do i = 1, limax
+                xn_adv(:,i,j,k)=0.0
+                xn_bgn(:,i,j,k)=0.0
+             enddo
+          enddo
+       enddo
+       !top
+       do k = 1, 1
+          do j = 1, ljmax
+             do i = 1, limax
+                xn_adv(:,i,j,k)=0.0
+                xn_bgn(:,i,j,k)=0.0
+             enddo
+          enddo
+       enddo
+    endif
+    !== BEGIN READ_IN OF GLOBAL DATA
+
+    do ibc = 1, NGLOB_BC
+       if (MasterProc) call GetGlobalData(year,iyr_trend,month,ibc,bc_used(ibc), &
+            iglobact,jglobact,bc_data,io_num,errcode)
+
+       if (DEBUG_BCS.and.MasterProc) &
+            write(*, *)'Calls GetGlobalData: year,iyr_trend,ibc,month,bc_used=', &
+            year,iyr_trend,ibc,month,bc_used(ibc)
+
+       call CheckStop(ibc==1.and.errcode/= 0,&
+            "ERRORBCs: GetGlobalData, failed in BoundaryConditions_ml")
+
+       !-- If the read-in bcs are required, we broadcast and use:
+       if ( bc_used(ibc) > 0 ) then
+          CALL MPI_BCAST(bc_data,8*iglobact*jglobact*KMAX_MID,MPI_BYTE,0,&
+               MPI_COMM_WORLD,INFO)
+
+          ! - set bc_adv: advected species
+!          do i = 1, bc_used_adv(ibc)
+!             iem = spc_used_adv(ibc,i)
+!             iem1 = spc_adv2changed(iem)
+!             bc_adv (iem1,:,:,:) = bc_adv(iem1,:,:,:) &
+!                  + bc_data(:,:,:)*bc2xn_adv(ibc,iem)
+!          enddo
+
+          ! - set bc_bgn: background (prescribed) species
+!          do i = 1, bc_used_bgn(ibc)
+!             iem = spc_used_bgn(ibc,i)
+!             iem1 = spc_bgn2changed(iem)
+             !             bc_bgn(iem1,:,:,:) = bc_bgn(iem1,:,:,:) &
+             !                  +  bc_data(:,:,:)*bc2xn_bgn(ibc,iem)
+!          enddo
+       endif    ! bc_used
+
+       !   if (MasterProc) close(io_num)
+
+       if (first_call) then
+
+          ! Set 3-D arrays of new BCs
+          do n = 1, bc_used_adv(ibc)
+             iem = spc_used_adv(ibc,n)
+             ntot = iem + NSPEC_SHL 
+
+            ! Sea-salt. 
+            !  If SeaSalt isn't called from mk.GenChem, we don't have the
+            !  SS_GROUP, so we search for the simple SEASALT name.
+             bc_seaspec = .false.
+             if ( USE_SEASALT .and. &
+                  ( index( species(ntot)%name, "SEASALT_" ) > 0 ) ) then
+                bc_seaspec = .true.
+             end if
+
+             if ( debug_proc ) write (*,*) "SEAINDEX", &
+                  trim(species(ntot)%name), n, ntot, bc_seaspec,&
+                       index( species(ntot)%name, "SEASALT_")
+
+             do k = 1, KMAX_MID
+                do j = 1, ljmax
+                   do i = 1, limax
+                      bc_fac     = 1.0
+
+                      if ( bc_seaspec ) then
+                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+                      end if
+
+                      xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
+                           bc_fac * &  ! used for sea-salt species 
+                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
+                   end do ! i
+                end do ! j
+             end do ! k
+          end do !n
+
+          do n = 1,bc_used_bgn(ibc)
+             iem = spc_used_bgn(ibc,n)
+
+             !/- Non-advected background species
+             do k = 1, KMAX_MID
+                do j = 1, ljmax
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
+                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
+                      !                      !        bc_bgn(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
+                   end do ! i
+                end do ! j
+             end do ! k
+          enddo
+       else
+
+          ! Set LATERAL (edge and top) arrays of new BCs
+
+          !       call MiscBoundaryConditions(iglobact,jglobact,bc_adv,bc_bgn)
+          !       call Set_BoundaryConditions("lateral",iglobact,jglobact,bc_adv,bc_bgn)
+          idebug = idebug + 1
+          do n = 1, bc_used_adv(ibc)
+             iem = spc_used_adv(ibc,n)
+             ntot = iem + NSPEC_SHL 
+             bc_seaspec = .false.
+             if ( USE_SEASALT .and. ( index( species(ntot)%name, "SEASALT_" ) > 0 ) ) then
+                bc_seaspec = .true.
+             end if
+
+             do k = 2, KMAX_MID
+                do j = lj0, lj1
+                   !left
+                   do i = 1, li0-1
+                      bc_fac     = 1.0
+
+                      if ( bc_seaspec ) then
+                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+                      end if
+
+                      xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
+                           bc_fac * &  ! used for sea-salt species 
+                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
+
+                   enddo
+                   !right
+                   do i = li1+1, limax
+                      bc_fac     = 1.0
+
+                      if ( bc_seaspec ) then
+                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+                      end if
+
+                      xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
+                           bc_fac * &  ! used for sea-salt species 
+                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
+
+                   enddo
+                enddo
+                !lower
+                do j = 1, lj0-1
+                   do i = 1, limax
+                      bc_fac     = 1.0
+
+                      if ( bc_seaspec ) then
+                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+                      end if
+
+                      xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
+                           bc_fac * &  ! used for sea-salt species 
+                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
+
+                   enddo
+                enddo
+                !upper
+                do j = lj1+1, ljmax
+                   do i = 1, limax
+                      bc_fac     = 1.0
+
+                      if ( bc_seaspec ) then
+                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+                      end if
+
+                      xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
+                           bc_fac * &  ! used for sea-salt species 
+                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
+
+                   enddo
+                enddo
+             enddo
+             !top
+             do k = 1, 1
+                do j = 1, ljmax
+                   do i = 1, limax
+                      bc_fac     = 1.0
+
+                      if ( bc_seaspec ) then
+                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+                      end if
+
+                      xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
+                           bc_fac * &  ! used for sea-salt species 
+                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
+
+                   enddo
+                enddo
+             enddo
+
+          end do !n
+
+          !/- Non-advected background species
+          do n = 1,bc_used_bgn(ibc)
+             iem = spc_used_bgn(ibc,n)
+
+             do k = 2, KMAX_MID
+                do j = lj0, lj1
+                   !left
+                   do i = 1, li0-1
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
+                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
+                   enddo
+                   !right
+                   do i = li1+1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
+                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
+                   enddo
+                enddo
+                !lower
+                do j = 1, lj0-1
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
+                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
+                   enddo
+                enddo
+                !upper
+                do j = lj1+1, ljmax
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
+                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
+                   enddo
+                enddo
+             enddo
+             !top
+             do k = 1, 1
+                do j = 1, ljmax
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
+                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
+                   enddo
+                enddo
+             enddo
+          enddo
+       endif
+    enddo  ! ibc
+    if (first_call) then
+       !3D misc
+       do ibc = NGLOB_BC+1, NTOT_BC
+          do n = 1,bc_used_bgn(ibc)
+             iem = spc_used_bgn(ibc,n)            
+             !/- Non-advected background misc species
+             do k = 1, KMAX_MID
+                do j = 1, ljmax
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
+                   end do ! i
+                end do ! j
+             end do ! k
+          enddo
+          do n = 1,bc_used_adv(ibc)
+             iem = spc_used_adv(ibc,n)
+
+             !/- Advected misc species
+             do k = 1, KMAX_MID
+                do j = 1, ljmax
+                   do i = 1, limax
+                      xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
+                      !                      !        bc_bgn(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
+                   end do ! i
+                end do ! j
+             end do ! k
+          enddo!n
+       enddo!ibc
+    else
+       !LATERAL misc
+       do ibc = NGLOB_BC+1, NTOT_BC
+          do n = 1,bc_used_bgn(ibc)
+             iem = spc_used_bgn(ibc,n)            
+             !/- Non-advected background misc species
+             do k = 2, KMAX_MID
+                do j = lj0, lj1
+                   !left
+                   do i = 1, li0-1
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
+                   enddo
+                   !right
+                   do i = li1+1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
+                   enddo
+                enddo
+                !lower
+                do j = 1, lj0-1
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
+                   enddo
+                enddo
+                !upper
+                do j = lj1+1, ljmax
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
+                   enddo
+                enddo
+             enddo
+             !top
+             do k = 1, 1
+                do j = 1, ljmax
+                   do i = 1, limax
+                      xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
+                   enddo
+                enddo
+             enddo
+          enddo
+          !/- Advected misc species
+          do n = 1,bc_used_adv(ibc)
+             iem = spc_used_adv(ibc,n)
+             do k = 2, KMAX_MID
+                do j = lj0, lj1
+                   !left
+                   do i = 1, li0-1
+                      xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
+                   enddo
+                   !right
+                   do i = li1+1, limax
+                      xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
+                   enddo
+                enddo
+                !lower
+                do j = 1, lj0-1
+                   do i = 1, limax
+                      xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
+                   enddo
+                enddo
+                !upper
+                do j = lj1+1, ljmax
+                   do i = 1, limax
+                      xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
+                   enddo
+                enddo
+             enddo
+             !top
+             do k = 1, 1
+                do j = 1, ljmax
+                   do i = 1, limax
+                      xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
+                   enddo
+                enddo
+             enddo
+          enddo!n
+      enddo!ibc
+    endif
+
+
+    if (DEBUG_BCS.and.debug_proc.and.i_test>0) then
+       i = i_test
+       j = j_test
+       print "(a20,3i4,2f8.2)","DEBUG BCS Rorvik", me, i,j,glon(i,j),glat(i,j)
+       print "(a20,3i4)","DEBUG BCS Rorvik DIMS",num_adv_changed,iglobact,jglobact
+       do k = 1, KMAX_MID
+          print "(a20,i4,f8.2)","DEBUG O3  Debug-site ", k, &
+               xn_adv(IXADV_O3,i_test,j_test,k)/PPB
+       enddo
+    endif ! DEBUG
+
+    if (DEBUG_BCS.and.debug_proc) then
+       itest = 1
+       print *,"BoundaryConditions: No CALLS TO BOUND Cs", first_call,idebug
+       !/** the following uses hard-coded  IXADV_ values for testing.
+       !    Remove later **/
+       info = 1   ! index for ozone in bcs
+       print *,"BCs: bc2xn(info,itest) : ", bc2xn_adv(info,itest)
+
+
+       info = 43   ! index for NO in bcs
+       print *,"BCs: NSPECS: BC, ADV, BG, ", NTOT_BC, NSPEC_ADV, NSPEC_BGN
+       print *,"BCs: Number  of bc_used: ", sum(bc_used)
+       print *,"BCs: limax, ljmax",  limax, ljmax
+
+       if (NSPEC_BGN>0) then
+          do k = KMAX_MID, 1, -1
+             print "(a23,i3,e14.4)","BCs NO :",k,xn_bgn(itest,i_test,j_test,k)/PPB
+          enddo
+       else
+          print "(a)","No SET BACKGROUND BCs"
+       endif
+    endif !  DEBUG
+
+    deallocate(bc_data,stat=alloc_err)
+    call CheckStop(alloc_err,"de-alloc1 failed in BoundaryConditions_ml")
+!    if (num_adv_changed>0) then
+!       deallocate(bc_adv,stat=alloc_err)
+!       call CheckStop(alloc_err,"de-alloc2 failed in BoundaryConditions_ml")
+!    endif
+!    if (num_bgn_changed>0) then
+!       deallocate(bc_bgn,stat=alloc_err)
+!       call CheckStop(alloc_err,"de-alloc3 failed in BoundaryConditions_ml")
+!    endif
+
+    if (first_call) first_call = .false.
+  end subroutine BoundaryConditions
 
 subroutine My_bcmap(iyr_trend)
 ! ---------------------------------------------------------------------------
@@ -398,11 +733,17 @@ subroutine My_bcmap(iyr_trend)
   ! concentrations specified in misc_bc are transferred correctly into the
   ! boundary conditions.
 
-  ! set values of 1625 in 1980, 1780 in 1990, and 1820 in 2000. Interpolate
+  ! set values of 1625 in 1980, 1780 in 1990, 1820 in 2000, and 1970 in
+  ! 2010. Interpolate
   ! between these for other years. Values from EMEP Rep 3/97, Table 6.2 for
   ! 1980, 1990, and from CDIAC (Mace Head) data for 2000.
+  ! 2010 also from Mace Head
 
-  if ( iyr_trend >= 1990 ) then
+  if( iyr_trend >= 2010) then
+    top_misc_bc(IBC_CH4) =  1870.0
+  else if ( iyr_trend >= 2000) then
+    top_misc_bc(IBC_CH4) = 1820 + (iyr_trend-2000)*0.1*(1870-1820) 
+  else if ( iyr_trend >= 1990 ) then
     top_misc_bc(IBC_CH4) = 1780.0 + (iyr_trend-1990)*0.1*(1820-1780.0)
   else
     top_misc_bc(IBC_CH4) = 1780.0 * exp(-0.01*0.91*(1990-iyr_trend)) ! Zander,1975-1990
@@ -507,9 +848,9 @@ subroutine Set_bcmap()
     endif
   enddo ! iem
 
-  if (DEBUG_BCS) print "(A,/10i5)","TEST SET_BCMAP bc_used: ",&
+  if (DEBUG_BCS) write(*,*) "TEST SET_BCMAP bc_used: ",&
     (bc_used(ibc),ibc=1, NTOT_BC)
-  if (MasterProc.and.DEBUG_BCS) print *,"Finished Set_bcmap: Nbcused is ", sum(bc_used)
+  if (MasterProc.and.DEBUG_BCS) write(*,*)"Finished Set_bcmap: Nbcused is ", sum(bc_used)
 
   allocate(spc_changed2adv(num_adv_changed))
   allocate(spc_changed2bgn(num_bgn_changed))
@@ -573,25 +914,32 @@ subroutine MiscBoundaryConditions(iglobact,jglobact,bc_adv,bc_bgn)
   integer :: ibc, iem, i, iem1, k ! local loop variables
   integer :: itest                ! Used to specify species index
 
-  if (NTOT_BC>NGLOB_BC) then
+       do ibc = NGLOB_BC+1, NTOT_BC
+        do i = 1,bc_used_adv(ibc)
+          iem = spc_used_adv(ibc,i)
+          iem1 = spc_adv2changed(iem)
+          if(me==0)write(*,*)'bc_adv misc ',ibc,i,iem1
+          enddo
+          enddo
+ if (NTOT_BC>NGLOB_BC) then
     do k=1,KMAX_MID
       do ibc = NGLOB_BC+1, NTOT_BC
         do i = 1,bc_used_adv(ibc)
           iem = spc_used_adv(ibc,i)
           iem1 = spc_adv2changed(iem)
-          bc_adv(iem1,:,:,k) = misc_bc(ibc,k)
+!          bc_adv(iem1,:,:,k) = misc_bc(ibc,k)
         enddo
         do i = 1,bc_used_bgn(ibc)
           iem = spc_used_bgn(ibc,i)
           iem1 = spc_bgn2changed(iem)
-          bc_bgn(iem1,:,:,k) = misc_bc(ibc,k)
+!          bc_bgn(iem1,:,:,k) = misc_bc(ibc,k)
         enddo
      enddo
     enddo
   endif
 
   itest = 1
-  if (DEBUG_BCS.and.debug_proc) print "(a50,i4,/,(5es12.4))", &
+  if (DEBUG_BCS.and.debug_proc) write(*,*) "(a50,i4,/,(5es12.4))", &
     "From MiscBoundaryConditions: ITEST (ppb): ",&
     itest, ((bc_adv(spc_adv2changed(itest),1,1,k)/1.0e-9),k=1,20)
 end subroutine MiscBoundaryConditions
@@ -651,7 +999,7 @@ subroutine Set_BoundaryConditions(mode,iglobact,jglobact,bc_adv,bc_bgn)
     ntot = nadv + NSPEC_SHL 
 
     bc_seaspec = .false.
-    if ( USE_SEASALT .and. ( find_index( ntot, SS_GROUP(:) ) > 0 ) ) then
+    if ( USE_SEASALT .and. ( index( species(ntot)%name, "SEASALT_" ) > 0 ) ) then
       bc_seaspec = .true.
     end if
     if ( debug_proc ) write (*,*) "SEAINDEX", &
@@ -663,10 +1011,11 @@ subroutine Set_BoundaryConditions(mode,iglobact,jglobact,bc_adv,bc_bgn)
           if ( mask(i,j,k) ) then
 
             bc_fac     = 1.0
-           ! Parentheses needed to get correct precedence (dangerous!): 
-            if ( bc_seaspec .and. ( nwp_sea(i,j) .eqv. .false. ) ) bc_fac = 0.01
+            if ( bc_seaspec ) then
+                  if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                  if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
+            end if
 
-            !xn_adv(spc_changed2adv(n),i,j,k) =   &
             xn_adv(nadv,i,j,k) =   &
                bc_fac * &  ! used for sea-salt species 
                  bc_adv(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
@@ -687,10 +1036,10 @@ subroutine Set_BoundaryConditions(mode,iglobact,jglobact,bc_adv,bc_bgn)
  
 
   !/- Non-advected background species
-  forall(i=1:limax, j=1:ljmax, k=1:KMAX_MID, n=1:num_bgn_changed)
-    xn_bgn(spc_changed2bgn(n),i,j,k) = &
-        bc_bgn(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
-  endforall
+!  forall(i=1:limax, j=1:ljmax, k=1:KMAX_MID, n=1:num_bgn_changed)
+!    xn_bgn(spc_changed2bgn(n),i,j,k) = &
+!        bc_bgn(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
+!  endforall
 end subroutine Set_BoundaryConditions    ! call every 3-hours
 
 end module BoundaryConditions_ml

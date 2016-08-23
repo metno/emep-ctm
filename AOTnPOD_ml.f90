@@ -145,9 +145,13 @@ contains
              return
     end if
 
-   !If night, or outside growing season, we simply exit with aot=0
-    if ( vego3_outputs(iO3cl)%defn == "EU" .and.  (current_date%hour < 9 .or. &
-         current_date%hour > 21 )) then ! 8-20 CET, assuming summertime
+   ! If night, or outside growing season, we simply exit with aot=0
+   ! EU AOT for 8:00 -- 20:00 CET, is really 8:00 -- 19:59 CET 
+   ! Or:        7:00 -- 18:59 UTC
+   ! (nb hour is integer value)
+
+    if ( vego3_outputs(iO3cl)%defn == "EU" .and.  &
+         (current_date%hour  <  7 .or. current_date%hour  > 18 )) then
           return
 
     else if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight

@@ -33,6 +33,7 @@ module PhyChem_ml
 !     Output of hourly data
 !
 !-----------------------------------------------------------------------------
+   use Biogenics_ml,     only : Set_SoilNOx
    use CoDep_ml, only : make_so2nh3_24hr
    use ChemSpecs_adv_ml, only : IXADV_SO2, IXADV_NH3, IXADV_O3
    use My_Outputs_ml , only : NHOURLY_OUT, FREQ_SITE, FREQ_SONDE, FREQ_HOURLY
@@ -44,8 +45,8 @@ module PhyChem_ml
    use DerivedFields_ml,  only : d_2d, f_2d
    use DryDep_ml,      only : init_drydep
    use Emissions_ml,   only : EmisSet
-   use GridValues_ml,  only : debug_proc, debug_li,debug_lj,& !ds jun2005
-                             glon, glat, projection, Pole_included
+   use GridValues_ml,  only : debug_proc, debug_li,debug_lj,&
+                             glon, glat, projection
    use Met_ml,         only : metint
    use MetFields_ml,   only : ps, roa,z_bnd,z_mid, cc3dmax, &
                                zen,coszen,Idirect,Idiffuse
@@ -191,6 +192,7 @@ contains
 
          !===================================
            call Set_SoilWater()
+           call Set_SoilNOx()
 
          !===================================
            call init_drydep()

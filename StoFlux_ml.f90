@@ -50,9 +50,6 @@ module StoFlux_ml
       lai_flux,      & ! Fluxes to total LAI
       unit_flux        ! Fluxes per m2 of leaf area (flag-leaf)
 
- !real,   public,save,dimension(MAXLIMAX,MAXLJMAX) :: &
- !      SumVPD ,   &   ! For critical VPD calcs, reset each day  
- !      old_gsun       !
  real,   public,save, allocatable,dimension(:,:,:) :: &
        SumVPD ,   &   ! For critical VPD calcs, reset each day  
        old_gsun       !

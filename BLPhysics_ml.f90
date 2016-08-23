@@ -4,6 +4,8 @@ module BLPhysics_ml
  !  here in future. Try to keep 1-D or elemental to allow use in offline codes 
  ! (*No* routines in use, except for testing)
 
+ use Landuse_ml,           only : Landcover, water_fraction
+ use MetFields_ml,         only : nwp_sea
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, KWINDTOP, PT
  use PhysicalConstants_ml, only : KARMAN, GRAV
  implicit none
@@ -34,6 +36,11 @@ module BLPhysics_ml
     !"BW"   ! Brost Wynngard
     !"Sb"   ! Seibert
 
+!Movbed
+!  character(len=4), parameter, public :: FluxPROFILE = &
+!     "Iter"   ! 
+! !     "Ln95"   ! ! will use Launiainen1995 
+
  logical, parameter, public :: PIELKE = .true.
  real, public, parameter :: KZ_MINIMUM = 0.001 ! m2/s
  real, public, parameter :: KZ_MAXIMUM = 1.0e3 ! m2/s - as old kzmax
@@ -48,7 +55,9 @@ module BLPhysics_ml
 public :: SeibertRiB_Hmix
 public :: SeibertRiB_Hmix_3d
 public :: JericevicRiB_Hmix
+public :: JericevicRiB_Hmix0  ! Now allow mixing heights based upon surface T
 public :: Venkatram_Hmix
+public :: VogelezangHoltslag_Hmix
 public :: Zilitinkevich_Hmix
 public :: TI_Hmix
 
@@ -84,25 +93,26 @@ contains
 
  !----------------------------------------------------------------------------
 
-function BrostWyngaardKz(z,h,ustar,invL) result(Kz)
+function BrostWyngaardKz(z,h,ustar,invL,Kdef) result(Kz)
   real, intent(in) :: z    ! height
   real, intent(in) :: h    ! Boundary layer depth 
   real, intent(in) :: ustar!  u*
   real, intent(in) :: invL !  1/L  
+  real, intent(in) :: Kdef !  1/L  
   real :: Kz
 
      if ( z < h ) then
         Kz = KARMAN * ustar * z * (1-z/h)**1.5 / (1+5*z*invL)
      else
-        Kz= 0.0
+       Kz =  Kdef
      end if
 
 end function BrostWyngaardKz
 
-function JericevicKz(z,h,ustar) result(Kz)
+function JericevicKz(z,h,ustar,Kdef) result(Kz)
   real, intent(in) :: z    ! height
   real, intent(in) :: h    ! Boundary layer depth 
-  real, intent(in) :: ustar!  u*
+  real, intent(in) :: ustar, Kdef !  u*, default Kz
   real :: Kz
   real :: Kmax, zmax
 
@@ -111,8 +121,12 @@ function JericevicKz(z,h,ustar) result(Kz)
         Kmax = 0.05 * h * ustar
         zmax = 0.21 * h
         Kz = 0.39 * ustar * z * exp( -0.5*(z/zmax)**2 )
-     else
-        Kz= 0.0
+     !OS_TEST_Hmix1 
+
+     else ! open-source had this Kz=0.0 line. Not sure why
+     !OS_TEST_Hmix1    
+     !Kz= 0.0
+       Kz =  Kdef
      end if
 
 end function JericevicKz
@@ -157,7 +171,7 @@ end subroutine SeibertRiB_Hmix_3d
 
  !----------------------------------------------------------------------------
 subroutine SeibertRiB_Hmix (u,v, zm, theta, pzpbl)
-  real, dimension(KWINDTOP:KMAX_MID), intent(in) :: u,v ! winds
+  real, dimension(KMAX_MID), intent(in) :: u,v ! winds
   real, dimension(KMAX_MID), intent(in) :: zm ! mid-cell height
   real, dimension(KMAX_MID), intent(in) :: theta !pot. temp
   real, intent(out) :: pzpbl
@@ -186,7 +200,7 @@ end subroutine SeibertRiB_Hmix
  !----------------------------------------------------------------------------
 
 subroutine JericevicRiB_Hmix (u,v, zm, theta, zi)
-  real, dimension(KWINDTOP:KMAX_MID), intent(in) :: u,v ! winds
+  real, dimension(KMAX_MID), intent(in) :: u,v ! winds
   real, dimension(KMAX_MID), intent(in) :: zm ! mid-cell height
   real, dimension(KMAX_MID), intent(in) :: theta !pot. temp
   real, intent(out) :: zi
@@ -214,6 +228,78 @@ subroutine JericevicRiB_Hmix (u,v, zm, theta, zi)
 
 end subroutine JericevicRiB_Hmix
 
+ !----------------------------------------------------------------------------
+subroutine JericevicRiB_Hmix0 (u,v, zm, theta, zi, theta0, coastal)
+ !- as above, but allow test for surface SBL
+  real, dimension(KMAX_MID), intent(in) :: u,v ! winds
+  real, dimension(KMAX_MID), intent(in) :: zm ! mid-cell height
+  real, dimension(KMAX_MID), intent(in) :: theta !pot. temp
+  real, intent(out) :: zi
+  real, intent(in) :: theta0  ! pot temp at ground (2m)
+  logical, intent(in) :: coastal ! or likely coastal, be careful
+  integer :: k
+  real, parameter :: Ric = 0.25  ! critical Ric
+  real :: Rib  ! bulk Richardson number
+  real :: Theta1, z1  ! pot temp  and height of lowest cell
+
+! Jericevic et al., ACP, 2009, pp1001-,  eqn (17): 
+
+   Theta1 = theta(KMAX_MID)
+   z1     = zm(KMAX_MID)
+   zi     = z1  ! start val
+
+   do k=KMAX_MID-1, KWINDTOP, -1
+
+       Rib =   GRAV * ( zm(k) - z1 ) &
+             * (theta(k)-Theta1 ) / &
+       ( 0.5*(theta(k)+Theta1) * ( u(k)**2 + v(k)**2 )+EPS )
+       if(Rib >= Ric) then
+              zi = zm(k)
+              exit
+       endif
+    enddo
+
+end subroutine JericevicRiB_Hmix0
+
+subroutine VogelezangHoltslag_Hmix (u,v, zm, theta, q, ustar, pzpbl)
+  real, dimension(KMAX_MID), intent(in) :: u,v ! winds
+  real, dimension(KMAX_MID), intent(in) :: zm ! mid-cell height
+  real, dimension(KMAX_MID), intent(in) :: theta !pot. temp
+  real, dimension(KMAX_MID), intent(in) :: q ! spec humid
+  real, intent(in) :: ustar
+  real, intent(out) :: pzpbl
+  real, dimension(KMAX_MID):: tv !virtual pot. temp
+  integer :: k
+  real, parameter :: Ric = 0.25  ! critical Ric
+  real :: Rig  ! bulk Richardson number
+  real :: Theta1, u1, v1, z1, bu2 !  values for lowest grid cell
+
+! Vogelezang, D. & Holtslag, A.,  BLM, 1996, 81, 245-269, Eqn. (3)
+! Although we should use virtual pot temp, not just theta
+
+
+  !     Calculate virtual temperature
+
+   tv(:) = theta(:) * (1.0+0.622*q(:))
+
+   Theta1 = tv(KMAX_MID)
+   z1     = zm(KMAX_MID)
+   bu2    = 100.0 * ustar * ustar
+   u1     = u(KMAX_MID)
+   v1     = v(KMAX_MID)
+
+   do k=KMAX_MID-1, KWINDTOP, -1
+      Rig =      GRAV * ( zm(k) - z1 )  &
+             *(tv(k)-Theta1 ) / &
+             ( Theta1 * ( ( u(k) - u1) **2 + ( v(k) - v1) **2 )+ bu2 + EPS )
+             !print *, k, zm(k), theta(k), sqrt(( u(k)**2 + v(k)**2 )),  RiB
+      if(Rig >= Ric) then
+             pzpbl = zm(k)
+             exit
+      endif
+   enddo
+
+end subroutine VogelezangHoltslag_Hmix
  !----------------------------------------------------------------------------
 function Venkatram_Hmix (ustar) result(zi)
   real, intent(in) :: ustar
@@ -292,9 +378,10 @@ subroutine PielkeBlackadarKz (u,v, zm, zb, th, Kz, Pielke_flag, debug_flag)
          !if( debug_flag ) write(6,*) "BLPielke Ris ",k, Ris(k), Ric
          if (Ris(k) > Ric ) then
             Kz(k) = KZ_MINIMUM
+            if( debug_flag ) write(6,"(a,i3,9es10.2)") "BLPielke Kmin ",k, Ris(k), Ric, Kz(k)
          else
             Kz(k) = 1.1 * (Ric-Ris(k)) * xl2 * dvdz /Ric
-           if( debug_flag ) write(6,"(a,es10.2,f6.3,9es10.2)") "BLPielke Ks ", &
+           if( debug_flag ) write(6,"(a,i3,es10.2,f6.3,9es10.2)") "BLPielke Ks ",k, &
                 Ris(k), Ric, xl2, dvdz, Kz(k)
          end if
       else
@@ -319,7 +406,7 @@ end subroutine PielkeBlackadarKz
 
  !----------------------------------------------------------------------------
 subroutine Test_BLM (mm,dd,hh,fH,u,v, zm, zb, pb, exnm, &
-          th, Kz, Kz_nwp, invL, ustar, zi )
+          th, q,  Kz, Kz_nwp, invL, ustar, zi )
   integer, intent(in) :: mm, dd, hh        ! date
   real, intent(in)               :: fh     ! heart flux, -ve = Unstable
   real, dimension(:), intent(in) :: u,v    ! winds
@@ -328,6 +415,7 @@ subroutine Test_BLM (mm,dd,hh,fH,u,v, zm, zb, pb, exnm, &
   real, dimension(:), intent(in) :: zb     ! cell boundary height
   real, dimension(:), intent(in) :: pb     ! pressure at boundaries
   real, dimension(:), intent(in) :: th     ! pot. temp
+  real, dimension(:), intent(in) :: q      !  specific humid ! TEST Vogel
   real, dimension(:), intent(in) :: Kz     ! Kz  (m2/s) 
   real, dimension(:), intent(in) :: Kz_nwp ! Kz from NWP if available/used
   real, intent(in)               :: ustar  ! m/s
@@ -341,7 +429,7 @@ subroutine Test_BLM (mm,dd,hh,fH,u,v, zm, zb, pb, exnm, &
    ,Kz_BW   &! Kz  Brost-Wynaargd, unstable
    ,Kz_PBT  &! Kz  Pielke+Blackader, Pielke flag=T
    ,Kz_PBF   ! Kz    "   "   flag=F
-  real :: ziSeibert, ziJericevic, ziVenki, ziTI
+  real :: ziSeibert, ziJericevic, ziVenki, ziTI, ziVH
 
     write(*,*)"HmixMETHOD "//HmixMethod
     write(*,*)"KzMETHOD "//KzMethod//"-U:"//UnstableKzMethod// &
@@ -359,17 +447,19 @@ subroutine Test_BLM (mm,dd,hh,fH,u,v, zm, zb, pb, exnm, &
 
     call JericevicRiB_Hmix (u,v, zm, th, ziJericevic)
 
+    call VogelezangHoltslag_Hmix (u,v, zm, th, q,  ustar, ziVH)
+
     ziVenki = Venkatram_Hmix(ustar)
 
     call TI_Hmix(Kz_PBT, zm, zb, fh, th, exnm, pb, ziTI, debug_flag=.true.)
 
-    write(*,"(a,3i3,f9.3,10(a,f7.1))") "TEST_BLM fh:", mm, dd, hh, fh, &
+    write(*,"(a,3i3,f8.2,10(a,f5.0))") "TEST_BLM fh:", mm, dd, hh, fh, &
           " zi ", zi, " ziS: ", ziSeibert, " ziJ: ", ziJericevic, &
-          " ziV: ", ziVenki, " ziTI: ", ziTI
+          " ziV: ", ziVenki, " ziTI: ", ziTI, " ziVH: ", ziVH
 
   !/ Kz *************************************************
-    write(*,"(a,4a3,a7,a9,9a8)") "DEBUG_Kz: ", "mm", "dd", "hh", "k", &
-           "fh", "zb", "pzpbl", &
+    write(*,"(a,4a3,2a7,a9,9a10)") "DEBUG_Kz: ", "mm", "dd", "hh", "k", &
+           "fh", "u*", "zb", "pzpbl", &
            "Kz_m2s", "Kz_nwp", "Kz_PBT", "Kz_PBF", "Kz_OB", "KBW", "KAJ"
 
     Kz_OB(:) = Kz_PBT(:) ! sim to orig emep
@@ -382,18 +472,23 @@ subroutine Test_BLM (mm,dd,hh,fH,u,v, zm, zb, pb, exnm, &
 
     do k = 2, size(th)
 
-       Kz_AJ(k) = JericevicKz    ( zb(k), ziJericevic, ustar )
+       if ( zb(k) < zi  ) then
+          Kz_AJ(k) = JericevicKz( zb(k), ziJericevic, ustar, -8.888  )
+       else
+          Kz_AJ(k) = -9.999
+       end if
+
 
        if( fh > 0 ) then  ! Query choices above zi?
            if( zb(k) < ziSeibert ) then ! Query
-               Kz_BW(k) = BrostWyngaardKz( zb(k), ziSeibert, ustar, invL )
+               Kz_BW(k) = BrostWyngaardKz( zb(k), ziSeibert, ustar, invL, -8.888  )
            else
                Kz_BW(k) = KZ_MINIMUM
            end if
        end if
 
-       write(*,"(a,4i3,f7.1,2f8.0,9f8.2)") "DEBUG_Kz: ", &
-        mm, dd, hh, k, fh, zb(k), zi, Kz(k), Kz_nwp(k), Kz_PBT(k), &
+       write(*,"(a,4i3,f7.1,f7.3,2f8.0,9es10.2)") "DEBUG_Kz: ", &
+        mm, dd, hh, k, fh, ustar, zb(k), zi, Kz(k), Kz_nwp(k), Kz_PBT(k), &
            Kz_PBF(k), Kz_OB(k), Kz_BW(k), Kz_AJ(k)
 
     end do
@@ -749,7 +844,7 @@ subroutine fake_zbnd(z)
   z(20) =       91.302
   z(21) =       91.302
 end subroutine fake_zbnd
-function SigmaKz_2_m2s_scalar (roa,ps) result(Kz_fac)   ! hb
+subroutine SigmaKz_2_m2s_scalar (roa,ps,Kz_fac)   ! hb
   real, intent(in) :: roa
   real, intent(in) :: ps
   real :: fac
@@ -758,7 +853,7 @@ function SigmaKz_2_m2s_scalar (roa,ps) result(Kz_fac)   ! hb
      fac= (ps - PT)/(GRAV*roa)
      Kz_fac= fac*fac
 
-end function SigmaKz_2_m2s_scalar
+end subroutine SigmaKz_2_m2s_scalar
 
 subroutine SigmaKz_2_m2s_arrays (SigmaKz,roa,ps,Kz)
   real, intent(in), dimension(:,:,:) :: SigmaKz, roa

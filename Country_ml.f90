@@ -72,7 +72,7 @@ module Country_ml
   integer, parameter, public ::  IC_AT =   2   ! Austria                       
   integer, parameter, public ::  IC_BE =   3   ! Belgium                       
   integer, parameter, public ::  IC_BG =   4   ! Bulgaria                      
-  integer, parameter, public ::  IC_CS =   5   ! Former Yugoslavia             
+  integer, parameter, public :: IC_FCS =   5   ! Former Czechoslovakia     
   integer, parameter, public ::  IC_DK =   6   ! Denmark                       
   integer, parameter, public ::  IC_FI =   7   ! Finland                       
   integer, parameter, public ::  IC_FR =   8   ! France                        
@@ -96,7 +96,7 @@ module Country_ml
   integer, parameter, public ::  IC_SU =  26   ! Former USSE                   
   integer, parameter, public ::  IC_GB =  27   ! United Kingdom                
   integer, parameter, public :: IC_VUL =  28   ! Vulcanoes                     
-  integer, parameter, public :: IC_REM =  29   ! Remaining Areas                     
+  integer, parameter, public :: IC_REM =  29   ! Remaining Areas              
   integer, parameter, public :: IC_BAS =  30   ! The Baltic Sea                
   integer, parameter, public :: IC_NOS =  31   ! The North Sea                 
   integer, parameter, public :: IC_ATL =  32   ! NE Atlantic Ocean (within EMEP domain)  
@@ -118,7 +118,7 @@ module Country_ml
   integer, parameter, public ::  IC_SI =  48   ! Slovenia                      
   integer, parameter, public ::  IC_HR =  49   ! Croatia                       
   integer, parameter, public ::  IC_BA =  50   ! Bosnia                        
-  integer, parameter, public ::  IC_YU =  51   ! Yugoslavia                    
+  integer, parameter, public ::  IC_CS =  51   ! Serbia and Montenegro    
   integer, parameter, public ::  IC_MK =  52   ! Macedonia                    
   integer, parameter, public ::  IC_KZ =  53   ! Kazakstan                     
   integer, parameter, public ::  IC_GE =  54   ! Georgia                       
@@ -141,6 +141,11 @@ module Country_ml
   integer, parameter, public :: IC_RUX =  71   ! RU outside old EMEP domain
   integer, parameter, public :: IC_RS  =  72   ! Serbia
   integer, parameter, public :: IC_ME  =  73   ! Montenegro
+  integer, parameter, public :: IC_RUE =  93   ! Russian Federation in the extended EMEP domain (RU+RFE+RUX)
+
+!Extra cc for rest CityZen
+  integer, parameter, public :: IC_RAA  =  170   ! Rest of Africa and Asia
+  integer, parameter, public :: IC_SEA  =  171   ! Ship
 
   ! Biomass-burnung (Wild-fires etc.) allocated to a country-number
   ! Allows easy use of emissplits to allocate speciation
@@ -260,7 +265,7 @@ Country( IC_AL ) = cc(  "AL " ,  1 ,F,  1,  1  , "Albania                       
 Country( IC_AT ) = cc(  "AT " ,  2 ,F,  2,  1  , "Austria                       " )
 Country( IC_BE ) = cc(  "BE " ,  3 ,F,  3,  1  , "Belgium                       " )
 Country( IC_BG ) = cc(  "BG " ,  4 ,F,  4,  2  , "Bulgaria                      " )
-Country( IC_CS ) = cc(  "CS " ,  5 ,F,  5,  1  , "Former Czechoslovakia         " )
+Country( IC_FCS ) = cc(  "FCS " ,  5 ,F,  5,  1 , "Former Czechoslovakia         " )
 Country( IC_DK ) = cc(  "DK " ,  6 ,F,  6,  1  , "Denmark                       " )
 Country( IC_FI ) = cc(  "FI " ,  7 ,F,  7,  2  , "Finland                       " )
 Country( IC_FR ) = cc(  "FR " ,  8 ,F,  8,  1  , "France                        " )
@@ -326,7 +331,7 @@ Country( IC_SK ) = cc(  "SK " , 47 ,F, 47,  1  , "Slovakia                      
 Country( IC_SI ) = cc(  "SI " , 48 ,F, 48,  1  , "Slovenia                      " )
 Country( IC_HR ) = cc(  "HR " , 49 ,F, 49,  1  , "Croatia                       " )
 Country( IC_BA ) = cc(  "BA " , 50 ,F, 50,  1  , "Bosnia and Herzegovina        " )
-Country( IC_YU ) = cc(  "YU " , 51 ,F, 51,  1  , "Yugoslavia                    " )
+Country( IC_CS ) = cc(  "CS " , 51 ,F, 51,  1  , "Serbia and Montenegro    " )
 Country( IC_MK ) = cc(  "MK " , 52 ,F, 52,  1  , "Macedonia, The F.Yugo.Rep. of " )
 Country( IC_KZ ) = cc(  "KZ " , 53 ,F, 53,  6  , "Kazakstan                     " )
 Country( IC_GE ) = cc(  "GE " , 54 ,F, 54,  4  , "Georgia                       " )
@@ -350,7 +355,7 @@ Country( IC_ATX) = cc(  "ATX" , 70 ,T,  32, 1  , "Atlantic outside. EMEP        
 Country( IC_RUX) = cc(  "RUX" , 71 ,F,  42, 4  , "Russian Fed. outside emep     " )
 Country( IC_RS)  = cc(  "RS " , 72 ,F,  72, 1  , "Serbia                        " )
 Country( IC_ME)  = cc(  "ME " , 73 ,F,  73, 1  , "Montenegro                    " )
-
+Country( IC_RUE) = cc(  "RUE" , 93 ,F,  93, -100 , "Russian Federeation (all)   " )   
 ! Biomass burning
 Country( IC_BB)  = cc(  "BB ", 101,F,  101, 0  , "Biomass burning (wild)        " )
 
@@ -428,6 +433,9 @@ Country( IC_AOX ) = cc(  "AOX" , 90 ,F,  90, 12  ,"Extended EMEP-external part o
 ! b) Domain x = -16-132 y = -11-0
 Country( IC_NAX ) = cc(  "NAX" , 91 ,F,  91, 1   ,"EMEP-external part of North Africa               " )
 
+!Extra cc for rest CityZen
+Country( IC_RAA ) = cc(  "RAA" , 170 ,F,  170, 1, "Rest of Africa and Asia" )
+Country( IC_SEA ) = cc(  "SEA" , 171 ,F,  171, 1, "Ships" )
 
   end subroutine Country_Init
 end module Country_ml

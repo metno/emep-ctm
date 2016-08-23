@@ -44,7 +44,8 @@ module InterpolationRoutines_ml
 
   public :: inside_1234 !test wether a point is inside the quadrilateral 1234 
 
-  public :: great_circle_distance!distance between two points following the surface on a unit sphere
+!great_circle_distance already defined in Functions_ml, but keep here for use as standalone
+  private :: great_circle_distance!distance between two points following the surface on a unit sphere
 
   !/-- interpolation stuff
   public  :: bilin_interpolate                         !  "Generic" subroutine

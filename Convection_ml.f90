@@ -19,7 +19,7 @@ module Convection_ml
  use ModelConstants_ml,    only  : KMAX_BND,KMAX_MID,PT
  use MetFields_ml ,        only  : ps,sdot,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
  use GridValues_ml,        only  : dA, dB, sigma_bnd
- use Par_ml,               only  : MAXLIMAX,MAXLJMAX,limax,ljmax
+ use Par_ml,               only  : MAXLIMAX,MAXLJMAX,limax,ljmax,li0,li1,lj0,lj1
  use PhysicalConstants_ml, only  : GRAV
 
 
@@ -48,8 +48,8 @@ module Convection_ml
 
 !UPWARD
 
-    do j=1,LJMAX
-      do i=1,LIMAX
+    do j=lj0,lj1
+      do i=li0,li1
          xn_in_core = 0.0!concentration null below surface
          mass=0.0
 !

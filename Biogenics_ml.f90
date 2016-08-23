@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,10 +52,11 @@ module Biogenics_ml
   !    by the ReadField_CDF interpolation routines. No need to worry about
   !    conserving these very imperfect numbers accurately ;-)
   !
-  !    Dave Simpson, 2010-2011
+  !    Dave Simpson, 2010-2012
   !---------------------------------------------------------------------------
 
   use CheckStop_ml,      only: CheckStop
+  use ChemChemicals_ml,  only : species
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
   use Io_ml            , only : IO_FORES, open_file, ios, PrintLog, datewrite
   use KeyValue_ml,       only : KeyVal,KeyValue
@@ -63,6 +64,8 @@ module Biogenics_ml
   use LandPFT_ml,        only: MapPFT_LAI, pft_lai
   use Landuse_ml,        only : LandCover
   use LocalVariables_ml, only : Grid  ! -> izen, DeltaZ
+  use MetFields_ml,      only : t2_nwp
+  use ModelConstants_ml, only : USE_SOILNOX, DEBUG_SOILNOX, USE_SOILNH3
   use ModelConstants_ml, only : NPROC, MasterProc, TINY, &
                            USE_PFT_MAPS, NLANDUSEMAX, IOU_INST, & 
                            KT => KCHEMTOP, KG => KMAX_MID, & 
@@ -70,15 +73,16 @@ module Biogenics_ml
   use NetCDF_ml,        only : ReadField_CDF, printCDF
   use OwnDataTypes_ml,  only : Deriv, TXTLEN_SHORT
   use Par_ml   , only :  MAXLIMAX,MAXLJMAX,MSG_READ1,me, limax, ljmax
+  use Par_ml,            only : limax, ljmax, MAXLIMAX, MAXLJMAX, me
   use PhysicalConstants_ml,  only :  AVOG, GRAV
   use Radiation_ml,          only : PARfrac, Wm2_uE
-  use Setup_1dfields_ml,     only : rcbio  
+  use Setup_1dfields_ml,     only : rcemis  
   use SmallUtils_ml, only : find_index
-  use TimeDate_ml,       only :  current_date
+  use TimeDate_ml,       only : current_date, daynumber
   implicit none
   private
 
-  !/-- subroutines
+  !/-- subroutines for BVOC
   public ::  Init_BVOC
   private :: Get_LCinfo
   public ::  GetEuroBVOC
@@ -87,19 +91,40 @@ module Biogenics_ml
   public ::  SetDailyBVOC
   private :: TabulateECF
 
+  !/-- subroutines for soil NO
+  public :: Set_SoilNOx
+
   INCLUDE 'mpif.h'
+  include 'CM_EmisBioNat.inc'
+  !e.g.
+  !  integer, parameter, public ::  NEMIS_BioNat  = 3
+  !  character(len=7), save, dimension(NEMIS_BioNat), public:: &
+  !    EMIS_BioNat =  (/ "C5H8   " , "APINENE" , "NO     " /)
+ 
   INTEGER STATUS(MPI_STATUS_SIZE),INFO
   integer, public, parameter :: N_ECF=2, ECF_ISOP=1, ECF_TERP=2
-  integer, public, parameter :: NBIO_DEF=3, BIO_ISOP=1, BIO_MTP=2, BIO_MTL=3
+  integer, public, parameter :: BIO_ISOP=1, BIO_MTP=2, &
+                                 BIO_MTL=3 ! , BIO_SOILNO=4, BIO_SOILNH3=5
   integer, public, parameter :: BIO_TERP=2 ! Used for final emis, sum of MTP+MTL
   integer, public, save ::  last_bvoc_LC   !max index land-cover with BVOC (min 4)
+                                                        
+  ! Soil NOx
+   real,public, save, allocatable, dimension(:,:) :: &
+      AnnualNdep, &  ! N-dep in mgN/m2/
+      SoilNOx, SoilNH3
 
  ! Set true if LCC read from e.g. EMEP_EuroBVOC.nc:
  ! (Currently for 1st four LCC, CF, DF, BF, NF)
   logical, private, dimension(NLANDUSEMAX), save :: HaveLocalEF 
 
-  real, public, save, dimension(MAXLIMAX,MAXLJMAX,size(BVOC_USED)) :: &
-     EmisNat =0.0      !  will be transferred to d_2d emis sums
+! real, public, save, dimension(MAXLIMAX,MAXLJMAX,size(BVOC_USED)+NSOIL_EMIS) :: &
+
+  ! EmisNat is used for BVOC; soil-NO, also in futur for sea-salt etc.
+  ! Main criteria is not provided in gridded data-bases, often land-use
+  ! dependent.
+
+  real, public, save, allocatable, dimension(:,:,:) :: &
+     EmisNat       !  will be transferred to d_2d emis sums
 
 
   !standard emission factors (EFs) per LC
@@ -108,10 +133,10 @@ module Biogenics_ml
      bvocEF       !  Gridded std. emissions per PFT
 
   !standard emission factors per LC for daily LAI
-  real, private, save, dimension(MAXLIMAX,MAXLJMAX,size(BVOC_USED)) :: &
-     day_embvoc = 0.0   !  emissions scaled by daily LAI
+  real, private, save, allocatable, dimension(:,:,:) :: &
+     day_embvoc    !  emissions scaled by daily LAI
 
-  logical, private, dimension(MAXLIMAX,MAXLJMAX) :: EuroMask
+  logical, private, save, allocatable, dimension(:,:) :: EuroMask
 
   !/-- Canopy environmental correction factors-----------------------------
   !
@@ -119,7 +144,11 @@ module Biogenics_ml
   !    - from Guenther's papers. (Limit to 0<T<40 deg C.)
 
   real, public, save, dimension(N_ECF,40) :: canopy_ecf  ! Canopy env. factors
-                                                        
+
+ ! Indices for the species defined in this routine. Only set if found
+  integer, private, save :: ispec_C5H8, ispec_APIN, ispec_NO , ispec_NH3
+  integer, private, save :: itot_C5H8,  itot_APIN,  itot_NO , itot_NH3
+
   contains
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -134,6 +163,14 @@ module Biogenics_ml
 !   8113-8152, and Keenan, T. et al., ACP, 2009, 9, 4053-4076 
 
     integer :: alloc_err
+    
+    allocate(AnnualNdep(MAXLIMAX,MAXLJMAX),SoilNOx(MAXLIMAX,MAXLJMAX), SoilNH3(MAXLIMAX,MAXLJMAX))
+    allocate(EmisNat(NEMIS_BioNat,MAXLIMAX,MAXLJMAX))
+    EmisNat=0.0
+    allocate(day_embvoc(MAXLIMAX,MAXLJMAX,size(BVOC_USED)))
+    day_embvoc = 0.0
+    allocate(EuroMask(MAXLIMAX,MAXLJMAX))
+    EuroMask=.false.
 
       if ( size(BVOC_USED) == 0 ) then
         call PrintLog("No Biogenic Emissions ", MasterProc)
@@ -141,10 +178,22 @@ module Biogenics_ml
       end if
 
    !====================================
-   ! Initialise chemical emission rates to zero. In rest of  code
-   ! only k=KMAX_MID will be set
+   ! get indices.  NH3 not yet used.
+      ispec_C5H8 = find_index( "C5H8", EMIS_BioNat(:) ) 
+      ispec_APIN = find_index( "APINENE", EMIS_BioNat(:) ) 
+      ispec_NO   = find_index( "NO", EMIS_BioNat(:) ) 
+      ispec_NH3  = find_index( "NH3", EMIS_BioNat(:) ) 
+      call CheckStop( ispec_C5H8 < 1 , "BiogencERROR C5H8")
+      !call CheckStop( ispec_APIN < 1 , "BiogencERROR APIN")
+      if( ispec_APIN < 0 ) call PrintLog("WARNING: No APINENE Emissions")
+     
+      call CheckStop( USE_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
 
-     rcbio(:,:) = 0.0  
+      itot_C5H8 = find_index( "C5H8", species(:)%name    ) 
+      itot_APIN = find_index( "APINENE", species(:)%name )
+      itot_NO   = find_index( "NO", species(:)%name      )
+      itot_NH3  = find_index( "NH3", species(:)%name      )
+
    !====================================
  
     call TabulateECF()   ! Tabulates temp functions
@@ -216,7 +265,7 @@ module Biogenics_ml
 
 !    Reads the processed BVOC emission potentials.
 
-    real    :: loc(MAXLIMAX,MAXLJMAX) = 0.0  ! Emissions read from file
+!    real    :: loc(MAXLIMAX,MAXLJMAX)  ! Emissions read from file
     integer :: iVeg, iEmis, ibvoc, i,j
     character(len=1000) :: varname
     character(len=2), dimension(4) :: VegName = (/ "CF", "DF", "NF", "BF" /)
@@ -228,33 +277,38 @@ module Biogenics_ml
        !    loc,1,interpol='zero_order',needed=.true.,debug_flag=.true.)
        !if( debug_proc ) write(*,*)  "EMEP_EuroBVOC i,j fake ", &
        !   loc(debug_li, debug_lj)
-
      do iVeg = 1, size(VegName)
        ibvoc = find_index( VegName(iveg), LandDefs(:)%code )
        HaveLocalEF(ibvoc) = .true.
        do iEmis = 1, size(BVOC_USED)
           varname = trim(BVOC_USED(iEmis)) // "_" // trim(VegName(iVeg))
+          
           call ReadField_CDF('EMEP_EuroBVOC.nc',varname,&
-             loc,1,interpol='zero_order',needed=.true.,debug_flag=.false.)
-         if( debug_proc ) write(*, "(2a,f12.3,3i2)") "EURO-BVOC:E ", &
-             trim(varname), loc(debug_li, debug_lj), iVeg, ibvoc, iEmis
-         if( debug_proc ) write(*, "(2a,2es12.3)") "EURO-BVOC:minmax ", &
-             trim(varname), minval(loc), maxval(loc)
-         bvocEF(:,:,ibvoc,iEmis) = loc(:,:)
+             bvocEF(:,:,ibvoc,iEmis),1,interpol='zero_order',needed=.true.,debug_flag=.false.,UnDef=-999.0)
+
+ 
+         if( debug_proc ) then
+              write(*, "(2a,f12.3,3i2)") "EURO-BVOC:E ", &
+             trim(varname), bvocEF(debug_li, debug_lj,ibvoc,iEmis), iVeg, ibvoc, iEmis
+              write(*, "(2a,2es12.3)") "EURO-BVOC:minmax ", &
+             trim(varname), minval(bvocEF(:,:,ibvoc,iEmis)), maxval(bvocEF(:,:,ibvoc,iEmis))
+         end if     
+
        end do
 
+       
       ! Make a mask where we can use the local bvoc. Should be the same from
       ! all EFs, since only non-def areas set to -999, otherwise zero or +
       ! If any values exist, should exist for all entries, hence check.
-
+       iEmis=size(BVOC_USED)
        if( iVeg == 1 )  then
-          where(loc>-1.0)
+          where(bvocEF(:,:,ibvoc,iEmis)>-1.0)
             EuroMask = .true.
           end where
        else  ! Just check that following maps are consistent
-           do i=1,MAXLIMAX
-           do j=1,MAXLJMAX
-             if ( EuroMask(i,j) .and. loc(i,j)<0.0 ) then
+           do i=1,limax
+           do j=1,ljmax
+             if ( EuroMask(i,j) .and. bvocEF(i,j,ibvoc,iEmis)<0.0 ) then
                write(*,*) "MASK ERROR", me, i_fdom(i), j_fdom(j)
                call CheckStop("EuroMask BVOC ERROR")
              end if
@@ -409,14 +463,14 @@ module Biogenics_ml
       end do
 
       if ( DEBUG_BIO ) then
-         if ( my_first_call  ) then ! print out 1st day
-              call printCDF("BIO-LAI", workarray, "m2/m2" )
-              workarray(:,:) = day_embvoc(:,:,1)
-              call printCDF("BIO-Eiso", workarray, "ug/m2/h" )
-              workarray(:,:) = day_embvoc(:,:,2) + day_embvoc(:,:,3)
-              call printCDF("BIO-Emt", workarray, "ug/m2/h" )
-              deallocate(  workarray )
-         end if
+!         if ( my_first_call  ) then ! print out 1st day
+!              call printCDF("BIO-LAI", workarray, "m2/m2" )
+!              workarray(:,:) = day_embvoc(:,:,1)
+!              call printCDF("BIO-Eiso", workarray, "ug/m2/h" )
+!              workarray(:,:) = day_embvoc(:,:,2) + day_embvoc(:,:,3)
+!              call printCDF("BIO-Emt", workarray, "ug/m2/h" )
+!              deallocate(  workarray )
+!         end if
        end if
        my_first_call = .false.
 
@@ -471,12 +525,16 @@ module Biogenics_ml
   integer, intent(in) ::  i,j
 
   integer :: it2m
-  real :: E_ISOP , E_MTP, E_MTL
+  real    :: E_ISOP, E_MTP, E_MTL
 
 ! To get from ug/m2/h to molec/cm3/s
 ! ug -> g  1.0e-9; g -> mole / MW; x AVOG
-  real, save :: biofac_ISOP = 1.0e-12*AVOG/64.0/3600.0   ! needs /Grid%DeltaZ
-  real, save :: biofac_TERP = 1.0e-12*AVOG/136.0/3600.0  ! needs /Grid%DeltaZ
+! will need /Grid%DeltaZ
+  real, parameter :: & 
+        biofac_ISOP   = 1.0e-12*AVOG/68.0 /3600.0  &
+       ,biofac_TERP   = 1.0e-12*AVOG/136.0/3600.0  &
+       ,biofac_SOILNO = 1.0e-12*AVOG/14.0 /3600.0  &
+       ,biofac_SOILNH3= 1.0e-12*AVOG/14.0 /3600.0  
 
  ! Light effects added for isoprene emissions
 
@@ -493,9 +551,8 @@ module Biogenics_ml
   it2m = max(it2m,1)
   it2m = min(it2m,40)
 
-  rcbio(:,KG) = 0.0
-
-  if ( Grid%izen <= 90) then ! Isoprene in daytime only:
+  !ASSUME C5H8 FOR NOW if ( ispec_C5H8 > 0 ) then
+    if ( Grid%izen <= 90) then ! Isoprene in daytime only:
 
      ! Light effects from Guenther G93
 
@@ -516,31 +573,47 @@ module Biogenics_ml
      ! Emissions_ml (snapemis).  ug/m2/h -> kg/m2/s needs 1.0-9/3600.0. 
 
       E_ISOP = day_embvoc(i,j,BIO_ISOP)*canopy_ecf(BIO_ISOP,it2m) * cL 
-      rcbio(BIO_ISOP,KG)   = E_ISOP * biofac_ISOP/Grid%DeltaZ
-      EmisNat(i,j,BIO_ISOP)= E_ISOP * 1.0e-9/3600.0
+
+      rcemis(itot_C5H8,KG)   = rcemis(itot_C5H8,KG) + E_ISOP * biofac_ISOP/Grid%DeltaZ
+      EmisNat(ispec_C5H8,i,j)= E_ISOP * 1.0e-9/3600.0
 
   else ! night
-     EmisNat(i,j,BIO_ISOP) = 0.0
+     EmisNat(ispec_C5H8,i,j) = 0.0
      E_MTL = 0.0
      E_ISOP = 0.0
   endif ! daytime
 
-    if ( BIO_TERP > 0 ) then
+    if ( ispec_APIN > 0 ) then
 
      ! add pool-only terpenes rate;
         E_MTP = day_embvoc(i,j,BIO_MTP)*canopy_ecf(ECF_TERP,it2m)
-        rcbio(BIO_TERP,KG)    = (E_MTL+E_MTP) * biofac_TERP/Grid%DeltaZ
-        EmisNat(i,j,BIO_TERP) = (E_MTL+E_MTP) * 1.0e-9/3600.0
+        rcemis(itot_APIN,KG)    = rcemis(itot_APIN,KG) + &
+               (E_MTL+E_MTP) * biofac_TERP/Grid%DeltaZ
+        EmisNat(ispec_APIN,i,j) = (E_MTL+E_MTP) * 1.0e-9/3600.0
     end if
+
+    if ( USE_SOILNOX ) then
+        rcemis(itot_NO,KG)    = rcemis(itot_NO,KG) + &
+             SoilNOx(i,j) * biofac_SOILNO/Grid%DeltaZ
+        EmisNat(ispec_NO,i,j) =  SoilNOx(i,j) * 1.0e-9/3600.0
+    end if
+
+    !EXPERIMENTAL
+    if ( USE_SOILNH3 ) then
+        rcemis(itot_NH3,KG)    = rcemis(itot_NH3,KG) + &
+            SoilNH3(i,j) * biofac_SOILNH3/Grid%DeltaZ
+        EmisNat(ispec_NH3,i,j) =  SoilNH3(i,j) * 1.0e-9/3600.0
+    end if
+     
  
     if ( DEBUG_BIO .and. debug_proc .and. i==debug_li .and. j==debug_lj .and. &
          current_date%seconds == 0 ) then
 
       call datewrite("DBIO env ", it2m, (/ max(par,0.0), max(cL,0.0), &
             canopy_ecf(BIO_ISOP,it2m),canopy_ecf(BIO_TERP,it2m) /) )
-      call datewrite("DBIO EISOP EMTP EMTL ", (/  E_ISOP, E_MTP, E_MTL /) ) 
-      call datewrite("DBIO rc ", (/ rcbio(BIO_ISOP,KG), rcbio(BIO_TERP,KG) /) )
-      call datewrite("DBIO EmisNat ", EmisNat(i,j,:) )
+      call datewrite("DBIO EISOP EMTP EMTL ESOIL ", (/  E_ISOP, &
+             E_MTP, E_MTL, SoilNOx(i,j) /) ) 
+      call datewrite("DBIO EmisNat ", EmisNat(:,i,j) )
 
      end if
 
@@ -548,4 +621,141 @@ module Biogenics_ml
   end subroutine setup_bio
 
   !----------------------------------------------------------------------------
+
+
+   subroutine Set_SoilNOx()
+      integer :: i, j, nLC, iLC, LC
+      logical :: my_first_call = .true.
+      real    :: f, ft, fn, ftn
+      real    :: enox, enh3  ! emissions, ugN/m2/h
+      real :: beta, bmin, bmax, bx, by ! for beta function
+      real :: hfac
+
+      if( DEBUG_SOILNOX .and. debug_proc )write(*,*)"DEBUG_SOILNOX START: ",&
+        current_date%day, current_date%hour, current_date%seconds
+
+      if ( .not. USE_SOILNOX  ) return ! and fSW has been set to 1. at start
+
+
+      ! We reset once per hour
+
+      if ( current_date%seconds /= 0 .and. .not. my_first_call ) return
+      hfac = 0.5 ! Lower at night
+      if ( current_date%hour > 7 .and. current_date%hour < 20 ) hfac = 1.5
+
+
+        do j = 1, ljmax
+           do i =  1, limax
+
+             nlc = LandCover(i,j)%ncodes
+
+           ! Temperature function from Rolland et al., 2005, eqn. 6
+
+             ft =  exp( (t2_nwp(i,j,1)-273.15-20)*log(2.1) / 10.0 )
+
+           ! Inspired by e.g. Pilegaard et al, Schaufler et al. (2010)
+           ! we scale emissions from seminat with N-depositions
+           ! We use a factor normalised to 1.0 at 5000 mgN/m2/a
+
+             fn = AnnualNdep(i,j)/5000.0 ! scale for now
+
+             ftn = ft * fn * hfac 
+
+             enox = 0.0
+             enh3 = 0.0 
+
+     LCLOOP: do ilc= 1, nLC
+
+                 LC = LandCover(i,j)%codes(ilc)
+                 if ( LandType(LC)%is_water ) cycle
+                 if ( LandType(LC)%is_ice   ) cycle
+                 if ( LandType(LC)%is_iam   ) cycle
+
+               ! Soil NO
+               ! for 1 ugN/m2/hr, the temp funct alone would give
+               ! ca. 6 mgN/m2/a in Germany, where dep is about 5000 mgN/m2 max ca. 9
+               ! Conif Forests in Germany  
+
+                 f  = LandCover(i,j)%fraction(ilc) 
+                 beta = 0.0
+
+                 if ( LandType(LC)%is_conif ) then
+                    enox = enox + f*ftn*150.0
+                    enh3 = enh3 + f*ftn*1500.0 ! Huge?! W+E ca. 600 ngNH3/m2/s -> 1800 ugN/m2/h
+                 else if ( LandType(LC)%is_decid ) then
+                    enox = enox + f*ftn* 50.0
+                    enh3 = enh3 + f*ftn*500.0 !  Just guessing
+                 else if ( LandType(LC)%is_seminat ) then
+                    enox = enox + f*ftn* 50.0
+                    enh3 = enh3 + f * ftn  *20.0 !mg/m2/h approx from US report 1 ng/m2/s
+
+                 else if ( LandType(LC)%is_crop    ) then ! emissions in 1st 70 days
+
+                    bmin = Landcover(i,j)%SGS(iLC) -30 ! !st March LandCover(i,j)%SGS(iLC) - 30 
+                    bmax = Landcover(i,j)%SGS(iLC) +30 ! End April  LandCover(i,j)%SGS(iLC) + 40 
+
+                    ! US p.29, Suttn had ca. 20 ng/m2/s  = 60ugN/m2/hfor crops
+                    ! throughout growing season
+                    if ( daynumber >= Landcover(i,j)%SGS(iLC) .and. &
+                         daynumber <= Landcover(i,j)%EGS(iLC) ) then
+                         enox = enox + f* 1.0
+                         enh3 = enh3 + f * 60.0
+                    end if
+
+                    ! CRUDE - just playing for NH3.
+                    ! NH3 from fertilizer? Assume e.g. 120 kg/ha over 1 month
+                    ! with 10% giving emission, i.e. 10 kg/ha
+                    ! 10 kg/ha/month =  ca. 1000 ugN/m2/h
+
+                    ! For NO, numbers based upon papers by e.g. Rolland,
+                    ! Butterbach, etc.
+                    if ( daynumber >= bmin .and. daynumber <= bmax ) then
+
+                         bx = (daynumber-bmin)/( bmax-bmin)
+                         bx = max(bx,0.0)
+                         by = 1.0 - bx
+                         beta =  ( bx*by *4.0) 
+                         enox = enox + f*80.0*ft* beta 
+                         enh3 = enh3 + f * 1000.0*ft * beta
+                    end if
+
+                    
+                 end if
+                 if (  DEBUG_SOILNOX .and. debug_proc .and. &
+                     i == debug_li .and. j == debug_lj ) then
+                   write(*, "(a,4i4,f7.2,9g12.3)") "LOOPING SOIL", daynumber, &
+                   iLC, LC, LandCover(i,j)%SGS(iLC), t2_nwp(i,j,1)-273.15, &
+                      f, ft, fn, ftn,  beta, enox, enh3
+                   if(iLC==1) &
+                     call datewrite("HFAC SOIL", (/ 1.0*daynumber,hfac /) )
+                 end if
+                 enox = max( 0.001, enox ) ! Just to stop negatives while testing
+    
+               ! Soil NH3
+           end do LCLOOP
+
+
+     ! And we scale EmisNat to get units kg/m2 consistent with
+     ! Emissions_ml (snapemis).  ug/m2/h -> kg/m2/s needs 1.0-9/3600.0. 
+ 
+           SoilNOx(i,j) = enox
+           SoilNH3(i,j) = enh3
+ 
+         end do
+      end do
+ !     if ( DEBUG_SOILNOX .and. debug_proc ) then
+ !             SoilNOx(:,:) = 1.0 ! Check scaling
+ !     end if
+
+      if ( DEBUG_SOILNOX .and. debug_proc ) then
+         i = debug_li
+         j = debug_lj
+         write(*,"(a,4i4)") "RESET_SOILNOX: ",  1, limax, 1, ljmax
+         write(*,"(a,2i4,2f12.4,es12.4)") "RESET_SOILNOX: ", &
+                 daynumber, current_date%hour, t2_nwp(i,j,1), SoilNOx(i,j), AnnualNdep(i,j)
+      end if
+
+      my_first_call = .false.
+
+   end subroutine Set_SoilNOx
 end module Biogenics_ml

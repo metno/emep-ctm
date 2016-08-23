@@ -70,7 +70,7 @@
   use CheckStop_ml,      only : CheckStop
   use Convection_ml,     only : convection_pstar
   use GridValues_ml,     only : GRIDWIDTH_M,xm2,xmd,xm2ji,xmdji, &
-                                carea,xm_i, Pole_included,dA,dB
+                                carea,xm_i, Pole_Singular,dA,dB
   use Io_ml,             only : datewrite
   use ModelConstants_ml, only : KMAX_BND,KMAX_MID,NMET, nstep, nmax, &
                   dt_advec, dt_advec_inv,  PT,KCHEMTOP, NPROCX,NPROCY,NPROC, &
@@ -89,7 +89,7 @@
 
   INCLUDE 'mpif.h'
   INTEGER STATUS(MPI_STATUS_SIZE)
-  real :: MPIbuff(KMAX_MID*max(gimax,gjmax))
+  real,allocatable :: MPIbuff(:)
   integer, private, parameter :: NADVS      =  3
 
   real, private, save, dimension(KMAX_BND)  ::  dhs1, dhs1i, dhs2i
@@ -98,9 +98,9 @@
   real, private, save, dimension(9,2:KMAX_MID,0:1)  ::  alfnew
   real, private, save, dimension(3)  ::  alfbegnew,alfendnew
 
-  real, private,save, dimension(MAXLJMAX,KMAX_MID,NMET) :: uw,ue
+  real, private,save,allocatable, dimension(:,:,:) :: uw,ue
 
-  real, private,save, dimension(MAXLIMAX,KMAX_MID,NMET) :: vs,vn
+  real, private,save,allocatable, dimension(:,:,:) :: vs,vn
 
   integer, public, parameter :: ADVEC_TYPE = 1 ! Divides by advected p*
 ! integer, public, parameter :: ADVEC_TYPE = 2 ! Divides by "meteorologically" 
@@ -108,6 +108,7 @@
 
   public :: assign_dtadvec
   public :: assign_nmax
+  public :: alloc_adv_arrays
   public :: vgrid
   public :: advecdiff
   public :: advecdiff_poles
@@ -163,6 +164,8 @@
 
    if(me==0)write(*,fmt="(a,F8.1,a)")' advection time step (dt_advec) set to: ',dt_advec,' seconds'
 
+   call alloc_adv_arrays!should be moved elsewhere
+
   end subroutine assign_dtadvec
 
   !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -176,7 +179,9 @@
 
     call CheckStop(mod(3600*metstep,nint(dt_advec)).ne.0, "3600*metstep/dt_advec must be an integer")
 
-    nmax = (3600*metstep)/dt_advec
+   ! Use nint for safety anyway:
+
+    nmax = nint(  (3600*metstep)/dt_advec )
 
     if (me .eq. 0) then
 !      write(6,*)
@@ -684,8 +689,13 @@
     call Code_timer(tim_before)
 
     if(firstcall)then
-      if(NPROCY>2.and.me==0.and.Pole_included==1)write(*,*)&
+      if(NPROCY>2.and.me==0.and.Pole_Singular>1)then
+         write(*,*)&
           'COMMENT: Advection routine will work faster if NDY = 2 (or 1)'
+      elseif(NPROCY>1.and.me==0.and.Pole_Singular==1)then
+         write(*,*)&
+          'COMMENT: Advection routine will work faster if NDY = 1'
+      endif
     endif
 
     if(KCHEMTOP==2)then
@@ -1394,16 +1404,6 @@
         fc3 = fc1*fc2
         n1k = 0
         if(fc1.lt.0)n1k=1
-!pw bug corrected 29/8-2002 (emep1.2beta):
-!       zzfl1 = alfnew(1,k,n1k)*fc1           &
-!             + alfnew(2,k,n1k)*fc2           &
-!             + alfnew(3,k,n1k)*fc3
-!       zzfl2 = alfnew(4,k,n1k)*fc1           &
-!             + alfnew(5,k,n1k)*fc2           &
-!             + alfnew(6,k,n1k)*fc3
-!       zzfl3 = alfnew(7,k,n1k)*fc1           &
-!             + alfnew(8,k,n1k)*fc2           &
-!             + alfnew(9,k,n1k)*fc3
         zzfl1 = alfnew(1,k+1,n1k)*fc1         &
               + alfnew(2,k+1,n1k)*fc2         &
               + alfnew(3,k+1,n1k)*fc3
@@ -3543,6 +3543,18 @@
 
 !  subroutine convection_pstar(ps3d,dt_conv)
 !  moved to Convection_ml.f90
+
+
+ 
+  subroutine alloc_adv_arrays
+
+    !allocate the arrays once
+    allocate(MPIbuff(KMAX_MID*max(gimax,gjmax)))
+    allocate(uw(MAXLJMAX,KMAX_MID,NMET),ue(MAXLJMAX,KMAX_MID,NMET))
+    allocate(vs(MAXLIMAX,KMAX_MID,NMET),vn(MAXLIMAX,KMAX_MID,NMET))
+
+
+  end subroutine alloc_adv_arrays
 
 
 end module Advection_ml

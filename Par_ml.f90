@@ -54,6 +54,7 @@
 !  mfsizeinp,mfsizeout!!!
 
 use CheckStop_ml,      only : CheckStop
+use Io_Nums_ml,        only:  IO_LOG
 use ModelConstants_ml, only : RUNDOMAIN, IIFULLDOM, JJFULLDOM, &
             MasterProc, &  ! Set true for me=0 processor
             NPROCX, NPROCY, NPROC
@@ -61,16 +62,14 @@ implicit none
 private
 
 
-  integer, public, parameter ::  &
-    IRUNBEG = RUNDOMAIN(1)  &
-  , JRUNBEG = RUNDOMAIN(3)  &
-  , GIMAX = RUNDOMAIN(2)-RUNDOMAIN(1)+1 &!Number of global points in longitude
-  , GJMAX = RUNDOMAIN(4)-RUNDOMAIN(3)+1 &!Number of global points in longitude
-  , MAXLIMAX = (GIMAX+NPROCX-1)/NPROCX &! Maximum number of local points in lon
-  , MAXLJMAX = (GJMAX+NPROCY-1)/NPROCY &! Maximum number of local points in lat
-  , MFSIZEINP = IIFULLDOM*JJFULLDOM    &! Maximum field size for input
-  , MFSIZEOUT = GIMAX*GJMAX             ! Maximum field size for output
-!
+  integer, public, save ::  &
+    IRUNBEG  &!
+  , JRUNBEG  &
+  , GIMAX  &!Number of rundomain points in x direction
+  , GJMAX  &!Number of rundomain points in y direction
+  , MAXLIMAX  &! Maximum number of subdomain points in x
+  , MAXLJMAX  !&! Maximum number of subdomain points in y
+
 !     Parameter statements for the parameters used to access the tabell 
 !     of neighbor processors (neighbor)
 !
@@ -128,7 +127,7 @@ private
 !     Tables of actual number of points and start and end points for
 !     all processors
 !
- integer, public, save, dimension(0:NPROC-1) ::  &
+ integer, public, save, allocatable, dimension(:) ::  &
       tlimax, tgi0, tgi1, tljmax, tgj0, tgj1
 !
 !
@@ -144,6 +143,7 @@ private
 !
 !     The different messages used in the bott version of airpol
 !
+    character (len=230) :: txt
     integer, public, parameter :: &
                MSG_INIT0 = 10     &
               ,MSG_INIT1 = 11     &
@@ -175,6 +175,7 @@ private
               ,MSG_READ5 = 85     &
               ,MSG_READ6 = 86     & ! hb NH3emis   
               ,MSG_READ7 = 87     &
+              ,MSG_READ8 = 88     & ! HDD
               ,MSG_FIELD1 = 91     &
               ,MSG_MET1 = 101     &
               ,MSG_MET2 = 102     &
@@ -190,15 +191,67 @@ private
 
  contains
 
-    subroutine parinit(min_grids)   
+    subroutine parinit(min_grids,Pole_singular)   
 !
 !defines size and position of subdomains
 !
 
     implicit none
-        integer, intent(in) :: min_grids  ! u4
-    integer ime, imex, imey, rest
-           
+    integer, intent(in) :: min_grids ,Pole_singular 
+    integer ime, imex, imey, rest,i
+
+    !Set size of grid actually used    
+    IRUNBEG = RUNDOMAIN(1)  
+    JRUNBEG = RUNDOMAIN(3)  
+    GIMAX = RUNDOMAIN(2)-RUNDOMAIN(1)+1 !Number of global points in longitude
+    GJMAX = RUNDOMAIN(4)-RUNDOMAIN(3)+1 !Number of global points in longitude
+
+    !Determine NPROCX, NPROCY
+    if(Pole_singular==0)then
+       !try values until it fits
+       NPROCX=nint(sqrt(1.0*NPROC))
+       do i=1,NPROC-NPROCX
+          NPROCY=NPROC/NPROCX
+          if(NPROCX*NPROCY==NPROC)then
+             !we found some values that divide NPROC
+             exit
+          endif
+          NPROCX=NPROCX+1
+          call CheckStop(NPROCX>NPROC,'bug in NPROCX algorithm')             
+       enddo
+    elseif(Pole_singular==2)then
+       !2 poles. divide Y into 2 for max efficiency (load balance)
+       NPROCY=2
+       NPROCX=NPROC/NPROCY
+       if(NPROCX*NPROCY/=NPROC)then
+          NPROCY=1
+          NPROCX=NPROC/NPROCY
+       endif          
+    else
+       !1 pole. divide only in X direction for  max efficiency (load balance)
+       NPROCY=1
+       NPROCX=NPROC/NPROCY
+    endif
+ 
+ 
+    if(GJMAX/NPROCY<min_grids.or.GIMAX/NPROCX<min_grids)then
+       if(MasterProc) write(*,*)'change number of processors, or rundomain ',min_grids
+       call CheckStop(GJMAX/NPROCY<min_grids,'subdomains are too small in Y direction')
+       call CheckStop(GIMAX/NPROCX<min_grids,'subdomains are too small in X direction')
+    endif
+
+56  format(A,I3,A,I3,A)
+66  format(A,I3,A,I5,A)
+    if(MasterProc)then
+       write(*,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC !may be different in future versions
+       write(IO_LOG,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC !may be different in future versions
+       write(*,66)' Divided rundomain into ',NPROCX ,' X',NPROCY ,' subdomains'
+       write(IO_LOG,66)' Divided rundomain into ',NPROCX ,' X',NPROCY ,' subdomains'
+    endif
+
+
+    MAXLIMAX = (GIMAX+NPROCX-1)/NPROCX ! Maximum number of local points in lon
+    MAXLJMAX = (GJMAX+NPROCY-1)/NPROCY !&! Maximum number of local points in lat
 !
 !
 !     Find the x-, y-, and z-addresses of the domain assigned to the
@@ -208,6 +261,14 @@ private
 !
     mey = me/NPROCX
     mex = me - mey*NPROCX
+
+    allocate(tlimax(0:NPROC-1))
+    allocate(tgi0(0:NPROC-1))
+    allocate(tgi1(0:NPROC-1))
+    allocate(tljmax(0:NPROC-1))
+    allocate(tgj0(0:NPROC-1))
+    allocate(tgj1(0:NPROC-1))
+
 !
 !
 !     Find the number of grid points in each direction for this processor.
@@ -313,11 +374,6 @@ private
         call CheckStop( ljmax < min_grids,   &
             "Subdomain too small! Ljmax must be at least min_grids")
 
-
-!   Finally, we set a logical from ModelConstants, which can be used for
-!   specifying the master processor for print-outs and such
-
-        MasterProc = ( me == 0 )
 
     end subroutine parinit
 

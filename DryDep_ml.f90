@@ -3,7 +3,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,7 +50,16 @@ module DryDep_ml
   !   and improving the EMEP ozone deposition module", Atmos.Env.,38,2373-2385
   !
   ! Also, handling of dry/wet and co-dep procedure changed following discussions
-  ! with CEH: Fagerli et al., in preperation....
+  ! with CEH:
+
+  ! Latest documentation and ACP eqn references in code below from
+  !  Simpson, D., Benedictow, A., Berge, H., Bergstr\"om, R., Emberson, L. D.,
+  !  Fagerli, H., Flechard, C. R.,  Hayman, G. D., Gauss, M., Jonson, J. E., 
+  !  Jenkin, M. E., Ny\'{\i}ri, A., Richter, C., Semeena, V. S., Tsyro, S.,
+  !  Tuovinen, J.-P., Valdebenito, \'{A}., and Wind, P.: 
+  !  The EMEP MSC-W chemical transport model -- technical description, 
+  !  Atmos. Chem. Phys., 12, 7825--7865, 2012.
+  
 
  use My_Aerosols_ml,    only : NSIZE  
 
@@ -76,7 +85,7 @@ module DryDep_ml
  use LocalVariables_ml,only : Grid, Sub, L, iL ! Grid and sub-scale Met/Veg data
  use MassBudget_ml,    only : totddep
  use MetFields_ml,     only : u_ref, rh2m
- use MetFields_ml,     only : tau, sdepth, SoilWater, SoilWater_deep, th,pzpbl
+ use MetFields_ml,     only : tau, sdepth, SoilWater_deep, th,pzpbl
  use MicroMet_ml,      only : AerRes, Wind_at_h
  use ModelConstants_ml,only : dt_advec,PT,KMAX_MID, KMAX_BND ,&
                                   DEBUG_i, DEBUG_j, NPROC, &
@@ -88,7 +97,7 @@ module DryDep_ml
 
  use MosaicOutputs_ml,     only : Add_MosaicOutput, MMC_RH
  use OwnDataTypes_ml,      only : depmap
- use Par_ml,               only : li0,li1,lj0,lj1, me
+ use Par_ml,               only : limax,ljmax, me,li0,li1,lj0,lj1
  use PhysicalConstants_ml, only : PI, KARMAN, GRAV, RGAS_KG, CP, AVOG, NMOLE_M3
  use Rb_ml,                only : Rb_gas
  use Rsurface_ml
@@ -140,6 +149,8 @@ module DryDep_ml
    ! The actual species used and their relation to the CDDEP_ indices
    ! above will be defined in Init_DepMap
 
+   !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
        include 'CM_DryDep.inc'
 
    !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -179,8 +190,8 @@ module DryDep_ml
 ! use EcoSystem_ml, only :: EcoSystemFrac, Is_EcoSystem
 
    EcoSystemFrac(:,:,:) = 0.0
-   do j = lj0, lj1
-     do i = li0, li1
+   do j = 1, ljmax
+     do i = 1, limax
        debug_flag = ( DEBUG_ECOSYSTEMS .and. debug_proc .and. &
           i == debug_li .and. j == debug_lj )
 
@@ -409,7 +420,6 @@ module DryDep_ml
          call datewrite("DRYDEP VS",NSIZE,(/ Grid%t2, Grid%rho_ref, Vs /) )
    !      if( maxval(Vs) > 0.02 ) write(*,*) "DRYDEP LIM!"
     end if
-   !  Vs(:) = min( Vs(:), 0.02) 
 
     !/ And start the sub-grid stuff over different landuse (iL)
 
@@ -432,16 +442,15 @@ module DryDep_ml
 
         L = Sub(iL)    ! ! Assign e.g. Sub(iL)ustar to ustar
 
-
              if ( DEBUG_DRYDEP .and. debug_flag ) then
                 write(6,"(a,3i3,f6.1,2i4,3f7.3,i4,i2,2f6.2)") "DVEG: ", &
                     nlu,iiL, iL, glat(i,j), L%SGS, L%EGS, &
                    L%coverage, L%LAI, L%hveg,daynumber, &
                    Grid%sdepth, fSW(i,j),L%t2C !ACB Grid%snow_flag
 
-                write(6,"(a,i4,2f7.2,2es10.2,3f8.3)") "DMET SUB", &
-                  iL, Grid%ustar, L%ustar, Grid%invL, &
-                  L%invL, L%Ra_ref, L%Ra_3m,L%rh
+                write(6,"(a,i4,3f7.2,7es10.2)") "DMET SUB", &
+                  iL, Grid%ustar, L%ustar, L%rh,  Grid%invL, &
+                  L%invL, L%Ra_ref, L%Ra_3m
 
              end if
 
@@ -474,28 +483,30 @@ module DryDep_ml
               if ( LandType(iL)%is_forest  ) then ! Vds NOV08
 
                  !/ Use eqn *loosely* derived from Petroff results
+                 ! ACP67-69
 
                   Vds = GPF_Vds300(L%ustar,L%invL, L%SAI )
-                  if (n==CDDEP_PMfN .and. L%invL<0.0 ) then ! We allow nitrate to deposit x 2
-                       Vds = Vds * 2.0 ! for nitrate-like
-                  end if
 
-              else !!!
+              else !!!  ! ACP67-68
 
                 !/  Use Wesely et al  for other veg & sea
 
                  ! Vds = Nemitz2004( 0.4, L%ustar, L%invL )
                  Vds = Wesely300( L%ustar, L%invL )
-                  ! We allow nitrate to deposit x 2
-                  if (n==CDDEP_PMfN .and. L%invL<0.0 ) then 
-                       Vds = Vds * 2.0 ! for nitrate-like
-                  end if
 
               end if
 
-                ! Use non-electrical-analogy version of Venkatram+Pleim (AE,1999)
-                 Vg_ref(n) =  Vs(nae)/ ( 1.0 - exp( -( L%Ra_ref + 1.0/Vds)* Vs(nae)))
-                 Vg_3m (n) =  Vs(nae)/ ( 1.0 - exp( -( L%Ra_3m  + 1.0/Vds)* Vs(nae)))
+             ! We allow fine N-patricles to deposit x 3, in
+             ! unstable conditions. (F_N in ACP68)
+              if (n==CDDEP_PMfN .and. L%invL<0.0 ) then 
+                   Vds = Vds * 3.0 ! for nitrate-like
+              end if
+
+            ! Use non-electrical-analogy version of Venkatram+Pleim (AE,1999)
+            ! ACP70
+
+              Vg_ref(n) =  Vs(nae)/ ( 1.0 - exp( -( L%Ra_ref + 1.0/Vds)* Vs(nae)))
+              Vg_3m (n) =  Vs(nae)/ ( 1.0 - exp( -( L%Ra_3m  + 1.0/Vds)* Vs(nae)))
 
 
         if ( DEBUG_VDS ) then
@@ -547,14 +558,14 @@ module DryDep_ml
              !QUERY - do we need Gsur for anything now?!
 
              Sub(iL)%Gsur(n) = 1.0/Rsur(n) ! Note iL, not iiL 
-             Sub(iL)%Gns(n)  = Gns(n)  ! Note iL, not iiL 
+             Sub(iL)%Gns(n)  = Gns(n)      ! Note iL, not iiL 
 
              !SUB0 Grid%Gsur(n)  =  Grid%Gsur(n) + L%coverage / Rsur(n)
              !SUB0 Grid%Gns(n)  =  Grid%Gns(n)+ L%coverage * Gns(n)
              Sub(0)%Gsur(n)  =  Sub(0)%Gsur(n) + L%coverage / Rsur(n)
              Sub(0)%Gns(n)   =  Sub(0)%Gns(n)  + L%coverage * Gns(n)
          endif
-         end do !species loop
+             end do !species loop
 
          Sumcover = Sumcover + L%coverage
 
@@ -578,8 +589,9 @@ module DryDep_ml
                call datewrite("DEPO3 ", iL, &
                    (/ Vg_ref(n), Sub(iL)%Vg_ref(n) /) )
                    !(/ Mosaic_VgRef(n,iL) , Vg_ref(n), Sub(iL)%Vg_ref(n) /) )
-               call datewrite("DEPDVG", iL, (/ L%coverage, 1.0*n,& ! gs in cm/s :
-                 L%LAI,100.0*L%g_sto, L%Ra_ref, Rb(n), min( 999.0,Rsur(n) ),  &
+               call datewrite("DEPDVGA", iL, (/ L%coverage, 1.0*n,& 
+                 L%LAI,100.0*L%g_sto, L%Ra_ref, Rb(n), min( 999.0,Rsur(n) ) /) )
+               call datewrite("DEPDVGB", iL, (/ L%coverage, 1.0*n,& 
                 100.0*Vg_3m(n), 100.0*Vg_ref(n), Vg_ratio(n) /) )
             end do
 
@@ -700,6 +712,10 @@ module DryDep_ml
 
          if ( DepLoss(nadv) < 0.0 .or. &
               DepLoss(nadv)>xn_2d(ntot,KMAX_MID) ) then
+             print "(a,2i4,a,es12.4,2f8.4,9es11.4)", "NEGXN ", ntot, ncalc, &
+                 trim(species(ntot)%name), xn_2d(ntot,KMAX_MID), &
+                 Fgas(ntot,KMAX_MID), Fpart(ntot,KMAX_MID), &
+                  DepLoss(nadv), vg_fac(ncalc)
              call CheckStop("NEGXN DEPLOSS" )
          end if
 
@@ -810,16 +826,20 @@ module DryDep_ml
           end if
        end do GASLOOP2 ! n
 
-    !  DryDep Budget terms
 
       convfac =  convfac/amk(KMAX_MID)
-      do n = 1, NDRYDEP_ADV
-         nadv    = DDepMap(n)%ind
-         totddep( nadv ) = totddep (nadv) + DepLoss(nadv)*convfac
-      enddo
+
+    !  DryDep Budget terms
+    !do not include values on outer frame
+      if(.not.(i<li0.or.i>li1.or.j<lj0.or.j>lj1))then
+         
+         do n = 1, NDRYDEP_ADV
+            nadv    = DDepMap(n)%ind
+            totddep( nadv ) = totddep (nadv) + DepLoss(nadv)*convfac
+         enddo
+      endif
 
        convfac2 = convfac * xm2(i,j) * inv_gridarea
-
 
       !.. Add DepLoss to budgets if needed:
 

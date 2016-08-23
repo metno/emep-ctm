@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,7 +44,7 @@ use Io_Nums_ml,             only: IO_TMP, IO_LOG
 use ModelConstants_ml,      only: DEBUG_IOPROG, DEBUG_i, DEBUG_j, DomainName, &
                                   MasterProc, IIFULLDOM, JJFULLDOM
 use KeyValue_ml,            only: KeyVal, KeyValue, LENKEYVAL
-use Par_ml,                 only: me, li0, li1, lj0, lj1
+use Par_ml,                 only: me, limax,ljmax
 use SmallUtils_ml,          only: wordsplit, WriteArray
 use TimeDate_ml,            only: date,current_date
 use TimeDate_ExtraUtil_ml,  only: date2string
@@ -64,7 +64,8 @@ public :: Read2DN       !  Reads x,y,z1...z2 data for simple case
 public :: PrintLog      !  writes message to both RunLog and unit 6
 public :: datewrite     ! writes date then data - helper sub
 private :: datewrite_ia,&   ! int, array vesion
-           datewrite_a      !  array versions
+           datewrite_iia,&  !  array of ints and reals version
+           datewrite_a      !  array of reals
 public :: Self_Test
 
 logical, public :: fexist                      ! true if file exists
@@ -75,7 +76,7 @@ integer, private, parameter :: MAXLINELEN = 9000 ! Max length of ascii inputs
 integer, private, parameter :: MAXHEADERS = 900  ! Max  No. headers
 
 interface datewrite
-  module procedure datewrite_ia,datewrite_a
+  module procedure datewrite_ia,datewrite_iia,datewrite_a
 end interface datewrite
 
 contains
@@ -164,7 +165,7 @@ subroutine check_file(fname,fexist,needed,errmsg)
 
   if(DEBUG_IOPROG)write(unit=6,fmt=*) "check_file::: ", fname
   if ( .not. fexist .and. .not. needed ) then
-    write(unit=6,fmt=*) "not needed, skipping....."
+    write(unit=6,fmt=*) "not needed, skipping....." // trim(fname)
     ios = 0
   elseif ( .not. fexist .and. needed ) then
     ios = -1
@@ -174,7 +175,7 @@ subroutine check_file(fname,fexist,needed,errmsg)
   end if
 end subroutine check_file
 !-------------------------------------------------------------------------
-subroutine open_file(io_num,mode,fname,needed,skip)
+subroutine open_file(io_num,mode,fname,needed,skip,iostat)
 ! Checks for the existence of a file and opens if present. If the
 ! file is specified as "needed", and missing, an error message is
 ! printed and the run is stopped.
@@ -184,6 +185,7 @@ subroutine open_file(io_num,mode,fname,needed,skip)
   character (len=*), intent(in) :: fname    ! file name
   logical, optional, intent(in) :: needed   ! see below
   integer, optional, intent(in) :: skip     ! No. text lines to be skipped
+  integer, optional, intent(out) :: iostat  ! return ios
 
   integer :: i  ! local loop counter
 
@@ -218,6 +220,7 @@ subroutine open_file(io_num,mode,fname,needed,skip)
     print *, "OPEN FILE: Incorrect mode: ", trim(mode)
     ios = -1
   end select
+  if(present(iostat))iostat=ios
 end subroutine open_file
 !-------------------------------------------------------------------------
 subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
@@ -389,7 +392,7 @@ subroutine Read2D(fname,data2d,idata2d)
 
     i = i_local(i_fdom)   ! Convert to local coordinates
     j = j_local(j_fdom)
-    if ( i >= li0 .and. i <= li1 .and. j >= lj0 .and. j <= lj1  ) then
+    if ( i >= 1 .and. i <= limax .and. j >= 1 .and. j <= ljmax  ) then
       Nused = Nused + 1
       if ( DEBUG_IOPROG .and. i_fdom==DEBUG_i .and. j_fdom==DEBUG_j ) &
         write(*,*) "READ TXTINPUT", me, i_fdom, j_fdom," => ",&
@@ -496,7 +499,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
 
     i = i_local(i_fdom)   ! Convert to local coordinates
     j = j_local(j_fdom)
-    if ( i >= 1 .and. i <= li1 .and. j >=1 .and. j <= lj1  ) then
+    if ( i >= 1 .and. i <= limax .and. j >=1 .and. j <= ljmax  ) then
       if ( DEBUG_IOPROG .and. i_fdom==DEBUG_i .and. j_fdom == DEBUG_j )&
         write(*,*)"READ TXTINPUT", me, i_fdom, j_fdom, " => ", i,j,tmp(1)
       data2d(i,j,1:Ndata) = tmp(1:Ndata)
@@ -521,7 +524,7 @@ subroutine datewrite_ia (txt,ii,array,txt_pattern)
     write(*,"(a,1x, i0, 20es11.2)") "dw:" // date2string(txt,current_date), &
       ii, array
   else
-    write(*,"(a,3i3,i5,1x, i0, 20es11.2)") "dw:" // trim(txt), &
+    write(*,"(a,3i3,i5,1x, i0, 20es14.5)") "dw:" // trim(txt), &
       current_date%month, current_date%day, current_date%hour, &
       current_date%seconds, ii, array
   endif
@@ -534,14 +537,38 @@ subroutine datewrite_a (txt,array,txt_pattern)
   logical :: use_pattern=.false.
   use_pattern=.false.;if(present(txt_pattern))use_pattern=txt_pattern
   if(use_pattern)then
-    write(*,"(a,1x, 20es10.0)") "dw:" // date2string(txt,current_date), &
+    write(*,"(a,1x, 20es11.0)") "dw:" // date2string(txt,current_date), &
       array
   else
-    write(*,"(a,3i3,i5,1x, 20es10.3)") "dw:" // trim(txt), &
+    write(*,"(a,3i3,i5,1x, 20es11.3)") "dw:" // trim(txt), &
       current_date%month, current_date%day, current_date%hour, &
       current_date%seconds, array
   endif
 end subroutine datewrite_a
+subroutine datewrite_iia (txt,ii,array,txt_pattern)
+  ! to write out date, integer + supplied data array
+  character(len=*), intent(in) :: txt
+  integer,  dimension(:), intent(in) :: ii  ! arrays of integers, max 5
+  real, dimension(:), intent(in) :: array
+  logical, intent(in), optional :: txt_pattern
+  logical :: use_pattern=.false.
+  integer :: Ni
+  integer,  dimension(5):: iout ! arrays of integers, max 5
+  Ni = size(ii)
+  call CheckStop(Ni>5, "Too many integers in datewrite: only coded for 5")
+  call CheckStop(maxval(ii)>9999, "Too big integer in datewrite_iia: only coded for i5")
+  iout = -1
+  iout(1:Ni) = ii
+  use_pattern=.false.;if(present(txt_pattern))use_pattern=txt_pattern
+  if(use_pattern)then
+    write(*,"(a,1x, 5i5, 20es11.2)") "dw:" // date2string(txt,current_date), &
+      iout, array
+  else
+    write(*,"(a,3i3,i5,1x, 5i5, 20es11.2)") "dw:" // trim(txt), &
+      current_date%month, current_date%day, current_date%hour, &
+      current_date%seconds, iout, array
+  endif
+end subroutine datewrite_iia
 !-------------------------------------------------------------------------
 subroutine Self_Test()
 ! The input files are designed to read nicely in gnumeric and other spread-

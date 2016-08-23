@@ -122,7 +122,7 @@ FUNCTION make_current_date (ts) RESULT (cd)
   INTEGER                       :: yy,mm,dd,hh,min,sc
   call get_ymd(ts%jdate,yy,mm,dd)
   call get_hms(ts%secs,hh,min,sc)
-  cd=date(yy,mm,dd,hh,min*60.0+sc)
+  cd=date(yy,mm,dd,hh,min*60+sc)
 END FUNCTION make_current_date
 
 SUBROUTINE dup_timestamp (ts1,ts2)

@@ -124,7 +124,7 @@ implicit none
   type, public:: Asc2D
     character(len=TXTLEN_DERIV):: name ! Name (no spaces!)
     character(len=TXTLEN_SHORT):: type ! "ADVppbv" or "ADVugm3" or "SHLmcm3"
-    character(len=9) :: ofmt      ! Output format (e.g. es12.4)
+!   character(len=9) :: ofmt      ! Output format (e.g. es12.4)
     integer          :: spec      ! Species number in xn_adv or xn_shl array
                                   ! or other arrays
     integer          :: ix1,ix2   ! bottom-left,upper-right x
@@ -132,7 +132,7 @@ implicit none
     integer          :: nk        ! number of vertical levels
     character(len=TXTLEN_SHORT) :: unit   ! Unit used
     real             :: unitconv   !  conv. factor
-    real             :: max         ! Max allowed value for output
+    real             :: max        ! Max allowed value for output
   end type
 
   !==================

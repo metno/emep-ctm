@@ -73,7 +73,7 @@ contains
                                                      ! output:found
   logical, optional, intent(in) :: fill_needed  ! If field has to fill
                                                 ! whole domain
-  logical, dimension(IIFULLDOM,JJFULLDOM) :: cell_set = .false.
+  logical, dimension(IIFULLDOM,JJFULLDOM) :: cell_set != .false.
   logical :: needed
   character*70 :: errmsg 
   real :: tmpin   ! To allow more than one input line per i,j
@@ -90,6 +90,7 @@ contains
   errmsg = "ok"
 
     if (me==0)then
+       cell_set = .false.
        call open_file(IO_INFILE,"r",fname,needed=needed)
        if(.not.needed .and. ios/=0)then
           write(*,*)trim(fname),' not found (but not needed)'
@@ -142,7 +143,7 @@ contains
                                                   ! output:found
   logical, optional, intent(in) :: fill_needed  ! If field has to fill 
                                                 ! whole domain
-  logical, dimension(IIFULLDOM,JJFULLDOM) :: cell_set = .false.
+  logical, dimension(IIFULLDOM,JJFULLDOM) :: cell_set! = .false.
   logical :: needed
   character*70 :: errmsg 
   integer :: intmp
@@ -162,7 +163,7 @@ contains
        else
 
         call CheckStop(ios,"ReadField: ios error " // fname )
-
+        cell_set = .false.
         READFIELD : do
            read(IO_INFILE,*,iostat=ios) i,j, intmp
            if ( ios /= 0 ) exit READFIELD

@@ -7,9 +7,9 @@ include Makefile.SRCS
 
 ###################################################
 
-LIBS = -lnetcdf
-INCL = -I/global/apps/netcdf/3.6.2/include
-LLIB = -L/global/apps/netcdf/3.6.2/lib
+LIBS = -lnetcdf -lnetcdff
+INCL = -I/global/apps/netcdf/4.1.3/include
+LLIB = -L/global/apps/netcdf/4.1.3/lib
 
 F90 = mpif90
 

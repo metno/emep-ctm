@@ -63,23 +63,54 @@ private
     !  model, as well as cfac (converts from 50m to 1m/3m output)         ! 
     !---------------------------------------------------------------------!
 
-  real, save, public :: &
-     xn_adv (NSPEC_ADV,MAXLIMAX,MAXLJMAX,KMAX_MID)   = 0.0  &
-    ,xn_shl (NSPEC_SHL,MAXLIMAX,MAXLJMAX,KMAX_MID)   = 0.0  &
-    ,xn_bgn (NSPEC_BGN,MAXLIMAX,MAXLJMAX,KMAX_MID)   = 0.0  &
-    ,PM25_water (MAXLIMAX,MAXLJMAX,KMAX_MID)         = 0.0  &  !3D PM water
-    ,PM25_water_rh50 (MAXLIMAX,MAXLJMAX)             = 0.0     !gravimetric PM water
+  real, save, allocatable, public :: &
+     xn_adv(:,:,:,:)  &
+    ,xn_shl(:,:,:,:)  &
+    ,xn_bgn(:,:,:,:) &
+    ,PM25_water(:,:,:) &  !3D PM water
+    ,PM25_water_rh50(:,:)    !gravimetric PM water
 
-  real, public, dimension(MAXLIMAX,MAXLJMAX) :: AOD
+  real, public, save, allocatable:: Fgas3d (:,:,:,:)  ! for SOA
 
-  real, save, public :: &
-     cfac   (NSPEC_ADV,MAXLIMAX,MAXLJMAX) = 1.0    
+  real, public, save, allocatable, dimension(:,:) :: AOD
 
-  real, save, public :: &
-     so2nh3_24hr(MAXLIMAX,MAXLJMAX) = 0.0 !hf CoDep
+  real, save, allocatable, public :: &
+     cfac   (:,:,:)   
 
-  real, save, public :: &
-     Grid_snow(MAXLIMAX,MAXLJMAX) = 0.0 !snow_flag fraction in grid
+  real, save, allocatable, public :: &
+     so2nh3_24hr(:,:)!hf CoDep
+
+  real, save, allocatable, public :: &
+     Grid_snow(:,:) !snow_flag fraction in grid
+
+  public ::alloc_ChemFields
+
+contains
+
+  subroutine alloc_ChemFields
+
+    implicit none
+
+    allocate(xn_adv(NSPEC_ADV,MAXLIMAX,MAXLJMAX,KMAX_MID))
+    xn_adv=0.0
+    allocate(xn_shl(NSPEC_SHL,MAXLIMAX,MAXLJMAX,KMAX_MID))
+    xn_shl=0.0
+    allocate(xn_bgn(NSPEC_BGN,MAXLIMAX,MAXLJMAX,KMAX_MID))
+    xn_bgn=0.0
+    allocate(PM25_water(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    PM25_water=0.0
+    allocate(PM25_water_rh50(MAXLIMAX,MAXLJMAX))
+    PM25_water_rh50=0.0
+    allocate(AOD(MAXLIMAX,MAXLJMAX))
+    allocate(cfac(NSPEC_ADV,MAXLIMAX,MAXLJMAX))
+    cfac=1.0
+    allocate(so2nh3_24hr(MAXLIMAX,MAXLJMAX))
+    so2nh3_24hr=0.0
+    allocate(Grid_snow(MAXLIMAX,MAXLJMAX))
+    Grid_snow=0.0
+
+
+  end subroutine alloc_ChemFields
 
 
 !_____________________________________________________________________________

@@ -1,8 +1,5 @@
 module MetFields_ml
-  use ModelConstants_ml,   only : KMAX_BND,KMAX_MID,NMET &
-       ,IIFULLDOM, JJFULLDOM
-  use Par_ml, only : MAXLIMAX,MAXLJMAX,GIMAX,GJMAX, me  &
-       ,limax,ljmax,li0,li1,lj0,lj1 
+
   implicit none
   private
 
@@ -87,33 +84,33 @@ module MetFields_ml
 
   !   Vertical level geopotential heights:
 
-  real,public, save, &
-       dimension(MAXLIMAX,MAXLJMAX,KMAX_BND) :: z_bnd ! height of full layers
-  real,public, save, &
-       dimension(MAXLIMAX,MAXLJMAX,KMAX_MID) :: z_mid ! height of half layers
+  real,public, save, allocatable,&
+       dimension(:,:,:) :: z_bnd ! height of full layers
+  real,public, save,allocatable, &
+       dimension(:,:,:) :: z_mid ! height of half layers
 
   !   Two sets of Met. fields are read in, and a linear interpolation is made
   !   between these two points in time. NMET  == 2 (two points in time)
   !   note u_xmj, v_xmi are not "real" m/s wind speeds
   !   - they are actually divided by the mapping factor in the perpendicular direction).
   !
-  real,public, save, dimension(0:MAXLIMAX,MAXLJMAX,KMAX_MID,NMET) :: u_xmj 
-  real,public, save, dimension(MAXLIMAX,0:MAXLJMAX,KMAX_MID,NMET) :: v_xmi
+  real,public, save,allocatable, dimension(:,:,:,:) :: u_xmj 
+  real,public, save,allocatable, dimension(:,:,:,:) :: v_xmi
 
 
-  real,public, save, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET) :: &
+  real,public, save,allocatable, dimension(:,:,:,:) :: &
        th      &  ! Potential teperature  ( deg. k )
        ,q      &  ! Specific humidity
        ,roa    &  ! kg/m3
        ,cw        ! cloudwater
-  real,public, save, dimension(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET) :: &
+  real,public, save,allocatable, dimension(:,:,:,:) :: &
         SigmaKz  &! vertical diffusivity in sigma coords
        ,sdot     &! vertical velocity, sigma coords, 1/s
        ,Kz_met    ! vertical diffusivity in sigma coordinates from meteorology
 
 
   ! since pr,cc3d,cc3dmax,cnvuf,cnvdf used only for 1 time layer - define without NMET
-  real,public, save, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID) :: &
+  real,public, save,allocatable, dimension(:,:,:) :: &
         pr      & ! Precipitation
        ,cc3d    & ! 3-d cloud cover (cc3d),
        ,cc3dmax & ! and maximum for layers above a given layer
@@ -121,7 +118,7 @@ module MetFields_ml
   ! QUERY - should xksig be MID, not BND? Is it needed at all?
        ,Kz_m2s     ! estimated Kz, in intermediate sigma levels, m2/s
 
-  real,public, save, dimension(MAXLIMAX,MAXLJMAX,KMAX_BND) :: &
+  real,public, save,allocatable, dimension(:,:,:) :: &
         cnvuf   & ! convective_updraft_flux (kg/s/m2)
        ,cnvdf    ! convective_downdraft_flux (kg/s/m2)
 
@@ -129,14 +126,14 @@ module MetFields_ml
  ! We don't need to calculate u,v for RiB, Kz for all layer in future maybe
  ! Still, for safety  we let this extent to K=1 for now
 
-  real,public, save, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID) :: &
+  real,public, save,allocatable, dimension(:,:,:) :: &
         u_mid   & ! wind u-compnent, m/s (real, not projected)
        ,v_mid     ! wind v-compnent, m/s
   
 
 
 ! Surface fields, interpolated:
- real,public, save, dimension(MAXLIMAX,MAXLJMAX,NMET) :: &
+ real,public, save,allocatable, dimension(:,:,:) :: &
         ps        &! Surface pressure Pa
        ,t2_nwp    & ! Temp 2 m   deg. K
        ,fh        & ! surf.flux.sens.heat W/m^2
@@ -144,7 +141,7 @@ module MetFields_ml
        ,tau       & ! surf. stress  N/m^2
   ! These fields only available for EMEP/PARLAM from 2002 on
        ,rh2m            & !  RH at 2m
-       ,SoilWater       & !  Shallow  (Upper 7.2cm in PARLAM)
+       ,SoilWater_uppr  & !  Shallow  (Upper 7.2cm in PARLAM)
        ,SoilWater_deep  & !  Deep (Next 6x7cm in PARLAM), converted to relative value 
        ,sdepth          & !  Snowdepth, m
        ,ice_nwp             & ! QUERY why real?
@@ -152,29 +149,30 @@ module MetFields_ml
        ,ws_10m    ! wind speed 10m
  
 
- real,public, save, dimension(MAXLIMAX,MAXLJMAX) :: &
+ real,public, save,allocatable, dimension(:,:) :: &
      u_ref             & ! wind speed m/s at 45m (real, not projected)
     ,rho_surf          & ! Surface density
     ,surface_precip    & ! Surface precip mm/hr
     ,Tpot2m            & ! Potential temp at 2m
     ,ustar_nwp         & ! friction velocity m/s ustar^2 = tau/roa
     ,invL_nwp          & ! friction velocity m/s ustar^2 = tau/roa
-    ,pzpbl               ! stores H(ABL) for averaging and plotting purposes, m
-
+    ,pzpbl             & ! stores H(ABL) for averaging and plotting purposes, m
+    ,pwp               & ! Permanent Wilting Point
+    ,fc                  ! Field Capacity
 
 !  temporary placement of solar radiation variations QUERY?
  
-  real, public, dimension(MAXLIMAX, MAXLJMAX), save:: &
+  real, public,allocatable, dimension(:,:), save:: &
        zen          &  ! Zenith angle (degrees)
-      ,coszen=0.0   &  ! cos of zenith angle
+      ,coszen       &  ! cos of zenith angle
       ,Idiffuse     &  ! diffuse solar radiation (W/m^2)
       ,Idirect         ! total direct solar radiation (W/m^2)
 
 
- logical,public, save, dimension(MAXLIMAX,MAXLJMAX) :: &
+ logical,public, save,allocatable, dimension(:,:) :: &
        nwp_sea     ! Sea in NWP mode, determined in HIRLAM from roughness class
 
-  real,public, save, dimension(MAXLIMAX,MAXLJMAX) :: &   !st-dust
+  real,public, save,allocatable, dimension(:,:) :: &   !st-dust
        clay_frac  &  ! clay fraction (%) in the soil
       ,sand_frac     ! sand fraction (%) in the soil
 
@@ -182,6 +180,16 @@ module MetFields_ml
   ! cope with two:
   character(len=10), public, save  :: SoilWaterSource  ! IFS or PARLAM
 
+  real,public, save, allocatable,dimension(:,:) :: &
+    fSW     ! fSW= f(relative extractable water) =  (sw-swmin)/(swFC-swmin)
+
+  real, public, dimension(:,:), save,allocatable  ::&
+         xwf  ! extension of water fraction, save after 1st call
+
+  integer, parameter, public :: NEXTEND = 2 ! no. box to side of (i,j) 
+
+  integer, public, save   :: Nhh &         ! number of field stored per 24 hours
+       ,nhour_first  ! time of the first meteo stored
 ! Logical flags, used to determine if some met fields are present in the
 ! input or not:
   logical, public, save :: &
@@ -189,7 +197,7 @@ module MetFields_ml
     ,foundsdot      & ! If not found: compute using divergence=0
     ,sdot_at_mid    & ! set false if sdot is defined
     ,foundSST       & ! false if no SeaSurfaceT in metdata
-    ,foundSoilWater       & ! false if no SW-shallow
+    ,foundSoilWater_uppr  & ! false if no SW-shallow
     ,foundSoilWater_deep  & ! false if no SW-deep
     ,foundsdepth    & ! false if no snow_flag depth in metdata
     ,foundice       & ! false if no ice_nwp coverage (%) in metdata
@@ -203,6 +211,73 @@ module MetFields_ml
     ,foundu10_met   & ! false if no u10 from meteorology
     ,foundv10_met   & ! false if no v10 from meteorology
     ,foundprecip    & ! false if no precipitationfrom meteorology
-    ,foundcloudwater  !false if no cloudwater found
+    ,foundcloudwater& !false if no cloudwater found
+    ,foundSMI1& ! false if no Soil Moisture Index level 1 (shallow)
+    ,foundSMI3 ! false if no Soil Moisture Index level 3 (deep)
+
+
+  public :: Alloc_MetFields !allocate arrays
+
+contains
+
+subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
+!allocate MetFields arrays arrays
+  implicit none
+  
+  integer, intent(in) ::MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET
+
+    allocate(u_xmj(0:MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+    allocate(v_xmi(MAXLIMAX,0:MAXLJMAX,KMAX_MID,NMET))
+    allocate(th(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+    allocate(q(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+    allocate(roa(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+    allocate(cw(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+    allocate(SigmaKz(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+    allocate(sdot(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+    allocate(Kz_met(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+    allocate(pr(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(cc3d(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(cc3dmax(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(lwc(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(Kz_m2s(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(cnvuf(MAXLIMAX,MAXLJMAX,KMAX_BND))
+    allocate(cnvdf(MAXLIMAX,MAXLJMAX,KMAX_BND))
+    allocate(u_mid(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(v_mid(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(ps(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(t2_nwp(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(fh(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(fl(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(tau(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(rh2m(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(SoilWater_uppr(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(SoilWater_deep(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(sdepth(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(ice_nwp(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(sst(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(ws_10m(MAXLIMAX,MAXLJMAX,NMET))
+    allocate(u_ref(MAXLIMAX,MAXLJMAX))
+    allocate(rho_surf(MAXLIMAX,MAXLJMAX))
+    allocate(surface_precip(MAXLIMAX,MAXLJMAX))
+    allocate(Tpot2m(MAXLIMAX,MAXLJMAX))
+    allocate(ustar_nwp(MAXLIMAX,MAXLJMAX))
+    allocate(invL_nwp(MAXLIMAX,MAXLJMAX))
+    allocate(pzpbl(MAXLIMAX,MAXLJMAX))
+    allocate(pwp(MAXLIMAX,MAXLJMAX))
+    allocate(fc(MAXLIMAX,MAXLJMAX))
+    allocate(xwf(MAXLIMAX+2*NEXTEND,MAXLJMAX+2*NEXTEND)) 
+    allocate(fSW(MAXLIMAX,MAXLJMAX))
+    fSW = 1.0
+    allocate(zen(MAXLIMAX, MAXLJMAX))
+    allocate(coszen(MAXLIMAX, MAXLJMAX))
+    coszen=0.0
+    allocate(Idiffuse(MAXLIMAX, MAXLJMAX))
+    allocate(Idirect(MAXLIMAX, MAXLJMAX))
+    allocate(nwp_sea(MAXLIMAX, MAXLJMAX))
+    allocate(clay_frac(MAXLIMAX, MAXLJMAX))
+    allocate(sand_frac(MAXLIMAX, MAXLJMAX))
+
+
+  end subroutine Alloc_MetFields
 
 end module MetFields_ml

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +26,7 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
 module Rsurface_ml
-use LandDefs_ml,       only : LandDefs
+use LandDefs_ml,       only : LandDefs, LandType
 use CheckStop_ml,      only : CheckStop
 use CoDep_ml,          only : CoDep_factors, humidity_fac, Rns_NH3, Rns_SO2
 use DO3SE_ml,          only : g_stomatal, do3se
@@ -36,16 +36,19 @@ use LocalVariables_ml, only : iL, L, G => Grid
   !      PARsun,PARshade,LAIsunfrac, RgsO, RgsS, is_water, is_forest
   ! G (Grid)  provides snow, sdepth so2nh3ratio, 
 
-use ModelConstants_ml, only: DEBUG_RSUR
+use ModelConstants_ml, only: DEBUG_RSUR, NO_CROPNH3DEP
 use Radiation_ml, only : CanopyPAR
 use TimeDate_ml,  only : current_date
 use Wesely_ml,    only : Wesely_tab2 &  ! Wesely Table 2 for 14 gases
    ,WES_HNO3, WES_NH3,DRx,WES_SO2    ! Indices and Ratio of diffusivities to ozone
 use MetFields_ml, only : foundsdepth, foundice
+use Par_ml,only :me
 implicit none
 private
 
 public   :: Rsurface
+INCLUDE 'mpif.h'
+INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
 
 real, public, save :: Rinc, RigsO, GnsO, RgsS  !hf CoDep 
@@ -196,6 +199,7 @@ contains
 
   !===========================================================================
   !/**  Adjustment for low temperatures (Wesely, 1989, p.1296, left column)
+  !     (ACP63)
 
     lowTcorr = exp(0.2*(-1 -L%t2C))!Zhang,2003 & Erisman 1994
     lowTcorr = min(2.0,lowTcorr)   !Zhang,2003 & Erisman 1994
@@ -246,9 +250,8 @@ contains
               current_date, iL, leafy_canopy, G%Idirect,  L%g_sto
    end if
 
-!Need to find a way to define vegetation outside growing season - Rns_SO2 and NH3 should be used here as well
 
-  !/** Calculate Rinc, Gext 
+  !/** Calculate Rinc, Gext   (ACPs8.6.1)
 
      if(  canopy ) then   
 
@@ -281,15 +284,15 @@ contains
 
      end if !  canopy
 
-        !snow treated as in Zhang 2003
+        !snow treated similar to Zhang 2003
         !But Zhang wse 2*fsnow for ground surface because Sdmax(snow depth when total coverage is assumed)
         !for soils under vegetation is assumed to stay snow covered longer than 'the leafs'
         !but - we have underlying surfaces only for O3 and for simplicity we treat them equally
         !RECONSIDER THIS ESPECIALLY BASED ON SATELITTES
 
         !no snow corrections (or low temperature) for Rinc 
-        !RgsO 'corrected for snow' and low temp
-        !as adviced by Juha-Pekka
+        !RgsO 'corrected for snow' and low temp  (JP)
+
         GigsO=  (1.-fsnow)/do3se(iL)%RgsO   + fsnow/RsnowO
         RigsO = lowTcorr/GigsO +  Rinc
 
@@ -299,8 +302,8 @@ contains
 
    !/ Ozone values....
 
-        !RextO corrected for low temp
-        !as adviced by Juha-Pekka
+      !RextO corrected for low temp (JP)
+
      GnsO   = L%SAI/(RextO * lowTcorr) + 1.0/ RigsO     ! (SAI=0 if no canopy)
 
 
@@ -362,6 +365,22 @@ contains
 
            Rsur(icmp) = 1.0/( L%LAI*DRx(iwes) *L%g_sto + Gns(icmp)  )
 
+         ! Stop NH3 deposition for growing crops 
+         ! Crude reflection of likely emission
+
+           if ( NO_CROPNH3DEP .and. DRYDEP_CALC(icmp) == WES_NH3 ) then
+
+              if ( L%is_crop .and.  L%LAI > 0.1 ) then
+                   if ( DEBUG_RSUR .and. debug_flag .and. L%is_crop ) then 
+                      write(*,"(a,i4,2i4,L2,f8.2)")  "NO_CROPNH3DEP ", &
+                       iL, DRYDEP_CALC(icmp), WES_NH3, L%is_crop, L%LAI
+                   end if
+
+                 Rsur(icmp) =  1.0e10  ! BIG number
+
+              end if
+           end if
+
       ! write(*,"(a20,2i3,3g12.3)")  "RSURFACE Gs  (i): ", iL, icmp, GnsO, Gns_dry, Gns_wet
 
       elseif (L%is_veg) then !vegetation outside growing season
@@ -383,7 +402,8 @@ contains
       end if  ! end of canopy tests 
 
 
-      ! write(*,"(a20,2i3,3g12.3)")  "RSURFACE Rsur(i): ", iL, icmp, Rsur_dry(icmp), Rsur_wet(icmp)
+      if(DEBUG_RSUR.and.debug_flag) write(*,"(a20,2i3,L2,3g12.3)")  &
+             "RSURFACE Rsur(i): ", iL, icmp, L%is_crop,  Rsur(icmp)
 
 
   end do GASLOOP
@@ -391,10 +411,13 @@ contains
 
    if ( DEBUG_RSUR ) then
        if ( debug_flag ) then 
-      write(*,"(a,2i4)")  "RSURFACE DRYDEP_CALC", size(DRYDEP_CALC), DRYDEP_CALC(1)
-      write(*,"(a,i3,2f7.3,5L2)")  "RSURFACE iL, LAI, SAI, LOGIS ", iL, L%LAI, L%SAI, &
-                       L%is_forest, L%is_water, L%is_veg, canopy, leafy_canopy
-      write(*,"(a,i3,4g12.3)")  "RSURFACE xed Gs", iL, do3se(iL)%RgsO,do3se(iL)%RgsS, lowTcorr, Rinc
+      write(*,"(a,2i4)")  "RSURFACE DRYDEP_CALC", &
+            size(DRYDEP_CALC), DRYDEP_CALC(1)
+      write(*,"(a,i3,2f7.3,5L2)")  "RSURFACE iL, LAI, SAI, LOGIS ", &
+            iL, L%LAI, L%SAI, L%is_forest, L%is_water, L%is_veg, &
+              canopy, leafy_canopy
+      write(*,"(a,i3,4g12.3)")  "RSURFACE xed Gs", iL, &
+             do3se(iL)%RgsO,do3se(iL)%RgsS, lowTcorr, Rinc
      end if
    end if
  end subroutine Rsurface

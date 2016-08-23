@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !***************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -45,7 +45,8 @@ use ModelConstants_ml,only: DEBUG_i, DEBUG_j, NLANDUSEMAX, &
                             USE_PFT_MAPS, DEBUG_LANDPFTS, &
                             DEBUG_LANDUSE, NPROC, IIFULLDOM, JJFULLDOM, &
                             DomainName, MasterProc
-use Par_ml,         only: li0, lj0, li1, lj1, MAXLIMAX, MAXLJMAX, &
+use NetCDF_ml,      only: ReadField_CDF,printcdf
+use Par_ml,         only: MAXLIMAX, MAXLJMAX, &
                           limax, ljmax, me
 use SmallUtils_ml,  only: find_index, NOT_FOUND, WriteArray
 use TimeDate_ml,    only: daynumber, effectivdaynumber, nydays, current_date
@@ -93,17 +94,19 @@ private
          ,old_gsun   ! also for flux
  end type LandCov
  !=============================================
- type(LandCov), public, save, dimension(MAXLIMAX,MAXLJMAX) :: LandCover
+ type(LandCov), public, save, allocatable,dimension(:,:) :: LandCover
  !=============================================
 
 
-  integer, public,save,dimension(MAXLIMAX,MAXLJMAX) :: &
+  logical, public,save, allocatable,dimension(:,:) :: likely_coastal 
+
+  integer, public,save, allocatable,dimension(:,:) :: &
           WheatGrowingSeason  ! Growing season (days), IAM_WHEAT =1 for true
  
  ! For some flux work, experimental
 
- real,public,save,dimension(MAXLIMAX,MAXLJMAX) :: water_cover, ice_landcover 
- logical,public,save :: water_cover_set = .false.
+ real,public,save, allocatable,dimension(:,:) :: water_fraction, ice_landcover 
+ logical,public,save :: water_frac_set = .false.
 
  character(len=80), private :: errmsg
 
@@ -112,15 +115,104 @@ contains
 
  !==========================================================================
   subroutine InitLanduse()
-   logical :: filefound
-
+    logical :: filefound
+    real, parameter ::water_fraction_THRESHOLD=0.5
+    integer ::i,j,ilu,lu
+    logical :: debug_flag = .false.
     !=====================================
-     call ReadLandUse(filefound) !=> Land_codes, Percentage cover per grid
 
-     call CheckStop(.not.filefound,"InitLanduse failed!")
+    !ALLOCATE ARRAYS
+    allocate(LandCover(MAXLIMAX,MAXLJMAX))
+    allocate(likely_coastal(MAXLIMAX,MAXLJMAX) )
+    likely_coastal  = .false.
+    allocate(WheatGrowingSeason(MAXLIMAX,MAXLJMAX))
+    allocate(water_fraction(MAXLIMAX,MAXLJMAX), ice_landcover(MAXLIMAX,MAXLJMAX))
 
-     call Init_LandDefs(Land_codes)   ! => LandType, LandDefs
 
+    !ReadLandUse_CDF to be used as default when glc2000 data is improved?
+
+
+    filefound=.false.
+    call ReadLandUse(filefound) !=> Land_codes, Percentage cover per grid
+
+    !ReadLandUse_CDF use Max Posch 5km landuse over emep area and glc200 where this dat is not defined.
+    if(.not.filefound)call ReadLandUse_CDF(filefound) !=> Land_codes, Percentage cover per grid
+
+    call CheckStop(.not.filefound,"InitLanduse failed!")
+
+    call Init_LandDefs(Land_codes)   ! => LandType, LandDefs
+
+
+    ! effectiv daynumber to shift 6 month when in southern hemisphere
+    effectivdaynumber=daynumber
+
+
+    !/ -- Calculate growing seasons where needed and water_fraction
+    !          (for Rn emissions)
+
+    water_fraction(:,:) = 0.0    !for Pb210 
+    ice_landcover(:,:) = 0.0  !for Pb210 
+    likely_coastal(:,:) = .false.   ! already done, but just for clarity
+
+    do i = 1, limax
+       do j = 1, ljmax
+
+          debug_flag = ( debug_proc .and. i == debug_li .and. j == debug_lj )
+          do ilu= 1, LandCover(i,j)%ncodes
+             lu      = LandCover(i,j)%codes(ilu)
+             call CheckStop( lu < 0 .or. lu > NLANDUSEMAX , &
+                  "SetLandUse out of range" )
+
+             if ( LandDefs(lu)%SGS50 > 0 ) then ! need to set growing seasons 
+
+                call Growing_season( lu,abs(glat(i,j)),&  
+                     LandCover(i,j)%SGS(ilu),LandCover(i,j)%EGS(ilu) )
+             else
+                LandCover(i,j)%SGS(ilu) =  LandDefs(lu)%SGS50
+                LandCover(i,j)%EGS(ilu) =  LandDefs(lu)%EGS50
+             end if
+             if ( DEBUG_LANDUSE .and. debug_flag ) &
+                  write(*,"(a,i3,a20,2i4)")"LANDUSE: LU_SETGS", &
+                  lu, LandDefs(lu)%name,&
+                  LandCover(i,j)%SGS(ilu),LandCover(i,j)%EGS(ilu)
+
+
+             !/ for landuse classes with bulk-resistances, we only
+             !  need to specify height once. Dummy values are assigned
+             !  to LAI and gpot:
+
+             if ( LandType(lu)%is_bulk ) then
+                LandCover(i,j)%hveg(ilu) =  LandDefs(lu)%hveg_max
+                LandCover(i,j)%LAI(ilu)  =  0.0          
+                LandCover(i,j)%fphen(ilu) =  0.0          
+             end if
+
+             if ( LandType(lu)%is_water ) water_fraction(i,j) = &
+                  LandCover(i,j)%fraction(ilu)
+             if ( LandType(lu)%is_ice   ) ice_landcover(i,j) = &
+                  LandCover(i,j)%fraction(ilu)
+
+
+          end do ! ilu
+
+!set default values for nwp_sea
+          if(water_fraction(i,j)>water_fraction_THRESHOLD) &
+               nwp_sea(i,j) = .true.
+
+
+          ! We don't want to trust some squares with a mixture of sea
+          ! and land for micromet purposes, e.g. T2 can be very wrong
+          ! We mark these as likely coastal:
+          if ( nwp_sea(i,j) )  then
+             if (  water_fraction(i,j) < 1.0  ) likely_coastal(i,j) = .true.
+          else if ( water_fraction(i,j) > 0.2 ) then
+             likely_coastal(i,j) = .true.
+          end if !
+       end do ! j
+    end do ! i
+
+    water_frac_set = .true.  ! just to inform other routines
+    
   end subroutine InitLanduse
  !==========================================================================
   subroutine ReadLanduse(filefound)
@@ -203,13 +295,15 @@ contains
          
       else
          filefound=.false.
+         if(MasterProc)Write(*,*)'Inputs.Landuse not found'
+         return
          call StopAll('Inputs.Landuse not found') 
       endif
 
- 
+!      call printCDF('LU', landuse_in(:,:,1),'??')
 
-    do i = li0, li1
-       do j = lj0, lj1
+    do i = 1, limax
+       do j = 1, ljmax
            debug_flag = ( debug_proc .and. i == debug_li .and. j == debug_lj ) 
            do lu = 1, NLanduse_DEF
               if ( landuse_in(i,j,lu) > 0.0 ) then
@@ -234,8 +328,8 @@ contains
              if (  sumfrac < 0.99 .or. sumfrac > 1.01 ) then
                write(unit=errmsg,fmt="(a19,3i4,f12.4,8i4)") &
                  "Land SumFrac Error ", me,  &
-                    i_fdom(i),j_fdom(j), sumfrac, li0, li1, lj0, lj1, &
-                       i_fdom(li0), j_fdom(lj0), i_fdom(li1), j_fdom(lj1)
+                    i_fdom(i),j_fdom(j), sumfrac, limax,  ljmax, &
+                       i_fdom(1), j_fdom(1), i_fdom(limax), j_fdom(ljmax)
                call CheckStop(errmsg)
              end if
 
@@ -247,6 +341,111 @@ contains
 
   end subroutine  ReadLanduse
  
+  subroutine ReadLanduse_CDF(filefound)
+    !Read data in other grid and interpolate to present grid
+    !
+    !So far only basic version for use in TNO7. Under construction
+    !
+    implicit none
+    logical :: filefound
+    integer :: i,j,lu, index_lu, maxlufound
+    logical :: debug_flag
+    real :: sumfrac
+
+
+    ! temporary arrays used.  Will re-write one day....
+    real, dimension(MAXLIMAX,MAXLJMAX,NLANDUSEMAX):: landuse_in ! tmp, with all data
+    real, dimension(MAXLIMAX,MAXLJMAX):: landuse_tmp ! tmp, with all data
+    real, dimension(MAXLIMAX,MAXLJMAX,NLUMAX):: landuse_data ! tmp, with all data
+    integer, dimension(MAXLIMAX,MAXLJMAX):: landuse_ncodes ! tmp, with all data
+    integer, dimension(MAXLIMAX,MAXLJMAX,NLUMAX):: landuse_codes ! tmp, with all data
+
+    if ( DEBUG_LANDUSE .and. MasterProc ) &
+         write(*,*) "LANDUSE: Starting ReadLandUse "
+
+
+    if (MasterProc ) write(*,*) "LANDUSE_CDF: experimental so far"
+!    filefound=.false.
+!    return
+
+    maxlufound = 0   
+
+    landuse_ncodes(:,:)   = 0     !/**  initialise  **/
+    landuse_codes(:,:,:)  = 0     !/**  initialise  **/
+    landuse_data  (:,:,:) = 0.0   !/**  initialise  **/
+
+    !hardcoded so far -> to softimize
+
+    NLanduse_DEF=19
+    Land_codes(1) = 'CF' 
+    Land_codes(2) = 'DF' 
+    Land_codes(3) = 'NF' 
+    Land_codes(4) = 'BF' 
+    Land_codes(5) = 'TC' 
+    Land_codes(6) = 'MC' 
+    Land_codes(7) = 'RC' 
+    Land_codes(8) = 'SNL' 
+    Land_codes(9) = 'GR' 
+    Land_codes(10) = 'MS' 
+    Land_codes(11) = 'WE' 
+    Land_codes(12) = 'TU' 
+    Land_codes(13) = 'DE' 
+    Land_codes(14) = 'W' 
+    Land_codes(15) = 'ICE' 
+    Land_codes(16) = 'U' 
+    Land_codes(17) = 'IAM_CR' 
+    Land_codes(18) = 'IAM_DF'
+    Land_codes(19) = 'IAM_MF'
+    do lu=1,NLanduse_DEF
+       !
+       if(me==0)write(*,*)'Reading landuse ',trim(Land_codes(lu))
+       !   call ReadField_CDF('/global/work/mifapw/emep/Data/LanduseGLC.nc',&!fast but unprecise
+       call ReadField_CDF('Landuse_PS_5km.nc',& !SLOW!
+            Land_codes(lu),landuse_in(1,1,lu),1,interpol='conservative', &
+            needed=.true.,debug_flag=.false.,UnDef=-9.9E19) !NB: Undef must be largenegative, 
+!          because it is averagad over many points, and the final result must still be negative
+          call ReadField_CDF('LanduseGLC.nc',&
+               Land_codes(lu),landuse_tmp,1,interpol='conservative', &
+               needed=.true.,debug_flag=.false.)
+          do j = 1, ljmax
+             do i = 1, limax
+                if(landuse_in(i,j,lu)<-0.1)landuse_in(i,j,lu)=landuse_tmp(i,j)
+             end do  !j
+          end do  !i
+    enddo
+     ! call printCDF('LU_cdf', landuse_in(:,:,1),'??')
+
+    do i = 1, limax
+       do j = 1, ljmax
+          do lu = 1, NLanduse_DEF
+             if ( landuse_in(i,j,lu) > 0.0 ) then
+
+                call GridAllocate("LANDUSE",i,j,lu,NLUMAX, &
+                     index_lu, maxlufound, landuse_codes, landuse_ncodes)
+                landuse_data(i,j,index_lu) = &
+                     landuse_data(i,j,index_lu) + landuse_in(i,j,lu)!already in fraction unit
+             endif
+          end do ! lu
+          LandCover(i,j)%ncodes  = landuse_ncodes(i,j)
+          LandCover(i,j)%codes(:) = landuse_codes(i,j,:)
+          LandCover(i,j)%fraction(:)  = landuse_data(i,j,:)
+          sumfrac = sum( LandCover(i,j)%fraction(:) )
+
+          if (  sumfrac < 0.99 .or. sumfrac > 1.01 ) then
+             write(unit=errmsg,fmt="(a19,3i4,f12.4,8i4)") &
+                  "Land SumFrac Error ", me,  &
+                  i_fdom(i),j_fdom(j), sumfrac, limax,  ljmax, &
+                  i_fdom(1), j_fdom(1), i_fdom(limax), j_fdom(ljmax)
+             call CheckStop(errmsg)
+          end if
+
+       end do  !j
+    end do  !i
+
+    filefound=.true.
+
+  end subroutine ReadLanduse_CDF
+
   !=========================================================================
   subroutine  SetLandUse()
     integer :: i,j,ilu,lu ! indices
@@ -256,8 +455,7 @@ contains
     logical :: debug_flag = .false.
     real :: hveg, lat_factor
     real :: xSAIadd
-    real, parameter ::water_fraction_THRESHOLD=0.5
-    integer :: pft
+     integer :: pft
 
 ! Treatment of growing seasons in the southern hemisphere:
 !   all the static definitions (SGS,EGS...) refer to northern hemisphere, 
@@ -270,69 +468,13 @@ contains
         write(*,*) "LANDUSE: SetLandUse, me, day ", me, daynumber, debug_proc
     end if
 
-    if ( my_first_call ) then
-
-     ! effectiv daynumber to shift 6 month when in southern hemisphere
-        effectivdaynumber=daynumber
-
-
-      !/ -- Calculate growing seasons where needed and water_fraction
-      !          (for Rn emissions)
-
-        water_cover(:,:) = 0.0    !for Pb210 
-        ice_landcover(:,:) = 0.0  !for Pb210 
-
-        do i = li0, li1
-          do j = lj0, lj1
-
-             debug_flag = ( debug_proc .and. i == debug_li .and. j == debug_lj )
-             do ilu= 1, LandCover(i,j)%ncodes
-                lu      = LandCover(i,j)%codes(ilu)
-                call CheckStop( lu < 0 .or. lu > NLANDUSEMAX , &
-                                "SetLandUse out of range" )
-
-                if ( LandDefs(lu)%SGS50 > 0 ) then ! need to set growing seasons 
-
-                    call Growing_season( lu,abs(glat(i,j)),&  
-                            LandCover(i,j)%SGS(ilu),LandCover(i,j)%EGS(ilu) )
-                else
-                   LandCover(i,j)%SGS(ilu) =  LandDefs(lu)%SGS50
-                   LandCover(i,j)%EGS(ilu) =  LandDefs(lu)%EGS50
-                end if
-                if ( DEBUG_LANDUSE .and. debug_flag ) &
-                  write(*,"(a,i3,a20,2i4)")"LANDUSE: LU_SETGS", &
-                   lu, LandDefs(lu)%name,&
-                     LandCover(i,j)%SGS(ilu),LandCover(i,j)%EGS(ilu)
-
-
-               !/ for landuse classes with bulk-resistances, we only
-               !  need to specify height once. Dummy values are assigned
-               !  to LAI and gpot:
-
-             if ( LandType(lu)%is_bulk ) then
-                 LandCover(i,j)%hveg(ilu) =  LandDefs(lu)%hveg_max
-                 LandCover(i,j)%LAI(ilu)  =  0.0          
-                 LandCover(i,j)%fphen(ilu) =  0.0          
-             end if
-
-             if ( LandType(lu)%is_water ) water_cover(i,j) = &
-                                          LandCover(i,j)%fraction(ilu)
-             if ( LandType(lu)%is_ice   ) ice_landcover(i,j) = &
-                                          LandCover(i,j)%fraction(ilu)
-             
-
-            end do ! ilu
-            if(.not. foundnwp_sea)then
-               if(water_cover(i,j)>water_fraction_THRESHOLD) &
-                  nwp_sea(i,j) = .true.
-            endif
-          end do ! j
-        end do ! i
-
-        water_cover_set = .true.  ! just to inform other routines
-        my_first_call   = .false.
-
    !======================================================================
+    if ( my_first_call ) then
+       !read in data from file
+        my_first_call   = .false.
+        
+        call InitLanduse()
+
     end if ! my_first_call
    !======================================================================
 
@@ -352,8 +494,8 @@ contains
      end if
 
     
-     do i = li0, li1
-       do j = lj0, lj1
+     do i = 1, limax
+       do j = 1, ljmax
 
           effectivdaynumber=daynumber
          ! effectiv daynumber to shift 6 months when in southern hemisphere
@@ -369,7 +511,11 @@ contains
              lu      = LandCover(i,j)%codes(ilu)
              pft     = LandType(lu)%pft
 
-             if ( LandType(lu)%is_bulk ) cycle    !else Growing veg present:
+             if ( LandType(lu)%is_bulk ) then
+                LandCover(i,j)%LAI(ilu) = 0.0
+                LandCover(i,j)%SAI(ilu) = 0.0
+                cycle    
+             endif!else Growing veg present:
 
              LandCover(i,j)%LAI(ilu) = Polygon(effectivdaynumber, &
                     0.0, LandDefs(lu)%LAImin, LandDefs(lu)%LAImax,&
@@ -451,6 +597,7 @@ contains
     if ( DEBUG_LANDUSE.and.debug_proc ) then
        i=debug_li
        j=debug_lj
+
        do ilu= 1, LandCover(i,j)%ncodes
           lu      = LandCover(i,j)%codes(ilu)
           pft     = LandType(lu)%pft
@@ -462,9 +609,9 @@ contains
               LandCover(i,j)%fphen(ilu), &
              LandCover(i,j)%SGS(ilu), LandCover(i,j)%EGS(ilu)
        end do
-   end if
 
-  end subroutine  SetLandUse
+   end if
+ end subroutine  SetLandUse
 ! =====================================================================
 
 !=======================================================================

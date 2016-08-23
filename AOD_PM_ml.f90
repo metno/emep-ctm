@@ -53,7 +53,7 @@
  !// subroutines
   public ::   AOD_calc 
 
-  real, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID) :: kext 
+  real :: kext 
 
   contains
 
@@ -83,7 +83,6 @@
 
 
   AOD(i,j)     = 0.0
-  kext(i,j,:)  = 0.0
 
   do k =  KCHEMTOP, KMAX_MID   !_______________ vertical layer loop
 
@@ -97,26 +96,27 @@
 !..=>  xn_2d(ispec,k) * species(ispec)%molwt * 1.e6 / AVOG  [g/m3]
 !.. ===========================================================================
 
-    do n = 1, size(AOD_GROUP)
+   kext  = 0.0
+   do n = 1, size(AOD_GROUP)
       itot = AOD_GROUP(n)
 
-      kext(i,j,k) = kext(i,j,k) +   &
+      kext= kext +   &
                     xn_2d(itot,k) * species(itot)%molwt * species(itot)%ExtC        
     enddo
 
-     kext(i,j,k) = kext(i,j,k) * 1.0e6 / AVOG 
+     kext = kext * 1.0e6 / AVOG 
 
 !     if(debug .and. (k == 18 .or. k == KMAX_MID) )  &
-!            write(6,'(a17,i4,es15.3)') '> Ext. coeff', k, kext(i,j,k)
+!            write(6,'(a17,i4,es15.3)') '> Ext. coeff', k, kext
 
 !.. Aerosol extinction optical depth : integral over all vertical layers
 !.. [1/m} * [m]
 
-      AOD(i,j) = AOD(i,j) + kext(i,j,k) * (z_bnd(i,j,k)-z_bnd(i,j,k+1))
+      AOD(i,j) = AOD(i,j) + kext * (z_bnd(i,j,k)-z_bnd(i,j,k+1))
 
 !      if(debug .and. (k == 18 .or. k == KMAX_MID) )  & 
 !      write(6,'(a25,i4,2es15.4,2f8.1)') '>> Kext AOD for layer', k,  &
-!                kext(i,j,k), AOD(i,j), z_bnd(i,j,k), z_bnd(i,j,k+1)
+!                kext, AOD(i,j), z_bnd(i,j,k), z_bnd(i,j,k+1)
 
   enddo                        !_______________ vertical layer loop
 

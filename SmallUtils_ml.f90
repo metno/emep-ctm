@@ -62,7 +62,8 @@ contains
 
 !===========================================================================
 
-subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator)
+subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
+                     strict_separator,empty_words)
 !**************************************************************
 !   Subroutine takes in a character string and splits it into
 !   a word-array, of length nwords
@@ -75,32 +76,42 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator)
 
   character(len=*), dimension(:), intent(out) :: wordarray
   integer,          intent(out) :: nwords      ! No. words found
-  integer,          intent(out) :: errcode      ! No. words found
-  character(len=1), optional, intent(in) ::  separator  ! additional separators
+  integer,          intent(out) :: errcode      ! error status
+  character(len=1), optional, intent(in) ::  &
+                            separator,       &  ! additional separators
+                            strict_separator    ! only this separator
+  logical, optional, intent(in) :: empty_words  ! keep empty strings
 
   !-- local
-  logical   :: wasinword   ! true if we are in or have just left a word
+  logical   :: wasinword,&  ! remove leading spaces on request
+               keep_empty   ! keep empty strings on request
   integer   :: i, is, iw
-  character(len=1) ::  c,s
+  character(len=1) ::  c,s(0:3)
 
   errcode = 0
   wasinword = .false.   !To be safe, with spaces at start of line
   is = 0 ! string index
   iw = 1 ! Word index
-  s=' '
-  if(present(separator))s=separator
+  s(:)=(/' ',' ',',',':'/)
+  if(present(separator))s(0)=separator
+  if(present(strict_separator))s(:)=strict_separator
   wordarray(1) = ""
+  keep_empty=.false.
+  if(present(empty_words))then
+    keep_empty=empty_words
+    wasinword=keep_empty
+  endif
 
   do i = 1, len_trim(text)
     c = text(i:i)
-    if( c /= " " .and. c /= "," .and. c /= ":" .and. c /= s ) then
+    if( all(c/=s) ) then
       is = is + 1
       wordarray(iw)(is:is) = c
       wasinword = .true.
     elseif ( wasinword ) then
       iw = iw + 1
       wordarray(iw) = ""
-      wasinword = .false.
+      wasinword = keep_empty
       is = 0
     endif
   enddo
@@ -111,6 +122,12 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator)
     print *,"Too many words"
   endif
 
+! Remove leading spaces
+  if(keep_empty.or.present(strict_separator))then
+    do iw=1,nwords
+      wordarray(iw)=ADJUSTL(wordarray(iw))
+    enddo
+  endif
 end subroutine wordsplit
 
 !============================================================================
