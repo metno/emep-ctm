@@ -268,7 +268,7 @@ subroutine GetGlobalData(year,month,ibc,used,        &
   SIAtrend%nh4 =f0*SIAtrends(i0)%nh4 + f1*SIAtrends(i1)%nh4
 
   if (MasterProc.and.first_call) then
-     write(unit=txtmsg,fmt="(a,i5,4f8.3)") &
+     write(unit=txtmsg,fmt="(a,2i5,3f8.3)") &
        "BC:trends SOx,NOx,NH3 ", iyr_trend, SIAtrend
      call PrintLog(txtmsg)
   end if

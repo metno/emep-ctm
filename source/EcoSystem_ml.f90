@@ -74,7 +74,7 @@ contains
           !Deriv(name, class,    subc,  txt,           unit
           !Deriv index, f2d, dt_scale, scale, avg? Inst Yr Mn Day
         DepEcoSystem(iEco) = Deriv(  &
-               name, "EcoFrac", "Area",DEF_ECOSYSTEMS(iEco) , unit, &
+               trim(name), "EcoFrac", "Area",trim(DEF_ECOSYSTEMS(iEco)) , trim(unit), &
                   iEco, -99, F, 1.0, F, IOU_YEAR   )
 
         if(DEBUG_ECOSYSTEMS .and. MasterProc) &

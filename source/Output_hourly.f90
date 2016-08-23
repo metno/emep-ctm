@@ -32,16 +32,31 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 !       Calculates and
 !       Outputs hourly concentration (or met) values for a sub-set of the grid.
 !
-!**    REVISION HISTORY:
-!      Extended to produce new file, Hourly.mmyy, every month, 10/5/01 ds
-!      stop_test used instead of stop_all, su, 05/01
-!      Extended for variable format, met, xn_adv or xn_shl, ds, and to use
-!       Asc2D type 19/4/01
-!      Corrected for IRUNBEG, etc., su, 4/01
-!      New, ds, 5/3/99
+!** Surface output
+! Onyl relevant for lowermost model level, meaningless for higher levels.
+! - ADVppbv: instantaneous surface concentrations in ppb.
+! - ADVugXX: instantaneous surface concentrations in ug (ug/m3, ugC/m3, ugS/m3, ugN/m3).
+!   For ug/m3     output, set hr_out%unitconv=to_ug_ADV(ixadv).
+!   For ugX/m3    output, set hr_out%unitconv=to_ug_X(ixadv).
+! - D2D_mean: hourly means comparable to daily output defined on My_Derived_ml.
+! - D2D_inst: instantaneous value used in daily output defined on My_Derived_ml.
+! - D2D_accum: accumulated   alue used in daily output defined on My_Derived_ml.
+! - D2D: D2D_mean/D2D_accum according to the corresponding My_Derived_ml definition.
 !
+!** Column integrated output
+! - COLUMN: 
+!   For ug/m2     output, set hr_out%unitconv=to_ug_ADV(ixadv).
+!   For ugX/m2    output, set hr_out%unitconv=to_ug_X(ixadv).
+!   For molec/cm2 output, set hr_out%unitconv=to_molec_cm2.
+!
+!** Multi-layer output
+!  NLEVELS_HOURLY (My_Outputs_ml) max levels
+!  hr_out%nk levels for each output
+! - BCVppbv: instantaneous grid-centre concentrations in ppb.
+! - BCVugXX: instantaneous grid-centre concentrations in ug (ug/m3, ugC/m3, ugS/m3, ugN/m3).
+!   For ug/m3     output, set hr_out%unitconv=to_ug_ADV(ixadv).
+!   For ugX/m3    output, set hr_out%unitconv=to_ug_X(ixadv).
 !*************************************************************************
-!
   use My_Outputs_ml,    only: NHOURLY_OUT,    & ! No. outputs
                               NLEVELS_HOURLY, & ! No. output levels
                               hr_out,         & ! Required outputs
@@ -51,7 +66,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
   use CheckStop_ml,     only: CheckStop
   use Chemfields_ml,    only: xn_adv,xn_shl,cfac,PM25_water,PM25_water_rh50,AOD
   use ChemGroups_ml,    only: chemgroups
-  use Derived_ml,       only: num_deriv2d        ! D2D houtly output type
+  use Derived_ml,       only: num_deriv2d,nav_2d        ! D2D houtly output type
   use DerivedFields_ml, only: f_2d,d_2d          ! D2D houtly output type
   use OwnDataTypes_ml,  only: Asc2D, Deriv
   use ChemSpecs_shl_ml ,only: NSPEC_SHL          ! Maps indices
@@ -60,7 +75,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
                               debug_proc, debug_li,debug_lj
   use Io_ml,            only: IO_HOURLY
   use ModelConstants_ml,only: KMAX_MID, MasterProc, &
-                              IOU_INST, IOU_HOUR, IOU_YEAR, IOU_HOUR_PREVIOUS, &
+                              IOU_INST, IOU_HOUR, IOU_YEAR, IOU_YEAR_LASTHH, &
                               DEBUG => DEBUG_OUT_HOUR,runlabel1,HOURLYFILE_ending,&
                               FORECAST
   use ModelConstants_ml,only: SELECT_LEVELS_HOURLY !NML
@@ -115,11 +130,17 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
   integer, pointer, dimension(:) :: gspec=>null()       ! group array of indexes
   real,    pointer, dimension(:) :: gunit_conv=>null()  ! & unit conv. factors
 
+  integer, allocatable, dimension(:), save :: navg ! D2D average counter
+
   character(len=len(fileName_hour)) :: filename
+  logical       :: file_exist=.false.
   logical, save :: debug_flag      ! = ( MasterProc .and. DEBUG )
   logical       :: surf_corrected  ! to get 3m values
 
-  logical       :: file_exist=.false.
+  character(len=*), parameter :: &
+    SRF_TYPE(9)=(/"ADVppbv     ","ADVugXX     ","ADVugXXgroup",&
+                  "COLUMN      ","COLUMNgroup ","D2D         ",&
+                  "D2D_mean    ","D2D_inst    ","D2D_accum   "/)
 
   if(NHOURLY_OUT<= 0) then
     if(my_first_call.and.MasterProc.and.DEBUG) &
@@ -141,6 +162,9 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 !     hr_out(ih)%nk  = min(KMAX_MID,hr_out(ih)%nk)
       if(debug_flag) write(*,*) "DEBUG Hourly nk ", ih, hr_out(ih)%nk
     enddo ! ih
+
+    allocate(navg(NHOURLY_OUT)) ! allocate and initialize
+    navg(:)=0.0                 ! D2D average counter
   endif  ! first_call
 
   filename=trim(runlabel1)//date2string(HOURLYFILE_ending,current_date)
@@ -161,8 +185,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       nk  = hr_out(ih)%nk
       CDFtype=Real4 ! can be choosen as Int1,Int2,Int4,Real4 or Real8
       scale=1.
-      if(any(hr_out(ih)%type==(/"ADVppbv     ","ADVugXX     ","ADVugXXgroup",&
-                                "COLUMN      ","COLUMNgroup ","D2D         "/)))nk=1
+      if(any(hr_out(ih)%type==SRF_TYPE))nk=1
       select case(nk)
       case(1)       ! write as 2D
         call Out_netCDF(IOU_HOUR,def1,2,1,hourly,scale,CDFtype,ist,jst,ien,jen,&
@@ -188,12 +211,11 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 
   hourly(:,:) = 0.0 ! initialize
 
-  HLOOP: do ih = 1, NHOURLY_OUT
+  HLOOP: do ih = 0, NHOURLY_OUT
 
     hr_out_type=trim(hr_out(ih)%type)
     hr_out_nk=hr_out(ih)%nk
-    if(any(hr_out_type==(/"ADVppbv     ","ADVugXX     ","ADVugXXgroup",&
-                          "COLUMN      ","COLUMNgroup ","D2D         "/)))hr_out_nk=1
+    if(any(hr_out_type==SRF_TYPE))hr_out_nk=1
 
     KVLOOP: do k = 1,hr_out_nk
 
@@ -222,42 +244,30 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
           if(ik==0)then
             ik=KMAX_MID              ! surface/lowermost level
             if(debug_flag) write(*,*)"DEBUG LOWEST LEVELS", ik, hr_out_type
-            if(any(hr_out_type==(/"BCVppbv     ","BCVugXX     ",&
-                                  "BCVugXXgroup"/)))&
-!                                 "BCVugXXgroup","Out3D       "/)))&
+            select case(hr_out_type)
+            case("BCVppbv","BCVugXX","BCVugXXgroup")
               hr_out_type(1:3)="ADV" ! ensure surface output
-            if(any(hr_out_type==(/"PMwater"/)))&
+            case("PMwater")
               hr_out_type=trim(hr_out_type)//"SRF"
+            case("D2D")
+              if(f_2d(ispec)%avg)then ! averaged variables        
+!               hr_out_type="D2D_inst"   ! output instantaneous values
+                hr_out_type="D2D_mean"   ! output mean values
+              else                    ! accumulated variables
+                hr_out_type="D2D_accum"
+              endif
+            endselect
           else
 !TESTHH QUERY:
             ik=KMAX_MID-ik+1         ! model level to be outputed
-            if(any(hr_out_type==(/"ADVppbv     ","ADVugXX     ","ADVugXXgroup"/)))&
+            select case(hr_out_type)
+            case("ADVppbv","ADVugXX","ADVugXXgroup")
               ik=KMAX_MID            ! all ADV* types represent surface output
+            endselect
           endif
         endif
       endif
 
-   !----------------------------------------------------------------
-   ! Multi-layer output.
-   !  Specify NLEVELS_HOURLY here, and in hr_out defs use either:
-   !    ADVppbv to get surface concentrations (onyl relevant for
-   !            layer k=20 of course - gives meaningless number
-   !            for higher levels).
-   !  Or,
-   !    BCVppbv to get grid-centre concentrations (relevant for all layers).
-   !
-   !  For ug output (ug/m3, ugC/m3, ugS/m3, ugN/m3) use
-   !    ADVugXX to get surface concentrations (only lowermost model level).
-   !  Or,
-   !    BCVppbv to get grid-centre concentrations (model levels).
-   !  For ug/m3     output, set hr_out%unitconv=to_ug_ADV(ixadv).
-   !  For ugX/m3    output, set hr_out%unitconv=to_ug_X(ixadv).
-   !
-   !  For Column integrated output use COLUMN
-   !  For ug/m2     output, set hr_out%unitconv=to_ug_ADV(ixadv).
-   !  For ugX/m2    output, set hr_out%unitconv=to_ug_X(ixadv).
-   !  For molec/cm2 output, set hr_out%unitconv=to_molec_cm2.
-   !----------------------------------------------------------------
 
       if(debug_flag) write(*,"(5a,i4)") "DEBUG Hourly MULTI ",&
               trim(hr_out(ih)%name), " case ", trim(hr_out_type), " k: ",  ik
@@ -469,34 +479,79 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       case("Idiffus")     ! Diffuse radiation (W/m2); Skip Units conv.
         forall(i=1:limax,j=1:ljmax) hourly(i,j) = Idiffuse(i,j)
 
-      case ( "D2D" )
+      case("D2D_inst")
        ! Here ispec is the index in the f_2d arrays
         call CheckStop(ispec<1.or.ispec>num_deriv2d,&
           "ERROR-DEF! Hourly_out: "//trim(hr_out(ih)%name)//", wrong D2D id!")
         if(hr_out(ih)%unit=="") hr_out(ih)%unit = f_2d(ispec)%unit
         unit_conv = hr_out(ih)%unitconv*f_2d(ispec)%scale
-        if(f_2d(ispec)%avg)then           ! non accumulated variables
-          if( debug_flag ) write(*,*) " D2Davg ",&
-          trim(hr_out(ih)%name), ih, ispec, trim(f_2d(ispec)%name), f_2d(ispec)%avg
-          forall(i=1:limax,j=1:ljmax)
-            hourly(i,j) = d_2d(ispec,i,j,IOU_INST) * unit_conv
-          endforall
-        else                              ! hourly accumulated variables
-          if(debug_flag) then
-            i=debug_li
-            j=debug_lj
-            write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR D2Dpre ",&
-              trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
-              d_2d(ispec,i,j,IOU_YEAR), d_2d(ispec,i,j,IOU_HOUR_PREVIOUS),&
-              unit_conv
-          endif
-  
-          forall(i=1:limax,j=1:ljmax)
-            hourly(i,j) = (d_2d(ispec,i,j,IOU_YEAR)&
-                          -d_2d(ispec,i,j,IOU_HOUR_PREVIOUS)) * unit_conv
-            d_2d(ispec,i,j,IOU_HOUR_PREVIOUS)=d_2d(ispec,i,j,IOU_YEAR)
-          endforall
+
+        if(debug_flag) then
+          i=debug_li
+          j=debug_lj
+          write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR "//trim(hr_out_type),&
+            trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
+            d_2d(ispec,i,j,IOU_YEAR), d_2d(ispec,i,j,IOU_YEAR_LASTHH),&
+            unit_conv
         endif
+        forall(i=1:limax,j=1:ljmax)
+          hourly(i,j) = d_2d(ispec,i,j,IOU_INST) * unit_conv
+        endforall
+        if(debug_flag) &
+          write(*,'(a,2i3,2es12.3)')"HHH DEBUG D2D", ispec, ih, &
+            hr_out(ih)%unitconv, hourly(debug_li,debug_lj)
+
+      case("D2D_accum")
+       ! Here ispec is the index in the f_2d arrays
+        call CheckStop(ispec<1.or.ispec>num_deriv2d,&
+          "ERROR-DEF! Hourly_out: "//trim(hr_out(ih)%name)//", wrong D2D id!")
+        if(hr_out(ih)%unit=="") hr_out(ih)%unit = f_2d(ispec)%unit
+        unit_conv = hr_out(ih)%unitconv*f_2d(ispec)%scale
+  
+        if(debug_flag) then
+          i=debug_li
+          j=debug_lj
+          write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR "//trim(hr_out_type),&
+            trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
+            d_2d(ispec,i,j,IOU_YEAR), d_2d(ispec,i,j,IOU_YEAR_LASTHH),&
+            unit_conv
+        endif
+        forall(i=1:limax,j=1:ljmax)
+          hourly(i,j) = (d_2d(ispec,i,j,IOU_YEAR)&
+                        -d_2d(ispec,i,j,IOU_YEAR_LASTHH)) * unit_conv
+          d_2d(ispec,i,j,IOU_YEAR_LASTHH)=d_2d(ispec,i,j,IOU_YEAR)
+        endforall
+        if(debug_flag) &
+          write(*,'(a,2i3,2es12.3)')"HHH DEBUG D2D", ispec, ih, &
+            hr_out(ih)%unitconv, hourly(debug_li,debug_lj)
+
+      case("D2D_mean")
+       ! Here ispec is the index in the f_2d arrays
+        call CheckStop(ispec<1.or.ispec>num_deriv2d,&
+          "ERROR-DEF! Hourly_out: "//trim(hr_out(ih)%name)//", wrong D2D id!")
+        if(hr_out(ih)%unit=="") hr_out(ih)%unit = f_2d(ispec)%unit
+        unit_conv = hr_out(ih)%unitconv*f_2d(ispec)%scale &
+                   /MAX(nav_2d(ispec,IOU_YEAR)-navg(ih),1)
+        navg(ih)=nav_2d(ispec,IOU_YEAR)
+        
+        if(debug_flag) then
+          if(f_2d(ispec)%avg)then           ! averaged variables        
+            write(*,"(a,1x,$)") "OUTHOUR D2D_mean avg"
+          else                              ! accumulated variables --> mean
+            write(*,"(a,1x,$)") "OUTHOUR D2D_mean acc"
+          endif
+          i=debug_li
+          j=debug_lj
+          write(*,"(a,2i4,a,3g12.3)"),&
+            trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
+            d_2d(ispec,i,j,IOU_YEAR), d_2d(ispec,i,j,IOU_YEAR_LASTHH),&
+            unit_conv
+        endif
+        forall(i=1:limax,j=1:ljmax)
+          hourly(i,j) = (d_2d(ispec,i,j,IOU_YEAR)&
+                        -d_2d(ispec,i,j,IOU_YEAR_LASTHH)) * unit_conv
+          d_2d(ispec,i,j,IOU_YEAR_LASTHH)=d_2d(ispec,i,j,IOU_YEAR)
+        endforall
         if(debug_flag) &
           write(*,'(a,2i3,2es12.3)')"HHH DEBUG D2D", ispec, ih, &
             hr_out(ih)%unitconv, hourly(debug_li,debug_lj)
@@ -556,18 +611,8 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
         call Out_netCDF(IOU_HOUR,def1,3,1,hourly,scale,CDFtype,ist,jst,ien,jen,klevel)
       !case default   ! no output
       endselect
-    enddo KVLOOP
-    
+    enddo KVLOOP    
   enddo HLOOP
-  !write out surface pressure at each time step to define vertical coordinates
-  if(NHOURLY_OUT>0)then
-      def1%name='PS'
-      def1%unit='hPa'
-      def1%class='Surface pressure'
-      CDFtype=Real4 ! can be choosen as Int1,Int2,Int4,Real4 or Real8
-      scale=1.
-      call Out_netCDF(IOU_HOUR,def1,2,1,ps(:,:,1)*0.01,scale,CDFtype,ist,jst,ien,jen)     
-  endif
 
 !Not closing seems to give a segmentation fault when opening the daily file
 !Probably just a bug in the netcdf4/hdf5 library.

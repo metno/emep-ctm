@@ -69,6 +69,7 @@ module Biogenics_ml
   use ModelConstants_ml, only : NPROC, MasterProc, TINY, &
                            USE_PFT_MAPS, NLANDUSEMAX, IOU_INST, & 
                            KT => KCHEMTOP, KG => KMAX_MID, & 
+                           EURO_SOILNOX_DEPSCALE, & 
                            DEBUG_BIO, BVOC_USED, MasterProc
   use NetCDF_ml,        only : ReadField_CDF, printCDF
   use OwnDataTypes_ml,  only : Deriv, TXTLEN_SHORT
@@ -112,10 +113,6 @@ module Biogenics_ml
    real,public, save, allocatable, dimension(:,:) :: &
       AnnualNdep, &  ! N-dep in mgN/m2/
       SoilNOx, SoilNH3
-
-  ! To avoid pre-runs of the model for scenario years, we assume that changes
-  ! can ve approximated by EU N emission changes
-   real, public, save :: Ndep_trends = 1.0  ! for scaling assumed soil N-dep
 
 
  ! Set true if LCC read from e.g. EMEP_EuroBVOC.nc:
@@ -644,7 +641,7 @@ module Biogenics_ml
       if( DEBUG_SOILNOX .and. debug_proc ) then
          write(*,*)"Biogenic_ml DEBUG_SOILNOX EURO: ",&
           current_date%day, current_date%hour, current_date%seconds,&
-          USE_EURO_SOILNOX, Ndep_trends
+          USE_EURO_SOILNOX, EURO_SOILNOX_DEPSCALE
       end if
 
       if ( .not. USE_EURO_SOILNOX  ) return ! and fSW has been set to 1. at start
@@ -671,7 +668,7 @@ module Biogenics_ml
            ! We use a factor normalised to 1.0 at 5000 mgN/m2/a
 
              fn = AnnualNdep(i,j)/5000.0 ! scale for now
-             fn = fn * Ndep_trends       ! For e.g. 2030, see Emissions_ml
+             fn = fn * EURO_SOILNOX_DEPSCALE  ! See ModelConstants_ml
 
              ftn = ft * fn * hfac 
 

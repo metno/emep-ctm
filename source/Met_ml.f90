@@ -206,8 +206,22 @@ contains
     real :: nsec                                 ! step in seconds
 
     real :: buff(MAXLIMAX,MAXLJMAX)!temporary metfields
-    integer :: i, j
+    integer :: i, j, isw
     logical :: fexist 
+
+   ! Soil water has many names. Some we can deal with:
+   ! (and all need to end up as SMI)
+    character(len=*), dimension(4), parameter :: possible_soilwater_uppr = (/&
+        "SMI1                " &
+       ,"SMI                 " &
+       ,"soil_water_content  " &
+       ,"soil_wetness_surface" &
+    /)
+    character(len=*), dimension(3), parameter :: possible_soilwater_deep = (/&
+        "SMI3                   " &
+       ,"SMI                    " &
+       ,"deep_soil_water_content" &
+    /)
 
     nr=2 !set to one only when the first time meteo is read
     call_msg = "Meteoread"
@@ -525,94 +539,147 @@ contains
     !
     ! Start with shallow
 
+
 if( USE_DUST .and. .not.USE_SOILWATER ) call StopAll("Inconsistent SM, DUST")
 if( USE_SOILWATER ) then
     SoilWaterSource = "IFS"! use as default?
 
-    namefield='SMI1'
-    call Getmeteofield(meteoname,namefield,nrec,ndim,&
+    do isw = 1, size(possible_soilwater_uppr)
+      namefield=possible_soilwater_uppr(isw)
+      if(MasterProc) write(*,*) "Met_ml: soil water search ", isw, trim(namefield)
+      call Getmeteofield(meteoname,namefield,nrec,ndim,&
         unit,validity, SoilWater_uppr(:,:,nr))
+      if(validity/=field_not_found) then ! found
+        if( index( namefield, "SMI" ) > 0 ) foundSMI1=.true.
+        foundSoilWater_uppr = .true.
+        if( .not.foundSMI1 ) &  ! = 1st call
+           call PrintLog("Met: found SMI1:" // trim( namefield), MasterProc)
+        exit
+      end if
+    end do
+       !?if( .not.foundSMI1 ) call PrintLog("Met: found SMI1", MasterProc)
 
-    if(validity/=field_not_found)then
-       if( .not.foundSMI1 ) call PrintLog("Met: found SMI1", MasterProc)
-       foundSMI1=.true.
-       foundSoilWater_uppr = .true.
-    else
-       
-       namefield='soil_water_content'
-       call Getmeteofield(meteoname,namefield,nrec,ndim,&
-            unit,validity, SoilWater_uppr(:,:,nr))
-       if(validity==field_not_found)then
-          namefield='soil_wetness_surface'
-          call Getmeteofield(meteoname,namefield,nrec,ndim,&
-               unit,validity, SoilWater_uppr(:,:,nr))
-       endif
-       if(validity==field_not_found)then
-          if(MasterProc.and.numt==1)write(*,*)' WARNING: SoilWater_uppr not found '
-          foundSoilWater_uppr = .false.
-          
-       else if ( trim(unit) /= "m" ) then 
-              ! PARLAM/HIRLAM has metres of water in top 7.2 cm
-          
-          if(MasterProc.and.numt==1) &
-               write(*,*)'WARNING: Assuming SoilWater  from IFS'
-          foundSoilWater_uppr = .true.
-          SoilWaterSource = "IFS"
-       else
-          foundSoilWater_uppr = .true.
-          SoilWaterSource = "PARLAM"
-       endif
-    endif
+!SW    if(validity/=field_not_found)then
+!SW       if( .not.foundSMI1 ) call PrintLog("Met: found SMI1", MasterProc)
+!SW       foundSMI1=.true.
+!SW       foundSoilWater_uppr = .true.
+!SW    else
+!SW       namefield='SMI'  ! e.g. RCA data have just SMI. Use for SMI1 and SMI3
+!SW       call Getmeteofield(meteoname,namefield,nrec,ndim,&
+!SW              unit,validity, SoilWater_uppr(:,:,nr))
+!SW       foundSMI1=.true.
+!SW       foundSoilWater_uppr = .true.
+!SW       print *, "TEST RCA SMI ", me, validity
+!SW
+!SW      if ( validity==field_not_found)then
+!SW       
+!SW       namefield='soil_water_content'
+!SW       call Getmeteofield(meteoname,namefield,nrec,ndim,&
+!SW            unit,validity, SoilWater_uppr(:,:,nr))
+!SW       if(validity==field_not_found)then
+!SW          namefield='soil_wetness_surface'
+!SW          call Getmeteofield(meteoname,namefield,nrec,ndim,&
+!SW               unit,validity, SoilWater_uppr(:,:,nr))
+!SW       endif
+!SW       if(validity==field_not_found)then
+!SW          if(MasterProc.and.numt==1)write(*,*)' WARNING: SoilWater_uppr not found '
+!SW          foundSoilWater_uppr = .false.
+!SW          
+!SW       else
+
+       if( foundSoilWater_uppr .and.  trim(unit) == "m" ) SoilWaterSource = "PARLAM"
+
+!SW              ! PARLAM/HIRLAM has metres of water in top 7.2 cm
+!SW          
+!SW          if(MasterProc.and.numt==1) &
+!SW               write(*,*)'WARNING: Assuming SoilWater  from IFS'
+!SW          foundSoilWater_uppr = .true.
+!SW          SoilWaterSource = "IFS"
+!SW       else
+!SW          foundSoilWater_uppr = .true.
+!SW          SoilWaterSource = "PARLAM"
+!SW       endif
+!SW    endif
   end if ! USE_SOILWATER first one
+
   if ( USE_SOILWATER ) then  !just deep here
 
+    do isw = 1, size(possible_soilwater_deep)
+      namefield=possible_soilwater_deep(isw)
+       if(DomainName == "HIRHAM" ) then
+           if(MasterProc.and.numt==1)write(*,*) " Rename soil water in HIRHAM"
+           namefield='soil_water_second_layer'
+       end if
+      if(MasterProc) write(*,*) "Met_ml: deep soil water search ", isw, trim(namefield)
+
+      call Getmeteofield(meteoname,namefield,nrec,ndim,&
+        unit,validity, SoilWater_deep(:,:,nr))
+
+      if(validity/=field_not_found) then ! found
+         if( index( namefield, "SMI" ) > 0 ) foundSMI3=.true.
+         foundSoilWater_deep = .true.
+         if( .not.foundSMI3 ) &  ! = 1st call
+           call PrintLog("Met: found SMI3:" // trim( namefield), MasterProc)
+         exit
+      end if
+    end do
      !========================================
      !In the long term, all meteofile should have Soil Moisture Index defined
      
-     namefield='SMI3'
-     call Getmeteofield(meteoname,namefield,nrec,ndim,&
-          unit,validity, SoilWater_deep(:,:,nr))
-     
-     if(validity/=field_not_found)then
-        if( .not.foundSMI3 ) call PrintLog("Met: found SMI3", MasterProc)
-        foundSMI3=.true.
-        foundSoilWater_deep = .true.
-        
-     else
-        
-        !Search for other fields which can be used for making SMI
-        namefield='deep_soil_water_content'
-        if(DomainName == "HIRHAM" ) then
-           if(MasterProc.and.numt==1)write(*,*) " Rename soil water in HIRHAM"
-           namefield='soil_water_second_layer'
-        end if
-        call Getmeteofield(meteoname,namefield,nrec,ndim,&
-             unit,validity, SoilWater_deep(:,:,nr))
-        if(validity==field_not_found)then
-           if(MasterProc.and.numt==1)write(*,*)' WARNING: ',trim(namefield),' not found '
-           foundSoilWater_deep = .false.
-        else
-           !<<<<<<< process SW <<<<<<<<<<<<<<<<<<<<<<<
-           foundSoilWater_deep = .true.
-           if ( trim(unit) == "m" ) then  ! PARLAM has metres of water
-              SoilWaterSource = "PARLAM"
-           else if(unit(1:5)=='m3/m3')then
-              !IFS has a fairly complex soil water system, with field capacity of 
-              ! up to 0.766 for organic soils. More medium soils have ca. 0.43
-              ! Typical values in January are even down to 0.2. Best to use
-              ! SMI....
-              SoilWaterSource = "IFS"
-           else   ! units not defined yet
-              if(numt==1)write(*,*)trim(unit)
-              call StopAll("Need units for deep soil water")
-           endif
-           
-           if(MasterProc.and.numt==1) write(*,*)'max Met_ml Soilwater_deep: ' // &
-                trim(SoilWaterSource), maxval( SoilWater_deep(:,:,nr) )
-
-        endif !found deep_soil_water_content
-
-     endif !SMI3 found
+!SW     namefield='SMI3'
+!SW     call Getmeteofield(meteoname,namefield,nrec,ndim,&
+!SW          unit,validity, SoilWater_deep(:,:,nr))
+!SW     
+!SW     if(validity/=field_not_found)then
+!SW        if( .not.foundSMI3 ) call PrintLog("Met: found SMI3", MasterProc)
+!SW        foundSMI3=.true.
+!SW        foundSoilWater_deep = .true.
+!SW        
+!SW     else
+!SW       namefield='SMI'  ! e.g. RCA data have just SMI. Use for SMI1 and SMI3
+!SW       call Getmeteofield(meteoname,namefield,nrec,ndim,&
+!SW              unit,validity, SoilWater_uppr(:,:,nr))
+!SW       foundSMI3=.true.
+!SW       foundSoilWater_deep = .true.
+!SW       print *, "TEST RCA SMI DEEP ", me, validity
+!SW
+!SW      if ( validity==field_not_found)then
+!SW        
+!SW        !Search for other fields which can be used for making SMI
+!SW        namefield='deep_soil_water_content'
+!SW        if(DomainName == "HIRHAM" ) then
+!SW           if(MasterProc.and.numt==1)write(*,*) " Rename soil water in HIRHAM"
+!SW           namefield='soil_water_second_layer'
+!SW        end if
+!SW        call Getmeteofield(meteoname,namefield,nrec,ndim,&
+!SW             unit,validity, SoilWater_deep(:,:,nr))
+!SW        if(validity==field_not_found)then
+!SW           if(MasterProc.and.numt==1)write(*,*)' WARNING: ',trim(namefield),' not found '
+!SW           foundSoilWater_deep = .false.
+!SW        else
+!SW           !<<<<<<< process SW <<<<<<<<<<<<<<<<<<<<<<<
+!SW           foundSoilWater_deep = .true.
+            if(  foundSoilWater_deep ) then
+               if ( trim(unit) == "m" ) then  ! PARLAM has metres of water
+                  SoilWaterSource = "PARLAM"
+              else if(unit(1:5)=='m3/m3')then
+!SW              !IFS has a fairly complex soil water system, with field capacity of 
+!SW              ! up to 0.766 for organic soils. More medium soils have ca. 0.43
+!SW              ! Typical values in January are even down to 0.2. Best to use
+!SW              ! SMI....
+                 SoilWaterSource = "IFS"
+              end if
+!SW           else   ! units not defined yet
+!SW              if(numt==1)write(*,*)trim(unit)
+!SW              call StopAll("Need units for deep soil water")
+!SW           endif
+!SW           
+!SW           if(MasterProc.and.numt==1) write(*,*)'max Met_ml Soilwater_deep: ' // &
+!SW                trim(SoilWaterSource), maxval( SoilWater_deep(:,:,nr) )
+!SW
+            endif !found deep_soil_water_content
+!SW
+!SW     endif !SMI3 found
 
 
      if ( DEBUG_SOILWATER.and.debug_proc ) then
@@ -691,7 +758,7 @@ if( USE_SOILWATER ) then
     real,   dimension(MAXLIMAX,KMAX_MID) :: vrcv   ! and in y direction
 
     real   divt, p1, p2
-    real   prhelp_sum,divk(KMAX_MID),sumdiv
+    real   prhelp_sum,divk(KMAX_MID),sumdiv,dB_sum
     real   inv_METSTEP
 
     integer :: i, j, k, kk, nr,info, ii,jj,ii2,jj2
@@ -1204,6 +1271,8 @@ if( USE_SOILWATER ) then
 !see http://www.ecmwf.int/research/ifsdocs/DYNAMICS/Chap2_Discretization3.html#959545
 
 !(note that u_xmj and v_xmi have already been divided by xm here)
+    dB_sum=1.0/(B_bnd(KMAX_MID+1)-B_bnd(1))!normalisation factor for dB (should be one if entire atmosphere is included)
+ 
     do j = 1,ljmax
        do i = 1,limax
           Pmid=Ps_extended(i,j)! without "-PT"
@@ -1223,7 +1292,7 @@ if( USE_SOILWATER ) then
 
           Etadot(i,j,KMAX_MID+1,nr)=0.0
           do k=KMAX_MID,1,-1
-             Etadot(i,j,k,nr)=Etadot(i,j,k+1,nr)-dB(k)*sumdiv+divk(k)
+             Etadot(i,j,k,nr)=Etadot(i,j,k+1,nr)-dB(k)*dB_sum*sumdiv+divk(k)
              Etadot(i,j,k+1,nr)=Etadot(i,j,k+1,nr)*(dA(k)/Pref+dB(k))/(dA(k)+dB(k)*Pmid)
 !             Etadot(i,j,k+1,nr)=Etadot(i,j,k+1,nr)/(Ps_extended(i,j)-PT) gives same result as sdot for sigma coordinates
           enddo
@@ -2953,7 +3022,7 @@ if( USE_SOILWATER ) then
     integer :: varID,ndims
     integer :: ncFileID,status
     real :: scale,offset
-    character *100 :: period_read
+    character *100 :: period_read=' '
     character *200,save :: filename_save='notsaved'
     integer,save :: ncFileID_save=-99
    

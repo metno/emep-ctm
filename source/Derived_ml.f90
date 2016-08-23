@@ -99,7 +99,7 @@ use ModelConstants_ml, only: &
   ,FORECAST     & ! only dayly (and hourly) output on FORECAST mode
   ,NTDAY        & ! Number of 2D O3 to be saved each day (for SOMO)
   ! output types corresponding to instantaneous,year,month,day
-  ,IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_HOUR_PREVIOUS, IOU_HOUR, IOU_HOUR_MEAN
+  ,IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_YEAR_LASTHH, IOU_HOUR, IOU_HOUR_MEAN
 
 use MosaicOutputs_ml, only: nMosaic, MosaicOutput
 use OwnDataTypes_ml, only: Deriv,TXTLEN_DERIV,TXTLEN_SHORT ! type & length of names
@@ -146,7 +146,7 @@ private
   ! fields we use daily outputs. For the big 3d fields, monthly output
   ! is sufficient.
 
-   integer, public, parameter ::  LENOUT2D = IOU_HOUR_PREVIOUS  ! Allows INST..DAY,H.PREV. for 2d fields
+   integer, public, parameter ::  LENOUT2D = IOU_YEAR_LASTHH  ! Allows INST..DAY,H.PREV. for 2d fields
    integer, public, parameter ::  LENOUT3D = IOU_DAY            ! Allows INST..DAY for 3d fields
 
   !will be used for:
