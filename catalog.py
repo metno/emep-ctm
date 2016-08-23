@@ -17,7 +17,7 @@ _CONST={
 }
 
 def parse_arguments():
-  from optparse import OptionParser,OptionGroup
+  from optparse import OptionParser,OptionGroup,SUPPRESS_HELP
   from os.path import dirname
   from sys      import argv as args
 
@@ -58,7 +58,7 @@ Examples:
   group.add_option("-S","--status",
     type="int", metavar="YEAR",
     action="store", dest="status",
-    help="YEAR's status report")
+    help=SUPPRESS_HELP) # help="YEAR's status report")
   group.add_option("-Y","--year",
     type="int", metavar="YEAR",
     action="store", dest="year",
