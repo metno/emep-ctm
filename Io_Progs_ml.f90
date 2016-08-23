@@ -169,9 +169,10 @@ subroutine check_file(fname,fexist,needed,errmsg)
     ios = 0
   elseif ( .not. fexist .and. needed ) then
     ios = -1
-    print *, "ERROR: Missing!!! in check-file"
+    if(MasterProc) print *, "ERROR: Missing!!! in check-file:" // trim(fname)
+    call CheckStop("Missing!!! in check-file:" // trim(fname))
   else
-    write(unit=6,fmt=*) "Reading ",trim(fname)
+    if(MasterProc) write(unit=6,fmt=*) "IO check_file: Reading ",trim(fname)
   end if
 end subroutine check_file
 !-------------------------------------------------------------------------
@@ -537,7 +538,7 @@ subroutine datewrite_a (txt,array,txt_pattern)
   logical :: use_pattern=.false.
   use_pattern=.false.;if(present(txt_pattern))use_pattern=txt_pattern
   if(use_pattern)then
-    write(*,"(a,1x, 20es11.0)") "dw:" // date2string(txt,current_date), &
+    write(*,"(a,1x, 20es11.3)") "dw:" // date2string(txt,current_date), &
       array
   else
     write(*,"(a,3i3,i5,1x, 20es11.3)") "dw:" // trim(txt), &

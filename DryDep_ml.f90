@@ -3,7 +3,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-2013 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -72,11 +72,13 @@ module DryDep_ml
  use ChemSpecs_adv_ml         ! several species needed
  use ChemSpecs_tot_ml, only : NSPEC_TOT, FIRST_SEMIVOL, LAST_SEMIVOL, &
                                NO2, SO2, NH3, O3
- use DO3SE_ml,         only : do3se, f_phen
+ use DO3SE_ml,         only : do3se
  use EcoSystem_ml,     only : EcoSystemFrac, Is_EcoSystem,  &
                              NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS
  use GridValues_ml ,   only : GRIDWIDTH_M,xmd,xm2, glat,dA,dB, &
-          debug_proc, debug_li, debug_lj, i_fdom, j_fdom   ! for testing
+       glon,   debug_proc, debug_li, debug_lj, i_fdom, j_fdom   ! for testing
+ 
+ use Io_Nums_ml,       only : IO_SPOD
  use Io_Progs_ml,      only : datewrite
  use Landuse_ml,       only : SetLandUse, Land_codes  & 
                               ,NLUMAX &  ! Max. no countries per grid
@@ -102,7 +104,8 @@ module DryDep_ml
  use Rb_ml,                only : Rb_gas
  use Rsurface_ml
  use Setup_1dfields_ml,    only : xn_2d,amk, Fpart, Fgas
- use SoilWater_ml,         only : fSW !  =1.0 always for now with EC metdata. Can change with PARLAM
+ use Sites_ml, only : nlocal_sites, site_x, site_y, site_name, site_gn
+ use SoilWater_ml,         only : fSW !  =1.0 unless set by Met_ml
  use StoFlux_ml,  only:   unit_flux, &! = sto. flux per m2
                           lai_flux,  &! = lai * unit_flux
                           Setup_StoFlux, Calc_StoFlux  ! subs
@@ -120,6 +123,7 @@ module DryDep_ml
  INCLUDE 'mpif.h'
  INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
+  integer, private, save :: P != IO_SPOD + me
   ! Maps from adv index to one of calc indices
   integer, public, save, dimension(NSPEC_ADV) :: DepAdv2Calc 
 
@@ -290,7 +294,12 @@ module DryDep_ml
       real :: Vg_3mN           ! Crude nitrate correction
 
       real :: c_hveg, Ra_diff, surf_ppb  ! for O3 fluxes and Fst where needed
-      real :: c_hveg3m  !TESTS ONLY
+      real :: c_hveg3m, o3_45m  !TESTS ONLY
+! temporary for POD/SPOD
+logical, parameter :: SPOD_OUT = .false.  ! MAKES HUGE FILES. Not for routine use!
+logical, save      :: first_spod = .true.
+character(len=20), save :: fname
+integer :: nglob
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! Extra outputs sometime used. Important that this 
 !! line is kept at the end of the variable definitions and the start of real
@@ -388,6 +397,8 @@ module DryDep_ml
                xn_2d(SO2,KMAX_MID) / max(1.0,xn_2d(NH3,KMAX_MID))
 
     Grid%so2nh3ratio24hr = so2nh3_24hr(i,j)
+    Grid%latitude = glat(i,j) !SPOD tests
+    Grid%longitude = glon(i,j)
 
   ! Surrogate for NO2 compensation point approach, assuming 
   ! c.p.=4 ppb (actually use 1.0e11 #/cm3):        
@@ -435,7 +446,12 @@ module DryDep_ml
           iL_fluxes (nFlux) = iL    ! for eco dep
         end if
 
-        f_phen   = LandCover(i,j)%fphen(iiL)
+        Sub(iL)%f_phen = LandCover(i,j)%fphen(iiL) !FEB2013
+        Sub(iL)%f_sun  = 0.0 !FEB2013 for SPOD_OUT
+        Sub(iL)%g_sun  = 0.0 !FEB2013 for SPOD_OUT
+        Sub(iL)%g_sto  = 0.0 !FEB2013 for SPOD_OUT
+        Sub(iL)%f_temp = 0.0 !FEB2013 for SPOD_OUT. Can 
+        Sub(iL)%f_vpd  = 0.0 !FEB2013 for SPOD_OUT
 
         Sub(iL)%SGS = LandCover(i,j)%SGS(iiL)   !used for AOT CHECK?
         Sub(iL)%EGS = LandCover(i,j)%EGS(iiL)
@@ -443,10 +459,10 @@ module DryDep_ml
         L = Sub(iL)    ! ! Assign e.g. Sub(iL)ustar to ustar
 
              if ( DEBUG_DRYDEP .and. debug_flag ) then
-                write(6,"(a,3i3,f6.1,2i4,3f7.3,i4,i2,2f6.2)") "DVEG: ", &
+                write(6,"(a,3i3,f6.1,2i4,3f7.3,i4,9f8.3)") "DVEG: ", &
                     nlu,iiL, iL, glat(i,j), L%SGS, L%EGS, &
                    L%coverage, L%LAI, L%hveg,daynumber, &
-                   Grid%sdepth, fSW(i,j),L%t2C !ACB Grid%snow_flag
+                   Grid%sdepth, fSW(i,j),L%fSW,L%t2C
 
                 write(6,"(a,i4,3f7.2,7es10.2)") "DMET SUB", &
                   iL, Grid%ustar, L%ustar, L%rh,  Grid%invL, &
@@ -459,8 +475,9 @@ module DryDep_ml
 
          call Rsurface(i,j,DRYDEP_GASES ,Gns,Rsur,errmsg,debug_flag,snow_iL)
 
-           Sub(iL)%g_sto = L%g_sto   ! needed elsewhere
-           Sub(iL)%g_sun = L%g_sun
+           !Sub(iL)%g_sto = L%g_sto   ! needed elsewhere
+           !Sub(iL)%g_sun = L%g_sun
+         Sub(iL) = L  !Resets Sub with new L values frmom Rsurface FEB2013
 
          Grid_snow(i,j) = Grid_snow(i,j) +  L%coverage * snow_iL 
 
@@ -511,12 +528,12 @@ module DryDep_ml
 
         if ( DEBUG_VDS ) then
             if ( debug_flag .or. (Vg_3m(n)>0.50 .or. Vg_ref(n)>0.50 )) then
-              print "(a,5i3,2i4,2f7.3,f8.2,20f7.2)", "AEROCHECK", imm, idd, ihh, &
+              write(*,"(a,5i3,2i4,2f7.3,f8.2,20f7.2)") "AEROCHECK", imm, idd, ihh, &
               n, iL, i_fdom(i), j_fdom(j), L%ustar,  L%invL, pzpbl(i,j), &
                 Grid%ustar, Grid%Hd,  100.0*Vds, &
               100.0*Vs(nae), 100.0*Vg_ref(n),  100.0*Vg_3m (n) &
              , Grid%t2, Grid%rho_ref 
-               print "(a,2i4,3es10.3)", "VDS CHECK ",n, nae, Vds, Vg_ref(n)
+               write(*,"(a,2i4,3es10.3)") "VDS CHECK ",n, nae, Vds, Vg_ref(n)
             
             call CheckStop((Vg_3m(n)>0.50 .or. Vg_ref(n)>0.50 ), "AEROSTOP")
           end if
@@ -619,12 +636,13 @@ module DryDep_ml
            c_hveg = xn_2d(FLUX_TOT,KMAX_MID)  &     ! #/cm3 units
                         * ( 1.0-Ra_diff*Vg_ref(n) )
 
-          if ( DEBUG_AOT .and. debug_flag ) then
-              write(*, "(a,3i3,i5,i3, 3f9.3,f5.2,9es10.3)") &
+          if ( DEBUG_AOT .and. debug_flag .and. iL==1 ) then
+              !preO3 = xn_2d(FLUX_TOT,KMAX_MID)*surf_ppb
+              write(*, "(a,3i3,i5,i3, 3f9.3,2f5.2,9es10.3)") &
                "CHVEG ", imm, idd, ihh, current_date%seconds,  iL, &
                   xn_2d(FLUX_TOT,KMAX_MID)*surf_ppb, c_hveg*surf_ppb,&
                    c_hveg3m * surf_ppb, &
-                   100.0*Vg_ref(n), L%Ra_ref, (L%Ra_ref-L%Ra_3m), Ra_diff, Rb(n),Rsur(n)
+                   100.0*Vg_ref(n), 100.0*Vg_3m(n), L%Ra_ref, (L%Ra_ref-L%Ra_3m), Ra_diff, Rb(n),Rsur(n)
           end if
            
 
@@ -662,7 +680,7 @@ module DryDep_ml
         end if
 
         if ( DEBUG_DRYDEP .and. debug_flag ) then
-            call datewrite("DEP VGR snow_flag Vg", (/ Grid%sdepth, & !ACB Grid%snow_flag
+            call datewrite("DEP VGR snow_flag Vg", (/ Grid%sdepth, & 
              !SUB0 (/ (100.0*Grid%Vg_Ref(n), n = 1, min(4,NDRYDEP_GASES )) , &
                 (100.0*Sub(0)%Vg_Ref(n), n = 1, min(4,NDRYDEP_GASES )) , &
                 (100.0*Sub(iL)%Vg_Ref(n), n = 1, min(4,NDRYDEP_GASES )) /) )
@@ -722,6 +740,7 @@ module DryDep_ml
 
          if ( ntot == O3 ) then 
 
+           o3_45m = xn_2d(O3,KMAX_MID)*surf_ppb !store for consistency of SPOD outputs
            Grid%surf_o3_ppb = xn_2d(O3,KMAX_MID)*gradient_fac( ncalc )*surf_ppb
 
            Grid%O3factor = vg_fac(ncalc)
@@ -738,8 +757,8 @@ module DryDep_ml
 
 
         if ( ntot == FLUX_TOT ) then
+
            ! fraction by which xn is reduced - safety measure:
-             
               if( xn_2d( ntot,KMAX_MID)  > 1.0e-30 ) then
                   lossfrac = ( 1.0 - DepLoss(nadv)/ &
                                 (DepLoss(nadv)+xn_2d( ntot,KMAX_MID)))
@@ -749,6 +768,14 @@ module DryDep_ml
                   !SUB0 Grid%Vg_Ref(n), DepLoss(nadv), vg_fac(ncalc), lossfrac /) )
                     Sub(0)%Vg_Ref(n), DepLoss(nadv), vg_fac(ncalc), lossfrac /) )
                   call CheckStop( lossfrac < 0.1, "ERROR: LOSSFRAC " )
+              end if
+
+              if ( DEBUG_AOT .and. debug_flag ) then !FEB2013 testing
+                write(*, "(a,3i3,i5,i3, 3f9.3,2f6.2,9es10.3)") &
+                 "CHVEGX", imm, idd, ihh, current_date%seconds,  me, &
+                  xn_2d(FLUX_TOT,KMAX_MID)*surf_ppb, c_hveg*surf_ppb,&
+                   c_hveg3m * surf_ppb, &
+                   100.0*Vg_ref(n), 100.0*Vg_3m(n)
               end if
         end if
 
@@ -846,6 +873,69 @@ module DryDep_ml
        call Add_MosaicOutput(debug_flag,i,j,convfac2,&
            DepAdv2Calc, fluxfrac_adv, Deploss ) 
 
+
+      !----------------------------------------------------------------
+      ! HUGE OUTPUTS. Not for routine use ! 
+       if (SPOD_OUT ) then   ! Extra outputs for ICP folkks
+          if ( first_spod .and. nlocal_sites > 0  ) then
+      P = IO_SPOD + me
+      write(fname,"(a,i2.2)") "OutputSPOD", me
+      open(P, file=fname)
+            write(P,"(a25,a5)",advance="no") adjustl("name"), "code"
+            write(P,"(3a4)",advance="no")   "SGS", "EGS", "jd"
+            write(P,"(3a3)",advance="no")   "mm", "dd", "hh"
+            write(P,"(a7)",advance="no")  "cover"
+            write(P,"(2a7)",advance="no")  "t2C", "ustar"
+            write(P,"(3a7)",advance="no") "G-rh2m","L-rh","L-vpd"
+            write(P,"(2a8)",advance="no")  "PARsun", "PARshd"
+            write(P,"(2a7)",advance="no") "G45-O3","G3-O3"
+           !if ( LandType(iL)%flux_wanted ) then
+            write(P,"(a7)",advance="no") "CO3ppb"
+            write(P,"(2a10)",advance="no") "CO3nmole","FstO3"
+            ! Some params have value -999 unless sun shining...
+            write(P,"(5a7)",advance="no") &
+                  "fphen", "f_L","f_T","f_D", "fenv" 
+            write(P,"(a7,2a10)",advance="no")  "fsun", "gsto", "gsun"
+            !write(P,"(a)",advance="yes") ";"
+            write(P,*)
+           !end if
+            first_spod = .false.
+          end if ! first spod
+
+        if( iss==0 .and. nlocal_sites > 0  )then
+         do  n = 1, nlocal_sites
+            if( i == site_x(n) .and. j == site_y(n) ) then 
+               nglob = site_gn(n)  ! number in global list
+!        if( iss==0 .and. debug_proc.and.  i==debug_li .and. j==debug_lj)then
+       
+         do iiL = 1, nlu
+            iL  = iL_used(iiL)
+            L   = Sub(iL)
+          !print *, "SPOD_OUT:"//trim(fname), me,nlocal_sites, iL, imm, idd, ihh
+            write(P,"(a25,a8)",advance="no") adjustl(site_name(nglob)), adjustl(LandDefs(iL)%code)
+            write(P,"(3i4)",advance="no")   L%SGS, L%EGS, daynumber
+            write(P,"(3i3)",advance="no")   imm, idd, ihh
+            write(P,"(f7.3)",advance="no")  L%coverage
+            write(P,"(2f7.2)",advance="no") L%t2C,L%ustar
+            write(P,"(3f7.3)",advance="no") Grid%rh2m,L%rh,L%vpd
+            write(P,"(2f8.1)",advance="no") L%PARsun,L%PARshade
+            write(P,"(2f7.2)",advance="no") o3_45m,Grid%surf_o3_ppb
+           if ( LandType(iL)%flux_wanted ) then
+            write(P,"(f7.2)",advance="no") L%cano3_ppb
+            write(P,"(2es10.3)",advance="no") L%cano3_nmole,L%FstO3
+            ! Some params have value -999 unless sun shining...
+            write(P,"(5f7.2)",advance="no") &
+                 L%f_phen,max(-1.,L%f_light),max(-1.,L%f_temp),max(-1.,L%f_vpd), L%f_env 
+            write(P,"(f7.3,2es10.3)",advance="no") L%f_sun, L%g_sto, L%g_sun
+           end if
+            !write(P,"(a)",advance="yes") ";"
+            write(P,*) 
+         end do !iL
+        end if
+         end do !sites
+        end if !iss
+      end if !SPOD_OUT
+     !SPOD----------------------------------------------------
  end subroutine drydep
 
 end module DryDep_ml

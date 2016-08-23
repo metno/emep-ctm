@@ -57,7 +57,7 @@ real, public, dimension(NSPEC_ADV), save  :: &
   to_ug_N,    & ! conversion to ug of N
   to_ug_S       ! conversion to ug of S
 
-type, private :: umap
+type, public :: umap
   character(len=TXTLEN_SHORT)  :: utxt,units    ! short,NetCDF units
   real, dimension(0:NSPEC_ADV) :: uconv         ! conversion factor
 endtype umap
@@ -68,7 +68,7 @@ type, public :: group_umap
   real,   pointer,dimension(:) :: uconv=>null() ! conversion factor
 endtype group_umap
 
-type(umap), public, save :: unit_map(18)=(/&
+type(umap), public, save :: unit_map(19)=(/&
 ! Air concentration
   umap("mix_ratio","mol/mol",1.0),&  ! Internal model unit
   umap("ppb" ,"ppb" ,PPBINV),&
@@ -90,6 +90,7 @@ type(umap), public, save :: unit_map(18)=(/&
 ! Aerosol optical properties
   umap("ext" ,"ext550nm",extX),&! ext* units need to be further multiplied...
 ! Coulumn output
+  umap("ugm2"   ,"ug/m2",ugXm3),&  ! ug* units need to be further multiplied
   umap("mcm2"   ,"molec/cm2"    ,to_molec_cm2),&
   umap("e15mcm2","1e15molec/cm2",to_molec_cm2*1e-15)/)
 
@@ -113,7 +114,7 @@ subroutine Init_Units()
 
  do i=1,size(unit_map)
    select case (unit_map(i)%utxt)
-    case("ug","mg","uBq","uBqh","mBq")
+    case("ug","mg","uBq","uBqh","mBq","ugm2")
       uconv_spec = species_adv%molwt
     case("ugC","mgC")
       uconv_spec = species_adv%carbons
@@ -154,6 +155,7 @@ subroutine Group_Units_Asc2D(hr_out,gspec,gunit_conv,debug,name)
     trim(dname),(trim(species_adv(gspec(i))%name),gspec(i),i=1,size(gspec))
 
   i=find_index(hr_out%unit,unit_map(:)%utxt)
+!!if(i>0)hr_out%unit=unit_map(i)%units
   if(i<1)i=find_index(hr_out%unit,unit_map(:)%units)
   call CheckStop(i<1,"Group_Units Error: Unknown unit "//trim(hr_out%unit))
 
@@ -199,22 +201,25 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
   integer :: i
 
   if(Initialize_Units) call Init_Units
-  txt=ADJUSTL(txtin) ! Remove leading spaces
+  txt=ADJUSTL(txtin)                    ! Remove leading spaces
+  do i=1,len(txt)                       ! Remove invisible character
+    if(ichar(txt(i:i))==0)txt(i:i)=' '  ! char(0)
+  enddo
   select case (txt)
   case("ugSS","ugSS/m3","ugP","ugP/m3",&
        "mgSS","mgSS/m2","mgP","mgP/m2")
     txt=txt(1:2)
   case("mol/mol","mole mole-1","mixratio")
     txt="mix_ratio"
- !case default
- !  txt=txtin
+  case("ppbv")
+    txt="ppb"
   endselect
   i=find_index(txt,unit_map(:)%utxt)
   if(i<1)i=find_index(txt,unit_map(:)%units)
   call CheckStop(i<1,"Units_Scale Error: Unknown unit "// trim(txtin) )
 
   if(present(unitstxt))unitstxt = unit_map(i)%units
-  if(present(volunit )) volunit = any(txt==(/"ppb","ppbh","ppb h"/))
+  if(present(volunit )) volunit = txt(1:3)=="ppb"
   if(present(needroa )) needroa = any(txt(1:2)==(/"ug","uB","ex"/))
   select case (iadv)
   case (-1)

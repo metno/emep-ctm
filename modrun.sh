@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Minimalistic script for run the Unified EMEP model
 
 # Link the input data
@@ -12,7 +11,7 @@ trendyear=2010              # emission year
 runlabel1=Base              # short label
 runlabel2=Opensource_setup  # long label
 startdate="2010 01 01"      # start date (metdata)
-  enddate="2010 12 31"      # end date (metdata)
+  enddate="2010 01 01"      # end date (metdata)
 
 # Put the run parameters in a temporary file
 cat > INPUT.PARA << EOF

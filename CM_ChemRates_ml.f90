@@ -19,7 +19,7 @@
 
     integer, parameter, public :: NRCT = 93   !! No. coefficients
 
-    real, save, public, dimension(NRCT,KCHEMTOP:KMAX_MID) :: rct
+    real, allocatable, save, public, dimension(:,:) :: rct
 
   contains
   !------------------------------------
@@ -27,6 +27,10 @@
      real, dimension(KCHEMTOP:KMAX_MID) :: log300divt, logtdiv300
 !     real, dimension(KCHEMTOP:KMAX_MID) :: BranchingNO
 !     real, dimension(KCHEMTOP:KMAX_MID) :: BranchingHO2
+     logical,save::first_call=.true.
+     if(first_call)then
+       allocate(rct(NRCT,KCHEMTOP:KMAX_MID))
+     endif	
        log300divt(:) = log(300.0*tinv(:))
        logtdiv300(:) = log(temp(:)/300.0)
 !       BranchingNO(:) = 1.0e-11*xn_2d(NO,:)/ &
@@ -162,6 +166,6 @@
        rct(91,:) = 4e-12*FGAS(NON_C_BSOA_UG1E3,:) 
        rct(92,:) = EC_AGEING_RATE() 
        rct(93,:) = EC_AGEING_RATE() 
-
+       first_call=.false.
   end subroutine set_rct_rates
 end module  ChemRates_rct_ml

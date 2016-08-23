@@ -53,7 +53,6 @@ use ChemGroups_ml,    only: Init_ChemGroups
 use DefPhotolysis_ml, only: readdiss
 use Derived_ml,       only: Init_Derived, iou_min, iou_max
 use DerivedFields_ml, only: f_2d, f_3d
-use DO3SE_ml,         only: Init_DO3SE 
 use EcoSystem_ml,     only: Init_EcoSystems
 use Emissions_ml,     only: Emissions, newmonth
 use ForestFire_ml,    only: Fire_Emis
@@ -71,10 +70,9 @@ use ModelConstants_ml,only: MasterProc, &   ! set true for host processor, me==0
                             runlabel2,  &   ! explanatory text
                             nprint,nterm,iyr_trend,                       &
                             IOU_INST,IOU_HOUR, IOU_YEAR,IOU_MON, IOU_DAY, &
-                            USE_CONVECTION, USE_SOILWATER, USE_SOILNOX,  &
-                            USE_FOREST_FIRES, USE_DUST,DO_SAHARA, &
-                            USE_LIGHTNING_EMIS, USE_ROADDUST,     &
+                            USE_FOREST_FIRES, USE_LIGHTNING_EMIS, &
                             FORECAST       ! FORECAST mode
+use ModelConstants_ml,only: Config_ModelConstants
 use NetCDF_ml,        only: Init_new_netCDF
 use OutputChem_ml,    only: WrtChem, wanted_iou
 use Par_ml,           only: me, GIMAX, GJMAX, Topology, parinit
@@ -143,10 +141,11 @@ call CheckStop(digits(1.0)<50, &
 
 
 if (MasterProc) then
-  open(IO_RES,file='eulmod.res')
   open(IO_LOG,file='RunLog.out')
   open(IO_TMP,file='INPUT.PARA')
 endif
+
+call Config_ModelConstants(IO_LOG)
 
 call read_line(IO_TMP,txt,status(1))
 read(txt,*) iyr_trend
@@ -177,19 +176,7 @@ if( MasterProc ) then
   call PrintLog( date2string("enddate   = YYYYMMDD",enddate  (1:3)) )
   write(unit=txt,fmt="(a,i4)") "iyr_trend= ", iyr_trend
 !  call PrintLog( trim(txt) )
-!  write(unit=IO_LOG,fmt="(a12,4i4)")"RunDomain:  ", RUNDOMAIN
 
-  ! And record some settings to RunLog (will recode later)
-  if(  FORECAST       ) call PrintLog("Forecast mode on")
-  call PrintLog("Options used of (convec., soilwater, soilnox, forest fires)")
-  if(  USE_CONVECTION ) call PrintLog("Convection used")
-  if(  USE_SOILWATER  ) call PrintLog("SoilWater  switch on")
-  if(  USE_SOILNOX   ) call PrintLog("SoilNOx    switch on")
-  if(  USE_FOREST_FIRES)call PrintLog("ForestFires switch on")
-  call PrintLog("Options used of (dust, sahara)")
-  if(  USE_DUST        )call PrintLog("Dust switch on")
-  if(  USE_ROADDUST    )call PrintLog("Road Dust switch on")
-  if(  DO_SAHARA       )call PrintLog("Sahara switch on")
 endif
 
 !*** Timing ********
@@ -249,11 +236,6 @@ call Emissions(current_date%year)
 
 
 call MetModel_LandUse(1)   !
-
-! Read data for DO3SE (deposition O3 and  stomatal exchange) module
-! (also used for other gases!)
-call Init_DO3SE(IO_DO3SE,"Inputs_DO3SE.csv",Land_codes, errmsg)
-call CheckStop(errmsg, "Reading DO3SE ")
 
 call Init_EcoSystems()     ! Defines ecosystem-groups for dep output
 
@@ -349,7 +331,7 @@ do numt = 2, nterm + nadd         ! 3-hourly time-loop
     if (DEBUG_UNI) print *, "Into BCs" , me
     ! We set BCs using the specified iyr_trend
     !   which may or may not equal the meteorology year
-    call BoundaryConditions(current_date%year,iyr_trend,mm)
+    call BoundaryConditions(current_date%year,mm)
     if (DEBUG_UNI) print *, "Finished BCs" , me
   endif
 

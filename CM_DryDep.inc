@@ -1,4 +1,4 @@
-  integer, public, parameter ::  NDRYDEP_ADV  = 64
+  integer, public, parameter ::  NDRYDEP_ADV  = 62
   type(depmap), public, dimension(NDRYDEP_ADV), parameter:: DDepMap= (/ &
         depmap( IXADV_O3, CDDEP_O3, -1) & 
       , depmap( IXADV_NO2, CDDEP_NO2, -1) & 
@@ -19,8 +19,6 @@
       , depmap( IXADV_NO3_f, CDDEP_PMfN, -1) & 
       , depmap( IXADV_NO3_c, CDDEP_PMc, -1) & 
       , depmap( IXADV_NH4_f, CDDEP_PMfN, -1) & 
-      , depmap( IXADV_V1702A02B_f, CDDEP_PMfS, -1) & 
-      , depmap( IXADV_V1702A02B_c, CDDEP_PMc, -1) & 
       , depmap( IXADV_POM_f_WOOD, CDDEP_PMfS, -1) & 
       , depmap( IXADV_POM_f_FFUEL, CDDEP_PMfS, -1) & 
       , depmap( IXADV_POM_c_FFUEL, CDDEP_PMc, -1) & 

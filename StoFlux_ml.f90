@@ -29,7 +29,7 @@ module StoFlux_ml
   use CheckStop_ml
   use DO3SE_ml, only : do3se, nSumVPD, SumVPD_LC
   use Io_Progs_ml, only : current_date, datewrite
-  use LandDefs_ml, only : LandType, STUBBLE,NLanduse_DEF, iLC_grass
+  use LandDefs_ml, only : LandType, STUBBLE, iLC_grass
   use LocalVariables_ml, only : L, Grid, Sub
   use MicroMet_ml, only : AerRes, Wind_at_h
   use ModelConstants_ml, only : NLANDUSEMAX, dt_advec, DEBUG_STOFLUX
@@ -107,6 +107,7 @@ contains
     i = Grid%i
     j = Grid%j
 
+
     LC_LOOP: do iiL = 1, nLC
         iL = iL_used(iiL) 
         L = Sub(iL)
@@ -165,7 +166,9 @@ contains
           Sub(iL)%FstO3 = L%cano3_nmole * rc_leaf/(rb_leaf+rc_leaf) * L%g_sun 
 
           if( DEBUG_STOFLUX .and. debug_flag ) then
-            call datewrite("STOFLUX ", iL, (/ L%cano3_nmole, L%cano3_ppb /) )
+            !write(*,*) "StoFlux SXXS", iL, nLC, iL, L%hveg, L%cano3_nmole, L%g_sun
+            call datewrite("StoFlux O3 ", (/ iiL, nLC, iL /),&
+                (/ L%hveg, L%g_sun, L%cano3_nmole, L%cano3_ppb /) )
           end if
 
 ! ======   CLOVER  ===========================================================
@@ -224,8 +227,8 @@ contains
          !                 (rb_leaf/1.6 + 0.0224*(L%t2/273.0) 
 
 
-          if ( DEBUG_STOFLUX .and. debug_flag ) then 
-            call datewrite("STO ", iL, (/ L%LAI, L%g_sto, L%g_sun, u_hveg,&
+          if ( DEBUG_STOFLUX .and. debug_flag.and. current_date%seconds==0 ) then 
+            call datewrite("StoFlux VALS ", iL, (/ L%LAI, L%g_sto, L%g_sun, u_hveg,&
                              Sub(iL)%cano3_ppb, Sub(iL)%FstO3, gvcms /) )
           end if
 

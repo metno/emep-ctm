@@ -144,7 +144,8 @@
 
         ipoll = find_index("DUST_WB_F", species(:)%name )
         dust_found = .true.
-        if( ipoll < 1 ) then
+        inat_DUf  = find_index( "DUST_WB_F", EMIS_BioNat(:) )
+        if( ipoll < 1 .or. inat_DUf < 1 ) then
             call PrintLog( "WARNING: Dust asked for, but not found"&
                   ,MasterProc)
             dust_found = .false.
@@ -158,7 +159,6 @@
 
         end if
         if(DEBUG_DUST.and.MasterProc) print *, "DUSTI ", ipoll, dust_found, debug_proc
-          !FEB2012 call CheckStop( ipoll < 1, "Dust asked for, but not found")
 
           my_first_call = .false.
 
@@ -169,10 +169,10 @@
  !++++++++++++++++++++++++++++
  if ( .not. dust_found  .or.  & 
      (glat(i,j)>65.0 .and. glon(i,j)>50.0)) then  ! Avoid dust production in N. Siberia
-       EmisNat( inat_DUf,i,j) = 0.0
-       EmisNat( inat_DUc,i,j) = 0.0
-       rcemis( itot_DUf,KMAX_MID) = 0.0
-       rcemis( itot_DUc,KMAX_MID) = 0.0
+       if( inat_DUf>0) EmisNat( inat_DUf,i,j) = 0.0
+       if( inat_DUc>0) EmisNat( inat_DUc,i,j) = 0.0
+       if( itot_DUf>0) rcemis( itot_DUf,KMAX_MID) = 0.0
+       if( itot_DUf>0) rcemis( itot_DUc,KMAX_MID) = 0.0
     return 
  end if
  !++++++++++++++++++++++++++++
@@ -309,21 +309,19 @@
 ! 
 ! (Note, v_h2o should not end up negative here, see Met_ml.f90)
 
-     v_h2o = pwp(i,j) + SoilWater(i,j,1) * (fc(i,j)-pwp(i,j) )
-  ! call CheckStop(v_h2o <= 0.0 ,  "DUSTY DRY" )
+  v_h2o = pwp(i,j) + SoilWater(i,j,1) * (fc(i,j)-pwp(i,j) )
+
   if( v_h2o < SMALL ) then
    print "(a,2i4,9f10.4)"," DUSTY DRY!!",  i_fdom(i), j_fdom(j), &
       v_h2o, pwp(i,j), fc(i,j), SoilWater(i,j,1), water_fraction(i,j)
-  ! v_h2o = max( 1.0e-12, v_h2o) 
+     !v_h2o = max( 1.0e-12, v_h2o) 
    call CheckStop(v_h2o <= 0.0 ,  "DUSTY DRY" )
   end if
-  if( v_h2o > fc(i,j) ) then
-   write(*,"(a,2i4,9f10.4)")," DUSTY WET!!",  i_fdom(i), j_fdom(j), &
+  if( v_h2o > fc(i,j) + 0.00001  ) then
+   print "(a,2i4,9f10.4)"," DUSTY WET!!",  i_fdom(i), j_fdom(j), &
     v_h2o, pwp(i,j), fc(i,j), SoilWater(i,j,1), water_fraction(i,j)
 
-   if( v_h2o > fc(i,j)+0.00001 ) then
     call CheckStop(v_h2o > fc(i,j),  "DUSTY WET" )
-   end if
 
   end if
 
@@ -625,6 +623,11 @@
   inat_DUc = find_index( "DUST_WB_C", EMIS_BioNat(:) )
   itot_DUf = find_index( "DUST_WB_F", species(:)%name    )
   itot_DUc = find_index( "DUST_WB_C", species(:)%name    )
+
+  if ( itot_DUf < 1 ) then
+      write(*,*) "DUST species not found!"
+      return
+  end if
 
   dust_indices = (/   inat_DUf,  inat_DUc /)  
 

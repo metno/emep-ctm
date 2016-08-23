@@ -67,6 +67,7 @@ Module GridValues_ml
   use PhysicalConstants_ml, only : GRAV, PI ! gravity, pi
   use TimeDate_ml,          only : current_date, date,Init_nmdays,nmdays,startdate
   use TimeDate_ExtraUtil_ml,only : nctime2idate,date2string
+  use InterpolationRoutines_ml,only: inside_1234
 
   implicit none
   private
@@ -93,7 +94,6 @@ Module GridValues_ml
   !** 1) Public (saved) Variables from module:
   INCLUDE 'mpif.h'
   INTEGER STATUS(MPI_STATUS_SIZE),INFO
-  real MPIbuff
 
   real, public, save :: &
        xp, yp  &   ! Coordinates of North pole (from infield)
@@ -116,32 +116,36 @@ Module GridValues_ml
   integer, public, allocatable, save,dimension(:) :: j_local  !of full-domain i,j
 
   !Parameters for Vertical Hybrid coordinates:
-  real, public, save,  dimension(KMAX_BND) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        A_bnd !Unit Pa.  first constant, defined at layer boundary
   ! (i.e. half levels in EC nomenclature)
-  real, public, save,  dimension(KMAX_BND) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        B_bnd !Unit 1.  second constant, defined at layer boundary
   ! (i.e. half levels in EC nomenclature)
-  real, public, save,  dimension(KMAX_MID) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        A_mid !Unit Pa.  first constant, defined at middle of layer
   ! (i.e. full levels in EC nomenclature)
-  real, public, save,  dimension(KMAX_MID) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        B_mid !Unit 1.  second constant, defined at middle of layer
   ! (i.e. full levels in EC nomenclature)
-  real, public, save,  dimension(KMAX_MID) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        dA !Unit Pa.  A_bnd(k+1)-A_bnd(k) 
-  real, public, save,  dimension(KMAX_MID) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        dB !Unit 1.  B_bnd(k+1)-B_bnd(k) 
   ! P = A + B*PS
   ! eta = A/Pref + B
+  real, public, save,allocatable,  dimension(:) ::  &
+       Eta_bnd ! sigma, layer boundary 
+  real, public, save,allocatable,  dimension(:) ::  &
+       Eta_mid ! sigma, layer boundary 
 
-  real, public, save,  dimension(KMAX_BND) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        sigma_bnd ! sigma, layer boundary 
 
-  real, public, save,  dimension(KMAX_MID) ::  &
+  real, public, save,allocatable,  dimension(:) ::  &
        sigma_mid   ! sigma layer midpoint
 
-  real, public, save,  dimension(KMAX_MID) ::  carea    ! for budgets?
+  real, public, save,allocatable,  dimension(:) ::  carea    ! for budgets?
 
   real, public, save,allocatable,  dimension(:,:) :: &
        glon       &         !longitude of gridcell centers
@@ -195,6 +199,7 @@ Module GridValues_ml
   integer, public, parameter :: MIN_ADVGRIDS = 5 !minimum size of a subdomain
   integer, public :: Poles(2) !Poles(1)=1 if North pole is found, Poles(2)=1:SP
   integer, public :: Pole_Singular !Pole_included=1 or 2 if the grid include at least one pole and has lat lon projection
+  logical, public :: Grid_Def_exist
 
 
 contains
@@ -213,7 +218,7 @@ contains
     integer                    :: KMAX,MIN_GRIDS
     character (len = 100),save :: filename !name of the input file
     character (len=230) :: txt
-
+    logical :: Use_Grid_Def=.false.!Experimental for now
 
     nyear=startdate(1)
     nmonth=startdate(2)
@@ -223,14 +228,30 @@ contains
     call Init_nmdays( current_date )
 
     !*********initialize grid parameters*********
+    filename='Grid_Def.nc'
+    inquire(file=filename,exist=Grid_Def_exist)
+    Grid_Def_exist=Grid_Def_exist.and.Use_Grid_Def
+    if(Grid_Def_exist)then
+    if(MasterProc)write(*,*)'Found Grid_Def! ',trim(filename)
+    else
+    if(MasterProc.and.Use_Grid_Def)write(*,*)'Did not found Grid_Def ',trim(filename)
 56  FORMAT(a5,i4.4,i2.2,i2.2,a3)
     write(filename,56)'meteo',nyear,nmonth,nday,'.nc'
- 
+    endif
     if(MasterProc)write(*,*)'reading domain sizes from ',trim(filename)
 
     call GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,Pole_Singular,projection)
 
-    call CheckStop(KMAX_MID/=KMAX,"vertical cordinates not yet flexible")
+!    call CheckStop(KMAX_MID/=KMAX,"vertical cordinates not yet flexible")
+
+    KMAX_MID=KMAX
+    KMAX_BND=KMAX_MID+1
+
+    allocate(A_bnd(KMAX_BND),B_bnd(KMAX_BND))
+    allocate(A_mid(KMAX_MID),B_mid(KMAX_MID))
+    allocate(dA(KMAX_MID),dB(KMAX_MID))
+    allocate(sigma_bnd(KMAX_BND),sigma_mid(KMAX_MID),carea(KMAX_MID))
+    allocate(Eta_bnd(KMAX_BND),Eta_mid(KMAX_MID))
 
     allocate(i_local(IIFULLDOM))
     allocate(j_local(JJFULLDOM))
@@ -261,8 +282,7 @@ contains
     call Alloc_GridFields(GIMAX,GJMAX,MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND)
 
     call Getgridparams(filename,GRIDWIDTH_M,xp,yp,fi,&
-         ref_latitude,sigma_mid,Nhh,nyear,nmonth,nday,nhour,nhour_first&
-         ,cyclicgrid)
+         ref_latitude,sigma_mid,cyclicgrid)
 
 
     if(MasterProc .and. DEBUG_GRIDVALUES)then
@@ -306,7 +326,7 @@ contains
        status = nf90_open(path=trim(filename),mode=nf90_nowrite,ncid=ncFileID)
        if(status /= nf90_noerr) then
           print *,'not found',trim(filename)
-          call StopAll("File not found")
+          call StopAll("GridValues: File not found")
        endif
 
        !          print *,'  reading ',trim(filename)
@@ -331,15 +351,15 @@ contains
           call check(nf90_inq_dimid(ncid = ncFileID, name = "j", dimID = jdimID))
        endif
 
-       call check(nf90_inq_dimid(ncid = ncFileID, name = "k", dimID = kdimID))
-       call check(nf90_inq_dimid(ncid = ncFileID, name = "time", dimID = timeDimID))
-       call check(nf90_inq_varid(ncid = ncFileID, name = "time", varID = timeVarID))
+       status=nf90_inq_dimid(ncid = ncFileID, name = "k", dimID = kdimID)
+       if(status /= nf90_noerr)then
+          call check(nf90_inq_dimid(ncid = ncFileID, name = "lev", dimID = kdimID))       
+       endif
 
        !get dimensions length
        call check(nf90_inquire_dimension(ncid=ncFileID,dimID=idimID,len=GIMAX_file))
        call check(nf90_inquire_dimension(ncid=ncFileID,dimID=jdimID,len=GJMAX_file))
        call check(nf90_inquire_dimension(ncid=ncFileID,dimID=kdimID,len=KMAX_file))
-!       call check(nf90_inquire_dimension(ncid=ncFileID,dimID=timedimID,len=Nhh))
 
        write(*,*)'dimensions input grid:',GIMAX_file,GJMAX_file,KMAX_file!,Nhh
 
@@ -383,8 +403,7 @@ contains
 
 
   subroutine Getgridparams(filename,GRIDWIDTH_M,xp,yp,fi,&
-       ref_latitude,sigma_mid,Nhh,nyear,nmonth,nday,nhour,nhour_first&
-       ,cyclicgrid)
+       ref_latitude,sigma_mid,cyclicgrid)
     !
     ! Get grid and time parameters as defined in the meteo file
     ! Do some checks on sizes and dates
@@ -402,17 +421,16 @@ contains
     implicit none
 
     character (len = *), intent(in) ::filename
-    integer, intent(in):: nyear,nmonth,nday,nhour
     real, intent(out) :: GRIDWIDTH_M,xp,yp,fi, ref_latitude,sigma_mid(KMAX_MID)
-    integer, intent(out):: Nhh,nhour_first,cyclicgrid
+    integer, intent(out):: cyclicgrid
 
-    integer :: nseconds(1),n1,i,j,im,jm,i0,j0
+    integer :: nseconds(1),n1,i,j,k,im,jm,i0,j0
     integer :: ncFileID,idimID,jdimID, kdimID,timeDimID,varid,timeVarID
     integer :: GIMAX_file,GJMAX_file,KMAX_file,ihh,ndate(4)
     !    realdimension(-1:GIMAX+2,-1:GJMAX+2) ::xm_global,xm_global_j,xm_global_i
     real,allocatable,dimension(:,:) ::xm_global,xm_global_j,xm_global_i
     integer :: status,iglobal,jglobal,info,South_pole,North_pole,Ibuff(2)
-    real :: ndays(1),x1,x2,x3,x4
+    real :: ndays(1),x1,x2,x3,x4,P0
     character (len = 50) :: timeunit
  
     allocate(xm_global(-1:GIMAX+2,-1:GJMAX+2))
@@ -423,15 +441,15 @@ contains
        call CheckStop(GIMAX+IRUNBEG-1 > IIFULLDOM, "GridRead: I outside domain" )
        call CheckStop(GJMAX+JRUNBEG-1 > JJFULLDOM, "GridRead: J outside domain" )
 
-       call CheckStop(nhour/=0 .and. nhour /=3,&
-            "ReadGrid: must start at nhour=0 or 3")
+!       call CheckStop(nhour/=0 .and. nhour /=3,&
+!            "ReadGrid: must start at nhour=0 or 3")
 
       print *,'Defining grid properties from ',trim(filename)
        !open an existing netcdf dataset
        status = nf90_open(path=trim(filename),mode=nf90_nowrite,ncid=ncFileID)
        if(status /= nf90_noerr) then
           print *,'not found',trim(filename)
-          call StopAll("File not found")
+          call StopAll("GridValues: File not found")
        endif
 
        !          print *,'  reading ',trim(filename)
@@ -448,52 +466,6 @@ contains
           call check(nf90_inq_dimid(ncid = ncFileID, name = "i", dimID = idimID))
           call check(nf90_inq_dimid(ncid = ncFileID, name = "j", dimID = jdimID))
        endif
-
-       call check(nf90_inq_dimid(ncid = ncFileID, name = "k", dimID = kdimID))
-       call check(nf90_inq_dimid(ncid = ncFileID, name = "time", dimID = timeDimID))
-       call check(nf90_inq_varid(ncid = ncFileID, name = "time", varID = timeVarID))
-       call check(nf90_inquire_dimension(ncid=ncFileID,dimID=timedimID,len=Nhh))
-
-       call CheckStop(24/Nhh, METSTEP,          "GridRead: METSTEP != meteostep" )
-
-       call check(nf90_get_att(ncFileID,timeVarID,"units",timeunit))
-
-       ihh=1
-       n1=1
-       if(trim(timeunit(1:19))==trim("days since 1900-1-1"))then
-          write(*,*)'Date in days since 1900-1-1 0:0:0'
-          call check(nf90_get_var(ncFileID,timeVarID,ndays,&
-               start=(/ihh/),count=(/n1 /)))
-          call nctime2idate(ndate,ndays(1))  ! for printout: msg="meteo hour YYYY-MM-DD hh"
-       else
-          call check(nf90_get_var(ncFileID,timeVarID,nseconds,&
-               start=(/ihh/),count=(/n1 /)))
-          call nctime2idate(ndate,nseconds(1)) ! default
-       endif
-       nhour_first=ndate(4)
- 
-       call CheckStop(ndate(1), nyear,  "NetCDF_ml: wrong year" )
-       call CheckStop(ndate(2), nmonth, "NetCDF_ml: wrong month" )
-       call CheckStop(ndate(3), nday,   "NetCDF_ml: wrong day" )
-
-       do ihh=1,Nhh
-
-          if(trim(timeunit(1:19))==trim("days since 1900-1-1"))then
-             call check(nf90_get_var(ncFileID, timeVarID, ndays,&
-                  start=(/ ihh /),count=(/ n1 /)))
-             call nctime2idate(ndate,ndays(1))
-             write(*,*)'ndays ',ndays(1),ndate(3),ndate(4)
-          else
-             call check(nf90_get_var(ncFileID, timeVarID, nseconds,&
-                  start=(/ ihh /),count=(/ n1 /)))
-             call nctime2idate(ndate,nseconds(1))
-          endif
-          write(*,*)ihh,METSTEP,nhour_first, ndate(4)
-          call CheckStop( mod((ihh-1)*METSTEP+nhour_first,24), ndate(4),  &
-               date2string("NetCDF_ml: wrong hour YYYY-MM-DD hh",ndate))
-
-       enddo
-
 
        !get global attributes
        call check(nf90_get_att(ncFileID,nf90_global,"Grid_resolution",GRIDWIDTH_M))
@@ -601,22 +573,69 @@ contains
                ,start=(/ IRUNBEG,JRUNBEG /),count=(/ GIMAX,GJMAX /)))
        endif
 
-       call check(nf90_inq_varid(ncid = ncFileID, name = "k", varID = varID))
-       call check(nf90_get_var(ncFileID, varID, sigma_mid ))
-
+       status=nf90_inq_varid(ncid = ncFileID, name = "k", varID = varID)
+       if(status /= nf90_noerr)then
+          call check(nf90_inq_varid(ncid = ncFileID, name = "hyam", varID = varID))                 
+          call check(nf90_get_var(ncFileID, varID, A_mid ))
+          call check(nf90_inq_varid(ncid = ncFileID, name = "P0", varID = varID))                 
+          call check(nf90_get_var(ncFileID, varID, P0 ))
+          A_mid=P0*A_mid!different definition in modell and grid_Def
+          call check(nf90_inq_varid(ncid = ncFileID, name = "hybm", varID = varID))                 
+          call check(nf90_get_var(ncFileID, varID,B_mid))
+          sigma_mid =B_mid!for Hybrid coordinates sigma_mid=B if A*P0=PT-sigma_mid*PT
+          call check(nf90_inq_varid(ncid = ncFileID, name = "hyai", varID = varID))                 
+          call check(nf90_get_var(ncFileID, varID, A_bnd ))
+          A_bnd=P0*A_bnd!different definition in modell and grid_Def
+          call check(nf90_inq_varid(ncid = ncFileID, name = "hybi", varID = varID))                 
+          call check(nf90_get_var(ncFileID, varID, B_bnd ))          
+       else
+          call check(nf90_get_var(ncFileID, varID, sigma_mid ))
+       endif
        call check(nf90_close(ncFileID))
-
     endif !me=0
 
 
 
-    CALL MPI_BCAST(Nhh,4*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(GRIDWIDTH_M,8*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(ref_latitude,8*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(xp,8*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(yp,8*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(fi,8*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+
+    !TEMPORARY: definition of sigma. Only A and B will be used in the future
     CALL MPI_BCAST(sigma_mid,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+    ! definition of the half-sigma levels (boundaries between layers)
+    ! from the full levels. 
+    sigma_bnd(KMAX_BND) = 1.
+    do k = KMAX_MID,2,-1
+       sigma_bnd(k) = 2.*sigma_mid(k) - sigma_bnd(k+1)
+    enddo
+    sigma_bnd(1) = 0.
+
+    if(Grid_Def_exist)then
+       CALL MPI_BCAST(A_bnd,8*(KMAX_MID+1),MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+       CALL MPI_BCAST(B_bnd,8*(KMAX_MID+1),MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+       CALL MPI_BCAST(A_mid,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+       CALL MPI_BCAST(B_mid,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,INFO)       
+    else
+       !define A and B that gives the correspondin sigma
+       do k = 1,KMAX_BND
+          A_bnd(k)=PT * (1-sigma_bnd(k)) 
+          B_bnd(k)=sigma_bnd(k) 
+       enddo
+       do k = 1,KMAX_MID
+          A_mid(k)=(A_bnd(k+1)+A_bnd(k))/2.0      
+          B_mid(k)=(B_bnd(k+1)+B_bnd(k))/2.0
+       enddo
+    endif
+    do k = 1,KMAX_MID
+       dA(k)=A_bnd(k+1)-A_bnd(k)
+       dB(k)=B_bnd(k+1)-B_bnd(k)
+       Eta_bnd(k)=A_bnd(k)/Pref+B_bnd(k)
+       Eta_mid(k)=A_mid(k)/Pref+B_mid(k)
+    enddo
+    Eta_bnd(KMAX_MID+1)=A_bnd(KMAX_MID+1)/Pref+B_bnd(KMAX_MID+1)
+
     CALL MPI_BCAST(xm_global_i(1:GIMAX,1:GJMAX),8*GIMAX*GJMAX,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(xm_global_j(1:GIMAX,1:GJMAX),8*GIMAX*GJMAX,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
     CALL MPI_BCAST(glat_fdom,8*IIFULLDOM*JJFULLDOM,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
@@ -890,28 +909,6 @@ contains
        enddo
     enddo
 
-    ! definition of the half-sigma levels (boundaries between layers)
-    ! from the full levels. 
-
-    sigma_bnd(KMAX_BND) = 1.
-    do k = KMAX_MID,2,-1
-       sigma_bnd(k) = 2.*sigma_mid(k) - sigma_bnd(k+1)
-    enddo
-    sigma_bnd(1) = 0.
-
-    !TEMPORARY: definition of A and B. Will be read from metfile in the future
-    do k = 1,KMAX_BND
-       A_bnd(k)=PT * (1-sigma_bnd(k)) 
-       B_bnd(k)=sigma_bnd(k) 
-    enddo
-    do k = 1,KMAX_MID
-       dA(k)=A_bnd(k+1)-A_bnd(k)
-       dB(k)=B_bnd(k+1)-B_bnd(k)
-       A_mid(k)=(A_bnd(k+1)+A_bnd(k))/2.0      
-       B_mid(k)=(B_bnd(k+1)+B_bnd(k))/2.0
-    enddo
-
-
     !
     !     some conversion coefficients needed for budget calculations
     !
@@ -1048,17 +1045,14 @@ contains
     gbacmin = minval(glat(:,:))
     glacmax = maxval(glon(:,:))
     glacmin = minval(glon(:,:))
-    MPIbuff= gbacmax 
-    CALL MPI_ALLREDUCE(MPIbuff, gbacmax, 1,MPI_DOUBLE_PRECISION, &
+
+    CALL MPI_ALLREDUCE(MPI_IN_PLACE, gbacmax, 1,MPI_DOUBLE_PRECISION, &
          MPI_MAX, MPI_COMM_WORLD, INFO) 
-    MPIbuff= gbacmin
-    CALL MPI_ALLREDUCE(MPIbuff, gbacmin  , 1, &
+    CALL MPI_ALLREDUCE(MPI_IN_PLACE, gbacmin  , 1, &
          MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, INFO) 
-    MPIbuff= glacmax 
-    CALL MPI_ALLREDUCE(MPIbuff, glacmax, 1,MPI_DOUBLE_PRECISION, &
+    CALL MPI_ALLREDUCE(MPI_IN_PLACE, glacmax, 1,MPI_DOUBLE_PRECISION, &
          MPI_MAX, MPI_COMM_WORLD, INFO) 
-    MPIbuff= glacmin
-    CALL MPI_ALLREDUCE(MPIbuff, glacmin  , 1, &
+    CALL MPI_ALLREDUCE(MPI_IN_PLACE, glacmin  , 1, &
          MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, INFO) 
 
     if(me==0) write(unit=6,fmt="(a,4f9.2)") &
@@ -1624,28 +1618,64 @@ contains
   end subroutine ij2ijm
 
   ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-  function coord_in_gridbox(lon,lat,i,j) result(in)
-    !-------------------------------------------------------------------!
-    ! Is coord (lon/lat) is inside gridbox(i,j)?
-    !-------------------------------------------------------------------!
-    real, intent(in) :: lon,lat
-    integer, intent(in) :: i,j
-    logical :: in
-    in=gl_stagg(i-1,j)<=lon.and.lon<gl_stagg(i,j).and. &
-         gb_stagg(i,j-1)<=lat.and.lat<gb_stagg(i,j)
-  end function coord_in_gridbox
-  function coord_in_processor(lon,lat) result(in)
-    !-------------------------------------------------------------------!
-    ! Is coord (lon/lat) is inside local domain?
-    !-------------------------------------------------------------------!
-    real, intent(in) :: lon,lat
-    logical :: in
-    integer :: i,j
-    real    :: xr,yr
-    call lb2ij(lon,lat,xr,yr)
-    i=nint(xr);j=nint(yr)
-    in=(gi0<=i).and.(i<=gi1).and.(gj0<=j).and.(j<=gj1)
-  end function coord_in_processor
+subroutine range_check(vname,var,vrange,fatal)
+  character(len=*), intent(in) :: vname
+  real, intent(in) :: var,vrange(0:1)
+  logical :: fatal
+  character(len=*), parameter :: &
+    errfmt="(A,'=',F6.2,' is out of range ',F6.2,'..',F6.2)"
+  character(len=len_trim(vname)+21+6*3) :: errmsg
+  if(var<vrange(0).or.var>vrange(1))then
+    write(errmsg,errfmt)trim(vname),var,vrange
+    if(fatal)then
+      call CheckStop("range_check",trim(errmsg))
+    else
+      write(*,*)"WARNING: ",trim(errmsg)
+    endif
+  endif
+endsubroutine range_check
+subroutine coord_check(msg,lon,lat,fix)
+  character(len=*), intent(in) :: msg
+  real, intent(inout) :: lon,lat
+  logical :: fix
+  call range_check(trim(msg)//" lat",lat,(/ -90.0, 90.0/),fatal=.not.fix)
+  call range_check(trim(msg)//" lon",lon,(/-180.0,180.0/),fatal=.not.fix)
+  if(fix)then
+    lat=modulo(lat      , 90.0)       ! lat/gb_stagg range  -90 .. 90
+    lon=modulo(lon+180.0,360.0)-180.0 ! lon/gl_stagg range -180 .. 180
+  endif
+endsubroutine coord_check
+function coord_in_gridbox(lon,lat,iloc,jloc) result(in)
+!-------------------------------------------------------------------!
+! Is coord (lon/lat) is inside gridbox(iloc,jloc)?
+!-------------------------------------------------------------------!
+  real, intent(inout) :: lon,lat
+  integer, intent(inout) :: iloc,jloc
+  logical :: in
+  integer :: i,j
+  real    :: xr,yr
+  call coord_check("coord_in_gridbox",lon,lat,fix=.true.)
+  call lb2ij(lon,lat,xr,yr)
+  i=i_local(nint(xr));j=j_local(nint(yr))
+  in=(i==iloc).and.(j==jloc)
+endfunction coord_in_gridbox
+function coord_in_processor(lon,lat,iloc,jloc) result(in)
+!-------------------------------------------------------------------!
+! Is coord (lon/lat) is inside local domain?
+!-------------------------------------------------------------------!
+  real, intent(inout) :: lon,lat
+  integer, intent(out),optional:: iloc,jloc
+  logical :: in
+  integer :: i,j
+  real    :: xr,yr
+  call coord_check("coord_in_processor",lon,lat,fix=.true.)
+  call lb2ij(lon,lat,xr,yr)
+  i=i_local(nint(xr));j=j_local(nint(yr))
+  in=(i>=1).and.(i<=limax).and.(j>=1).and.(j<=ljmax)
+  if(present(iloc))iloc=i
+  if(present(jloc))jloc=j
+endfunction coord_in_processor
+
   subroutine check(status)
     use netcdf
     implicit none

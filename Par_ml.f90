@@ -176,6 +176,7 @@ private
               ,MSG_READ6 = 86     & ! hb NH3emis   
               ,MSG_READ7 = 87     &
               ,MSG_READ8 = 88     & ! HDD
+              ,MSG_READ9 = 89     & ! POLLEN              
               ,MSG_FIELD1 = 91     &
               ,MSG_MET1 = 101     &
               ,MSG_MET2 = 102     &
@@ -207,6 +208,7 @@ private
     GJMAX = RUNDOMAIN(4)-RUNDOMAIN(3)+1 !Number of global points in longitude
 
     !Determine NPROCX, NPROCY
+    NPROCY=1
     if(Pole_singular==0)then
        !try values until it fits
        NPROCX=nint(sqrt(1.0*NPROC))

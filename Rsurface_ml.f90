@@ -231,6 +231,10 @@ contains
   !    less than 1m above vegetation (1m chosen arbitrary)
 
    !g_sto 0 when snow covering canopy
+   if ( DEBUG_RSUR .and. debug_flag ) then
+       write(*,"(a,5i5,i3,2L2,2f10.4,9es12.4)") "IN RSUR testcan ", &
+              current_date, iL, canopy, leafy_canopy, G%Idirect, L%PARsun, G%sdepth
+   end if
    if( leafy_canopy  .and. G%Idirect > 0.001 .and. G%sdepth< (1.0 +Sdmax) ) then  ! Daytime 
 
         call CanopyPAR(L%LAI, G%coszen, G%Idirect, G%Idiffuse, &
@@ -238,16 +242,23 @@ contains
 
 
         call g_stomatal(iL, debug_flag )
+   if ( DEBUG_RSUR .and. debug_flag ) then
+       write(*,"(a,5i5,i3,L2,2f10.4,9es12.4)") "IN RSUR gstoA ", &
+              current_date, iL, leafy_canopy, G%Idirect+G%Idiffuse, L%PARsun,  L%g_sto, L%f_env
+   end if
 
    else
         L%g_sun = 0.0
         L%g_sto = 0.0
+        L%f_env = 0.0 !JAN2013
+        L%PARsun  = 0.0 !FEB2013
+        L%PARshade = 0.0 !FEB2013
 
    end if ! leafy canopy and daytime
 
    if ( DEBUG_RSUR .and. debug_flag ) then
-       write(*,"(a,5i5,i3,L2,2f10.4)") "IN RSUR gsto ", &
-              current_date, iL, leafy_canopy, G%Idirect,  L%g_sto
+       write(*,"(a,5i5,i3,L2,3f10.4)") "IN RSUR gsto ", &
+              current_date, iL, leafy_canopy, G%Idirect,  L%g_sto, L%f_env
    end if
 
 

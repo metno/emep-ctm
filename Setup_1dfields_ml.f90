@@ -36,13 +36,13 @@
   ! - new aray added to keep o2, m, and for MADE oh, etc
 
 !DSA12  use ModelConstants_ml,     only :  KMAX_MID, KCHEMTOP, KUPPER, NBVOC, NSOIL_EMIS
-  use ModelConstants_ml,     only :  KMAX_MID, KCHEMTOP, KUPPER
+!  use ModelConstants_ml,     only :  KMAX_MID, KCHEMTOP, KUPPER
   !ESX use EmisDef_ml,            only :  NSS, NDU, NROADDUST, NPOL !SeaS, Dust
   !use EmisDef_ml,            only :  NDU, NROADDUST, NPOL !SeaS, Dust
-  use EmisDef_ml,            only :  NROADDUST, NPOL !SeaS, Dust
-  use ChemSpecs_tot_ml,      only :  NSPEC_TOT, FIRST_SEMIVOL, LAST_SEMIVOL
-  use ChemSpecs_shl_ml,      only :  NSPEC_SHL
-  use Chemfields_ml,         only :  NSPEC_COL
+!  use EmisDef_ml,            only :  NROADDUST, NPOL !SeaS, Dust
+!  use ChemSpecs_tot_ml,      only :  NSPEC_TOT, FIRST_SEMIVOL, LAST_SEMIVOL
+!  use ChemSpecs_shl_ml,      only :  NSPEC_SHL
+!  use Chemfields_ml,         only :  NSPEC_COL
   implicit none
   private
 
@@ -54,21 +54,23 @@
 
   !/-- the chemistry is calculated for arrays of size:
 
-   integer, public, parameter  :: CHEMSIZE = KMAX_MID-KCHEMTOP+1 !
+   integer, public, save  :: CHEMSIZE  !
 
-   real, public, dimension(NSPEC_TOT,KCHEMTOP:KMAX_MID), save :: &
+ !FIELDS ALLOCATED IN Chem_ml.f90
+
+  real, public, allocatable, dimension(:,:), save :: &
                    xn_2d            ! Concentrations [molecules/cm3]
 
 ! For semivolatiles we track the farction as gas and particle- used for SOA
 ! We use NSPEC_TOT to allow us to write Fpart for FFUEL and WOOD also -
 ! these may be semivol one day.
    !real, public, dimension(FIRST_SOA:LAST_SOA,KCHEMTOP:KMAX_MID), save :: &
-   real, public, dimension(NSPEC_TOT,KCHEMTOP:KMAX_MID), save :: &
-                   Fgas  = 1.0     &! Fraction as gas-phase
-                  ,Fpart = 0.0      ! Fraction as gas-phase
+   real, public, allocatable, dimension(:,:), save :: &
+                   Fgas       &! Fraction as gas-phase
+                  ,Fpart      ! Fraction as gas-phase
 
  !Emissions in column. We assume that these only involve advected species
-   real, public, dimension(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID), save ::&
+   real, public, allocatable, dimension(:,:), save ::&
          rcemis     ! emissions
   ! We define a column array for isoprene and terpene for use in
   ! the chemical solver. All values except for k=KMAX_MID will
@@ -83,7 +85,7 @@
   ! real, public, dimension(NROADDUST,KCHEMTOP:KMAX_MID), save :: rcroadd = 0.0 ! road traffic dust
   ! real, public, dimension(NPOL,KCHEMTOP:KMAX_MID), save :: rcpol = 0.0 ! Pollen (birch)
 
-   real, public, dimension(KCHEMTOP:KMAX_MID), save :: &
+   real, public, allocatable, dimension(:), save :: &
           rh                  & ! RH (fraction, 0-1)
          ,amk                 & ! M - atmospheric conc.
          ,o2, n2              & ! oxygen, nitrogen
@@ -92,7 +94,7 @@
          ,tinv                & ! inverse temp
          ,pp                     !pressure
 
-   integer, public, dimension(KCHEMTOP:KMAX_MID), save :: &
+   integer, public, allocatable, dimension(:), save :: &
           itemp                  ! int of temperature
 
  end module Setup_1dfields_ml

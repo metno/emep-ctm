@@ -104,7 +104,9 @@ module MetFields_ml
        ,roa    &  ! kg/m3
        ,cw        ! cloudwater
   real,public, save,allocatable, dimension(:,:,:,:) :: &
-        SigmaKz  &! vertical diffusivity in sigma coords
+        EtaKz    &! vertical diffusivity in Eta coords
+       ,SigmaKz  &! vertical diffusivity in sigma coords
+       ,Etadot     &! vertical velocity, Eta coords, Pa/s
        ,sdot     &! vertical velocity, sigma coords, 1/s
        ,Kz_met    ! vertical diffusivity in sigma coordinates from meteorology
 
@@ -169,8 +171,6 @@ module MetFields_ml
       ,Idirect         ! total direct solar radiation (W/m^2)
 
 
- logical,public, save,allocatable, dimension(:,:) :: &
-       nwp_sea     ! Sea in NWP mode, determined in HIRLAM from roughness class
 
   real,public, save,allocatable, dimension(:,:) :: &   !st-dust
        clay_frac  &  ! clay fraction (%) in the soil
@@ -201,9 +201,6 @@ module MetFields_ml
     ,foundSoilWater_deep  & ! false if no SW-deep
     ,foundsdepth    & ! false if no snow_flag depth in metdata
     ,foundice       & ! false if no ice_nwp coverage (%) in metdata
-    ,foundnwp_sea   &  ! false if no rough file is found QUERY description?
-  ! (when read) at level  boundaries and therefore do not need to be
-  ! interpolated.
     ,foundKz_met    & ! false if no Kz from meteorology
     ,foundconv      & ! false if convection not found or not used
   ! Introduced for FUTURE NH3, but also sea-salt
@@ -233,7 +230,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
     allocate(roa(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
     allocate(cw(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
     allocate(SigmaKz(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+    allocate(EtaKz(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
     allocate(sdot(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+    allocate(Etadot(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
     allocate(Kz_met(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
     allocate(pr(MAXLIMAX,MAXLJMAX,KMAX_MID))
     allocate(cc3d(MAXLIMAX,MAXLJMAX,KMAX_MID))
@@ -273,7 +272,6 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
     coszen=0.0
     allocate(Idiffuse(MAXLIMAX, MAXLJMAX))
     allocate(Idirect(MAXLIMAX, MAXLJMAX))
-    allocate(nwp_sea(MAXLIMAX, MAXLJMAX))
     allocate(clay_frac(MAXLIMAX, MAXLJMAX))
     allocate(sand_frac(MAXLIMAX, MAXLJMAX))
 

@@ -34,7 +34,6 @@ MODULE TimeDate_ml
 ! ndiy -> day_of_year. Change IFIX to INT, FLOAT to REAL, MAX0 to MAX, etc.
 !===================Routines =================================================
 
-!FEB2011 use ModelConstants_ml, only : METSTEP,MasterProc
 
 IMPLICIT NONE
 

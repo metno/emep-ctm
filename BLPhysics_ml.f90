@@ -5,7 +5,6 @@ module BLPhysics_ml
  ! (*No* routines in use, except for testing)
 
  use Landuse_ml,           only : Landcover, water_fraction
- use MetFields_ml,         only : nwp_sea
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, KWINDTOP, PT
  use PhysicalConstants_ml, only : KARMAN, GRAV
  implicit none
@@ -80,6 +79,7 @@ public :: SigmaKz_2_m2s ! hb 23.02.2010 Kz from meteo
  private :: SigmaKz_2_m2s_scalar  ! function to get factor
  private :: SigmaKz_2_m2s_arrays  ! subrouitne for 3d arrays
 public :: Kz_m2s_toSigmaKz
+public :: Kz_m2s_toEtaKz
 
 ! Conversion of Kz in sigma coordinates to m2/s,
 !  Kz(sigma)=Kz*ro**2*(GRAV/p*)**2
@@ -895,4 +895,29 @@ subroutine Kz_m2s_toSigmaKz (Kz,roa,ps,SigmaKz)
 
 end subroutine Kz_m2s_toSigmaKz
 
+subroutine Kz_m2s_toEtaKz (Kz,roa,ps,EtaKz,Eta_mid,A_mid,B_mid)
+  real, intent(in), dimension(:,:,:) :: Kz, roa
+  real, intent(in), dimension(:,:)   :: ps
+  real, intent(out), dimension(:,:,:) :: EtaKz 
+  real, intent(in), dimension(:)   :: Eta_mid,A_mid,B_mid
+  real :: fac
+  integer :: i,j,k
+
+! Kz has dim 1:KMAX_MID, whereas EtaKz has 1:KMAX_BND
+! Kz defined at middle of level, EtaKz defined at level boundaries
+! EtaKz = Kz*(roa*g* d(Eta)/d(P) )**2
+  do k = 2, size(Kz,3)
+    do j = 1, size(Kz,2)
+      do i = 1, size(Kz,1)
+         fac= (GRAV*(roa(i,j,k)+roa(i,j,k-1))*0.5)*&
+         (Eta_mid(k)-Eta_mid(k-1))/(A_mid(k)+B_mid(k)*ps(i,j)-A_mid(k-1)-B_mid(k-1)*ps(i,j))
+         EtaKz(i,j,k) = fac*fac*Kz(i,j,k)
+      end do
+    end do
+  end do
+  k=size(Kz,3)+1  ! surface
+  EtaKz(:,:,k) = 0.0
+  EtaKz(:,:,1) = 0.0!top
+
+end subroutine Kz_m2s_toEtaKz
 end module BLPhysics_ml

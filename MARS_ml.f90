@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2012 met.no
+!*  Copyright (C) 2007-2011 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,14 +52,26 @@ module MARS_ml
 
       integer, private, save :: MAXNNN1 = 0
       integer, private, save :: MAXNNN2 = 0
-      real, private, parameter :: &
-        MWNO3  = 62.0049         &! molecular weight for NO3
-       ,MWHNO3 = 63.01287        &! .. HNO3       
-       ,MWSO4  = 96.0576         &! .. SO4 
-       ,MWHSO4 = MWSO4 + 1.0080  &! HSO4
-       ,MH2SO4 = 98.07354        &! H2SO4
-       ,MWNH3 = 17.03061         &! NH3
-       ,MWNH4 = 18.03858          ! NH4
+!ds      real        MWNO3            ! molecular weight for NO3
+      real, private, parameter :: MWNO3  = 62.0049 
+
+!ds      real        MWHNO3           ! molecular weight for HNO3
+      real, private, parameter :: MWHNO3 = 63.01287       
+
+!ds      real        MWSO4            ! molecular weight for SO4
+      real, private, parameter :: MWSO4 = 96.0576 
+
+!ds      real        MWHSO4           ! molecular weight for HSO4
+      real, private, parameter :: MWHSO4 = MWSO4 + 1.0080
+
+!ds      real        MH2SO4           ! molecular weight for H2SO4
+      real, private, parameter :: MH2SO4 = 98.07354 
+
+!ds      real        MWNH3            ! molecular weight for NH3
+      real, private, parameter :: MWNH3 = 17.03061 
+
+!ds      real        MWNH4            ! molecular weight for NH4
+      real, private, parameter :: MWNH4 = 18.03858
  contains
 
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -224,7 +236,7 @@ module MARS_ml
       real        MWNACL           ! molecular weight for NaCl
       parameter ( MWNACL = 58.44277 )
 
-!emep moved a bunch upstairs.
+!ds moved a bunch upstairs.
 
       real        MWORG            ! molecular weight for Organic Species
       parameter ( MWORG = 16.0 )
@@ -334,8 +346,8 @@ module MARS_ml
        parameter( MINSO4 = 1.0E-6 / MWSO4 ) 
       real        MINNO3
        parameter( MINNO3 = 1.0E-6 / MWNO3 )    !2/25/99 IJA
-!emep      real        FLOOR
-!emep       parameter( FLOOR = 1.0E-30) ! minimum concentration       
+!st      real        FLOOR
+!st       parameter( FLOOR = 1.0E-30) ! minimum concentration       
 !2/25/99 IJA
 ! FSB New variables Total ammonia and nitrate mass concentrations
       real  TMASSNH3  ! Total ammonia (gas and particle)
@@ -343,6 +355,15 @@ module MARS_ml
       real  TMASSHNO3 ! Total nitrate (vapor and particle) as
                       !  nitric acid vapor [ug /m**3]
 
+!for RATIO between RATIO_Low and RATIO_High, consider the species in two boxes one with
+! RATIO_Low and the other with  RATIO_High. Then take a linear combination of the results in each box
+      logical ::DO_RATIO_High_2,DO_RATIO_Low_2
+      real, parameter ::RATIO_Low = 1.95,RATIO_High= 2.05 !somewhat arbitrarily
+      real ::ASO4_High, ANO3_High, AH2O_High, ANH4_High, GNH3_High, GNO3_High
+      real ::ASO4_High1, ANO3_High1, AH2O_High1, ANH4_High1, GNH3_High1, GNO3_High1,diff1
+      real ::ASO4_Low, ANO3_Low, AH2O_Low, ANH4_Low, GNH3_Low, GNO3_Low
+      real ::ASO4_Low1, ANO3_Low1, AH2O_Low1, ANH4_Low1, GNH3_Low1, GNO3_Low1,diff2
+      real::TSO4_HighA,TSO4_LowA,High_Factor,X
 !-----------------------------------------------------------------------
 !  begin body of subroutine RPMARES
                                                                          
@@ -351,7 +372,7 @@ module MARS_ml
 
       ASO4=0.0;ANO3=0.0;AH2O=0.0;ANH4=0.0;GNO3=0.0;GNH3=0.0 
 
-      ASO4 = SO4   ! from RPM
+      ASO4 = SO4   !ds from RPM
 
 !...convert into micromoles/m**3
  
@@ -369,7 +390,7 @@ module MARS_ml
  
 !...now set humidity index fRH as a percent
 
-!      IRH = NINT( 100.0 * RH )
+!st      IRH = NINT( 100.0 * RH )
          fRH = RH 
 !...Check for valid fRH
 
@@ -419,8 +440,9 @@ module MARS_ml
       GAMAAN = 1.0
       GAMOLD = 1.0
 
-!emep from RPM, but removed FLOOR : (slighty different logic)
+!ds from RPM, but removed FLOOR : (slighty different logic)
       if( (TSO4 < MINSO4 ) .and. (TNO3 < MINNO3) ) then
+        !print *, "DSX  HERE"
           ASO4 = SO4   ! MAX..
           ANO3 = NO3   ! MAX..      
           WH2O = 0.0
@@ -429,7 +451,7 @@ module MARS_ml
           GNO3 = NO3   ! MAX(FLOOR,NO3)
           RETURN
        END IF
-!emep end rpm
+!ds end rpm
 
 
 !...set the ratio according to the amount of sulfate and nitrate
@@ -468,16 +490,51 @@ module MARS_ml
  
       END IF 
 
+
+      DO_RATIO_High_2=.false.
+      DO_RATIO_Low_2=.false.
+      ASO4_High = 0.0
+      ANO3_High = 0.0
+      AH2O_High = 0.0
+      ANH4_High = 0.0
+      GNH3_High = 0.0
+      GNO3_High = 0.0
+      ASO4_Low = 0.0
+      ANO3_Low = 0.0
+      AH2O_Low = 0.0
+      ANH4_Low = 0.0
+      GNH3_Low = 0.0
+      GNO3_Low = 0.0
+      TSO4_HighA = TSO4
+      TSO4_LowA  = TSO4
+       IF ( RATIO > 2.0 )then
+         DO_RATIO_High_2=.true.
+         High_Factor=1.0
+      else
+         DO_RATIO_Low_2=.true.
+         High_Factor=0.0
+      endif
+
+      IF ( RATIO >RATIO_Low  .and.  RATIO < RATIO_High)then
+         DO_RATIO_High_2=.true.
+         DO_RATIO_Low_2=.true.
+         TSO4_HighA=TSO4*Ratio/RATIO_High
+         TSO4_LowA=TSO4*Ratio/RATIO_Low
+!         High_Factor=(RATIO-RATIO_Low)/(RATIO_High-RATIO_Low)
+         High_Factor=(RATIO*RATIO_High-RATIO_Low*RATIO_High)/(RATIO*RATIO_High-RATIO*RATIO_Low)
+      endif
+
 !....................................
 !......... High Ammonia Case ........
 !....................................
  
-      IF ( RATIO > 2.0 ) THEN    ! NH4/SO4 > 2
+!      IF ( RATIO > 2.0 ) THEN    ! NH4/SO4 > 2
+      IF ( DO_RATIO_High_2 ) THEN    ! NH4/SO4 > 2
         GAMAAN = 0.1
 
 !...Set up twice the sulfate for future use.
 
-        TWOSO4 = 2.0 * TSO4
+        TWOSO4 = 2.0 * TSO4_HighA
         XNO3 = 0.0            
         YNH4 = TWOSO4
 
@@ -487,22 +544,22 @@ module MARS_ml
 !...  10**(-6) kg water/ (cubic meter of air)
 !...  start with ammomium sulfate solution without nitrate
 
-      CALL awater(fRH,TSO4,YNH4,TNO3,AH2O ) !**** note TNO3
+      CALL awater(fRH,TSO4_HighA,YNH4,TNO3,AH2O ) !**** note TNO3
         WH2O = 1.0E-3 * AH2O  
-        ASO4 = TSO4 * MWSO4
-        ANO3 = 0.0
-        ANH4 = YNH4 * MWNH4
-if(debug_flag) call datewrite("MARS debug ", -1,(/ ASO4, ANH4, AH2O /) )
+        ASO4_High = TSO4_HighA * MWSO4
+        ANO3_High = 0.0
+        ANH4_High = YNH4 * MWNH4
+if(debug_flag) call datewrite("MARS debug ", -1,(/ ASO4_High, ANH4_High, AH2O /) )
 
 if ( DEBUG_EQUIB ) then
-  if( ASO4 + ANH4 +  AH2O < 1.0-10 ) then
-     call datewrite("MARS failing? ", -1,(/ ASO4, ANH4, AH2O /) )
-     print *, "MARS PROB ", ASO4, ANH4, AH2O, TSO4, YNH4
+  if( ASO4_High + ANH4_High +  AH2O < 1.0-10 ) then
+     call datewrite("MARS failing? ", -1,(/ ASO4_High, ANH4_High, AH2O /) )
+     print *, "MARS PROB ", ASO4_High, ANH4_High, AH2O, TSO4_HighA, YNH4
      call CheckStop("MARS")
   end if
 end if
-        WFRAC = (AH2O + FLOOR)  / ( ASO4 + ANH4 +  AH2O + FLOOR  )
-        !emep WFRAC = AH2O / ( ASO4 + ANH4 +  AH2O + FLOOR  )
+        WFRAC = (AH2O + FLOOR)  / ( ASO4_High + ANH4_High +  AH2O + FLOOR  )
+        !ds WFRAC = AH2O / ( ASO4 + ANH4 +  AH2O + FLOOR  )
         !CRUDE FIX? WFRAC = AH2O / ( ASO4 + ANH4 +  AH2O )
 !!!!       IF ( WFRAC == 0.0 )  RETURN   ! No water       
         IF ( WFRAC < 0.2 ) THEN
@@ -515,6 +572,7 @@ end if
 
 !...check for not enough to support aerosol      
 
+          !dsjIF ( CC <= 0.0 ) THEN
           IF ( CC < FLOOR ) THEN
             XNO3 = 0.0
           ELSE
@@ -526,22 +584,24 @@ end if
 !...  set nitrate to zero and RETURN if complex roots are found
 !2/25/99 IJA
 
+            !DS IF ( DISC < 0.0 ) THEN
+            !dsDSdIF ( DISC < FLOOR ) THEN
             IF ( DISC < 0.0 ) THEN
-             if( DEBUG_EQUIB .and. debug_flag ) print *, &
-                "MARS DISC NEG ", XNO3, WH2O, DISC
+if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
               XNO3 = 0.0
-              AH2O = 1000.0 * WH2O
+              AH2O_High = 1000.0 * WH2O
               YNH4 = TWOSO4
-              GNO3 = HNO3
-              ASO4 = TSO4 * MWSO4
-              ANO3 = NO3
-              ANH4 = YNH4 * MWNH4
-              GNH3 = TMASSNH3 - ANH4
+              GNO3_High = HNO3
+              ASO4_High = TSO4_HighA * MWSO4
+              ANO3_High = NO3
+              ANH4_High = YNH4 * MWNH4
+              GNH3_High = TMASSNH3 - ANH4
               if( GNH3 < 0.0 ) then
                  print *, " NEG GNH3", TWOSO4, ANH4, TMASSNH3
                  call CheckStop("NEG GNH3")
               end if
-              RETURN
+!              RETURN
+          goto 333
             END IF
 
 !...to get here, BB .lt. 0.0, CC .gt. 0.0 always      
@@ -555,27 +615,27 @@ end if
           
           END IF
 !2/25/99 IJA
-          AH2O = 1000.0 * WH2O
+          AH2O_High = 1000.0 * WH2O
           YNH4 = TWOSO4 + XNO3
-          ASO4 = TSO4 * MWSO4
+          ASO4_High = TSO4_HighA * MWSO4
           !dsSAFE ANO3 = XNO3 * MWNO3
-          ANO3 = min(XNO3 * MWNO3, TMASSHNO3 )
+          ANO3_High = min(XNO3 * MWNO3, TMASSHNO3 )
           !dsSAFE ANH4 = YNH4 * MWNH4 ! ds should be safe as NH4/SO4 >2, but anyway:
-          ANH4 = min(YNH4 * MWNH4, TMASSNH3 )  ! ds should be safe as NH4/SO4 >2, but anyway:
-          GNH3 = TMASSNH3 - ANH4
-          GNO3 = TMASSHNO3 - ANO3
+          ANH4_High = min(YNH4 * MWNH4, TMASSNH3 )  ! ds should be safe as NH4/SO4 >2, but anyway:
+          GNH3_High = TMASSNH3 - ANH4_High
+          GNO3_High = TMASSHNO3 - ANO3_High
           !    if( GNH3 < 0.0 .or. GNO3 < 0.0 ) then
           !       print *, " NEG GNH3 GNO3", TWOSO4, ANH4, TMASSNH3, ANO3, TMASSHNO3
           !       call CheckStop("NEG GNH3 GNO3")
           !    end if
-          RETURN
-
+!          RETURN
+          goto 333
         END IF
 
 !...liquid phase containing completely neutralized sulfate and
 !...  some nitrate.  Solve for composition and quantity.
  
-        MAS = TSO4 / WH2O
+        MAS = TSO4_HighA / max(WH2O,FLOOR)
         MAN = 0.0
         XNO3 = 0.0
         YNH4 = TWOSO4
@@ -585,7 +645,8 @@ end if
  
 !...The assumption here is that all sulfate is ammonium sulfate,
 !...  and is supersaturated at lower relative humidities.
- 
+        diff1=1.0/TOLER1
+
         DO 1501 NNN = 1, 150 
           NITR = NNN
           GASQD = GAMAAN * GAMAAN
@@ -606,26 +667,29 @@ end if
 !...Check for complex roots, retain inital values and RETURN
 !2/25/99 IJA
 
+          !DS IF ( DISC < 0.0 ) THEN
+          !dsDS IF ( DISC < FLOOR ) THEN
           IF ( DISC < 0.0 ) THEN
 if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
             XNO3 = 0.0
-            AH2O = 1000.0 * WH2O
+            AH2O_High = 1000.0 * WH2O
             YNH4 = TWOSO4
-            GNO3 = HNO3
-            ASO4 = TSO4 * MWSO4
-            ANO3 = NO3
+            GNO3_High = HNO3
+            ASO4_High = TSO4_HighA * MWSO4
+            ANO3_High = NO3
             !ANH4 = YNH4 * MWNH4
-            ANH4 = min( YNH4 * MWNH4, TMASSNH3)  ! ds added "min"
-            GNH3 = TMASSNH3 - ANH4
+            ANH4_High = min( YNH4 * MWNH4, TMASSNH3)  ! ds added "min"
+            GNH3_High = TMASSNH3 - ANH4_High
 
               !WRITE( 10, * ) ' COMPLEX ROOTS '
-            RETURN
+!            RETURN
+                goto 333
           END IF
 ! 2/25/99 IJA
 
 ! Deal with degenerate case (yoj)
 
-          !emep IF ( AA /= 0.0 ) THEN
+          !DS IF ( AA /= 0.0 ) THEN
           IF ( abs(AA) > FLOOR  ) THEN
              if( DEBUG_EQUIB .and. debug_flag ) print "(a,9es11.3)", "MARS DEGEN  ",  XNO3, WH2O, DISC, AA, BB, CC
              DD = SQRT( DISC )
@@ -640,21 +704,22 @@ if( DEBUG_EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
                 XNO3 = MAX( RR1, RR2 )
              ELSE if(MIN( RR1, RR2 )>0.0)then
                 XNO3 = MIN( RR1, RR2 )
-             ELSE!two negative roots !emep added 4th July 2012
+             ELSE!two negative roots !DS PW added 4th July 2012
 
                            !--------------------- return copied from above
                 XNO3 = 0.0
-                AH2O = 1000.0 * WH2O
+                AH2O_High = 1000.0 * WH2O
                 YNH4 = TWOSO4
-                GNO3 = HNO3
-                ASO4 = TSO4 * MWSO4
-                ANO3 = NO3
-                !emep ANH4 = YNH4 * MWNH4
-                ANH4 = min( YNH4 * MWNH4, TMASSNH3)  ! emep added "min"
-                GNH3 = TMASSNH3 - ANH4
+                GNO3_High = HNO3
+                ASO4_High = TSO4_HighA * MWSO4
+                ANO3_High = NO3
+                !ds ANH4 = YNH4 * MWNH4
+                ANH4_High = min( YNH4 * MWNH4, TMASSNH3)  ! ds added "min"
+                GNH3_High = TMASSNH3 - ANH4_High
                 if( DEBUG_EQUIB .and. debug_flag ) WRITE( *, * ) ' TWO NEG ROOTS '
-                RETURN
-                
+!                RETURN
+                goto 333
+               
              END IF
           ELSE
              XNO3 = - CC / BB   ! AA equals zero here
@@ -666,7 +731,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 !...This version assumes no solid sulfate forms (supersaturated ) 
 !...  Now update water
 
-          CALL AWATER ( fRH, TSO4, YNH4, XNO3, AH2O)
+          CALL AWATER ( fRH, TSO4_HighA, YNH4, XNO3, AH2O)
 
 !...ZSR relationship is used to set water levels. Units are
 !...  10**(-6) kg water/ (cubic meter of air)
@@ -676,8 +741,8 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 
 !...Ionic balance determines the ammonium in solution.
 
-          MAN = XNO3 / WH2O
-          MAS = TSO4 / WH2O
+          MAN = XNO3 / max(WH2O,FLOOR)
+          MAS = TSO4_HighA / max(WH2O,FLOOR)
           MNH4 = 2.0 * MAS + MAN
           YNH4 = MNH4 * WH2O
 
@@ -711,34 +776,41 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 !!!            WRITE( 11, * ) RH, STION, GAMS( 1, 1 ),GAMS( 1, 2 ), GAMS( 1, 3 ),
 !!!     &      GAMS( 2, 1 ), GAMS( 2, 2 ), GAMS( 2, 3 ), PHIBAR
 ! 2/25/99 IJA
-            ASO4 = TSO4 * MWSO4
-!            ANO3 = XNO3 * MWNO3
-            ANO3 = min(XNO3 * MWNO3,TMASSHNO3) !pw added min
-            !ANH4 = YNH4 * MWNH4
-            ANH4 = min( YNH4 * MWNH4, TMASSNH3 )  ! ds pw added "min"
-            GNO3 = TMASSHNO3  - ANO3
-            GNH3 = TMASSNH3   - ANH4
-            AH2O = 1000.0 * WH2O
-            RETURN
+
+            ASO4_High = TSO4_HighA * MWSO4
+            ANO3_High = min(XNO3 * MWNO3,TMASSHNO3)
+            ANH4_High = min( YNH4 * MWNH4, TMASSNH3 )
+            GNO3_High = TMASSHNO3  - ANO3_High
+            GNH3_High = TMASSNH3   - ANH4_High
+            AH2O_High = 1000.0 * WH2O
+
+!            RETURN
+            goto 333
           END IF
+
 
 1501    CONTINUE
 
 !...If after NITR iterations no solution is found, then:
 ! FSB retain the initial values of nitrate particle and vapor
 ! 2/25/99 IJA
-        ASO4 = TSO4 * MWSO4
-        ANO3 = NO3
+        ASO4_High = TSO4_HighA * MWSO4
+        ANO3_High = NO3
         XNO3 = NO3 / MWNO3
         YNH4 = TWOSO4
 !        ANH4 = YNH4 * MWNH4
-        ANH4 = min( YNH4 * MWNH4, TMASSNH3 )  ! ds pw added "min"
-        CALL AWATER ( fRH, TSO4, YNH4, XNO3, AH2O)
-        GNO3 = HNO3
-        GNH3 = TMASSNH3 - ANH4
-        RETURN
+        ANH4_High = min( YNH4 * MWNH4, TMASSNH3 )  ! ds pw added "min"
+        CALL AWATER ( fRH, TSO4_HighA, YNH4, XNO3, AH2O_High)
+        GNO3_High = HNO3
+        GNH3_High = TMASSNH3 - ANH4_High
+!        RETURN
+        goto 333
 
-      ELSE
+333 CONTINUE !finished DO_RATIO_High_2
+
+!      ELSE
+     ENDIF
+      IF ( DO_RATIO_Low_2 ) THEN    ! NH4/SO4 <= 2
        
 !......................................
 !......... Low Ammonia Case ...........
@@ -750,25 +822,26 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 !...All cases covered by this logic
  
         WH2O = 0.0
-        CALL AWATER ( fRH, TSO4, TNH4, TNO3, AH2O )
+        CALL AWATER ( fRH, TSO4_LowA, TNH4, TNO3, AH2O )
         WH2O = 1.0E-3 * AH2O
         ZH2O = AH2O
 
 !...convert 10**(-6) kg water/(cubic meter of air) to micrograms of water
 !...  per cubic meter of air (1000 g = 1 kg)
 ! 2/25/99 IJA 
-        ASO4 = TSO4 * MWSO4
-        ANH4 = TNH4 * MWNH4
+        ASO4_Low = TSO4_LowA * MWSO4
+        ANH4_Low = TNH4 * MWNH4
         !dsSAFE ANO3 = NO3
-        ANO3 = min( NO3, TMASSHNO3 )
-        GNO3 = TMASSHNO3 - ANO3
-        GNH3 = FLOOR
+        ANO3_Low = min( NO3, TMASSHNO3 )
+        GNO3_Low = TMASSHNO3 - ANO3_Low
+        GNH3_Low = FLOOR
+        AH2O_Low = 1.0E3 *WH2O
 
 !...Check for zero water.      
 
-        !emep IF ( WH2O == 0.0 ) RETURN
-        IF ( abs(WH2O) < FLOOR ) RETURN
-        ZSO4 = TSO4 / WH2O 
+        !ds IF ( WH2O == 0.0 ) RETURN
+        IF ( abs(WH2O) < FLOOR ) goto 111!RETURN
+        ZSO4 = TSO4_LowA / max(WH2O,FLOOR)
 
 !...ZSO4 is the molality of total sulfate i.e. MSO4 + MHSO4      
 
@@ -779,7 +852,8 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 !...  greater than  9.0 because the model parameters break down
 
         IF ( ZSO4 > 9.0 ) THEN   ! 18 June 97
-          RETURN
+           goto 111
+          !RETURN
         END IF
 
 !...First solve with activity coeffs of 1.0, then iterate.
@@ -793,7 +867,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 
 !...All ammonia is considered to be aerosol ammonium. 
 
-        MNH4 = TNH4 / WH2O
+        MNH4 = TNH4 / max(WH2O,FLOOR)
 
 !...MNH4 is the molality of ammonium ion.
 
@@ -835,14 +909,14 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
           MHSO4 = ZSO4 - MSO4                       ! molality of bisulfate ion
           MNA = RKNA * TNO3 / ( HPLUS + RKNWET )    ! molality of nitrate ion
           MNA = MAX( 0.0, MNA )
-          MNA = MIN( MNA, TNO3 / WH2O )
+          MNA = MIN( MNA, TNO3 / max(WH2O,FLOOR) )
           XNO3 = MNA * WH2O
           !ds ANO3 = MNA * WH2O * MWNO3
-          ANO3 = min( TMASSHNO3, MNA * WH2O * MWNO3)
+          ANO3_Low = min( TMASSHNO3, MNA * WH2O * MWNO3)
 ! 2/25/99 IJA
-          GNO3 = TMASSHNO3 - ANO3
+          GNO3_Low = TMASSHNO3 - ANO3_Low
           if( DEBUG_EQUIB ) then
-             if (GNO3 < 0.0 ) call CheckStop("NNN2 GNO3 NEG")
+             if (GNO3_Low < 0.0 ) call CheckStop("NNN2 GNO3 NEG")
           end if
         
 !...Calculate ionic strength      
@@ -851,7 +925,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
           
 !...Update water
 
-          CALL AWATER ( fRH, TSO4, YNH4, XNO3, AH2O )
+          CALL AWATER ( fRH, TSO4_LowA, YNH4, XNO3, AH2O )
 
 !...Convert 10**(-6) kg water/(cubic meter of air) to micrograms of water
 !...  per cubic meter of air (1000 g = 1 kg)                       
@@ -879,26 +953,38 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 
 !...write out molalities and activity coefficient
 !...  and return with good solution
+          AH2O_Low = 1.0E3 *WH2O
 
           IF ( EROR <= TOLER2 ) THEN
 !!!            WRITE(12,*) RH, STION,HPLUS,ZSO4,MSO4,MHSO4,MNH4,MNA
 !!!            WRITE(11,*) RH, STION, GAMS(1,1),GAMS(1,2),GAMS(1,3),
 !!!     &                  GAMS(2,1),GAMS(2,2),GAMS(2,3), PHIBAR
-            RETURN
+
+           goto 111
+            !RETURN
           END IF
 
 1601    CONTINUE     
 
 !...after NITR iterations, failure to solve the system, no ANO3
 ! 2/25/99 IJA
-        ANH4 = TNH4 * MWNH4
-        GNH3 = FLOOR
-        GNO3 = HNO3
-        ANO3 = NO3
-        CALL AWATER ( fRH, TSO4, TNH4, TNO3, AH2O )      
-        RETURN
-            
+        ANH4_Low = TNH4 * MWNH4
+        GNH3_Low = FLOOR
+        GNO3_Low = HNO3
+        ANO3_Low = NO3
+        CALL AWATER ( fRH, TSO4_LowA, TNH4, TNO3, AH2O_Low )      
+!        RETURN
+           goto 111
+111        continue
+   
       END IF   ! ratio .gt. 2.0
+
+      ASO4 = ASO4_High*High_Factor + ASO4_Low*(1.0-High_Factor)
+      ANO3 = ANO3_High*High_Factor + ANO3_Low*(1.0-High_Factor)
+      AH2O = AH2O_High*High_Factor + AH2O_Low*(1.0-High_Factor)
+      ANH4 = ANH4_High*High_Factor + ANH4_Low*(1.0-High_Factor)
+      GNH3 = GNH3_High*High_Factor + GNH3_Low*(1.0-High_Factor)
+      GNO3 = GNO3_High*High_Factor + GNO3_Low*(1.0-High_Factor)
 
       end subroutine rpmares ! end RPMares
 
@@ -982,7 +1068,7 @@ if( DEBUG_EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
       if(crutes(1) <= 0.0) THEN
          crutes(1) = 1.0e9
   !!    if(debug_flag ) write(6,*) 'WARNING: NEGATIVE ROOTS IN CUBIC', crutes(1)
-  !!       stop
+  !!st       stop
       end if
       nr=1
       end if

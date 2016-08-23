@@ -44,24 +44,6 @@
  
 !Nothing to do for NH4_F! xnew(NH4_F)=  max(0.0, xold(NH4_F))
 
-!-> V1702A02B_F 
-
-      P =   &
-          rcemis(V1702A02B_F,k) 
-      ! L = 0.0
- 
-
-      xnew(V1702A02B_F)=  xold(V1702A02B_F) + dt2 * P
-
-!-> V1702A02B_C 
-
-      P =   &
-          rcemis(V1702A02B_C,k) 
-      ! L = 0.0
- 
-
-      xnew(V1702A02B_C)=  xold(V1702A02B_C) + dt2 * P
-
 !-> GAS_ASOA_OC 
       ! P = 0.0
  

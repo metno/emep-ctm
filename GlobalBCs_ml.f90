@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2013 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,11 +43,10 @@ use CheckStop_ml,   only: CheckStop
 use GridValues_ml,  only: glat_fdom, GlobalPosition
 use Functions_ml,   only: StandardAtmos_kPa_2_km ! for use in Hz scaling
 use GridValues_ml,  only: lb2ij, AN, glat_fdom, glon_fdom,A_mid, B_mid
-use Io_ml,          only: IO_GLOBBC, ios, open_file
+use Io_ml,          only: IO_GLOBBC, ios, open_file, PrintLog
 use LocalVariables_ml, only : Sub, Grid
-use MetFields_ml,   only: nwp_sea
 use ModelConstants_ml, only: PPB, KMAX_MID, Pref, MasterProc, DO_SAHARA, &
-                          IIFULLDOM, JJFULLDOM
+                          iyr_trend, IIFULLDOM, JJFULLDOM
 use NetCDF_ml,      only: GetCDF, Read_Inter_CDF
 use Par_ml,         only: GIMAX, GJMAX, IRUNBEG, JRUNBEG
 use PhysicalConstants_ml, only: PI
@@ -114,13 +113,15 @@ type, private :: sineconc
 end type sineconc
 type(sineconc), private, save, dimension(NGLOB_BC) :: SpecBC
 
-type, private :: UStrend
-  real:: so2trend=1.0,noxtrend=1.0,nh4trend=1.0
-end type UStrend
+type, private :: SIAfac ! trends in boundary conditions
+  integer :: year
+  real:: so2,nox,nh4
+end type SIAfac
 
 ! the actual values - do not use IGLOB,JGLOB, but the actual one's
 integer, save, private  :: iglbeg, iglend, jglbeg, jglend
 ! -----------------------------------------------------------------------
+integer,parameter ::KMAX20=20
 
 contains
 
@@ -144,7 +145,7 @@ subroutine setgl_actarray(iglobact,jglobact)
   jglobact = GJMAX
  end subroutine setgl_actarray
 
-subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
+subroutine GetGlobalData(year,month,ibc,used,        &
                          iglobact,jglobact,bc_data,io_num,errcode)
 ! -----------------------------------------------------------------------
 ! HANDLES READ_IN OF GLOBAL DATA. We read in the raw data from the
@@ -152,7 +153,6 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
 ! here if the species is to be used.
 ! -----------------------------------------------------------------------
   integer,             intent(in) :: year       ! for Mace Head correction
-  integer,             intent(in) :: iyr_trend  ! Allows future/past years
   integer,             intent(in) :: month
   integer,             intent(in) :: ibc        ! Index of BC
   integer,             intent(in) :: used       ! set to 1 if species wanted
@@ -165,19 +165,18 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
   logical, save :: first_call = .true.
   real, dimension(IIFULLDOM,JJFULLDOM,KMAX_MID) :: bc_rawdata   ! Data (was rtcdmp)
 
-  type(UStrend):: US=UStrend(1.0,1.0,1.0)
-!  integer, dimension(IIFULLDOM,JJFULLDOM), save :: lat5     ! for latfunc below
   integer, allocatable,dimension(:,:), save :: lat5     ! for latfunc below
   real, dimension(NGLOB_BC,6:14), save  :: latfunc  ! lat. function
   real, save ::  twopi_yr, cosfac                   ! for time-variations
   real, dimension(12) :: macehead_O3
   real :: O3fix
-  integer :: i, j, k, i1, j1, icount
-  character(len=30) :: fname                    ! input filename
-  character(len=99) :: errmsg   ! error messages
+  integer :: i, j, k, i0, i1, j1, icount
+  real    :: f0, f1             ! interpolation factors
+  character(len=30) :: fname    ! input filename
+  character(len=99) :: txtmsg   ! error messages
   character(len=30) :: BCpoll   ! pollutant name
   real :: trend_o3, trend_co, trend_voc
-  real, dimension(KMAX_MID), save :: p_kPa, h_km  !Use of standard atmosphere
+  real,allocatable,save, dimension(:) :: p_kPa, h_km  !Use of standard atmosphere
 
   real :: scale_old, scale_new,iMH,jMH
   logical :: notfound !set true if NetCDF BIC are not found
@@ -185,9 +184,8 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
   real, parameter :: macehead_lon = -9.9 !longitude of Macehead station
   logical,parameter :: MACEHEADFIX=.true.
 
-  io_num = IO_GLOBBC          ! for closure in BoundCOnditions_ml
 
-! -----------------------------------------------------------------------
+!----------------------------------------------------------
 !Trends 1980-2003 derived from EPA emissions of so2,nox.
 ! nh4 derived from 2/3so3+1/3nox
 !Support for SO2 can be found in Hicks, Artz, Meyer and Hosker, 2002
@@ -199,35 +197,83 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
 !  SOx: winter ice cores, Col du dome
 !  NOx: winter ice cores
 !1890-1920: trends from emissions for SOx,NOx,NH3, Aardenne USA
+! Updated: April 2013
+! - use data above to 1980, then EPA download of April 2013
+! - then IIASA/ECLAIRE/ECLIPSE
+ type(SIAfac), dimension(37), save :: SIAtrends = (/ &
+    SIAfac(1890,0.12,0.15,0.44) &
+   ,SIAfac(1900,0.18,0.20,0.48) &
+   ,SIAfac(1910,0.27,0.27,0.52) &
+   ,SIAfac(1920,0.32,0.33,0.59) &
+   ,SIAfac(1930,0.35,0.33,0.55) &
+   ,SIAfac(1940,0.46,0.25,0.59) &
+   ,SIAfac(1950,0.59,0.33,0.69) &
+   ,SIAfac(1960,0.76,0.50,0.76) &
+   ,SIAfac(1970,0.95,0.75,0.90) &
+   ,SIAfac(1980,   1.000,   1.000,   1.000)&
+   ,SIAfac(1985,   0.899,   0.951,   0.989)&
+   ,SIAfac(1990,   0.890,   0.943,   0.920)&
+   ,SIAfac(1991,   0.863,   0.930,   0.934)&
+   ,SIAfac(1992,   0.852,   0.933,   0.947)&
+   ,SIAfac(1993,   0.840,   0.936,   0.963)&
+   ,SIAfac(1994,   0.823,   0.936,   0.978)&
+   ,SIAfac(1995,   0.718,   0.922,   0.993)&
+   ,SIAfac(1996,   0.709,   0.915,   1.007)&
+   ,SIAfac(1997,   0.727,   0.912,   1.027)&
+   ,SIAfac(1998,   0.731,   0.899,   1.052)&
+   ,SIAfac(1999,   0.677,   0.844,   1.035)&
+   ,SIAfac(2000,   0.631,   0.835,   1.046)&
+   ,SIAfac(2001,   0.615,   0.796,   0.786)&
+   ,SIAfac(2002,   0.570,   0.781,   0.880)&
+   ,SIAfac(2003,   0.568,   0.753,   0.877)&
+   ,SIAfac(2004,   0.565,   0.726,   0.874)&
+   ,SIAfac(2005,   0.572,   0.703,   0.870)&
+   ,SIAfac(2006,   0.514,   0.681,   0.885)&
+   ,SIAfac(2007,   0.456,   0.658,   0.900)&
+   ,SIAfac(2008,   0.399,   0.635,   0.930)&
+   ,SIAfac(2009,   0.320,   0.579,   0.928)&
+   ,SIAfac(2010,   0.292,   0.543,   0.925)&
+   ,SIAfac(2011,   0.265,   0.488,   0.921)&
+   ,SIAfac(2012,   0.213,   0.421,   0.917)&
+   ! Default here from IIASA ECLAIRE/ECLIPSE
+   ! related to 2005 emissions as base
+   ! (Created by mk.UStrends, April 2013)
+   ,SIAfac(2030,   0.155,   0.252,   0.953)&
+   ,SIAfac(2050,   0.225,   0.276,   0.977)&! Last year which works
+   ,SIAfac(2200,   0.225,   0.276,   0.977)&! FAKE for interp
+ /)
+  type(SIAfac), save :: SIAtrend
 
-  select case (iyr_trend)!trend(so2,nox,nh4)
-  case(1890) ;US=UStrend(0.12,0.15,0.44)
-  case(1900) ;US=UStrend(0.18,0.20,0.48)
-  case(1910) ;US=UStrend(0.27,0.27,0.52)
-  case(1920) ;US=UStrend(0.32,0.33,0.59)
-  case(1930) ;US=UStrend(0.35,0.33,0.55)
-  case(1940) ;US=UStrend(0.46,0.25,0.59)
-  case(1950) ;US=UStrend(0.59,0.33,0.69)
-  case(1960) ;US=UStrend(0.76,0.50,0.76)
-  case(1970) ;US=UStrend(0.95,0.75,0.90)
-  case(1980) ;US=UStrend(1.00,1.00,1.00)
-  case(1985) ;US=UStrend(0.91,0.95,0.94)
-  case(1990) ;US=UStrend(0.89,0.94,0.93)
-  case(1995) ;US=UStrend(0.72,0.92,0.88)
-  case(1996) ;US=UStrend(0.71,0.92,0.88)
-  case(1997) ;US=UStrend(0.73,0.91,0.88)
-  case(1998) ;US=UStrend(0.73,0.90,0.87)
-  case(1999) ;US=UStrend(0.68,0.84,0.81)
-  case(2000) ;US=UStrend(0.63,0.83,0.80)
-  case(2001) ;US=UStrend(0.62,0.80,0.76)
-  case(2002) ;US=UStrend(0.59,0.78,0.74)
-  case(2003:);US=UStrend(0.62,0.77,0.74)
-  case default
-    write(unit=errmsg,fmt=*) "Unspecified trend BCs for this year:", ibc, year
-    call CheckStop(errmsg)
-  endselect
+  if (iyr_trend < SIAtrends(1)%year .or. iyr_trend >= SIAtrends(37)%year ) then
+    write(unit=txtmsg,fmt=*) "Unspecified trend BCs for this year:", ibc, year
+    call CheckStop(txtmsg)
+  end if
 
-!==================================================================
+!================================================================== 
+! Interpolate between boundary condition years if needed
+  i0 = 1
+  do i = 1, size(SIAtrends(:)%year) 
+    if ( iyr_trend >= SIAtrends(i)%year ) i0 = i
+    !if(MasterProc) print "(a,5i6)", "USAsrch: ", i, i0, BCtrend(i)%year, BCtrend(i0)%year
+  end do
+
+  i1= i0 + 1
+  f0 =     (SIAtrends(i1)%year - iyr_trend)/&
+       real(SIAtrends(i1)%year - SIAtrends(i0)%year )
+  f1 =     (iyr_trend        - SIAtrends(i0)%year )/&
+       real(SIAtrends(i1)%year - SIAtrends(i0)%year )
+
+  SIAtrend%so2 =f0*SIAtrends(i0)%so2 + f1*SIAtrends(i1)%so2
+  SIAtrend%nox =f0*SIAtrends(i0)%nox + f1*SIAtrends(i1)%nox
+  SIAtrend%nh4 =f0*SIAtrends(i0)%nh4 + f1*SIAtrends(i1)%nh4
+
+  if (MasterProc.and.first_call) then
+     write(unit=txtmsg,fmt="(a,i5,4f8.3)") &
+       "BC:trends SOx,NOx,NH3 ", iyr_trend, SIAtrend
+     call PrintLog(txtmsg)
+  end if
+
+!================================================================== 
 ! Trends - derived from EMEP report 3/97
 ! adjustment for years outside the range 1990-2000.
 
@@ -241,9 +287,14 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
     trend_voc= exp(-0.01*0.85*(1990-iyr_trend)) ! Zander,1975-1990
   end if
   if (MasterProc.and.first_call) then
-    print "(a,i5)"," Trend year: ",  iyr_trend
-    print "(a,3f8.3)"," Trends for O3,CO and VOC: ", trend_o3, trend_co, trend_voc
+    write(unit=txtmsg,fmt="(a,i5,3f8.3)") "BC:trends O3,CO,VOC: ", &
+       iyr_trend, trend_o3, trend_co, trend_voc
+    call PrintLog(txtmsg)
   endif
+
+!----------------------------------------------------------
+
+  io_num = IO_GLOBBC          ! for closure in BoundCOnditions_ml
 
 !==================================================================
 !=========== BCs Generated from Mace Head Data =======================
@@ -350,7 +401,7 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
 !=========== Generated from Mace Head Data =======================
 
   errcode = 0
-  errmsg = "ok"
+  txtmsg = "ok"
   if (DEBUG_Logan) print *,"DEBUG_LOgan ibc, mm", ibc, month
 
 ! ========= first call =========================================
@@ -358,6 +409,7 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
     ! Set up arrays to contain Logan's grid as lat/long
     !/ COnversions derived from emeplat2Logan etc.:
      allocate(lat5(IIFULLDOM,JJFULLDOM))
+     allocate(p_kPa(KMAX_MID), h_km(KMAX_MID))
     twopi_yr = 2.0 * PI / 365.25
 
     call GlobalPosition  !get glat for global domaib
@@ -383,7 +435,6 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
     SpecBC(IBC_C4H10)  = sineconc( 2.0  , 45.0, 1.0 , 6.0  , 0.05, 0.05,PPB)
     SpecBC(IBC_HCHO )  = sineconc( 0.7  ,180.0, 0.3 , 6.0  , 0.05, 0.05,PPB)
     SpecBC(IBC_CH3CHO) = sineconc( 0.3  ,180.0, 0.05 , 6.0  , 0.005, 0.005,PPB) !NAMBLEX,Solberg,etc.
-  !older    SpecBC(IBC_CH3CHO) = sineconc( 2.0  ,180.0, 0.5 , 6.0  , 0.05, 0.05,PPB)
     SpecBC(IBC_HNO3 )  = sineconc( 0.07 ,180.0, 0.03, 999.9,0.025, 0.03,PPB)
                          !~=NO3, but with opposite seasonal var.
     SpecBC(IBC_NO3_f ) = sineconc( 0.07 , 15.0, 0.03, 1.6  ,0.025, 0.02,PPB) !ACE-2
@@ -419,8 +470,8 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
     do i = 1, NGLOB_BC
       if (DEBUG_GLOBBC) print *,"SPECBC i, hmin ",i,SpecBC(i)%surf,SpecBC(i)%hmin
       if( SpecBC(i)%hmin*SpecBC(i)%conv_fac < 1.0e-17) then
-        write(unit=errmsg,fmt="(A,I0)") "PECBC: Error: No SpecBC set for species ", i
-        call CheckStop(errmsg)
+        write(unit=txtmsg,fmt="(A,I0)") "PECBC: Error: No SpecBC set for species ", i
+        call CheckStop(txtmsg)
       endif
     enddo
 
@@ -456,11 +507,15 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
   case (IBC_O3)
     fname=date2string("D3_O3.MM",month=month)
     BCpoll='D3_O3_Logan'
-    call ReadBC_CDF(BCpoll,month,bc_rawdata,IIFULLDOM,JJFULLDOM,KMAX_MID,notfound)
+    call ReadBC_CDF(BCpoll,month,bc_rawdata(:,:,KMAX_MID-KMAX20+1:KMAX_MID),&
+                IIFULLDOM,JJFULLDOM,KMAX20,notfound)
 
+    do k=1, KMAX_MID-KMAX20
+       bc_rawdata(:,:,k)=bc_rawdata(:,:,KMAX_MID-KMAX20+1)
+    enddo
     if(notfound)then
       call open_file(IO_GLOBBC,"r",fname,needed=.true.,skip=1)
-      if ( ios /= 0 ) errmsg = "BC Error O3"
+      if ( ios /= 0 ) txtmsg = "BC Error O3"
       read(IO_GLOBBC,*) bc_rawdata
       close(IO_GLOBBC)
     endif
@@ -487,10 +542,10 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
       ! grid coordinates of Mace Head
       call lb2ij(macehead_lon,macehead_lat, iMH,jMH)
 
-      if(DEBUG_GLOBBC)print "(a10,2f7.2,i4,i6,3f8.3)","O3FIXes ",iMH,jMH, &
+      if(DEBUG_GLOBBC) write(*,"(a10,2f7.2,i4,i6,3f8.3)")"O3FIXes ",iMH,jMH, &
         month,icount,bc_rawdata(nint(iMH),nint(jMH),20)/PPB,&
         macehead_O3(month),O3fix/PPB
-      print "(a,f8.3)",' MaceHead correction for O3: ',-O3fix/PPB
+      write(*,"(a,f8.3)")' MaceHead correction for O3: ',-O3fix/PPB
 
     endif
     bc_rawdata = max(15.0*PPB,bc_rawdata-O3fix)
@@ -513,8 +568,8 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
       bc_rawdata(:,:,k) = bc_rawdata(:,:,KMAX_MID)*scale_new
       if (DEBUG_HZ) then
         scale_old = exp( -(KMAX_MID-k)/SpecBC(ibc)%hz )
-        print "(a8,2i3,2f8.3,i4,f8.2,f8.3,2f8.3)","SCALE-HZ ",&
-          month, ibc, SpecBC(ibc)%surf, SpecBC(ibc)%hz, k,&
+        write(*,"(a8,2i3,2f8.3,i4,f8.2,f8.3,2f8.3)") &
+         "SCALE-HZ ", month, ibc, SpecBC(ibc)%surf, SpecBC(ibc)%hz, k,&
           h_km(k), p_kPa(k), scale_old, scale_new
       endif ! DEBUG_HZ
     enddo
@@ -576,7 +631,7 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
 
         ! open the file
         call open_file(IO_GLOBBC,"r",fname,needed=.true.)
-        if ( ios /= 0 ) errmsg = "BC Error DUST"
+        if ( ios /= 0 ) txtmsg = "BC Error DUST"
 
         ! read the file ....
         do
@@ -597,12 +652,12 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
 
     case  default
       print *,"Error with specified BCs:", ibc
-      errmsg = "BC Error UNSPEC"
+      txtmsg = "BC Error UNSPEC"
     end select
 !================== end select ==================================
 
-  if (DEBUG_GLOBBC) print *,"dsOH FACTOR ", ibc, fname
-  call CheckStop(errmsg)
+  if (DEBUG_GLOBBC) print *,"BCOH FACTOR ", ibc, fname
+  call CheckStop(txtmsg)
   if (DEBUG_Logan) then
     print "(a15,3i4,f8.3)","DEBUG:LOGAN: ",ibc, used, month, cosfac
     print *,"LOGAN BC MAX ", maxval ( bc_rawdata ), &
@@ -619,11 +674,11 @@ subroutine GetGlobalData(year,iyr_trend,month,ibc,used,        &
   !/ trend adjustments
   select case (ibc)
   case(IBC_SO2,IBC_SO4)
-    bc_rawdata = bc_rawdata*US%so2trend
+    bc_rawdata = bc_rawdata*SIAtrend%so2
   case(IBC_NH4_f)
-    bc_rawdata = bc_rawdata*US%nh4trend
+    bc_rawdata = bc_rawdata*SIAtrend%nh4
   case(IBC_NO3_f,IBC_NO3_c,IBC_HNO3,IBC_NO2,IBC_NO,IBC_PAN)
-    bc_rawdata = bc_rawdata*US%noxtrend
+    bc_rawdata = bc_rawdata*SIAtrend%nox
   endselect
 
 

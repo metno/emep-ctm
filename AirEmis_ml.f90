@@ -57,7 +57,6 @@ module AirEmis_ml
    include 'mpif.h'
    
    integer STATUS(MPI_STATUS_SIZE),INFO
-   real MPIbuff
    integer,private ,parameter :: ILEV=18
    logical, parameter :: MY_DEBUG = .false.
 
@@ -354,8 +353,7 @@ module AirEmis_ml
          end do
       end do
 
-        MPIbuff=sum2
-        CALL MPI_ALLREDUCE(MPIbuff,sum2, 1, &
+        CALL MPI_ALLREDUCE(MPI_IN_PLACE,sum2, 1, &
         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO) 
       if(me == 0.and.MY_DEBUG) write(6,*) 'ancat on limited area:',sum,sum2
 

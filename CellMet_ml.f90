@@ -36,12 +36,13 @@ module CellMet_ml
 
 
 use CheckStop_ml, only : CheckStop
-use GridValues_ml, only :  sigma_bnd
+use GridValues_ml, only :  sigma_bnd,dA,dB
 use Landuse_ml, only : LandCover, ice_landcover    ! Provides SGS, hveg, LAI ....
+use Landuse_ml, only : mainly_sea
 use LocalVariables_ml, only: Grid, Sub, ResetSub
 use MicroMet_ml, only :  PsiH, PsiM, AerRes    !functions
 use MetFields_ml, only: ps, u_ref
-use MetFields_ml, only: cc3dmax, nwp_sea, sdepth,ice_nwp, surface_precip, &
+use MetFields_ml, only: cc3dmax, sdepth,ice_nwp, surface_precip, &
    fh,fl,z_mid, z_bnd, q, roa, rh2m, rho_surf, th, pzpbl, t2_nwp, ustar_nwp,&
     zen, coszen, Idirect, Idiffuse
 use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, PT, USE_ZREF
@@ -105,8 +106,13 @@ contains
 ! More exact for thickness of bottom layer, since used for emissions
 ! from  dp = g. rho . dz and d sigma = dp/pstar
 ! we get dz = d sigma . pstar/(g.rho)
+!     Grid%DeltaZ  &!  = z_bnd(i,j,KMAX_BND-1) ! NB! Approx,updated every 3h
+!                = (1.0 - sigma_bnd(20) ) * (ps(i,j,1)-PT) /(GRAV*roa(i,j,20,1))
+!Eta coordinates:
+!dp = dA+dB*Ps
      Grid%DeltaZ  &!  = z_bnd(i,j,KMAX_BND-1) ! NB! Approx,updated every 3h
-                = (1.0 - sigma_bnd(20) ) * (ps(i,j,1)-PT) /(GRAV*roa(i,j,20,1))
+                = (dA(KMAX_MID)+dB(KMAX_MID)*ps(i,j,1) )/(GRAV*roa(i,j,20,1))
+
      Grid%u_ref    = u_ref(i,j)
      Grid%qw_ref    =  q(i,j,KMAX_MID,1)   ! specific humidity
      Grid%rho_ref  = roa(i,j,KMAX_MID,1)
@@ -127,8 +133,8 @@ contains
      Grid%rh2m  = rh2m(i,j,1)      ! 
      Grid%rho_s = rho_surf(i,j)    ! Should replace Met_ml calc. in future
 
-     Grid%is_NWPsea = nwp_sea(i,j)
-     Grid%is_allNWPsea = ( nwp_sea(i,j) .and. LandCover(i,j)%ncodes == 1)
+     Grid%is_mainlysea = mainly_sea(i,j)
+     Grid%is_allsea = ( mainly_sea(i,j) .and. LandCover(i,j)%ncodes == 1)
      Grid%sdepth    = sdepth(i,j,1)
      Grid%ice_nwp   = max( ice_nwp(i,j,1), ice_landcover(i,j) ) 
      Grid%snowice   = ( Grid%sdepth  > 1.0e-10 .or. Grid%ice_nwp > 1.0e-10 )

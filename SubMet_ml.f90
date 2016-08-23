@@ -137,7 +137,8 @@ real :: theta2
         Sub(iL)%is_forest = LandType(iL)%is_forest
         Sub(iL)%is_crop   = LandType(iL)%is_crop   
 
-        if( USE_SOILWATER ) Sub(iL)%fSW    = Grid%fSW
+        !if( USE_SOILWATER )
+          Sub(iL)%fSW    = Grid%fSW ! MAR2013 - not needed, but for safety
 
      ! If NWP thinks this is a sea-square, but we anyway have land,
      ! the surface temps will be wrong and so will stability gradients.
@@ -146,7 +147,7 @@ real :: theta2
      ! situations.
 
       if ( .not. LANDIFY_MET .and. &
-              Grid%is_NWPsea  .and. (.not. Sub(iL)%is_water) ) then
+              Grid%is_mainlysea  .and. (.not. Sub(iL)%is_water) ) then
            Sub(iL)%invL = 0.0
            Sub(iL)%Hd   = 0.0
       end if
@@ -216,7 +217,7 @@ real :: theta2
         rho_surf = Grid%psurf/(RGAS_KG * Sub(iL)%t2 )
 
 
-        if( Grid%is_allNWPsea ) then
+        if( Grid%is_allsea ) then
           Sub(iL)%ustar = Grid%ustar
           Sub(iL)%invL  = Grid%invL  
         else  ! Calculate ustar, invL for each landcover
@@ -308,14 +309,14 @@ real :: theta2
 
   end if ! FluxPROFILE
 
- end if ! allNWPsea
+ end if ! allsea
 
     if (  DEBUG_SUBMET .and. debug_flag ) then
         write(6,"(a12,10f9.3)") "SUBMET" // trim(FluxProfile), Sub(iL)%z0, &
          Sub(iL)%d, Sub(iL)%z_refd, 0.001*Grid%psurf, Sub(iL)%t2, rho_surf, &
          Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%t2, Sub(iL)%invL
         write(*,*) "UKDEP LOGICS ", iL, &
-         Sub(iL)%is_water, Sub(iL)%is_forest, Grid%is_allNWPsea
+         Sub(iL)%is_water, Sub(iL)%is_forest, Grid%is_allsea
 
 
         if ( my_first_call ) then ! title line

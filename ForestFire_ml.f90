@@ -159,7 +159,7 @@ subroutine Fire_Emis(daynumber)
     FINN_PATTERN = 'FINN_ForestFireEmis_YYYY.nc',&
     GFAS_PATTERN = 'GFAS_ForestFireEmis_YYYY.nc'
   character(len=len(GFAS_PATTERN)) :: fname = ''
-  logical :: my_debug=.false.
+  logical :: my_debug=.false.,fexist=.false.
   integer, parameter :: verbose = 1
 
   if(my_first_call) &
@@ -211,6 +211,7 @@ subroutine Fire_Emis(daynumber)
     call CheckStop("Unknown B.B.Mapping: "//trim(BiomassBurningMapping))
   endselect
 
+
   if(DEBUG_FORESTFIRE.and.MasterProc) &
     write(*,*) "Starting FIRE days:", current_date%year, &
       daynumber, dd_old, mod(daynumber,8), my_first_call
@@ -243,16 +244,30 @@ subroutine Fire_Emis(daynumber)
     call CheckStop(any(emep_used<0),"UNSET FFIRE EMEP "//BiomassBurningMapping)
 
   endif !my first call
-  allocate(rdemis(MAXLIMAX,MAXLJMAX),stat=alloc_err)
-  call CheckStop(alloc_err,"ForestFire rdemis alloc problem")
+
+! Check if ForestFire file exists
+  select case(BiomassBurningMapping(1:4))
+    case("GFED");fname=date2string(GFED_PATTERN,current_date)
+    case("FINN");fname=date2string(FINN_PATTERN,current_date)
+    case("GFAS");fname=date2string(GFAS_PATTERN,current_date)
+  endselect
+  inquire(file=fname,exist=fexist)
+  if(.not.fexist)then
+    if(MasterProc)then
+      write(*,*)"ForestFire file not found: "//trim(fname)
+      call CheckStop(.not.FORECAST,"Missing ForestFire file")
+    endif
+    burning(:,:) = .false.
+    return
+  endif
 
   if(DEBUG_FORESTFIRE.and.MasterProc) write(*,*) "FOREST_FIRE: ", daynumber,nstart
-
   BiomassBurningEmis(:,:,:) = 0.0
-
+  allocate(rdemis(MAXLIMAX,MAXLJMAX),stat=alloc_err)
+  call CheckStop(alloc_err,"ForestFire rdemis alloc problem")
+  
   ! We need to look for forest-fire emissions which are equivalent
   ! to the standard emission files:
-
   do iBB = 1, NBB_DEFS
     FF_poll = FF_defs(iBB)%BBname
     iemep   = FF_defs(iBB)%emep  ! 
@@ -267,7 +282,6 @@ subroutine Fire_Emis(daynumber)
 
     select case(BiomassBurningMapping(1:4))
     case("GFED")
-      fname = date2string(GFED_PATTERN,current_date)
       if(my_debug) &
         write(*,*) "FFIRE GFED ", me, iBB, nstart,  trim(FF_poll), trim(fname)
       call ReadField_CDF(fname,FF_poll,rdemis,nstart,interpol='zero_order',&
@@ -277,7 +291,6 @@ subroutine Fire_Emis(daynumber)
       forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*to_kgm2s
 
     case("FINN")
-      fname = date2string(FINN_PATTERN,current_date)
       if(my_debug) &
         write(*,*) "FFIRE FINN ", me, iBB, daynumber,  trim(FF_poll), trim(fname)
       call ReadField_CDF(fname,FF_poll,rdemis,daynumber,interpol='mass_conservative',&
@@ -288,7 +301,6 @@ subroutine Fire_Emis(daynumber)
       forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*fac*xm2(i,j)
 
     case("GFAS")
-      fname = date2string(GFAS_PATTERN,current_date)
       nstart = daynumber
 ! something more sophisticated is needed for YYYY_ or YYYYMM_ files,
 ! e.g. use ReadTimeCDF and nctime2idate/idate2nctime to find the right record:
@@ -361,7 +373,7 @@ subroutine Fire_rcemis(i,j)
   real, dimension(KEMISFIRE:KMAX_MID) :: invDeltaZfac !  height of layer in m div 9
   integer ::  k, n, iem
 
-  integer, parameter ::  N_LEVELS = KMAX_MID - KEMISFIRE + 1  ! = 9.0 here
+  integer ::  N_LEVELS  ! = 9.0 here
 
   real    :: origrc, bbe, fac
   logical :: debug_flag
@@ -371,6 +383,8 @@ subroutine Fire_rcemis(i,j)
   if(debug_flag.and.BiomassBurningEmis(ieCO,i,j) > 1.0e-10)  &
     write(*,"(a,5i4,es12.3,f9.3)") "BurningDEBUG ", me, i,j, &
       i_fdom(i), j_fdom(j), BiomassBurningEmis(ieCO,i,j)
+
+  N_LEVELS = KMAX_MID - KEMISFIRE + 1 
 
   !// last conversion factors:
   ! The biomassBurning array is kept in kg/m2/s for consistency with other

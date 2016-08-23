@@ -54,6 +54,7 @@ module InterpolationRoutines_ml
 
   public :: Nearest4interp
   public :: grid2grid_coeff
+  public :: Averageconserved_interpolate
 
   real, public, dimension(0:1,0:1) :: wt    ! weighting factors, array version
 
@@ -416,6 +417,60 @@ module InterpolationRoutines_ml
     enddo
 
   end subroutine grid2grid_coeff
+
+   subroutine Averageconserved_interpolate(Start,Endval,Average,Nvalues,i,x)
+     !this routine interpolates a function, and evaluate it at i 
+     !f(n), n=1...Nvalues, x=f(i)
+
+     !The properties imposed to f are:
+     !1)The average of f is equal Average, i.e. sum(f(n),n=1,Nvalues)=Average
+     !2)The function varies linearly between 0.5 and Nvalues/2 and between (Nvalues+1)/2 and Nvalues+0.5
+     !  Nvalues/2 is here considered as integer arithmetics, i.e. 
+     !  Nvalues/2 = (Nvalues+1)/2 for Nvalues even, and Nvalues/2 = (Nvalues+1)/2 -1 for Nvalues odd.
+     !3) f(Nvalues/2)=f((Nvalues+1)/2)  (still integer arithmetics)
+     !4) Start=f(0.5) is the value the function would have at i = 0.5 (input)
+     !5) Endval=f(Nvalues+0.5) is the value the function would have at i = Nvalues+0.5 (input)
+  
+     !Nvalues is the number of values n can have starting from 1(input)
+     !i is the actual values of n (input)
+     !x=f(i) ; x is the calculated value at n=i (output)
+
+     real, intent(in)::Start,Endval,Average
+     integer, intent(in)::Nvalues,i
+     real, intent(out)::x
+
+     real::Middle,frac
+!A) Calculate the value of the function in the middle (at (N+1)/2) Middle=f((N+1)/2):
+
+!It is not the same value for Nvalues odd or even 
+     if(2*(Nvalues/2)==Nvalues)then
+        Middle=2.0*Average-(Start+Endval)*0.5
+     else
+        Middle=(2.0*Nvalues*Average-(Nvalues-1)*(Start+Endval)*0.5)/(Nvalues+1)
+     endif
+
+!B) Evaluate the function at i
+
+     !Check that i is within allowed boundaries:
+     if(i<1.or.i>Nvalues)stop
+
+     if(i<=Nvalues/2)then
+        !linear interpolation between Start and Middle
+        frac=(i-0.5)/(Nvalues/2)
+        x = Start*(1.0-frac)+Middle*frac
+     elseif(i>(Nvalues+1)/2)then
+        !linear interpolation between Middle and End
+        frac=(Nvalues+0.5-i)/(Nvalues/2)
+        x = Endval*(1.0-frac)+Middle*frac        
+     elseif(i==(Nvalues+1)/2)then
+        !in the middle and odd number of values 
+        x=Middle
+     else
+        !should not be possible
+        stop
+     endif
+
+   end subroutine Averageconserved_interpolate
 
 end module InterpolationRoutines_ml
 

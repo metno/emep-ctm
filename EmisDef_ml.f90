@@ -124,7 +124,7 @@ implicit none
 
   integer, parameter, public :: NROAD_FILES = 2
   character(len=11), save, dimension(NROAD_FILES), public:: &
-       ROAD_FILE =  (/ "HIGHWAYplus", "NONHIGHWAY" /)
+       ROAD_FILE =  (/ "HIGHWAYplus", "NONHIGHWAY " /)
   character(len=21), save, public:: &
        ROADDUST_CLIMATE_FILE =  "ROADDUST_CLIMATE_FAC"
 

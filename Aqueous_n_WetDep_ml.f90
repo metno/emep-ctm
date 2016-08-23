@@ -105,13 +105,13 @@ module Aqueous_ml
   private:: setup_aqurates
 
 ! Outputs:
-  logical, public, save, dimension(KUPPER:KMAX_MID) :: &
+  logical, public, save,allocatable, dimension(:) :: &
     incloud              ! True for in-cloud k values
 ! Variables used in module:
-  real, private, save, dimension(KUPPER:KMAX_MID) :: &
+  real, private, save,allocatable, dimension(:) :: &
     pr_acc                  ! Accumulated precipitation
 !hf NEW (here for debugging)
-  real, private, save, dimension(KUPPER:KMAX_MID) :: &
+  real, private, save,allocatable, dimension(:) :: &
     pH,so4_aq,no3_aq,nh4_aq,nh3_aq,hso3_aq,so2_aq,so32_aq,co2_aq,hco3_aq   ! pH in cloud
 
   integer, private, save  :: kcloudtop   ! k-level of highest-cloud
@@ -140,7 +140,7 @@ module Aqueous_ml
     IH_NH3  = 4, &     !hf pH
     IH_CO2  = 5
 ! Aqueous fractions:
-  real, public,  dimension(NHENRY,KUPPER:KMAX_MID),   save :: frac_aq
+  real, save,allocatable, public,  dimension(:,:) :: frac_aq
   real, private, dimension(NHENRY,CHEMTMIN:CHEMTMAX), save :: H
   real, private, dimension(NK1,CHEMTMIN:CHEMTMAX),    save :: K1fac
 !hf NEW
@@ -155,7 +155,7 @@ module Aqueous_ml
     NAQUEOUS = 4, & ! No. aqueous rates
     NAQRC    = 3    ! No. constant rates
 
-  real, public,  dimension(NAQUEOUS,KCHEMTOP:KMAX_MID), save :: aqrck
+  real, public, save,allocatable, dimension(:,:) :: aqrck
   real, private, dimension(NAQRC), save :: aqrc ! constant rates for
                                                 ! so2 oxidn.
   real, private, dimension(2), save :: vw       ! constant rates for
@@ -262,6 +262,14 @@ subroutine Init_WetDep()
   real, parameter :: EFF25 = 0.02*SUBCLFAC, &
                      EFFCO = 0.4 *SUBCLFAC, &
                      EFFGI = 0.7 *SUBCLFAC
+
+  allocate(incloud(KUPPER:KMAX_MID),pr_acc(KUPPER:KMAX_MID))
+  allocate(pH(KUPPER:KMAX_MID),so4_aq(KUPPER:KMAX_MID),no3_aq(KUPPER:KMAX_MID))
+  allocate(nh4_aq(KUPPER:KMAX_MID),nh3_aq(KUPPER:KMAX_MID),hso3_aq(KUPPER:KMAX_MID))
+  allocate(so2_aq(KUPPER:KMAX_MID),so32_aq(KUPPER:KMAX_MID),co2_aq(KUPPER:KMAX_MID))
+  allocate(hco3_aq(KUPPER:KMAX_MID))
+  allocate(frac_aq(NHENRY,KUPPER:KMAX_MID))
+  allocate(aqrck(NAQUEOUS,KCHEMTOP:KMAX_MID))
 
 !/.. setup the scavenging ratios for in-cloud and sub-cloud. For
 !    gases, sub-cloud = 0.5 * incloud. For particles, sub-cloud=

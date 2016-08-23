@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2013 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -89,11 +89,14 @@ use GlobalBCs_ml,      only:  &
 use GridValues_ml,     only: glon, glat   & ! full domain lat, long
                             ,sigma_mid    & !sigma layer midpoint
                             ,debug_proc, debug_li, debug_lj & ! debugging
-                            ,i_fdom, j_fdom  ! for debugging
-use Io_Progs_ml,       only: datewrite
+                            ,i_fdom, j_fdom,B_mid  ! for debugging
+use Io_Progs_ml,       only: datewrite, PrintLog
+use Landuse_ml,        only: mainly_sea
 use LocalVariables_ml, only: Grid
-use MetFields_ml,      only: z_mid, nwp_sea       ! height of half layers
+use MetFields_ml,      only: z_mid      ! height of half layers
 use ModelConstants_ml, only: KMAX_MID  &  ! Number of levels in vertical
+                            ,iyr_trend &  ! Used for e.g. future scenarios
+                            ,BGND_CH4  &  ! If positive, replaces defaults
                             ,USE_SEASALT & 
                             ,DEBUG_BCS, DEBUG_i, DEBUG_j, MasterProc, PPB
 use Par_ml,          only: &
@@ -129,7 +132,7 @@ integer, public, parameter :: &
   NTOT_BC  = NGLOB_BC + NMISC_BC
 
 ! misc_bc specifies concentrations of these species:
-real, public, save, dimension(NGLOB_BC+1:NTOT_BC,KMAX_MID) :: misc_bc
+real, public, allocatable,save, dimension(:,:) :: misc_bc
 
 ! Define mapping arrays
 ! -----------------------------------------------------------------------
@@ -183,7 +186,7 @@ INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
 contains
 
-  subroutine BoundaryConditions(year,iyr_trend,month)
+  subroutine BoundaryConditions(year,month)
     ! ---------------------------------------------------------------------------
     ! Read in monthly-average global mixing ratios, and if found, collect the
     ! data in  bc_adv, bc_bgn arrays for later interpolations
@@ -196,7 +199,6 @@ contains
     !     This allows, e.g. runs with BCs for 2100 and met of 1990.
     ! ---------------------------------------------------------------------------
     integer, intent(in) :: year         ! "meteorology" year
-    integer, intent(in) :: iyr_trend    ! "trend" year
     integer, intent(in) :: month
     integer :: ibc, iem, k, iem1, i, j ,n, nadv,ntot ! loop variables
     integer :: info                     ! used in rsend
@@ -219,7 +221,7 @@ contains
     if (first_call) then
        if (DEBUG_BCS) write(*,"(a,I3,1X,a,i5)") &
             "FIRST CALL TO BOUNDARY CONDITIONS, me: ", me,  "TREND YR ", iyr_trend
-
+       allocate(misc_bc(NGLOB_BC+1:NTOT_BC,KMAX_MID))
        call My_bcmap(iyr_trend)      ! assigns bc2xn_adv and bc2xn_bgn mappings
        call Set_bcmap()              ! assigns xn2adv_changed, etc.
 
@@ -321,7 +323,7 @@ contains
     !== BEGIN READ_IN OF GLOBAL DATA
 
     do ibc = 1, NGLOB_BC
-       if (MasterProc) call GetGlobalData(year,iyr_trend,month,ibc,bc_used(ibc), &
+       if (MasterProc) call GetGlobalData(year,month,ibc,bc_used(ibc), &
             iglobact,jglobact,bc_data,io_num,errcode)
 
        if (DEBUG_BCS.and.MasterProc) &
@@ -381,7 +383,7 @@ contains
                       bc_fac     = 1.0
 
                       if ( bc_seaspec ) then
-                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                          if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
                       end if
 
@@ -429,7 +431,7 @@ contains
                       bc_fac     = 1.0
 
                       if ( bc_seaspec ) then
-                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                          if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
                       end if
 
@@ -443,7 +445,7 @@ contains
                       bc_fac     = 1.0
 
                       if ( bc_seaspec ) then
-                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                          if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
                       end if
 
@@ -459,7 +461,7 @@ contains
                       bc_fac     = 1.0
 
                       if ( bc_seaspec ) then
-                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                          if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
                       end if
 
@@ -475,7 +477,7 @@ contains
                       bc_fac     = 1.0
 
                       if ( bc_seaspec ) then
-                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                          if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
                       end if
 
@@ -493,7 +495,7 @@ contains
                       bc_fac     = 1.0
 
                       if ( bc_seaspec ) then
-                         if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                         if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                          if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
                       end if
 
@@ -716,6 +718,7 @@ subroutine My_bcmap(iyr_trend)
   real :: decrease_factor(NGLOB_BC+1:NTOT_BC) ! Decrease factor for misc bc's
         ! Gives the factor for how much of the top-layer conc. that is left
         ! at bottom layer
+  character(len=80) :: txt
 
   real :: top_misc_bc(NGLOB_BC+1:NTOT_BC) ! Conc. at top of misc bc
 !    real :: ratio_length(KMAX_MID)    ! Vertical length of the actual layer
@@ -749,10 +752,20 @@ subroutine My_bcmap(iyr_trend)
     top_misc_bc(IBC_CH4) = 1780.0 * exp(-0.01*0.91*(1990-iyr_trend)) ! Zander,1975-1990
                                  !exp(-0.01*0.6633*(1975-iyr_trend)) ! Zander,1951-1975
   endif
+
+
+  ! Reset with namelist values if set
+  if ( BGND_CH4 > 0 ) then
+     top_misc_bc(IBC_CH4) = BGND_CH4
+  end if
+
   trend_ch4 = top_misc_bc(IBC_CH4)/1780.0
-  if (MasterProc.and.DEBUG_MYBC) print "(a20,i5,2f12.3)","TREND CH4", &
-    iyr_trend, trend_ch4, top_misc_bc(IBC_CH4)
-  if (MasterProc) print "(a,f12.3,a,I5,a)"," CH4 ", top_misc_bc(IBC_CH4), ' (trend year ',iyr_trend,')'
+
+  if (MasterProc) then
+     write(txt,"(a,2i6,f8.1,f8.3)") "BC: CH4 settings (iyr,nml,ch4,trend): ",&
+             iyr_trend, nint(BGND_CH4), top_misc_bc(IBC_CH4),trend_ch4
+     call PrintLog(txt)
+  end if
 
   top_misc_bc(IBC_CH4) =  top_misc_bc(IBC_CH4) * PPB
   top_misc_bc(IBC_H2)  =  600.0 * PPB
@@ -765,11 +778,12 @@ subroutine My_bcmap(iyr_trend)
 ! is top_misc_bc -decrease_factor*top_misc_bc. Since the choice to set the
 ! concentration as a factor of sigma_mid, the concentration in the lowest
 ! grid cell will not be excactly top_misc_bc -decrease_factor*top_misc_bc, but close.
+!pw March 2013 sigma_mid replaced by B_mid (equal for sigma coordinates)
   do ii=NGLOB_BC+1,NTOT_BC
     do k=1,KMAX_MID
-      misc_bc(ii,k) = top_misc_bc(ii)*(1.0-decrease_factor(ii)*sigma_mid(k))
+      misc_bc(ii,k) = top_misc_bc(ii)*(1.0-decrease_factor(ii)*B_mid(k))
       if (MasterProc.and.DEBUG_MYBC) print "(a20,2es12.4,i4)",&
-        "height,misc_vert,k",sigma_mid(k),misc_bc(ii,k),k
+        "height,misc_vert,k",B_mid(k),misc_bc(ii,k),k
     enddo
   enddo
 
@@ -1012,7 +1026,7 @@ subroutine Set_BoundaryConditions(mode,iglobact,jglobact,bc_adv,bc_bgn)
 
             bc_fac     = 1.0
             if ( bc_seaspec ) then
-                  if ( .not. nwp_sea(i,j))  bc_fac = 0.001 ! low over land
+                  if ( .not. mainly_sea(i,j))  bc_fac = 0.001 ! low over land
                   if ( .not. USE_SEASALT )  bc_fac = 0.0   ! not wanted!
             end if
 

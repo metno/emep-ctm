@@ -51,7 +51,7 @@
  use Landuse_ml,           only : LandCover, water_fraction
  use LocalVariables_ml,    only : Sub, Grid
  use MetFields_ml,         only : u_ref, z_bnd, z_mid, sst,  &
-                                  nwp_sea, u_ref, foundSST, &
+                                  u_ref, foundSST, &
                                    foundws10_met,ws_10m
  use MicroMet_ml,          only : Wind_at_h
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, &
@@ -105,8 +105,8 @@
   ! Output: SS_prod - fluxes of fine and coarse sea salt aerosols [molec/cm3/s]
   !-----------------------------------------------------------------------
 
-   integer, intent(in) :: i,j    ! coordinates of column
-   logical, intent(in) :: debug_flag
+   integer, intent(in) :: i,j         ! coordinates
+   logical, intent(in) :: debug_flag  ! set true for debug i,j
 
    real, parameter :: Z10 = 10.0  ! 10m height
    integer :: ii, jj, nlu, ilu, lu
@@ -121,12 +121,13 @@
     ! We might have USE_SEASALT=.true. in ModelConstants, but the
     ! chemical scheme might not have seasalt species. We check.
 
-    inat_SSFI = find_index( "SEASALT_F", Emis_BioNat(:) )
-    inat_SSCO = find_index( "SEASALT_C", Emis_BioNat(:) )
+    inat_SSFI = find_index( "SEASALT_F", EMIS_BioNat(:) )
+    inat_SSCO = find_index( "SEASALT_C", EMIS_BioNat(:) )
     itot_SSFI = find_index( "SEASALT_F", species(:)%name    )
     itot_SSCO = find_index( "SEASALT_C", species(:)%name    )
 
-    if(DEBUG_SEASALT ) write(*,*)"SSALT INIT", inat_SSFI, itot_SSFI, debug_flag
+    if(DEBUG_SEASALT .and. MasterProc ) &
+        write(*,*) "SSALT INIT", inat_SSFI, itot_SSFI
 
     if ( inat_SSFI < 1 ) then
        seasalt_found = .false.
@@ -137,7 +138,7 @@
     end if
     
     ! For EmisNat, need kg/m2/h from molec/cm3/s
-     moleccm3s_2_kgm2h =   Grid%DeltaZ * 1.0e6 * 3600.0  &! /cm3/s > /m2/hr
+    moleccm3s_2_kgm2h =   Grid%DeltaZ * 1.0e6 * 3600.0  &! /cm3/s > /m2/hr
                           /AVOG * 1.0e-6  ! kg  after *MW
     my_first_call = .false.
 
@@ -150,7 +151,7 @@
 
 
 
-    if ( .not. Grid%is_NWPsea .or. Grid%snowice ) then ! quick check
+    if ( .not. Grid%is_mainlysea .or. Grid%snowice ) then ! quick check
        EmisNat( inat_SSFI,i,j) = 0.0
        EmisNat( inat_SSCO,i,j) = 0.0
        rcemis( itot_SSFI,KMAX_MID) = 0.0
@@ -188,9 +189,8 @@
                            Sub(lu)%z0,  Sub(lu)%invL)
           end if
 
-         !if (u10 <= 0.0) u10 = 1.0e-5  ! make sure u10!=0 because of LOG(u10)
-         !u10 =  max(1.0e-5, u10)  ! make sure u10!=0 because of LOG(u10)
-         u10 =  max(0.1, u10)  ! DS - use more physical limit here
+         u10 =  max(0.1, u10)  ! make sure u10!=0 because of LOG(u10),
+                               ! (use plausible physical limit for ws here)
 
          u10_341=exp(log(u10) * (3.41))
 
@@ -245,7 +245,8 @@
                    write(6,'(a20,i5,es13.4)') 'SSALT Flux Monah ->  ',ii, ss_flux(jj)
           enddo
 
-   if(DEBUG_SEASALT .and. debug_flag) write(6,'(a20,es13.3)') 'SSALT Total SS flux ->  ',  total_flux
+         if(DEBUG_SEASALT .and. debug_flag) &
+               write(6,'(a20,es13.3)') 'SSALT Total SS flux ->  ',  total_flux
 
 
   !ESX n2m = n_to_mSS * invdz *AVOG / species(iseasalt)%molwt *1.0e-15

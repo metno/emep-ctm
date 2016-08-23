@@ -50,6 +50,7 @@
   use Country_ml,   only : NLAND
   use EmisDef_ml,   only : NSECTORS, NEMIS_FILE, EMIS_FILE, ISNAP_DOM
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
+  use InterpolationRoutines_ml, only : Averageconserved_interpolate
   use Met_ml,       only : Getmeteofield
   use ModelConstants_ml, only : MasterProc, DEBUG => DEBUG_EMISTIMEFACS
   use ModelConstants_ml, only : IIFULLDOM, JJFULLDOM
@@ -135,7 +136,7 @@ contains
   !-- local
   integer ::  inland, insec     ! Country and sector value read from femis
   integer ::  i, ic, isec, n 
-  integer ::  idd, idd2, ihh, iday, mm, mm2 ! Loop and count variables
+  integer ::  idd, idd2, ihh, iday, mm, mm2 , mm0! Loop and count variables
   integer ::  iemis             ! emission count variables
 
   integer :: weekday            ! 1=monday, 2=tuesday etc.
@@ -145,6 +146,7 @@ contains
   character(len=200) :: inputline
   real :: fracchange
   real, dimension(NLAND,NEMIS_FILE):: sumfacc !factor to normalize monthly changes                                                         
+  real :: Start, Endval, Average, x
 
   if (DEBUG) write(unit=6,fmt=*) "into timefactors "
 
@@ -197,7 +199,7 @@ contains
            ! fac_min(inland,insec,iemis) = minval( fac_emm(inland,:,insec,iemis) )
 
            if( DEBUG.and.insec==ISNAP_DOM  ) &
-              write(*,"(a,3i3,f7.3,a,12f6.1)") "emm tfac ", &
+              write(*,"(a,3i3,f7.3,a,12f6.2)") "emm tfac ", &
                inland,insec,iemis, fac_min(inland,insec,iemis),&
                  " : ",  ( fac_emm(inland,mm,insec,iemis), mm=1,12)
 
@@ -208,20 +210,20 @@ contains
 
        close(IO_TIMEFACS)
 
-! Apply change in monthly factors for SNAP 1
-          sumfacc(:,:)=0.0
-          do ic = 1, NLAND
-             do mm=1,12
-                fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*fac_cemm(mm)
-                sumfacc(ic,iemis)=sumfacc(ic,iemis)+fac_emm(ic,mm,1,iemis)
-             enddo
+      ! Apply change in monthly factors for SNAP 1
+       sumfacc(:,:)=0.0
+       do ic = 1, NLAND
+          do mm=1,12
+               fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*fac_cemm(mm)
+               sumfacc(ic,iemis)=sumfacc(ic,iemis)+fac_emm(ic,mm,1,iemis)
           enddo
-! normalize
-          do ic = 1, NLAND
-             do mm=1,12
-                fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*12./sumfacc(ic,iemis)
-             enddo
+       enddo
+      ! normalize
+       do ic = 1, NLAND
+          do mm=1,12
+             fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*12./sumfacc(ic,iemis)
           enddo
+       enddo
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2 
    enddo  ! iemis
 
@@ -236,8 +238,7 @@ contains
        fname2 = "DailyFac." // trim ( EMIS_FILE(iemis) )
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
 
-       call CheckStop( ios, &
-        "Timefactors: Opening error in Dailyfac")
+       call CheckStop( ios, "Timefactors: Opening error in Dailyfac")
 
        n = 0
        do
@@ -348,20 +349,21 @@ contains
 
                    mm2 = mm + 1 
                    if( mm2  > 12 ) mm2 = 1          ! December+1 => January
-
-                   xday = real(idd-1) /real(nmdays(mm))
-
-                   sumfac = sumfac +                            &  ! timefac 
-                      ( fac_emm(ic,mm,isec,iemis) +             &
-                        ( fac_emm(ic,mm2,isec,iemis)            &
-                         - fac_emm(ic,mm,isec,iemis) ) * xday ) &
-                      * fac_edd(ic,weekday,isec,iemis)   
+                   mm0 = mm - 1 
+                   if( mm0 < 1   ) mm0 = 12          ! December+1 => January
+                   Start= 0.5*(fac_emm(ic,mm0,isec,iemis)+fac_emm(ic,mm,isec,iemis))
+                   Endval= 0.5*(fac_emm(ic,mm,isec,iemis)+fac_emm(ic,mm2,isec,iemis))                   
+                   Average=fac_emm(ic,mm,isec,iemis)
+                   !limit values, to ensure that x never can be negative
+                   Start=min(Start,2*Average,2*fac_emm(ic,mm0,isec,iemis))
+                   Endval=min(Endval,2*Average,2*fac_emm(ic,mm2,isec,iemis))
+                   call Averageconserved_interpolate(Start,Endval,Average,nmdays(mm),idd,x)
+                   sumfac = sumfac + x * fac_edd(ic,weekday,isec,iemis)   
 
                 end do ! idd
              end do ! mm
 
              sumfac = real(nydays)/sumfac    
-
 
               if ( sumfac < 0.97 .or. sumfac > 1.03 ) then
                  write(unit=errmsg,fmt=*) &
@@ -369,21 +371,19 @@ contains
                  call CheckStop(errmsg)
               end if
 
-             if ( sumfac < 0.999 .or. sumfac > 1.001 ) then
-                 n = n+1
+             ! can be caused by variable number of sundays in a month for instance
              ! Slight adjustment of monthly factors
-                  do mm = 1, 12
-                    fac_emm(ic,mm,isec,iemis)  =  &
+              do mm = 1, 12
+                 fac_emm(ic,mm,isec,iemis)  =  &
                        fac_emm(ic,mm,isec,iemis) * sumfac
-                  end do ! mm
-             end if
+              end do ! mm
+       if ( debug .and. abs(sumfac-1.0)>0.001) &
+            write(unit=6,fmt=*)  &
+           "needed for country, isec, iemis, sumfac = " ,ic, isec, iemis, sumfac
 
           end do ! ic
        enddo ! isec
 
-       if ( n ==  0 ) &
-            write(unit=6,fmt=*)  &
-           "Correction not needed for iemis, sumfac = " ,iemis, sumfac
 
       enddo ! iemis
 
@@ -428,10 +428,11 @@ contains
   integer :: isec           ! index over emission sectors
   integer :: iemis          ! index over emissions (so2,nox,..)
   integer :: iland          ! index over countries 
-  integer :: nmnd, nmnd2    ! this month, next month.
+  integer :: nmnd, nmnd2, nmnd0   ! this month, next month, preceding month.
   integer :: weekday        ! 1=Monday, 2=Tuesday etc.
   real    :: xday           ! used in interpolation
   integer :: yyyy,dd 
+  real :: Start, Endval, Average, x
 
  !-----------------------------
 
@@ -446,6 +447,8 @@ contains
 
     nmnd2 = nmnd + 1                   ! Next month
     if( nmnd2 > 12 ) nmnd2 = 1         ! December+1 => January
+    nmnd0 = nmnd - 1                   ! preceding month
+    if( nmnd0 < 1 ) nmnd0 = 12         ! January-1 => December
 
     xday = real( newdate%day - 1 ) / real( nmdays(nmnd) ) 
 
@@ -454,13 +457,16 @@ contains
     do iemis = 1, NEMIS_FILE
       do isec = 1, NSECTORS 
          do iland = 1, NLAND
-
-             timefac(iland,isec,iemis) =                           &
-                ( fac_emm(iland,nmnd,isec,iemis)  +                &
-                   ( fac_emm(iland,nmnd2,isec,iemis) -             &
-                      fac_emm(iland,nmnd,isec,iemis ) ) * xday )   &
-               *  fac_edd(iland,weekday,isec,iemis) 
-
+            
+            Start= 0.5*(fac_emm(iland ,nmnd0,isec,iemis)+fac_emm(iland ,nmnd,isec,iemis))
+            Endval= 0.5*(fac_emm(iland ,nmnd,isec,iemis)+fac_emm(iland ,nmnd2,isec,iemis))
+            Average=fac_emm(iland ,nmnd,isec,iemis)
+            !limit values, to ensure that x never can be negative
+            Start=min(Start,2*Average,2*fac_emm(iland ,nmnd0,isec,iemis))
+            Endval=min(Endval,2*Average,2*fac_emm(iland ,nmnd2,isec,iemis))
+            call Averageconserved_interpolate(Start,Endval,Average,nmdays(nmnd),dd,x)
+            timefac(iland,isec,iemis) = x *  fac_edd(iland,weekday,isec,iemis) 
+ 
          enddo ! iland  
       enddo ! isec   
    enddo ! iemis 
@@ -493,11 +499,11 @@ contains
    !/ See if we have a file to work with....
     if ( daynumber == 0 ) then
       call check_file("DegreeDayFactors.nc", Gridded_SNAP2_Factors,&
-        needed=.false., errmsg=errmsg )
+        needed=.true., errmsg=errmsg )
       if ( Gridded_SNAP2_Factors ) then
-         call PrintLog("Found DEGREE-day factors", MasterProc)
+         call PrintLog("Found DegreeDayFactors.nc", MasterProc)
       else
-         call PrintLog("Not-found: DEGREE-day factors", MasterProc)
+         call PrintLog("Not-found: DegreeDayFactors.nc"//trim(errmsg), MasterProc)
       end if
       return
     end if
@@ -536,8 +542,6 @@ contains
              ijloc(1), ijloc(2), i_fdom(iii), j_fdom(jjj)
   
        if( debug_proc ) then
-           !write(*,"(a,3i4,2f12.3)") "GRIDFACDAYGEN ", daynumber, &
-           !  i_fdom(iii), j_fdom(jjj),  tmpt2(iii,jjj), gridfac_HDD(iii,jjj)
            write(*,"(a,i4,f12.3)") "GRIDFACDAY ", daynumber, &
              gridfac_HDD(debug_li,debug_lj)
        end if
@@ -547,7 +551,6 @@ contains
     if ( DEBUG .and. debug_proc ) then
        iii = debug_li
        jjj = debug_lj
-       !write(*,*) "DEBUG GRIDFAC", me, daynumber, iii, jjj, tmpt2(iii,jjj),  gridfac_HDD(iii, jjj)
        write(*,*) "DEBUG GRIDFAC", me, daynumber, iii, jjj, gridfac_HDD(iii, jjj)
     end if
 

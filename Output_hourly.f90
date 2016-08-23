@@ -44,9 +44,9 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 !
   use My_Outputs_ml,    only: NHOURLY_OUT,    & ! No. outputs
                               NLEVELS_HOURLY, & ! No. output levels
-                              FREQ_HOURLY,    & ! No. hours between outputs
                               hr_out,         & ! Required outputs
-            SELECT_LEVELS_HOURLY, LEVELS_HOURLY ! Output selected model levels
+                              LEVELS_HOURLY ! Output selected model levels
+            !NML SELECT_LEVELS_HOURLY, LEVELS_HOURLY ! Output selected model levels
 
   use CheckStop_ml,     only: CheckStop
   use Chemfields_ml,    only: xn_adv,xn_shl,cfac,PM25_water,PM25_water_rh50,AOD
@@ -63,14 +63,17 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
                               IOU_INST, IOU_HOUR, IOU_YEAR, IOU_HOUR_PREVIOUS, &
                               DEBUG => DEBUG_OUT_HOUR,runlabel1,HOURLYFILE_ending,&
                               FORECAST
+  use ModelConstants_ml,only: SELECT_LEVELS_HOURLY !NML
+  use ModelConstants_ml,only: MFAC! TESTSHL
   use MetFields_ml,     only: t2_nwp,th, roa, surface_precip, ws_10m ,rh2m,&
                               pzpbl, ustar_nwp, Kz_m2s, &
-                              Idirect, Idiffuse, z_bnd, z_mid
+                              Idirect, Idiffuse, z_bnd, z_mid,ps
   use NetCDF_ml,        only: Out_netCDF, CloseNetCDF, Init_new_netCDF, fileName_hour, &
                               Int1, Int2, Int4, Real4, Real8  !Output data type to choose
   use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT
   use Par_ml,           only: MAXLIMAX, MAXLJMAX, GIMAX,GJMAX,        &
                               me, IRUNBEG, JRUNBEG, limax, ljmax
+! FUTURE  use Pollen_ml,        only: heatsum, pollen_left, AreaPOLL
   use TimeDate_ml,      only: current_date
   use TimeDate_ExtraUtil_ml,only : date2string
   use Units_ml,         only: Group_Units
@@ -135,7 +138,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       hr_out(ih)%iy1 = max(JRUNBEG,hr_out(ih)%iy1)
       hr_out(ih)%ix2 = min(GIMAX+IRUNBEG-1,hr_out(ih)%ix2)
       hr_out(ih)%iy2 = min(GJMAX+JRUNBEG-1,hr_out(ih)%iy2)
-      hr_out(ih)%nk  = min(KMAX_MID,hr_out(ih)%nk)
+!     hr_out(ih)%nk  = min(KMAX_MID,hr_out(ih)%nk)
       if(debug_flag) write(*,*) "DEBUG Hourly nk ", ih, hr_out(ih)%nk
     enddo ! ih
   endif  ! first_call
@@ -166,7 +169,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
           create_var_only=.true.)
       case(2:)      ! write as 3D
         call Out_netCDF(IOU_HOUR,def1,3,1,hourly,scale,CDFtype,ist,jst,ien,jen,1,&
-          create_var_only=.true.)
+          create_var_only=.true.,chunksizes=(/ien-ist+1,jen-jst+1,1,1/))
       endselect
     enddo
   endif
@@ -275,21 +278,45 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
         iadv  = ispec - NSPEC_SHL
         name = species(itot)%name
         unit_conv =  hr_out(ih)%unitconv
+        if(itot < NSPEC_SHL .and.  debug_proc) write(*,"(a,a,4es12.3)") &
+          "OUT3D MAR22 ", trim(name), unit_conv, &
+           MFAC,roa(2,2,ik,1)*MFAC, xn_shl(ispec,2,2,ik)
 
-        if(index(hr_out(ih)%unit,"ppb")>0) then
+        !MAR22 Added SHL option.
+        if( itot <= NSPEC_SHL ) then !TESTSHL
+         ! CRUDE units fix. Sort out later.
+         !   Inverse of No. air mols/cm3 = 1/M
+         ! where M =  roa (kgair m-3) * MFAC  when ! scale in ug,  else 1
+         !inv_air_density3D(i,j,k) = 1.0/( roa(i,j,k,1) * MFAC )
+
           forall(i=1:limax,j=1:ljmax)
-            hourly(i,j) = xn_adv(iadv ,i,j,ik) &
-                        * unit_conv            ! Units conv.
-          endforall
-        elseif(index(hr_out(ih)%unit,"ug")>0) then
-          forall(i=1:limax,j=1:ljmax)
-            hourly(i,j) = xn_adv(iadv ,i,j,ik) &
+             hourly(i,j) = xn_shl(ispec,i,j,ik)
+          end forall
+          if(index(hr_out(ih)%unit,"ppt")>0) then
+            forall(i=1:limax,j=1:ljmax)
+                hourly(i,j) = hourly(i,j)/( roa(i,j,ik,1) * MFAC ) * 1.0e9
+            end forall
+          else
+            call CheckStop("SHL Out3D option not coded yet")
+          end if
+        
+        else  ! ADV:, original code
+  
+          if(index(hr_out(ih)%unit,"ppb")>0) then
+            forall(i=1:limax,j=1:ljmax)
+              hourly(i,j) = xn_adv(iadv ,i,j,ik) &
+                          * unit_conv            ! Units conv.
+            end forall
+          else if(index(hr_out(ih)%unit,"ug")>0) then
+            forall(i=1:limax,j=1:ljmax)
+              hourly(i,j) = xn_adv(iadv ,i,j,ik) &
                         * roa(i,j,ik,1)        & ! density.
                         * unit_conv              ! Units conv.
-          endforall
-        else
-          call CheckStop("ERROR: Output_hourly  unit problem"//trim(name) )
-        endif
+            end forall
+          else
+            call CheckStop("ERROR: Output_hourly  unit problem"//trim(name) )
+          endif
+        end if ! MAR22 ADV/SHL split 
 
         if(surf_corrected.and.ik==KMAX_MID.and.itot>NSPEC_SHL) then
           forall(i=1:limax,j=1:ljmax)
@@ -429,7 +456,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 
       case("ws_10m")      ! No cfac for surf.variable; Skip Units conv.
         forall(i=1:limax,j=1:ljmax) hourly(i,j) = ws_10m(i,j,1)
-
+   
       case("theta")       ! No cfac for surf.variable; Skip Units conv.
         forall(i=1:limax,j=1:ljmax) hourly(i,j) = th(i,j,KMAX_MID,1)
 
@@ -530,7 +557,17 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       !case default   ! no output
       endselect
     enddo KVLOOP
+    
   enddo HLOOP
+  !write out surface pressure at each time step to define vertical coordinates
+  if(NHOURLY_OUT>0)then
+      def1%name='PS'
+      def1%unit='hPa'
+      def1%class='Surface pressure'
+      CDFtype=Real4 ! can be choosen as Int1,Int2,Int4,Real4 or Real8
+      scale=1.
+      call Out_netCDF(IOU_HOUR,def1,2,1,ps(:,:,1)*0.01,scale,CDFtype,ist,jst,ien,jen)     
+  endif
 
 !Not closing seems to give a segmentation fault when opening the daily file
 !Probably just a bug in the netcdf4/hdf5 library.

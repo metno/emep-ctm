@@ -29,17 +29,19 @@
 module Nest_ml
 ! This module performs the reading or writing of data for nested runs
 !
-! The Nesting modes (NEST_MODE in ModelConstants_ml) are:
+! The Nesting modes (MODE in Nest_config nml) are:
 ! 0=donothing , 1=write , 2=read , 3=read and write
 ! 10=write at end of run, 11=read at start , 12=read at start and write at end (BIC)
 !
 ! To make a nested run:
-! 1) run with MODE=1 (NEST_MODE in ModelConstants_ml) to write out 3d BC
-! 2) run (in a smaller domain) with MODE=2
+! 1) run with MODE=1 (MODE in Nest_config nml) to write out 3d BC (name in filename_write defined below)
+! 2) copy or link filename_write to filename_read_BC (for example "ln -s EMEP_OUT.nc EMEP_IN.nc")
+! 3) run (in a smaller domain) with MODE=2
 !
-! Set MODE (NEST_MODE in ModelConstants_ml) and istart,jstart,iend,jend
+! Set MODE (in Nest_config nml) and istart,jstart,iend,jend (same namelist)
 ! Choose NHOURSAVE and NHOURREAD
-! Also filename_read_BC_template and filename_read_3D should point to appropriate files
+! Also filename_read_BC and filename_read_3D should point to appropriate files
+! Be careful to remove old BC files before making new ones.
 !
 ! Grids may have any projection.
 ! Horizontal interpolation uses a weighted average of the four closest points
@@ -51,26 +53,25 @@ module Nest_ml
 !  The routines should be thought together with GlobalBC_ml (can it replace it?)
 
 !----------------------------------------------------------------------------!
-! EXTERNAL BICs: 
-! The code in My_ExternalBICs is different for different external sources. So
-! far coded for FORECAST and EnsClimRCA work.
-! These set the following arrays, and filenames
-
-use My_ExternalBICs_ml,     only: set_extbic, icbc, &
+! External Boundary (BC) and Initial Conditions (IC)
+!   ExternalBICs_ml should handle different for different external sources.
+!   Experiment specific information must be set on ExternalBICs namelists.
+!   So far coded for FORECAST and EnsClimRCA(?) work.
+use ExternalBICs_ml,     only: set_extbic, icbc, &
        EXTERNAL_BIC_SET, EXTERNAL_BC, EXTERNAL_BIC_NAME, TOP_BC, &
-       iw, ie, js, jn, kt, &  ! i West/East bnd; j North/South bnd; k Top
-       filename_read_3D,filename_read_BC,fileName_write,filename_eta
+       iw, ie, js, jn, kt, &! i West/East bnd; j North/South bnd; k Top
+       filename_eta
 !----------------------------------------------------------------------------!
-use CheckStop_ml,          only : CheckStop,StopAll
+use CheckStop_ml,           only: CheckStop,StopAll
 use ChemChemicals_ml,       only: species_adv
 use Chemfields_ml,          only: xn_adv    ! emep model concs.
 use ChemSpecs_adv_ml,       only: NSPEC_ADV
 use Functions_ml,           only: great_circle_distance
 use GridValues_ml,          only: A_mid,B_mid, glon,glat
-use Io_ml,                  only: open_file, IO_TMP
+use Io_ml,                  only: open_file,IO_TMP,IO_NML
 use ModelConstants_ml,      only: Pref,PPB,PT,KMAX_MID, MasterProc, NPROC     &
   , IOU_INST,IOU_HOUR,IOU_YEAR,IOU_MON,IOU_DAY, RUNDOMAIN  &
-  , MODE=>NEST_MODE, FORECAST, DEBUG_NEST, DEBUG_ICBC=>DEBUG_NEST_ICBC
+  , FORECAST, DEBUG_NEST, DEBUG_ICBC=>DEBUG_NEST_ICBC
 use MetFields_ml,           only: roa
 use netcdf
 use netcdf_ml,              only: GetCDF,Out_netCDF,Init_new_netCDF,&
@@ -78,7 +79,7 @@ use netcdf_ml,              only: GetCDF,Out_netCDF,Init_new_netCDF,&
 use OwnDataTypes_ml,        only: Deriv
 use Par_ml,                 only: MAXLIMAX,MAXLJMAX,GIMAX,GJMAX,IRUNBEG,JRUNBEG, &
                                   me, li0,li1,lj0,lj1,limax,ljmax
-use TimeDate_ml,            only: date
+use TimeDate_ml,            only: date,current_date
 use TimeDate_ExtraUtil_ml,  only: idate2nctime,nctime2idate,date2string
 use Units_ml,               only: Units_Scale
 implicit none
@@ -86,15 +87,20 @@ implicit none
 INCLUDE 'mpif.h'
 INTEGER INFO
 
+! Nesting modes:
+! produces netcdf dump of concentrations if wanted, or initialises mode runs
+! from such a file. Used in Nest_ml:
+!   0=donothing; 1=write; 2=read; 3=read and write;
+!  10=write at end of run; 11=read at start; 12=read atstart and write at end (BIC)
+integer, public, save :: MODE
+
 ! Nested input/output on FORECAST mode
 integer, public, parameter :: FORECAST_NDUMP = 1  ! Number of nested output
 ! on FORECAST mode (1: starnt next forecast; 2: NMC statistics)
 type(date), public :: outdate(FORECAST_NDUMP)=date(-1,-1,-1,-1,-1)
 
-!coordinates of subdomain to write
-!coordinates relative to LARGE domain (only used in write mode)
-integer ::istart=60,jstart=11,iend=107,jend=58 !ENEA NB: version has changed, these numbers where for small domain!!!
-!integer ::istart=RUNDOMAIN(1),jstart=RUNDOMAIN(3),iend=RUNDOMAIN(2),jend=RUNDOMAIN(4) !entire domain
+!coordinates of subdomain to write, relative to FULL domain (only used in write mode)
+integer ::istart,jstart,iend,jend ! Set on Nest_config namelist
 
 !/-- subroutines
 
@@ -108,9 +114,17 @@ integer, public, parameter :: NHOURREAD=1 !time between two reads. should be a f
 
 private
 
-!Use TOP BC on forecast mode - moved to EXTERNAL
-!DSBIC where?!logical, parameter :: TOP_BC=.false..or.FORECAST.or.RCA.or.TRANSPHORM.or.HTAP
-!rca integer,save :: iw, ie, js, jn, kt ! i West/East bnd; j North/South bnd; k Top
+integer, parameter :: &
+  max_string_length=200 ! large enough for paths to be set on Nest_config namelist
+character(len=max_string_length),private, save ::  &  
+  template_read_3D = 'EMEP_IN.nc',&       ! Different paths can be set here
+  template_read_BC = 'EMEP_IN.nc',&       ! for each of the IO IC/BC files,
+  template_write   = 'EMEP_OUT.nc'        ! on Nest_config namelist, if needed.
+character(len=max_string_length),private, save ::  &  
+  filename_read_3D = 'template_read_3D',& ! Overwritten in readxn and wrtxn.
+  filename_read_BC = 'template_read_BC',& ! Filenames are updated according to date
+  filename_write   = 'template_write'     ! following respective templates
+
 real(kind=8), parameter :: halfsecond=0.5/(24.0*3600.0)!used to avoid rounding errors
 !BC values at boundaries in present grid
 real, save, allocatable, dimension(:,:,:,:) :: &
@@ -127,32 +141,44 @@ integer,save :: KMAX_ext_BC
 integer,save :: itime!itime_saved(2),
 real(kind=8),save :: rtime_saved(2)
 
-! filename_read_3D,filename_read_BC,fileName_write,filename_eta defined in My_ExternalBICs_ml
-! ! filename_read_3D,filename_read_BC updated by set_extbic
-!YYYY, YY, MM, DD, hh will be replaced by numbers by the program. For details, see detail2str in TimeDate_ExtraUtil_ml.f90
-!character(len=130),save  :: filename_read_BC_template='/global/work/mifapw/emep/work/HTAP_sigma.nc'
-!character(len=130),save  :: filename_read_BC_template='/global/work/mifajej/TRANSPHORM/Data/EMAC_YYYYMM_TRANSPHORM.nc'
-
-!character(len=130),save  :: filename_read_3D='/global/work/mifapw/emep/Data/RCA/Boundary_conditions/YYYY/YYYYMMDDhh00_ll.nc'
-!character(len=130),save  :: filename_read_3D='/global/work/mifapw/emep/work/HTAP_sigma.nc'
-!character(len=130),save  :: filename_read_3D='/global/work/mifajej/TRANSPHORM/MACC/spinnup/EMEP_IN.nc'
-!character(len=130),save  :: filename_eta='/global/work/mifapw/emep/Data/MACC02/Boundary_conditions/mozart_eta.zaxis'
-
-!character(len= 30),save  :: filename_write='EMEP_OUT.nc'
-!character(len=130),save  :: filename_read_BC
-
 integer,save :: date_nextfile(4)!date corresponding to the next BC file to read
 integer,save :: NHOURS_Stride_BC   !number of hours between start of two consecutive records in BC files
 integer, public, parameter :: NHOURS_Stride_BC_default=6 !time between records if only one record per file (RCA for example)
 
 type(icbc), private, target, dimension(NSPEC_ADV) :: &
-  adv_ic=icbc(-1,'none',.false.,.false.)    ! Initial 3D IC/CB, varname, wanted, found
+  adv_ic=icbc('none','none',1.0,.false.,.false.,-1)  ! Initial 3D IC/BC: spcname,varname,wanted,found,ixadv
 type(icbc), private, pointer, dimension(:) :: &
-  adv_bc=>null()                            ! Time dependent BC, varname, wanted, found
-
+  adv_bc=>null()                                     ! Time dependent BC: spcname,varname,wanted,found,ixadv
 
 contains
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
+subroutine Config_Nest()
+  integer :: ios
+  logical, save :: first_call=.true.
+  NAMELIST /Nest_config/ MODE, &
+    template_read_3D,template_read_BC,template_write,&
+    istart,jstart,iend,jend
 
+  if(.not.first_call)return
+  mydebug = DEBUG_NEST.and.MasterProc
+! Default Nest mode
+  MODE=0  ! do nothing (unless FORECAST mode)
+! Default domain for write modes 1,3. Modes 10,12 write full RUNDOMAIN regardles
+  istart=RUNDOMAIN(1)+1;iend=RUNDOMAIN(2)-1
+  jstart=RUNDOMAIN(3)+1;jend=RUNDOMAIN(4)-1
+  rewind(IO_NML)
+  read(IO_NML,NML=Nest_config,iostat=ios)
+  call CheckStop(ios,"NML=Nest_config")  
+  if(mydebug)then
+    write(*,*) "NAMELIST IS "
+    write(*,NML=Nest_config)
+  endif
+! Update filenames according to date following templates defined on Nest_config
+  filename_read_3D=date2string(template_read_3D,current_date,debug=mydebug)
+  filename_read_BC=date2string(template_read_BC,current_date,debug=mydebug)
+  filename_write  =date2string(template_write  ,current_date,debug=mydebug)
+  first_call=.false.
+endsubroutine Config_Nest
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
 subroutine readxn(indate)
   type(date), intent(in) :: indate           ! Gives year..seconds
@@ -168,8 +194,8 @@ subroutine readxn(indate)
   logical :: fexist=.false.
   integer ::oldmonth=0
 
-  mydebug = DEBUG_NEST .and. MasterProc
-  if( mydebug )write(*,*)'Nest:Read BC, MODE=',MODE
+  call Config_Nest()
+  if(mydebug) write(*,*)'Nest:Read BC, MODE=',MODE
   if(MODE /= 2.and.MODE /= 3.and. MODE /= 11.and. MODE /= 12.and. MODE /= 100.and. .not.FORECAST)return
 
   KMAX_BC=KMAX_MID
@@ -182,35 +208,38 @@ subroutine readxn(indate)
   if(first_call)date_nextfile=ndate
 
   if(FORECAST)then ! FORECAST mode superseeds nest MODE
-    call set_extbic(date_nextfile)
-!filename_read_BC=date2string('EMEP_IN_BC_YYYYMMDD.nc',indate) !BC file: 01,...,24 UTC rec for 1 day
+! Update filenames according to date following templates defined on Nest_config nml
+    filename_read_3D=date2string(template_read_3D,date_nextfile,debug=mydebug)
+    filename_read_BC=date2string(template_read_BC,date_nextfile,debug=mydebug)
+
     if(first_call)then
       first_call=.false.
-      inquire(file=filename_read_3D,exist=fexist)
+      if(MasterProc) inquire(file=filename_read_3D,exist=fexist)
+      CALL MPI_BCAST(fexist,1,MPI_LOGICAL,0,MPI_COMM_WORLD,INFO)
       if(.not.fexist)then
         if(MasterProc) write(*,*)'No Nest IC file found: ',trim(filename_read_3D)
       else
-        if(MasterProc) write(*,*)'Nest RESET ALL XN 3D'
+        if(MasterProc) write(*,*)'Nest RESET ALL XN 3D ',trim(filename_read_3D)
         call reset_3D(ndays_indate)
       endif
     endif
     if(mod(indate%hour,NHOURREAD)/=0.or.indate%seconds/=0) return
-    inquire(file=filename_read_BC,exist=fexist)
+    if(MasterProc) inquire(file=filename_read_BC,exist=fexist)
+    CALL MPI_BCAST(fexist,1,MPI_LOGICAL,0,MPI_COMM_WORLD,INFO)
     if(.not.fexist)then
       if(MasterProc) write(*,*)'No Nest BC file found: ',trim(filename_read_BC)
       return
     endif
-  elseif(MODE == 100)then
-!monthly input file
-     if(indate%month==oldmonth)return
-     if(MasterProc.and.oldmonth==0)   print *,'Nest: Initialzing IC'
-     oldmonth=indate%month
-     if(MasterProc)   write(*,*)'Nest: New month, reset BC'
- 
+  elseif(MODE == 100)then !monthly input file
+    if(indate%month==oldmonth)return
+    if(MasterProc.and.oldmonth==0) write(*,*)'Nest: Initialzing IC'
+    oldmonth=indate%month
+    if(MasterProc) write(*,*)'Nest: New month, reset BC'
   elseif(MODE == 11.or.MODE == 12)then
     if(.not. first_call)return
     first_call=.false.
-   if(MasterProc)   write(*,*)'Nest RESET ALL XN 3D'
+    filename_read_3D=date2string(template_read_3D,ndate,debug=mydebug)
+    if(MasterProc) write(*,*)'Nest RESET ALL XN 3D ',trim(filename_read_3D)
     call reset_3D(ndays_indate)
     return
   else
@@ -222,29 +251,28 @@ subroutine readxn(indate)
 
   if(MasterProc) write(*,*) 'Nest: kt', kt, first_data
 
+! Update filenames according to date following templates defined on Nest_config nml
+  filename_read_3D=date2string(template_read_3D,ndate,debug=mydebug)
+  filename_read_BC=date2string(template_read_BC,ndate,debug=mydebug)
 
   if(first_data==-1)then
+    if(.not.FORECAST)then
+      if(MasterProc) write(*,*)'Nest RESET ALL XN 3D ',trim(filename_read_3D)
+      call reset_3D(ndays_indate)
+    endif
 
-    call set_extbic(date_nextfile)
-
-    if(.not.FORECAST) call reset_3D(ndays_indate)
-    if(mydebug) write(*,*)'Nest: READING FIRST BC DATA 3D: ',&
-          trim(filename_read_3D), ndays_indate
- 
+    if(mydebug) write(*,*)'Nest: READING FIRST BC DATA from ',&
+          trim(filename_read_BC), ndays_indate
     call read_newdata_LATERAL(ndays_indate)
     if(mydebug) write(*,"(a,5i4)")'Nest: iw, ie, js, jn, kt ',iw,ie,js,jn,kt
 
     !the first hour only these values are used, no real interpolation between two records
   endif
 
-
   if(ndays_indate-rtime_saved(2)>halfsecond.or.MODE==100)then
    !look for a new data set
-    call set_extbic(date_nextfile)
-
     if(MasterProc) write(*,*)'Nest: READING NEW BC DATA from ',&
           trim(filename_read_BC)
-
     call read_newdata_LATERAL(ndays_indate)
   endif
 
@@ -282,10 +310,8 @@ subroutine readxn(indate)
       xn_adv(n,i,j,k)=W1*xn_adv_bndt(n,i,j,1)+W2*xn_adv_bndt(n,i,j,2)
   enddo
 
-if(EXTERNAL_BIC_NAME == "RCA")then
-    call CheckStop("WORK NEEDED: RCA BICs commented out in Nest_ml - not consistent with all chem schemes")
-endif
-
+  call CheckStop(EXTERNAL_BIC_NAME=="RCA",&
+    "WORK NEEDED: RCA BICs commented out in Nest_ml - not consistent with all chem schemes")
 
   first_data=0
   first_call=.false.
@@ -296,14 +322,14 @@ endsubroutine readxn
 subroutine wrtxn(indate,WriteNow)
   type(date), intent(in) :: indate
   logical, intent(in) :: WriteNow !Do not check indate value
-  real,allocatable, dimension(:,:,:) :: dat ! Data arrays
+  real,allocatable, dimension(:,:,:) :: data ! Data arrays
 
   type(Deriv) :: def1 ! definition of fields
   integer :: n,iotyp,ndim,kmax
   real :: scale
-  logical, save ::first_call=.true.
   logical :: fexist, lsend, lrecv
 
+  call Config_Nest()
   if(MODE /= 1.and.MODE /= 3.and.MODE /= 10.and.MODE /= 12.and. .not.FORECAST)return
 
   if(FORECAST)then ! FORECAST mode superseeds nest MODE
@@ -330,11 +356,6 @@ subroutine wrtxn(indate,WriteNow)
     if(mod(indate%hour,NHOURSAVE)/=0.or.indate%seconds/=0)return
   endif
 
-! fileName_write=date2string("EMEP_BC_MMYYYY.nc",indate)!for different names each month
-                                                        !NB: readxn should have same name
-  if(MasterProc)write(*,*)'Nest:write data ',trim(fileName_write)
-
-
   iotyp=IOU_INST
   ndim=3 !3-dimensional
   kmax=KMAX_MID
@@ -346,10 +367,15 @@ subroutine wrtxn(indate,WriteNow)
   def1%iotype=iotyp     ! not used
   def1%name=''          ! written
   def1%unit='mix_ratio' ! written
+ 
+! Update filenames according to date following templates defined on Nest_config nml
+! e.g. set template_write="EMEP_BC_MMYYYY.nc" on namelist for different names each month
+  filename_write=date2string(template_write,indate,debug=mydebug)
+  if(MasterProc) inquire(file=fileName_write,exist=fexist)
+  if(MasterProc) write(*,*)'Nest:write data ',trim(fileName_write),fexist
+  CALL MPI_BCAST(fexist,1,MPI_LOGICAL,0,MPI_COMM_WORLD,INFO)
 
-  if(first_call) allocate(dat(MAXLIMAX,MAXLJMAX,KMAX_MID))
-
-  inquire(file=fileName_write,exist=fexist)
+  allocate(data(MAXLIMAX,MAXLJMAX,KMAX_MID))
   !do first one loop to define the fields, without writing them (for performance purposes)
   if(.not.fexist)then
     call init_icbc(cdate=indate)
@@ -363,9 +389,9 @@ subroutine wrtxn(indate,WriteNow)
            "Will not be written to IC file:",trim(filename_write),""
         cycle
       endif
-      dat=xn_adv(n,:,:,:)
+      data=xn_adv(n,:,:,:)
       if(FORECAST.and..false.)then
-        lsend=any(dat/=0.0)
+        lsend=any(data/=0.0)
         CALL MPI_ALLREDUCE(lsend,lrecv,1,MPI_LOGICAL,MPI_LOR,MPI_COMM_WORLD,INFO)
         adv_ic(n)%wanted=lrecv
         if(.not.adv_ic(n)%wanted)then
@@ -376,7 +402,7 @@ subroutine wrtxn(indate,WriteNow)
           cycle
         endif
       endif
-      call Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype=Real4,&
+      call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=Real4,&
             ist=istart,jst=jstart,ien=iend,jen=jend,&
             fileName_given=fileName_write,create_var_only=.true.)
     enddo
@@ -385,14 +411,12 @@ subroutine wrtxn(indate,WriteNow)
   do n= 1, NSPEC_ADV
     if(.not.adv_ic(n)%wanted)cycle
     def1%name= species_adv(n)%name       !written
-    dat=xn_adv(n,:,:,:)
-    call Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype=Real4,&
+    data=xn_adv(n,:,:,:)
+    call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=Real4,&
           ist=istart,jst=jstart,ien=iend,jen=jend,&
           fileName_given=fileName_write,create_var_only=.false.)
   enddo
-
-  first_call=.false.
-  return
+  deallocate(data)
 endsubroutine wrtxn
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
@@ -405,6 +429,16 @@ endsubroutine check
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
 subroutine init_icbc(idate,cdate,ndays,nsecs)
+!----------------------------------------------------------------------------!
+! Setup IC/BC detailed description.
+! ICs are assumed to come from Unimod.
+!
+! adv_ic            IC detailed description for all adv species
+! adv_bc            BC detailed description relevant adv species
+! EXTERNAL_BC       External (non Unimod) BC detailed description/setup
+! EXTERNAL_BIC_SET  EXTERNAL_BC has been set (adv_bc=>EXTERNAL_BC)
+!        otherwise  Assume Unimod BCs        (adv_bc=>adv_ic)
+!----------------------------------------------------------------------------!
   integer,   intent(in), optional :: idate(4)
   type(date),intent(in), optional :: cdate
   real(kind=8),intent(in),optional:: ndays
@@ -422,17 +456,25 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
   if(present(cdate)) dat=(/cdate%year,cdate%month,cdate%day,cdate%hour/) 
   if(present(ndays)) call nctime2idate(dat,ndays)
   if(present(nsecs)) call nctime2idate(dat,nsecs)
+
+! Update filenames according to date following templates defined on Nest_config nml
+!!filename_read_3D=date2string(template_read_3D,dat,debug=mydebug)
+!!filename_read_BC=date2string(template_read_BC,dat,debug=mydebug)
+!!filename_write  =date2string(template_write  ,dat,debug=mydebug)
+
   call set_extbic(dat)  ! set mapping, EXTERNAL_BC, TOP_BC
 
   adv_ic(:)%ixadv=(/(n,n=1,NSPEC_ADV)/)
+  adv_ic(:)%spcname=species_adv(:)%name
   adv_ic(:)%varname=species_adv(:)%name
+  adv_ic(:)%frac=1.0
   adv_ic(:)%wanted=.true.
   adv_ic(:)%found=find_icbc(filename_read_3D,adv_ic%varname(:))
   if(mydebug) then
-   do n = 1,size(adv_ic%varname)
-     if(adv_ic(n)%found) write(*,*) &
+    do n = 1,size(adv_ic%varname)
+      if(adv_ic(n)%found) write(*,*) &
         "init_icbc filled adv_ic "//trim(adv_ic(n)%varname)
-   enddo
+    enddo
   endif
   if(EXTERNAL_BIC_SET) then
     adv_bc=>EXTERNAL_BC
@@ -449,12 +491,15 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
 
   if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
     write(*,"(a)") "Nest: DEBUG_ICBC Variables:"
-    write(*,"((1X,A,I3,'->',I3,'=',A24,2L2))") &
+    write(*,"((1X,A,I3,'->',I3,'=',A24,'*',F7.2,2L2))") &
       ('Nest: ADV_IC',n,adv_ic(n),n=1,size(adv_ic)),&
       ('Nest: ADV_BC',n,adv_bc(n),n=1,size(adv_bc))
   endif
   contains
   function find_icbc(filename_read,varname) result(found)
+!----------------------------------------------------------------------------!
+! Check if variables (varname) are present on file (filename_read)
+!----------------------------------------------------------------------------!
     implicit none
     character(len=*), intent(in)               :: filename_read
     character(len=*), dimension(:), intent(in) :: varname
@@ -485,14 +530,15 @@ subroutine init_nest(ndays_indate,filename_read,IIij,JJij,Weight,&
      k1_ext,k2_ext,weight_k1,weight_k2,&
      N_ext,KMAX_ext,GIMAX_ext,GJMAX_ext)
 
+  logical, parameter :: USE_LAST_HYBRID_LEVELS=.true.
   character(len=*),intent(in) :: filename_read
   real ,intent(out):: Weight(MAXLIMAX,MAXLJMAX,4)
   integer ,intent(out)::IIij(MAXLIMAX,MAXLJMAX,4),JJij(MAXLIMAX,MAXLJMAX,4)
-  integer, intent(out), dimension(KMAX_MID) :: k1_ext,k2_ext
-  real, intent(out), dimension(KMAX_MID) :: weight_k1,weight_k2
+  integer, intent(out), dimension(*) :: k1_ext,k2_ext
+  real, intent(out), dimension(*) :: weight_k1,weight_k2
   integer ,intent(out)::N_ext,KMAX_ext,GIMAX_ext,GJMAX_ext
   real(kind=8) :: ndays_indate
-  integer :: ncFileID,idimID,jdimID, kdimID,timeDimID,varid,status !,timeVarID
+  integer :: ncFileID,idimID,jdimID,kdimID,timeDimID,varid,status,dimIDs(3) !,timeVarID
   integer :: ndate(4) !nseconds_indate,
   real :: DD,dist(4),P_emep
   integer :: i,j,k,n,k_ext,II,JJ !nseconds(1),n,n1,k
@@ -586,14 +632,14 @@ subroutine init_nest(ndays_indate,filename_read,IIij,JJij,Weight,&
     !Read lon lat of the external grid (global)
     if(trim(projection)==trim('lon lat')) then
       call check(nf90_inq_varid(ncid = ncFileID, name = "lon", varID = varID))
-      allocate(temp_ll(GJMAX_ext))
+      allocate(temp_ll(GIMAX_ext))
       call check(nf90_get_var(ncFileID, varID, temp_ll))
       lon_ext=SPREAD(temp_ll,2,GJMAX_ext)
       deallocate(temp_ll)
       call check(nf90_inq_varid(ncid = ncFileID, name = "lat", varID = varID))
       allocate(temp_ll(GJMAX_ext))
       call check(nf90_get_var(ncFileID, varID, temp_ll))
-      lon_ext=SPREAD(temp_ll,1,GIMAX_ext)
+      lat_ext=SPREAD(temp_ll,1,GIMAX_ext)
       deallocate(temp_ll)
     else
       call check(nf90_inq_varid(ncid = ncFileID, name = "lon", varID = varID))
@@ -636,9 +682,21 @@ subroutine init_nest(ndays_indate,filename_read,IIij,JJij,Weight,&
 
     status = nf90_inq_varid(ncid = ncFileID, name = "hyam", varID = varID)
     if(status == nf90_noerr) then
-      call check(nf90_get_var(ncFileID, varID, hyam,count=(/ KMAX_ext /) ))
+      call check(nf90_inquire_variable(ncid=ncFileID,varID=varID,dimIDs=dimIDs))
+      call check(nf90_inquire_dimension(ncid=ncFileID,dimID=dimIDs(1),len=k))
+      call CheckStop(k<KMAX_ext,"Nest BC, wrong hyam/hybm dimension")
+      if(USE_LAST_HYBRID_LEVELS)then
+        k_ext=1+k-KMAX_ext ! for 1+k-KMAX_ext .. k levels
+      else
+        k_ext=1            ! for 1 .. KMAX_ext levels
+      endif
+      if(k/=KMAX_ext.and.MasterProc)&
+        write(*,"(A,4(1X,A,I0))")'Nest BC warning:',&
+          'kdim #lev=',KMAX_ext,'and hyam/hybm #lev=',k,&
+          '. Using only levels ',k_ext,'..',k
+      call check(nf90_get_var(ncFileID,varID,hyam,start=(/k_ext/),count=(/KMAX_ext/)))
       call check(nf90_inq_varid(ncid = ncFileID, name = "hybm", varID = varID))
-      call check(nf90_get_var(ncFileID, varID, hybm,count=(/ KMAX_ext /) ))
+      call check(nf90_get_var(ncFileID,varID,hybm,start=(/k_ext/),count=(/KMAX_ext/)))
     else
       inquire(file=filename_eta,exist=fexist)
       status = nf90_inq_varid(ncid = ncFileID, name = "k", varID = varID)
@@ -719,17 +777,14 @@ subroutine init_nest(ndays_indate,filename_read,IIij,JJij,Weight,&
             JJij(i,j,4:4)=EOSHIFT(JJij(i,j,4:4),-1,BOUNDARY=JJ)
           endif
         enddo
-
-      enddo
+      enddo    
       Weight(i,j,1)=1.0-3.0*dist(1)/sum(dist(1:4))
       Weight(i,j,2)=(1.0-Weight(i,j,1))*(1.0-2.0*dist(2)/sum(dist(2:4)))
       Weight(i,j,3)=(1.0-Weight(i,j,1)-Weight(i,j,2))*(1.0-dist(3)/sum(dist(3:4)))
       Weight(i,j,4)=1.0-Weight(i,j,1)-Weight(i,j,2)-Weight(i,j,3)
     enddo
   enddo
-
   deallocate(lon_ext,lat_ext)
-
 
   !find vertical interpolation coefficients
   !use pressure as reference
@@ -806,6 +861,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
   real, allocatable, dimension(:,:,:) ::data
   integer :: ncFileID,varid,status
   integer :: ndate(4),n,i,j,k,bc
+  real    :: unitscale
   real(kind=8) :: ndays(1),ndays_old
   logical, save :: first_call=.true.
 
@@ -815,9 +871,9 @@ subroutine read_newdata_LATERAL(ndays_indate)
   real, save,allocatable :: Weight(:,:,:)
 
   !2 adjacent levels from external grid  (vertical)
-  integer, save, dimension(KMAX_MID) :: k1_ext,k2_ext
+  integer, allocatable,save, dimension(:) :: k1_ext,k2_ext
   !weights of the 2 adjacent levels (vertical)
-  real, save, dimension(KMAX_MID) :: weight_k1,weight_k2
+  real, allocatable,save, dimension(:) :: weight_k1,weight_k2
 
   integer:: KMAX_BC!which lvels are interpolated, = KMAX_MID for now
   integer:: timedimID
@@ -834,6 +890,9 @@ subroutine read_newdata_LATERAL(ndays_indate)
     if(mydebug)write(*,*)'Nest: initializations 2D'
     allocate(IIij(MAXLIMAX,MAXLJMAX,4),JJij(MAXLIMAX,MAXLJMAX,4))
     allocate(Weight(MAXLIMAX,MAXLJMAX,4))
+    allocate(k1_ext(KMAX_MID),k2_ext(KMAX_MID))
+    allocate(weight_k1(KMAX_MID),weight_k2(KMAX_MID))
+
     call init_icbc(ndays=ndays_indate)
     if(mydebug)write(*,*)'calling init_nest for '//trim(filename_read_BC)
     call init_nest(ndays_indate,filename_read_BC,IIij,JJij,Weight,&
@@ -968,14 +1027,17 @@ subroutine read_newdata_LATERAL(ndays_indate)
       if(status==nf90_noerr) then
         if(DEBUG_NEST.or.DEBUG_ICBC) write(*,*)&
           'Nest: variable '//trim(adv_bc(bc)%varname)//' has unit '//trim(units)
-        data=data/Units_Scale(units,n,needroa=divbyroa,debug_msg="read_newdata_LATERAL")
+        unitscale=adv_bc(bc)%frac/Units_Scale(units,n,needroa=divbyroa,&
+                                              debug_msg="read_newdata_LATERAL")
       else
         if(DEBUG_NEST.or.DEBUG_ICBC) write(*,*)&
-          'units attribute not found for variable '//trim(adv_bc(bc)%varname)
+          'Nest: variable '//trim(adv_bc(bc)%varname//' has no unit attribute')
+        unitscale=adv_bc(bc)%frac
       endif
+      if(unitscale/=1.0) data=data*unitscale
     endif
-
     CALL MPI_BCAST(data,8*GIMAX_ext*GJMAX_ext*KMAX_ext_BC,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+    CALL MPI_BCAST(divbyroa,1,MPI_LOGICAL,0,MPI_COMM_WORLD,INFO)
 
    !overwrite Global Boundaries (lateral faces)
     if(divbyroa)then
@@ -1062,6 +1124,7 @@ subroutine reset_3D(ndays_indate)
   real, allocatable, dimension(:,:,:) ::data
   integer :: ndate(4),n,i,j,k,itime=0,status
   integer :: ncFileID,varid
+  real    :: unitscale
   real(kind=8) :: ndays(1)
   logical, save :: first_call=.true.
 
@@ -1075,9 +1138,10 @@ subroutine reset_3D(ndays_indate)
   integer, save ::N_ext,KMAX_ext,GIMAX_ext,GJMAX_ext
 
   !2 adjacent levels from external grid  (vertical)
-  integer, save, dimension(KMAX_MID) :: k1_ext,k2_ext
+  integer, allocatable,save, dimension(:) :: k1_ext,k2_ext
   !weights of the 2 adjacent levels (vertical)
-  real, save, dimension(KMAX_MID) :: weight_k1,weight_k2
+  real, allocatable,save, dimension(:) :: weight_k1,weight_k2
+
   character (len=80) :: units
   real :: scale_factor,add_offset
   logical :: divbyroa
@@ -1086,8 +1150,10 @@ subroutine reset_3D(ndays_indate)
  
   if(first_call)then
     if(mydebug) write(*,*)'Nest: initializations 3D'
-     allocate(IIij(MAXLIMAX,MAXLJMAX,4),JJij(MAXLIMAX,MAXLJMAX,4))
-     allocate(Weight(MAXLIMAX,MAXLJMAX,4))
+    allocate(IIij(MAXLIMAX,MAXLJMAX,4),JJij(MAXLIMAX,MAXLJMAX,4))
+    allocate(Weight(MAXLIMAX,MAXLJMAX,4))
+    allocate(k1_ext(KMAX_MID),k2_ext(KMAX_MID))
+    allocate(weight_k1(KMAX_MID),weight_k2(KMAX_MID))
     first_call=.false.
     if(mydebug) write(*,*) 'Nest: init-icbc'
     call init_icbc(ndays=ndays_indate)
@@ -1141,13 +1207,19 @@ subroutine reset_3D(ndays_indate)
       if(status==nf90_noerr) data=data+add_offset
       status = nf90_get_att(ncFileID,VarID,"units",units)
       if(status==nf90_noerr) then
-        if(DEBUG_NEST)write(*,*)'Nest: variable '//trim(adv_ic(n)%varname)//' has unit '//trim(units)
-        data=data/Units_Scale(units,n,needroa=divbyroa,debug_msg="reset_3D")
+        if(DEBUG_NEST) write(*,*)&
+          'Nest: variable '//trim(adv_ic(n)%varname)//' has unit '//trim(units)
+        unitscale=adv_ic(n)%frac/Units_Scale(units,n,needroa=divbyroa,&
+                                             debug_msg="reset_3D")
       else
-        if(DEBUG_NEST)write(*,*)'units attribute not found for variable '//trim(adv_ic(n)%varname)
+        if(DEBUG_NEST) write(*,*)&
+          'Nest: variable '//trim(adv_ic(n)%varname//' has no unit attribute')
+        unitscale=adv_ic(n)%frac
       endif
+      if(unitscale/=1.0) data=data*unitscale
     endif
     CALL MPI_BCAST(data,8*GIMAX_ext*GJMAX_ext*KMAX_ext,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+    CALL MPI_BCAST(divbyroa,1,MPI_LOGICAL,0,MPI_COMM_WORLD,INFO)
 
      !overwrite everything 3D (init)
     if(divbyroa)then

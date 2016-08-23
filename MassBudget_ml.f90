@@ -40,7 +40,7 @@ use Chemfields_ml,      only: xn_adv        ! advected species
 use GridValues_ml,      only: carea,xmd, &  ! cell area, 1/xm2 where xm2 is
                                   ! the area factor in the middle of the cell
                               gridwidth_m,dA,dB,debug_proc,debug_li,debug_lj
-use Io_ml,              only: IO_RES, PrintLog, datewrite
+use Io_ml,              only: IO_LOG, PrintLog, datewrite
 use MetFields_ml,       only: ps            ! surface pressure
 use ModelConstants_ml,  only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d fields
                               MasterProc,       & ! Master processor
@@ -58,7 +58,6 @@ implicit none
 private
 INCLUDE 'mpif.h'
 INTEGER STATUS(MPI_STATUS_SIZE),INFO
-real    MPIbuff(NSPEC_ADV*KMAX_MID)
 
 ! Some work arrays used in Aqueous_ml and (in future) DryDry:
 ! Use ADV index, as Dry/WetDep makes no seance for SHL.
@@ -108,14 +107,13 @@ subroutine Init_massbudget()
     enddo
   enddo
 
-  MPIbuff(1:NSPEC_ADV)= sumint (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, sumint , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, sumint , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
 
   if(MasterProc.and.EXTENDEDMASSBUDGET)then
     do n = 1,NSPEC_ADV
       if(sumint(n)<=0.) cycle
-      write(IO_RES,"(a15,i4,4x,e10.3)") "Initial mass",n,sumint(n)
+      write(IO_LOG,"(a15,i4,4x,e10.3)") "Initial mass",n,sumint(n)
       write(*,"(a15,i4,4x,e10.3)") "Initial mass",n,sumint(n)
     enddo
   endif
@@ -157,7 +155,7 @@ subroutine massbudget()
                                     ! nn - Total no. of short lived and advected species
                                     ! info - printing info
   integer :: ifam                                 ! family index
-  real, dimension(NSPEC_ADV,KMAX_MID) ::  sumk    ! total mass in each layer
+  real, allocatable, dimension(:,:) ::  sumk   ! total mass in each layer
   integer, parameter :: NFAMILIES = 3             ! No. of families
   character(len=*), dimension(NFAMILIES), parameter :: &
     family_name = (/ "Sulphur ", "Nitrogen", "Carbon  " /)
@@ -187,6 +185,8 @@ subroutine massbudget()
 
   real :: totdiv,helsum
 
+  allocate(sumk(NSPEC_ADV,KMAX_MID))
+
   sum_mass(:)   = 0.0
   frac_mass(:)  = 0.0
   xmax(:)       =-2.0
@@ -214,41 +214,26 @@ subroutine massbudget()
     enddo
   enddo
 
-  MPIbuff(1:NSPEC_ADV)= xmax(1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, xmax, NSPEC_ADV,&
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, xmax, NSPEC_ADV,&
     MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= xmin   (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, xmin   , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, xmin   , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gfluxin (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gfluxin , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gfluxin , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gfluxout (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gfluxout , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gfluxout , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gtotem (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gtotem , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotem , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gtotddep (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gtotddep , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotddep , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gtotwdep (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gtotwdep , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotwdep , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gtotldep (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gtotldep , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotldep , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  MPIbuff(1:NSPEC_ADV)= gtotox (1:NSPEC_ADV)
-  CALL MPI_ALLREDUCE(MPIbuff, gtotox , NSPEC_ADV, &
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotox , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
-  j=0
-  do k=1,KMAX_MID
-    do i=1,NSPEC_ADV
-      j=j+1
-      MPIbuff(j)= sumk(i,k)
-    enddo
-  enddo
-  CALL MPI_ALLREDUCE(MPIbuff, sumk , NSPEC_ADV*KMAX_MID, &
+
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, sumk , NSPEC_ADV*KMAX_MID, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO)
 
 !     make some temporary variables used to hold the sum over all
@@ -326,10 +311,10 @@ subroutine massbudget()
   if(MasterProc.and.EXTENDEDMASSBUDGET) then     ! printout from node 0
     !/.. now use species array which is set in My_MassBudget_ml
     do n=1,NSPEC_ADV
-      write(IO_RES,*)
+      write(IO_LOG,*)
       write(*,*)
       do k=1,KMAX_MID
-        write(IO_RES,"(' Spec ',i3,2x,a12,5x,'k= ',i2,5x,es12.5)")&
+        write(IO_LOG,"(' Spec ',i3,2x,a12,5x,'k= ',i2,5x,es12.5)")&
           n,species_adv(n)%name, k,sumk(n,k)
         write(*     ,"(' Spec ',i3,2x,a12,5x,'k= ',i2,5x,es12.5)")&
           n,species_adv(n)%name, k,sumk(n,k)

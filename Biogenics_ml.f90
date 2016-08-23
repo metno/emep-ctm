@@ -65,7 +65,7 @@ module Biogenics_ml
   use Landuse_ml,        only : LandCover
   use LocalVariables_ml, only : Grid  ! -> izen, DeltaZ
   use MetFields_ml,      only : t2_nwp
-  use ModelConstants_ml, only : USE_SOILNOX, DEBUG_SOILNOX, USE_SOILNH3
+  use ModelConstants_ml, only : USE_EURO_SOILNOX, USE_GLOBAL_SOILNOx, DEBUG_SOILNOX, USE_SOILNH3
   use ModelConstants_ml, only : NPROC, MasterProc, TINY, &
                            USE_PFT_MAPS, NLANDUSEMAX, IOU_INST, & 
                            KT => KCHEMTOP, KG => KMAX_MID, & 
@@ -113,6 +113,11 @@ module Biogenics_ml
       AnnualNdep, &  ! N-dep in mgN/m2/
       SoilNOx, SoilNH3
 
+  ! To avoid pre-runs of the model for scenario years, we assume that changes
+  ! can ve approximated by EU N emission changes
+   real, public, save :: Ndep_trends = 1.0  ! for scaling assumed soil N-dep
+
+
  ! Set true if LCC read from e.g. EMEP_EuroBVOC.nc:
  ! (Currently for 1st four LCC, CF, DF, BF, NF)
   logical, private, dimension(NLANDUSEMAX), save :: HaveLocalEF 
@@ -157,10 +162,11 @@ module Biogenics_ml
 !    Read natural BVOC emission potentials
 !-----------------------------------------------------------------------------
 !   Emission potentials (EFs) now read a netcdf of ca. 50x50 resolution.
-!   This fie, EMEP_EuroBVOC.nc uses the ICP-Forests species map as processed
+!   This file, EMEP_EuroBVOC.nc uses the ICP-Forests species map as processed
 !   by Renate Koeble at JRC (e.g.
 !   EFs now a mixure of rates from Simpson et al., 1999, JGR, Vol 104, D7, 
 !   8113-8152, and Keenan, T. et al., ACP, 2009, 9, 4053-4076 
+!   See Simpson et al., ACP, 2012
 
     integer :: alloc_err
     
@@ -187,7 +193,9 @@ module Biogenics_ml
       !call CheckStop( ispec_APIN < 1 , "BiogencERROR APIN")
       if( ispec_APIN < 0 ) call PrintLog("WARNING: No APINENE Emissions")
      
-      call CheckStop( USE_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
+      call CheckStop( USE_EURO_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
+      call CheckStop( USE_GLOBAL_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
+      if( MasterProc ) write(*,*) "SOILNOX ispec ", ispec_NO
 
       itot_C5H8 = find_index( "C5H8", species(:)%name    ) 
       itot_APIN = find_index( "APINENE", species(:)%name )
@@ -592,10 +600,12 @@ module Biogenics_ml
         EmisNat(ispec_APIN,i,j) = (E_MTL+E_MTP) * 1.0e-9/3600.0
     end if
 
-    if ( USE_SOILNOX ) then
+    if ( USE_EURO_SOILNOX ) then
         rcemis(itot_NO,KG)    = rcemis(itot_NO,KG) + &
              SoilNOx(i,j) * biofac_SOILNO/Grid%DeltaZ
         EmisNat(ispec_NO,i,j) =  SoilNOx(i,j) * 1.0e-9/3600.0
+    else if ( USE_GLOBAL_SOILNOX ) then !TEST
+        EmisNat(ispec_NO,i,j) =  SoilNOx(i,j)*Grid%DeltaZ/biofac_SOILNO * 1.0e-9/3600.0
     end if
 
     !EXPERIMENTAL
@@ -631,10 +641,13 @@ module Biogenics_ml
       real :: beta, bmin, bmax, bx, by ! for beta function
       real :: hfac
 
-      if( DEBUG_SOILNOX .and. debug_proc )write(*,*)"DEBUG_SOILNOX START: ",&
-        current_date%day, current_date%hour, current_date%seconds
+      if( DEBUG_SOILNOX .and. debug_proc ) then
+         write(*,*)"Biogenic_ml DEBUG_SOILNOX EURO: ",&
+          current_date%day, current_date%hour, current_date%seconds,&
+          USE_EURO_SOILNOX, Ndep_trends
+      end if
 
-      if ( .not. USE_SOILNOX  ) return ! and fSW has been set to 1. at start
+      if ( .not. USE_EURO_SOILNOX  ) return ! and fSW has been set to 1. at start
 
 
       ! We reset once per hour
@@ -658,6 +671,7 @@ module Biogenics_ml
            ! We use a factor normalised to 1.0 at 5000 mgN/m2/a
 
              fn = AnnualNdep(i,j)/5000.0 ! scale for now
+             fn = fn * Ndep_trends       ! For e.g. 2030, see Emissions_ml
 
              ftn = ft * fn * hfac 
 

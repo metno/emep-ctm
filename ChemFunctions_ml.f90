@@ -40,7 +40,7 @@ module ChemFunctions_ml
 !** includes
 !   troe - standrad chemical function
 !____________________________________________________________________
- use LocalVariables_ml,     only : Grid   ! => izen, is_NWPsea
+ use LocalVariables_ml,     only : Grid   ! => izen, is_mainlysea
  use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID
  use PhysicalConstants_ml,  only : AVOG, RGAS_J, DAY_ZEN
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
@@ -340,7 +340,7 @@ module ChemFunctions_ml
      real, dimension(K1:K2) :: rate
      integer :: k
      
-    if ( Grid%is_NWPsea) then
+    if ( Grid%is_mainlysea) then
       rate(K1:15) = 0.0
       do k = 16, K2
         if ( rh(k)  > 0.9) then

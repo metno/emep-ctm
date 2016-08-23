@@ -83,7 +83,8 @@ use MetFields_ml,     only: roa,pzpbl,Kz_m2s,th,zen, ustar_nwp, z_bnd,u_ref,&
 use MetFields_ml,     only: ps, t2_nwp
 use MetFields_ml,     only: SoilWater_deep, SoilWater_uppr, Idirect, Idiffuse
 use ModelConstants_ml, only: &
-   KMAX_MID     & ! =>  z dimension
+   KMAX_MID     & ! =>  z dimension (layer number)
+  ,KMAX_BND     & ! =>  z dimension (level number)
   ,NPROC        & ! No. processors
   ,atwS, atwN, ATWAIR, dt_advec  &
   ,PPBINV       & ! 1.0e9, for conversion of units
@@ -93,8 +94,6 @@ use ModelConstants_ml, only: &
   ,DEBUG_AOT       &
   ,DEBUG => DEBUG_DERIVED,  DEBUG_COLUMN, MasterProc &
   ,SOURCE_RECEPTOR &
-  ,USE_SOILNOX &
-  ,USE_SOILNH3 &
   ,USE_EMERGENCY,DEBUG_EMERGENCY &
   ,PT           &
   ,FORECAST     & ! only dayly (and hourly) output on FORECAST mode
@@ -184,11 +183,29 @@ private
 
    integer, private :: i,j,k,n, ivoc, index    ! Local loop variables
 
-  integer, private, save :: iadv_O3=-999,iadv_NO3_C=-999,  & ! Avoid hard codded IXADV_SPCS
-    iadv_EC_C_WOOD=-999,iadv_EC_C_FFUEL=-999,iadv_POM_C_FFUEL=-999
-  integer, private, save :: ug_NO3_C=-999.0,  &             ! Avoid hard codded molwt
-    ug_EC_C_WOOD=-999.0,ug_EC_C_FFUEL=-999.0,ug_POM_C_FFUEL=-999.0
+  integer, private, save :: iadv_O3=-999,     & ! Avoid hard codded IXADV_SPCS
+    iadv_EC_C_WOOD=-999,iadv_EC_C_FFUEL=-999,iadv_POM_C_FFUEL=-999,  &
+    iadv_SO4=-999,iadv_NO3_F=-999,iadv_NO3_C=-999,iadv_NH4_F=-999,   &
+    iadv_EC_F_WOOD_AGE=-999,iadv_EC_F_FFUEL_AGE=-999,                &
+    iadv_EC_F_WOOD_NEW=-999,iadv_EC_F_FFUEL_NEW=-999,                &
+    iadv_PART_OM_F=-999,iadv_SEASALT_F=-999,iadv_SEASALT_C=-999,     &
+    iadv_REMPPM25=-999,iadv_REMPPM_C=-999,iadv_DUST_WB_F=-999,       &
+    iadv_DUST_WB_C=-999,iadv_DUST_SAH_F=-999,iadv_DUST_SAH_C=-999,   &
+    iadv_DUST_ROAD_F=-999,iadv_DUST_ROAD_C=-999,iadv_FFIRE_BC=-999,  &
+    iadv_FFIRE_OM=-999, iadv_FFIRE_REMPPM25=-999
 
+  real, private, save :: ug_NO3_C=-999.0,  &             ! Avoid hard codded molwt
+    ug_EC_C_WOOD=-999.0,ug_EC_C_FFUEL=-999.0,ug_POM_C_FFUEL=-999.0
+  integer, public, save ::                                          &
+    spec_SO4=-999,spec_NO3_F=-999,spec_NO3_C=-999,spec_NH4_F=-999,   &
+    spec_EC_F_WOOD_AGE=-999,spec_EC_F_FFUEL_AGE=-999,                &
+    spec_EC_F_WOOD_NEW=-999,spec_EC_F_FFUEL_NEW=-999,                &
+    spec_EC_C_WOOD=-999,spec_EC_C_FFUEL=-999,spec_POM_C_FFUEL=-999,  &
+    spec_PART_OM_F=-999,spec_SEASALT_F=-999,spec_SEASALT_C=-999,     &
+    spec_REMPPM25=-999,spec_REMPPM_C=-999,spec_DUST_WB_F=-999,       &
+    spec_DUST_WB_C=-999,spec_DUST_SAH_F=-999,spec_DUST_SAH_C=-999,   &
+    spec_DUST_ROAD_F=-999,spec_DUST_ROAD_C=-999,spec_FFIRE_BC=-999,  &
+    spec_FFIRE_OM=-999,spec_FFIRE_REMPPM25=-999
    contains
 
   !=========================================================================
@@ -233,14 +250,60 @@ private
 
     ! Avoid hard codded IXADV_SPCS
     iadv_O3         =find_index('O3'         ,species_adv(:)%name )
+    iadv_SO4        =find_index('SO4'        ,species_adv(:)%name )
+    iadv_NO3_F      =find_index('NO3_F'      ,species_adv(:)%name )
     iadv_NO3_C      =find_index('NO3_C'      ,species_adv(:)%name )
+    iadv_NH4_F      =find_index('NH4_F'      ,species_adv(:)%name )
+    iadv_EC_F_WOOD_AGE=find_index('EC_F_WOOD_AGE',species_adv(:)%name )
+    iadv_EC_F_FFUEL_AGE=find_index('EC_F_FFUEL_AGE',species_adv(:)%name )
+    iadv_EC_F_WOOD_NEW=find_index('EC_F_WOOD_NEW',species_adv(:)%name )
+    iadv_EC_F_FFUEL_NEW=find_index('EC_F_FFUEL_NEW',species_adv(:)%name )
     iadv_EC_C_WOOD  =find_index('EC_C_WOOD'  ,species_adv(:)%name )
     iadv_EC_C_FFUEL =find_index('EC_C_FFUEL' ,species_adv(:)%name )
     iadv_POM_C_FFUEL=find_index('POM_C_FFUEL',species_adv(:)%name )
+    iadv_PART_OM_F  =find_index('PART_OM_F'  ,species_adv(:)%name )
+    iadv_SEASALT_F  =find_index('SEASALT_F'  ,species_adv(:)%name )
+    iadv_SEASALT_C  =find_index('SEASALT_C'  ,species_adv(:)%name )
+    iadv_REMPPM25   =find_index('REMPPM25'   ,species_adv(:)%name )
+    iadv_REMPPM_C   =find_index('REMPPM_C'   ,species_adv(:)%name )
+    iadv_DUST_WB_F  =find_index('DUST_WB_F'  ,species_adv(:)%name )
+    iadv_DUST_WB_C  =find_index('DUST_WB_C'  ,species_adv(:)%name )
+    iadv_DUST_SAH_F =find_index('DUST_SAH_F' ,species_adv(:)%name )
+    iadv_DUST_SAH_C =find_index('DUST_SAH_C' ,species_adv(:)%name )
+    iadv_DUST_ROAD_F=find_index('DUST_ROAD_F',species_adv(:)%name )
+    iadv_DUST_ROAD_C=find_index('DUST_ROAD_C',species_adv(:)%name )
+
+    iadv_FFIRE_BC   =find_index('FFIRE_BC'   ,species_adv(:)%name )
+    iadv_FFIRE_OM   =find_index('FFIRE_OM'   ,species_adv(:)%name )
+    iadv_FFIRE_REMPPM25=find_index('FFIRE_REMPPM25',species_adv(:)%name )
+
     if(iadv_NO3_C      >0)ug_NO3_C      =Units_Scale('ug', iadv_NO3_C      )
     if(iadv_EC_C_WOOD  >0)ug_EC_C_WOOD  =Units_Scale('ug', iadv_EC_C_WOOD  )
     if(iadv_EC_C_FFUEL >0)ug_EC_C_FFUEL =Units_Scale('ug', iadv_EC_C_FFUEL )
     if(iadv_POM_C_FFUEL>0)ug_POM_C_FFUEL=Units_Scale('ug', iadv_POM_C_FFUEL)
+
+    if(iadv_SO4        >0) spec_SO4   = iadv_SO4 + NSPEC_SHL
+    if(iadv_NO3_F      >0) spec_NO3_F = iadv_NO3_F + NSPEC_SHL
+    if(iadv_NO3_C      >0) spec_NO3_C = iadv_NO3_C + NSPEC_SHL
+    if(iadv_NH4_F      >0) spec_NH4_F = iadv_NH4_F + NSPEC_SHL
+    if(iadv_EC_F_WOOD_AGE>0) spec_EC_F_WOOD_AGE = iadv_EC_F_WOOD_AGE + NSPEC_SHL
+    if(iadv_EC_F_FFUEL_AGE>0) spec_EC_F_FFUEL_AGE = iadv_EC_F_FFUEL_AGE + NSPEC_SHL
+    if(iadv_EC_F_WOOD_NEW>0) spec_EC_F_WOOD_NEW = iadv_EC_F_WOOD_NEW + NSPEC_SHL
+    if(iadv_EC_F_FFUEL_NEW>0) spec_EC_F_FFUEL_NEW = iadv_EC_F_FFUEL_NEW + NSPEC_SHL
+    if(iadv_PART_OM_F  >0) spec_PART_OM_F  = iadv_PART_OM_F   + NSPEC_SHL
+    if(iadv_SEASALT_F  >0) spec_SEASALT_F  = iadv_SEASALT_F   + NSPEC_SHL
+    if(iadv_SEASALT_C  >0) spec_SEASALT_C  = iadv_SEASALT_C   + NSPEC_SHL
+    if(iadv_REMPPM25   >0) spec_REMPPM25   = iadv_REMPPM25    + NSPEC_SHL
+    if(iadv_REMPPM_C   >0) spec_REMPPM_C   = iadv_REMPPM_C    + NSPEC_SHL
+    if(iadv_DUST_WB_F  >0) spec_DUST_WB_F  = iadv_DUST_WB_F   + NSPEC_SHL
+    if(iadv_DUST_WB_C  >0) spec_DUST_WB_C  = iadv_DUST_WB_C   + NSPEC_SHL
+    if(iadv_DUST_SAH_F >0) spec_DUST_SAH_F = iadv_DUST_SAH_F  + NSPEC_SHL
+    if(iadv_DUST_SAH_C >0) spec_DUST_SAH_C = iadv_DUST_SAH_C  + NSPEC_SHL
+    if(iadv_DUST_ROAD_F>0) spec_DUST_ROAD_F= iadv_DUST_ROAD_F + NSPEC_SHL
+    if(iadv_DUST_ROAD_C>0) spec_DUST_ROAD_C= iadv_DUST_ROAD_C + NSPEC_SHL
+    if(iadv_FFIRE_BC   >0) spec_FFIRE_BC   = iadv_FFIRE_BC    + NSPEC_SHL
+    if(iadv_FFIRE_OM   >0) spec_FFIRE_OM   = iadv_FFIRE_OM    + NSPEC_SHL
+    if(iadv_FFIRE_REMPPM25 >0) spec_FFIRE_REMPPM25 = iadv_FFIRE_REMPPM25+ NSPEC_SHL
 
     call Define_Derived()
     call Setups()  ! just for VOC now
@@ -577,7 +640,7 @@ enddo
     ! AddNewDeriv( name,class,subclass,txt,unit,
     !    index,f2d, dt_scale,scale, avg,iotype,Is3D)
 
-  do  ind = 1, NEMIS_BioNat !DSA12 size(BVOC_GROUP)
+  do  ind = 1, NEMIS_BioNat
      dname = "Emis_mgm2_BioNat" // trim(EMIS_BioNat(ind) )
      call AddNewDeriv( dname, "NatEmis", "-", "-", "mg/m2", &
                  ind , -99, T ,    1.0e6,     F, IOU_DAY )
@@ -650,9 +713,9 @@ end do
     if (ind>0) then
       f_2d(i) = def_2d(ind)
       if ( found_ind2d(ind) > 0 ) then
-          print *, "YYYY", me, trim( wanted_deriv2d(i) )
+          print *, "D2IND", me, trim( wanted_deriv2d(i) )
           do n = 1, size(def_2d(:)%name)
-             print *, "YYYY def2d", n, trim( def_2d(n)%name )
+             print *, "D2IND def2d", n, trim( def_2d(n)%name )
           end do
 
       call CheckStop ( found_ind2d(ind) > 0,  &
@@ -853,7 +916,7 @@ end do
           end forall
          case ( "Kz_m2s" )
             forall ( i=1:limax, j=1:ljmax )
-              d_2d( n, i,j,IOU_INST) = Kz_m2s(i,j,KMAX_MID)
+              d_2d( n, i,j,IOU_INST) = Kz_m2s(i,j,KMAX_BND-1)
             end forall
           case ( "ws_10m" )
             forall ( i=1:limax, j=1:ljmax )
@@ -913,7 +976,6 @@ end do
               d_2d( n, i,j,IOU_INST) = ps(i,j,1)*0.01
               !NOT YET - keep hPa in sites:d_2d( n, i,j,IOU_INST) = ps(i,j,1)
             end forall
-
 
           case ( "HMIX", "HMIX00", "HMIX12" )
 
@@ -982,11 +1044,15 @@ end do
           case ( "PM25X" )      ! Need to add PMFINE + fraction NO3_c
             if(first_call)then
               call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
-              call CheckStop(iadv_NO3_C      <1,"Unknown specie NO3_C")
-              call CheckStop(iadv_EC_C_WOOD  <1,"Unknown specie EC_C_WOOD")
-              call CheckStop(iadv_EC_C_FFUEL <1,"Unknown specie EC_C_FFUEL")
-              call CheckStop(iadv_POM_C_FFUEL<1,"Unknown specie POM_C_FFUEL")
             endif
+            if (iadv_NO3_C      < 1 .or. & 
+                iadv_EC_C_WOOD  < 1 .or. & 
+                iadv_EC_C_FFUEL < 1 .or. & 
+                iadv_POM_C_FFUEL< 1 ) then
+                if ( first_call ) write(*,*) &
+                     "WARNING: Derived - not all PM25X species present. Skipping"
+                cycle   !! Skip this case
+            end if
 
             !scale = 62.0
             ! All this size class has the same cfac.
@@ -1003,11 +1069,15 @@ end do
          case ( "PM25X_rh50" )      ! Need to add PMFINE + fraction NO3_c + water
             if(first_call)then
               call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
-              call CheckStop(iadv_NO3_C      <1,"Unknown specie NO3_C")
-              call CheckStop(iadv_EC_C_WOOD  <1,"Unknown specie EC_C_WOOD")
-              call CheckStop(iadv_EC_C_FFUEL <1,"Unknown specie EC_C_FFUEL")
-              call CheckStop(iadv_POM_C_FFUEL<1,"Unknown specie POM_C_FFUEL")
             endif
+            if (iadv_NO3_C      < 1 .or. & 
+                iadv_EC_C_WOOD  < 1 .or. & 
+                iadv_EC_C_FFUEL < 1 .or. & 
+                iadv_POM_C_FFUEL< 1 ) then
+                if ( first_call ) write(*,*) &
+                     "WARNING: Derived - not all PM25X_rh50 species present. Skipping"
+                cycle   !! Skip this case
+            end if
 
             forall ( i=1:limax, j=1:ljmax )
               d_2d( n, i,j,IOU_INST) = d_2d(ind_pmfine ,i,j,IOU_INST) &
@@ -1168,7 +1238,7 @@ end do
               endif
 
 
-          case ( "PREC", "WDEP", "DDEP", "VG" ,"Rs", "Rns", "Gns", "Mosaic", "POD", "AOT" )
+          case ( "PREC", "WDEP", "DDEP", "VG" ,"Rs", "Rns", "Gns", "Mosaic", "POD", "SPOD", "AOT" )
 !            if ( debug_flag ) write(*,"(2a,i4,a,es12.3)")"PROCESS ",trim(typ),&
 !                   n, trim(f_2d(n)%name), d_2d(n,debug_li,debug_lj,IOU_INST)
 !            Nothing to do - all set in My_DryDep
@@ -1326,6 +1396,7 @@ end do
             af = dt_advec
         end if
 
+!print *, "D2Ding", me, n, trim(f_2d(n)%name)
         d_2d(n,:,:,IOU_DAY )  = d_2d(n,:,:,IOU_DAY )  + af*d_2d(n,:,:,IOU_INST)
         if ( f_2d(n)%avg ) nav_2d(n,IOU_DAY) = nav_2d(n,IOU_DAY) + 1
 

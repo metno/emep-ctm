@@ -51,7 +51,7 @@ module OrganicAerosol_ml
   ,NVFFIREOC25 => NVFFIREOC25_GROUP  ! only non-vol. FFIREOC emissions
                                      ! (zero in VBS-PAX type runs)
 
-   use GridValues_ml, only: sigma_mid 
+   use GridValues_ml, only: A_mid,B_mid
    use ModelConstants_ml,    only :  PT
 
    use ModelConstants_ml,    only : CHEMTMIN, CHEMTMAX, &
@@ -84,7 +84,7 @@ module OrganicAerosol_ml
 
   real,public, save, allocatable, dimension(:,:,:) :: Grid_COA
 
-  real, private, dimension(K1:K2), save :: &
+  real, private, allocatable, dimension(:), save :: &
         COA           & ! Org. aerosol, ug/m3  
                         ! (this version does not include EC as absorber)
        ,BGND_OC       & ! FAKE FOR NOW, 0.50 ugC/m3 at surface
@@ -108,13 +108,13 @@ module OrganicAerosol_ml
    ! ug = array for aerosol masses (ug/m3). Includes non-volatile compounds:
    ! TMP??? Excluding NVOL for now?
 
-    real, private, dimension(S1:S2,K1:K2), save :: ug_semivol 
+    real, private,allocatable, dimension(:,:), save :: ug_semivol 
 ! - use new NONVOLOC grpup to define:
     integer, private, parameter :: NUM_NONVOLPCM = size(NONVOLPCM_GROUP)
     integer, private, parameter :: NUM_NVABSOM = size(NVABSOM_GROUP)
 !    integer, private, parameter, dimension(NUM_NONVOL) ::  &
 !      NONVOL = (/ NONVOLOC_GROUP, NONVOLEC_GROUP /) ! OC+EC in partitioning OM
-    real, private, dimension(NUM_NVABSOM,K1:K2), save :: ug_nonvol 
+    real, private,allocatable, dimension(:,:), save :: ug_nonvol 
     !real, private, dimension(K1:K2), save :: ug_ecf ! CityZen added 
 
     real,  private, save, dimension(S1:S2,CHEMTMIN:CHEMTMAX) :: tabCiStar
@@ -138,13 +138,16 @@ module OrganicAerosol_ml
    logical, intent(in) :: debug_flag
    integer :: is,  it, k
    real, parameter :: kJ = 1000.0  
-   real, dimension(K2), save :: p_kPa, h_km ! for standard atmosphere 
+   real,allocatable, dimension(:), save :: p_kPa, h_km ! for standard atmosphere 
    logical, save :: my_first_call = .true.
 
 
    if ( my_first_call ) then
-
+      allocate(COA(K1:K2),BGND_OC(K1:K2),BGND_OA(K1:K2))
+      allocate(ug_semivol(S1:S2,K1:K2))
       allocate(Grid_COA(LIDIM,LJDIM,K1:K2))
+      allocate(ug_nonvol(NUM_NVABSOM,K1:K2))
+      allocate(p_kPa(K2), h_km(K2))
 
     !=========================================================================
     ! Set up background OM 
@@ -158,7 +161,7 @@ module OrganicAerosol_ml
 
   ! Use Standard Atmosphere to get average heights of layers
 
-       p_kPa(:) = 0.001*( PT + sigma_mid(:)*(101325.0-PT) ) ! Pressure in kPa
+       p_kPa(:) = 0.001*( A_mid(:)+B_mid(:)*101325.0 ) ! Pressure in kPa
        h_km     = StandardAtmos_kPa_2_km(p_kPa)
        BGND_OC(:)= 0.5 * 1.005 ! ng/m3 !!! will give 0.5 ugC/m3 at z=0 m
 
@@ -192,7 +195,7 @@ module OrganicAerosol_ml
 
          if ( MasterProc ) then 
             do is = S1, S2
-               write(6,"(a,i4,a16,f7.1,i3,8es12.3)") &
+               write(6,"(a,i4,a20,f7.1,i3,8es10.2)") &
                 " Tab SOA: MW, Carbons, C*:", is, trim(species(is)%name), &
                  species(is)%molwt, species(is)%carbons, & 
                  tabCiStar(is,273), tabCiStar(is,303)

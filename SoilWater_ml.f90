@@ -32,7 +32,7 @@ module SoilWater_ml
  use Landuse_ml,        only : water_fraction
  use LocalVariables_ml, only: Grid
  use Met_ml,            only : extendarea
- use MetFields_ml,      only : SoilWater_deep, nwp_sea, SoilWaterSource,fSW &
+ use MetFields_ml,      only : SoilWater_deep, SoilWaterSource,fSW &
                                ,foundSoilWater_deep  ! false if no SW-deep
  use ModelConstants_ml, only : USE_SOILWATER, DEBUG_SOILWATER
  use Par_ml,            only : limax, ljmax, MAXLIMAX, MAXLJMAX, me
@@ -129,9 +129,9 @@ contains
          hourloc= mod(nint(current_date%hour+24*(1+longitude(i,j)/360.0)),24)
          REW   = SoilWater_deep(i,j,1) !done:/ SoilMAM
 
-         write(*,"(a,f7.4,i4,f7.4,i4,2f12.4,L8,f12.4)") "DEBUG_SWF: ", &
+         write(*,"(a,f7.4,i4,f7.4,i4,2f12.4)") "DEBUG_SWF: ", &
            water_fraction(i,j), daynumber, SoilWater_deep(i,j,1), hourloc,&
-            REW, fSW(i,j), nwp_sea(i,j)
+            REW, fSW(i,j)
              
       end if
 

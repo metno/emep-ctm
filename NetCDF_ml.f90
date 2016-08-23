@@ -40,10 +40,10 @@
 !for the lower left corner, the coordinates i_EMEP j_EMEP and long lat will
 !be wrong
 !
-  use My_Outputs_ml,     only : FREQ_HOURLY, &
-                                NHOURLY_OUT, &      ! No. outputs
+  use My_Outputs_ml,     only : NHOURLY_OUT, &      ! No. outputs
                                 Asc2D, hr_out, &      ! Required outputs
-                                SELECT_LEVELS_HOURLY, LEVELS_HOURLY, &
+                                LEVELS_HOURLY, &
+                                !NML SELECT_LEVELS_HOURLY, LEVELS_HOURLY, &
                                 NLEVELS_HOURLY
   use Chemfields_ml,     only : xn_shl,xn_adv
   use CheckStop_ml,      only : CheckStop,StopAll
@@ -62,14 +62,17 @@
                                ,glat,lb2ij,A_bnd,B_bnd&
                                ,lb2ij,lb2ijm,ij2lb&
                                ,ref_latitude_EMEP,xp_EMEP_old,yp_EMEP_old&
-                               ,i_local,j_local
+                               ,i_local,j_local&
+                               ,Eta_bnd,Eta_mid,A_bnd,B_bnd,A_mid,B_mid
   use InterpolationRoutines_ml,  only : grid2grid_coeff
   use ModelConstants_ml, only : KMAX_MID,KMAX_BND, runlabel1, runlabel2 &
                                ,MasterProc, FORECAST, NETCDF_COMPRESS_OUTPUT &
                                ,DEBUG_NETCDF, DEBUG_NETCDF_RF &
                                ,NPROC, IIFULLDOM,JJFULLDOM &
                                ,IOU_INST,IOU_HOUR,IOU_HOUR_MEAN, IOU_YEAR &
-                               ,IOU_MON, IOU_DAY ,PT,NLANDUSEMAX, model
+                               ,IOU_MON, IOU_DAY ,PT,Pref,NLANDUSEMAX, model&
+                               ,USE_EtaCOORDINATES
+  use ModelConstants_ml, only : SELECT_LEVELS_HOURLY  !NML
   use netcdf
   use OwnDataTypes_ml,   only : Deriv
   use Par_ml,            only : me,GIMAX,GJMAX,tgi0,tgj0,tlimax,tljmax, &
@@ -116,10 +119,11 @@
   public :: Read_Inter_CDF
   public :: ReadField_CDF
   public :: ReadTimeCDF
+  public :: check
 
   private :: CreatenetCDFfile
+  private :: CreatenetCDFfile_Eta
   private :: createnewvariable
-  private :: check
 
 contains
 !_______________________________________________________________________
@@ -172,7 +176,7 @@ case(IOU_HOUR)
   KMAXcdf =min(KMAXcdf ,NLEVELS_HOURLY)
 
 ! Output selected model levels
-  if(SELECT_LEVELS_HOURLY)then
+  if(SELECT_LEVELS_HOURLY)then     
     call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,&
                           KMAXcdf,KLEVcdf=LEVELS_HOURLY)
   else
@@ -211,7 +215,7 @@ character(len=*), parameter :: author_of_run='Unimod group'
 character(len=*), parameter :: vert_coord='sigma: k ps: PS ptop: PT'
 character(len=19) :: projection_params='90.0 -32.0 0.933013' !set later on
 
-real :: xcoord(GIMAX),ycoord(GJMAX),kcoord(KMAX_MID)
+real :: xcoord(GIMAX),ycoord(GJMAX),kcoord(KMAXcdf)
 
 character(len=8)  :: created_date,lastmodified_date
 character(len=10) :: created_hour,lastmodified_hour
@@ -220,9 +224,22 @@ integer :: ncFileID,iEMEPVarID,jEMEPVarID,latVarID,longVarID,PTVarID
 real :: scale_at_projection_origin
 character(len=80) ::UsedProjection
 
-  ! fileName: Name of the new created file
-  ! nf90_clobber: protect existing datasets
-  ! ncFileID: netcdf ID
+if(present(RequiredProjection))then
+   UsedProjection=trim(RequiredProjection)
+else
+   UsedProjection=trim(projection)
+endif
+
+if(USE_EtaCOORDINATES)then
+  if(present(KLEVcdf))then
+     call CreatenetCDFfile_Eta(fileName,GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,&
+          KMAXcdf,KLEVcdf,RequiredProjection=UsedProjection)
+  else
+     call CreatenetCDFfile_Eta(fileName,GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,&
+          KMAXcdf,RequiredProjection=UsedProjection)
+  endif
+  return
+endif
 
 !Check that the dimensions are > 0
   if(GIMAXcdf<=0.or.GJMAXcdf<=0.or.KMAXcdf<=0)then
@@ -234,16 +251,12 @@ character(len=80) ::UsedProjection
     return
   endif
 
-  if(present(RequiredProjection))then
-     UsedProjection=trim(RequiredProjection)
-  else
-     UsedProjection=trim(projection)
-  endif
 
   write(*,*)'creating ',trim(fileName)
   if(DEBUG_NETCDF)write(*,*)'UsedProjection ',trim(UsedProjection)
   if(DEBUG_NETCDF)write(*,fmt='(A,8I7)')'with sizes (IMAX,JMAX,IBEG,JBEG,KMAX) ',&
     GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,KMAXcdf
+
   if(NETCDF_COMPRESS_OUTPUT)then
     call check(nf90_create(path = trim(fileName), &
       cmode = nf90_hdf5, ncid = ncFileID),"create:"//trim(fileName))
@@ -362,10 +375,9 @@ character(len=80) ::UsedProjection
 !pwsvs for CF-1.0
   call check(nf90_put_att(ncFileID, kVarID, "standard_name", "atmosphere_sigma_coordinate"))
   call check(nf90_put_att(ncFileID, kVarID, "formula_terms", trim(vert_coord)))
-  call check(nf90_put_att(ncFileID, kVarID, "units", "sigma_level"))
   call check(nf90_put_att(ncFileID, kVarID, "positive", "down"))
   call check(nf90_def_var(ncFileID, "PT", nf90_float,  varID = PTVarID) )
-  call check(nf90_put_att(ncFileID, PTVarID, "units", "Pa"))
+  call check(nf90_put_att(ncFileID, PTVarID, "units", "hPa"))
   call check(nf90_put_att(ncFileID, PTVarID, "long_name", "Pressure at top"))
 
   call check(nf90_def_var(ncFileID, "time", nf90_double, dimids = timeDimID, varID = VarID) )
@@ -400,7 +412,7 @@ character(len=80) ::UsedProjection
   ! Leave define mode
   call check(nf90_enddef(ncFileID), "define_done"//trim(fileName) )
 
-  call check(nf90_open(path = trim(fileName), mode = nf90_write, ncid = ncFileID))
+!  call check(nf90_open(path = trim(fileName), mode = nf90_write, ncid = ncFileID))
 
 ! Define horizontal distances
 
@@ -511,33 +523,417 @@ character(len=80) ::UsedProjection
     enddo
   endif
   call check(nf90_put_var(ncFileID, kVarID, kcoord(1:KMAXcdf)) )
-  call check(nf90_put_var(ncFileID, PTVarID, PT ))
+! write PT in hPa
+  call check(nf90_put_var(ncFileID, PTVarID, PT * 0.01 ))
 
   call check(nf90_close(ncFileID))
   if(DEBUG_NETCDF)write(*,*)'NetCDF: file created, end of CreatenetCDFfile ',ncFileID
 end subroutine CreatenetCDFfile
 
+subroutine CreatenetCDFfile_Eta(fileName,GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,&
+                            KMAXcdf,KLEVcdf,RequiredProjection)
+
+integer, intent(in) :: GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,KMAXcdf
+character(len=*),  intent(in)  :: fileName
+character(len=*),optional, intent(in):: requiredprojection
+integer, intent(in), optional :: KLEVcdf(KMAXcdf)
+
+character(len=*), parameter :: author_of_run='Unimod group'
+character(len=19) :: projection_params='90.0 -32.0 0.933013' !set later on
+
+real :: xcoord(GIMAX),ycoord(GJMAX),kcoord(KMAXcdf+1)
+real :: Acdf(KMAXcdf),Bcdf(KMAXcdf),Aicdf(KMAXcdf+1),Bicdf(KMAXcdf+1)
+
+character(len=8)  :: created_date,lastmodified_date
+character(len=10) :: created_hour,lastmodified_hour
+integer :: iDimID,jDimID,kDimID,timeDimID,VarID,iVarID,jVarID,kVarID,i,j,k
+integer :: hyamVarID,hybmVarID,hyaiVarID,hybiVarID,ilevVarID,levVarID,levDimID,ilevDimID
+integer :: ncFileID,iEMEPVarID,jEMEPVarID,latVarID,longVarID,PTVarID
+real :: scale_at_projection_origin
+character(len=80) ::UsedProjection
+character (len=*), parameter :: vert_coord='atmosphere_hybrid_sigma_pressure_coordinate'
+
+  ! fileName: Name of the new created file
+  ! nf90_clobber: protect existing datasets
+  ! ncFileID: netcdf ID
+
+!Check that the dimensions are > 0
+  if(GIMAXcdf<=0.or.GJMAXcdf<=0.or.KMAXcdf<=0)then
+    write(*,*)'WARNING:'
+    write(*,*)trim(fileName),&
+              ' not created. Requested area too small (or outside domain) '
+    write(*,*)'sizes (IMAX,JMAX,IBEG,JBEG,KMAX) ',&
+              GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,KMAXcdf
+    return
+  endif
+
+  if(present(RequiredProjection))then
+     UsedProjection=trim(RequiredProjection)
+  else
+     UsedProjection=trim(projection)
+  endif
+
+  write(*,*)'creating ',trim(fileName)
+  if(DEBUG_NETCDF)write(*,*)'UsedProjection ',trim(UsedProjection)
+  if(DEBUG_NETCDF)write(*,fmt='(A,8I7)')'with sizes (IMAX,JMAX,IBEG,JBEG,KMAX) ',&
+    GIMAXcdf,GJMAXcdf,ISMBEGcdf,JSMBEGcdf,KMAXcdf
+  if(NETCDF_COMPRESS_OUTPUT)then
+    call check(nf90_create(path = trim(fileName), &
+      cmode = nf90_hdf5, ncid = ncFileID),"create:"//trim(fileName))
+  else
+    call check(nf90_create(path = trim(fileName), &
+      cmode = nf90_clobber, ncid = ncFileID),"create:"//trim(fileName))
+  endif
+
+  ! Define the dimensions
+  if(UsedProjection=='Stereographic')then
+    call check(nf90_def_dim(ncid = ncFileID, name = "i", len = GIMAXcdf, dimid = iDimID))
+    call check(nf90_def_dim(ncid = ncFileID, name = "j", len = GJMAXcdf, dimid = jDimID))
+
+  elseif(UsedProjection=='lon lat')then
+    call check(nf90_def_dim(ncid = ncFileID, name = "lon", len = GIMAXcdf, dimid = iDimID))
+    call check(nf90_def_var(ncFileID, "lon", nf90_double, dimids = iDimID, varID = iVarID) )
+    call check(nf90_put_att(ncFileID, iVarID, "standard_name", "longitude"))
+    call check(nf90_put_att(ncFileID, iVarID, "long_name", "longitude"))
+    call check(nf90_put_att(ncFileID, iVarID, "units", "degrees_east"))
+    call check(nf90_def_dim(ncid = ncFileID, name = "lat", len = GJMAXcdf, dimid = jDimID))
+    call check(nf90_def_var(ncFileID, "lat", nf90_double, dimids = jDimID, varID =jVarID) )
+    call check(nf90_put_att(ncFileID, jVarID, "standard_name", "latitude"))
+    call check(nf90_put_att(ncFileID, jVarID, "long_name", "latitude"))
+    call check(nf90_put_att(ncFileID, jVarID, "units", "degrees_north"))
+
+  else !general projection
+    call check(nf90_def_dim(ncid = ncFileID, name = "i", len = GIMAXcdf, dimid = iDimID))
+    call check(nf90_def_dim(ncid = ncFileID, name = "j", len = GJMAXcdf, dimid = jDimID))
+    call check(nf90_def_var(ncFileID, "i", nf90_float, dimids = iDimID, varID = iVarID) )
+    call check(nf90_put_att(ncFileID, iVarID, "standard_name", "projection_x_coordinate"))
+    call check(nf90_put_att(ncFileID, iVarID, "coord_axis", "x"))
+    call check(nf90_put_att(ncFileID, iVarID, "long_name", "grid x coordinate"))
+    call check(nf90_put_att(ncFileID, iVarID, "units", "km"))
+    call check(nf90_def_var(ncFileID, "j", nf90_float, dimids = jDimID, varID = jVarID) )
+    call check(nf90_put_att(ncFileID, jVarID, "standard_name", "projection_y_coordinate"))
+    call check(nf90_put_att(ncFileID, jVarID, "coord_axis", "y"))
+    call check(nf90_put_att(ncFileID, jVarID, "long_name", "grid y coordinate"))
+    call check(nf90_put_att(ncFileID, jVarID, "units", "km"))
+
+    call check(nf90_def_var(ncFileID, "lat", nf90_float, dimids = (/ iDimID, jDimID/), varID = latVarID) )
+    call check(nf90_put_att(ncFileID, latVarID, "long_name", "latitude"))
+    call check(nf90_put_att(ncFileID, latVarID, "units", "degrees_north"))
+    call check(nf90_put_att(ncFileID, latVarID, "standard_name", "latitude"))
+
+    call check(nf90_def_var(ncFileID, "lon", nf90_float, dimids = (/ iDimID, jDimID/), varID = longVarID) )
+    call check(nf90_put_att(ncFileID, longVarID, "long_name", "longitude"))
+    call check(nf90_put_att(ncFileID, longVarID, "units", "degrees_east"))
+    call check(nf90_put_att(ncFileID, longVarID, "standard_name", "longitude"))
+  endif
+
+!  call check(nf90_def_dim(ncid = ncFileID, name = "k", len = KMAXcdf, dimid = kDimID))
+  call check(nf90_def_dim(ncid = ncFileID, name = "lev", len = KMAXcdf, dimid = levDimID))
+  call check(nf90_def_dim(ncid = ncFileID, name = "ilev", len = KMAXcdf+1, dimid = ilevDimID))
+  call check(nf90_put_att(ncFileID, nf90_global, "vert_coord", vert_coord))
+
+  call check(nf90_def_dim(ncid = ncFileID, name = "time", len = nf90_unlimited, dimid = timeDimID))
+
+  call Date_And_Time(date=created_date,time=created_hour)
+  if(DEBUG_NETCDF)write(6,*) 'created_date: ',created_date
+  if(DEBUG_NETCDF)write(6,*) 'created_hour: ',created_hour
+
+  ! Write global attributes
+  call check(nf90_put_att(ncFileID, nf90_global, "Conventions", "CF-1.6" ))
+ !call check(nf90_put_att(ncFileID, nf90_global, "version", version ))
+  call check(nf90_put_att(ncFileID, nf90_global, "model", model))
+  call check(nf90_put_att(ncFileID, nf90_global, "author_of_run", author_of_run))
+  call check(nf90_put_att(ncFileID, nf90_global, "created_date", created_date))
+  call check(nf90_put_att(ncFileID, nf90_global, "created_hour", created_hour))
+  lastmodified_date = created_date
+  lastmodified_hour = created_hour
+  call check(nf90_put_att(ncFileID, nf90_global, "lastmodified_date", lastmodified_date))
+  call check(nf90_put_att(ncFileID, nf90_global, "lastmodified_hour", lastmodified_hour))
+
+  call check(nf90_put_att(ncFileID, nf90_global, "projection",UsedProjection))
+
+  if(UsedProjection=='Stereographic')then
+    scale_at_projection_origin=(1.+sin(ref_latitude*PI/180.))/2.
+    write(projection_params,fmt='(''90.0 '',F5.1,F9.6)')fi,scale_at_projection_origin
+    call check(nf90_put_att(ncFileID, nf90_global, "projection_params",projection_params))
+
+! define coordinate variables
+    call check(nf90_def_var(ncFileID, "i", nf90_float, dimids = iDimID, varID = iVarID) )
+    call check(nf90_put_att(ncFileID, iVarID, "standard_name", "projection_x_coordinate"))
+    call check(nf90_put_att(ncFileID, iVarID, "coord_axis", "x"))
+    call check(nf90_put_att(ncFileID, iVarID, "long_name", "EMEP grid x coordinate"))
+    call check(nf90_put_att(ncFileID, iVarID, "units", "km"))
+
+    call check(nf90_def_var(ncFileID, "i_EMEP", nf90_float, dimids = iDimID, varID = iEMEPVarID) )
+    call check(nf90_put_att(ncFileID, iEMEPVarID, "long_name", "official EMEP grid coordinate i"))
+    call check(nf90_put_att(ncFileID, iEMEPVarID, "units", "gridcells"))
+
+    call check(nf90_def_var(ncFileID, "j", nf90_float, dimids = jDimID, varID = jVarID) )
+    call check(nf90_put_att(ncFileID, jVarID, "standard_name", "projection_y_coordinate"))
+    call check(nf90_put_att(ncFileID, jVarID, "coord_axis", "y"))
+    call check(nf90_put_att(ncFileID, jVarID, "long_name", "EMEP grid y coordinate"))
+    call check(nf90_put_att(ncFileID, jVarID, "units", "km"))
+
+    call check(nf90_def_var(ncFileID, "j_EMEP", nf90_float, dimids = jDimID, varID = jEMEPVarID) )
+    call check(nf90_put_att(ncFileID, jEMEPVarID, "long_name", "official EMEP grid coordinate j"))
+    call check(nf90_put_att(ncFileID, jEMEPVarID, "units", "gridcells"))
+
+    call check(nf90_def_var(ncFileID, "lat", nf90_float, dimids = (/ iDimID, jDimID/), varID = latVarID) )
+    call check(nf90_put_att(ncFileID, latVarID, "long_name", "latitude"))
+    call check(nf90_put_att(ncFileID, latVarID, "units", "degrees_north"))
+    call check(nf90_put_att(ncFileID, latVarID, "standard_name", "latitude"))
+
+    call check(nf90_def_var(ncFileID, "lon", nf90_float, dimids = (/ iDimID, jDimID/), varID = longVarID) )
+    call check(nf90_put_att(ncFileID, longVarID, "long_name", "longitude"))
+    call check(nf90_put_att(ncFileID, longVarID, "units", "degrees_east"))
+    call check(nf90_put_att(ncFileID, longVarID, "standard_name", "longitude"))
+  endif
+
+! call check(nf90_put_att(ncFileID, nf90_global, "vert_coord", vert_coord))
+  call check(nf90_put_att(ncFileID, nf90_global, "period_type", &
+        trim(period_type)), ":period_type"//trim(period_type) )
+  call check(nf90_put_att(ncFileID, nf90_global, "run_label", trim(runlabel2)))
+
+  call check(nf90_def_var(ncFileID, "lev", nf90_double, dimids = levDimID, varID = levVarID) )
+  call check(nf90_put_att(ncFileID, levVarID, "standard_name","atmosphere_hybrid_sigma_pressure_coordinate"))
+  call check(nf90_put_att(ncFileID, levVarID, "long_name", "hybrid level at layer midpoints (A/P0+B)"))
+  call check(nf90_put_att(ncFileID, levVarID, "positive", "down"))
+  call check(nf90_put_att(ncFileID, levVarID, "formula_terms","ap: hyam b: hybm ps: PS p0: P0"))
+!p(n,k,j,i) = a(k)+ b(k)*ps(n,j,i)
+  call check(nf90_def_var(ncFileID, "P0", nf90_double,  varID = VarID) )
+  call check(nf90_put_att(ncFileID, VarID, "units", "hPa"))
+  call check(nf90_put_var(ncFileID, VarID, Pref/100.0 ))
+
+!The hybrid sigma-pressure coordinate for level k is defined as ap(k)/p0+b(k). 
+  call check(nf90_def_var(ncFileID, "hyam", nf90_double,dimids = levDimID,  varID = hyamVarID) )
+  call check(nf90_put_att(ncFileID, hyamVarID, "long_name","hybrid A coefficient at layer midpoints"))
+  call check(nf90_put_att(ncFileID, hyamVarID, "units","hPa"))
+  call check(nf90_def_var(ncFileID, "hybm", nf90_double,dimids = levDimID,  varID = hybmVarID) )
+  call check(nf90_put_att(ncFileID, hybmVarID, "long_name","hybrid B coefficient at layer midpoints"))
+
+  call check(nf90_def_var(ncFileID, "ilev", nf90_double, dimids = ilevDimID, varID = ilevVarID) )
+  call check(nf90_put_att(ncFileID, ilevVarID, "standard_name","atmosphere_hybrid_sigma_pressure_coordinate"))
+  call check(nf90_put_att(ncFileID, ilevVarID, "long_name", "hybrid level at layer interfaces (A/P0+B)"))
+  call check(nf90_put_att(ncFileID, ilevVarID, "positive", "down"))
+  call check(nf90_put_att(ncFileID, ilevVarID, "formula_terms","ap: hyai b: hybi ps: PS p0: P0"))
+  call check(nf90_def_var(ncFileID, "hyai", nf90_double, dimids = ilevDimID,  varID = hyaiVarID) )
+  call check(nf90_put_att(ncFileID, hyaiVarID, "long_name","hybrid A coefficient at layer interfaces"))
+  call check(nf90_put_att(ncFileID, hyaiVarID, "units","hPa"))
+  call check(nf90_def_var(ncFileID, "hybi", nf90_double, dimids = ilevDimID,  varID = hybiVarID) )
+  call check(nf90_put_att(ncFileID, hybiVarID, "long_name","hybrid B coefficient at layer interfaces"))
+
+
+  call check(nf90_def_var(ncFileID, "time", nf90_double, dimids = timeDimID, varID = VarID) )
+  if(trim(period_type) /= 'instant'.and.trim(period_type) /= 'unknown'.and.&
+     trim(period_type) /= 'hourly' .and.trim(period_type) /= 'fullrun')then
+    call check(nf90_put_att(ncFileID, VarID, "long_name", "time at middle of period"))
+  else
+    call check(nf90_put_att(ncFileID, VarID, "long_name", "time at end of period"))
+  endif
+  call check(nf90_put_att(ncFileID, VarID, "units", "days since 1900-1-1 0:0:0"))
+
+
+!CF-1.0 definitions:
+  if(UsedProjection=='Stereographic')then
+    call check(nf90_def_var(ncid = ncFileID, name = "Polar_Stereographic", xtype = nf90_int, varID=varID ) )
+    call check(nf90_put_att(ncFileID, VarID, "grid_mapping_name", "polar_stereographic"))
+    call check(nf90_put_att(ncFileID, VarID, "straight_vertical_longitude_from_pole", Fi))
+    call check(nf90_put_att(ncFileID, VarID, "latitude_of_projection_origin", 90.0))
+    call check(nf90_put_att(ncFileID, VarID, "scale_factor_at_projection_origin", scale_at_projection_origin))
+  elseif(UsedProjection=='lon lat')then
+
+  elseif(UsedProjection=='Rotated_Spherical')then
+    call check(nf90_def_var(ncid = ncFileID, name = "Rotated_Spherical", xtype = nf90_int, varID=varID ) )
+    call check(nf90_put_att(ncFileID, VarID, "grid_mapping_name", "rotated_latitude_longitude"))
+    call check(nf90_put_att(ncFileID, VarID, "grid_north_pole_latitude", grid_north_pole_latitude))
+    call check(nf90_put_att(ncFileID, VarID, "grid_north_pole_longitude", grid_north_pole_longitude))
+  else
+    call check(nf90_def_var(ncid = ncFileID, name = Default_projection_name, xtype = nf90_int, varID=varID ) )
+    call check(nf90_put_att(ncFileID, VarID, "grid_mapping_name", trim(UsedProjection)))
+  endif
+
+  ! Leave define mode
+  call check(nf90_enddef(ncFileID), "define_done"//trim(fileName) )
+
+!  call check(nf90_open(path = trim(fileName), mode = nf90_write, ncid = ncFileID))
+
+! Define horizontal distances
+
+  if(UsedProjection=='Stereographic')then
+    xcoord(1)=(ISMBEGcdf-xp)*GRIDWIDTH_M/1000.
+    do i=2,GIMAXcdf
+      xcoord(i)=xcoord(i-1)+GRIDWIDTH_M/1000.
+    enddo
+    call check(nf90_put_var(ncFileID, iVarID, xcoord(1:GIMAXcdf)) )
+
+    ycoord(1)=(JSMBEGcdf-yp)*GRIDWIDTH_M/1000.
+    do j=2,GJMAXcdf
+      ycoord(j)=ycoord(j-1)+GRIDWIDTH_M/1000.
+    enddo
+    call check(nf90_put_var(ncFileID, jVarID, ycoord(1:GJMAXcdf)) )
+
+! Define horizontal coordinates in the official EMEP grid
+   !xp_EMEP_official=8.
+   !yp_EMEP_official=110.
+   !GRIDWIDTH_M_EMEP=50000.
+   !fi_EMEP=-32.
+    if(fi==fi_EMEP)then
+      ! Implemented only if fi = fi_EMEP = -32 (Otherwise needs a 2-dimensional mapping)
+      ! uses (i-xp)*GRIDWIDTH_M = (i_EMEP-xp_EMEP)*GRIDWIDTH_M_EMEP
+      do i=1,GIMAXcdf
+        xcoord(i)=(i+ISMBEGcdf-1-xp)*GRIDWIDTH_M/GRIDWIDTH_M_EMEP + xp_EMEP_official
+       !print *, i,xcoord(i)
+      enddo
+      do j=1,GJMAXcdf
+        ycoord(j)=(j+JSMBEGcdf-1-yp)*GRIDWIDTH_M/GRIDWIDTH_M_EMEP + yp_EMEP_official
+       !print *, j,ycoord(j)
+      enddo
+    else
+      do i=1,GIMAXcdf
+        xcoord(i)=NF90_FILL_FLOAT
+      enddo
+      do j=1,GJMAXcdf
+        ycoord(j)=NF90_FILL_FLOAT
+      enddo
+    endif
+    call check(nf90_put_var(ncFileID, iEMEPVarID, xcoord(1:GIMAXcdf)) )
+    call check(nf90_put_var(ncFileID, jEMEPVarID, ycoord(1:GJMAXcdf)) )
+
+    if(DEBUG_NETCDF) write(*,*) "NetCDF: Starting long/lat defs"
+    !Define longitude and latitude
+    call GlobalPosition !because this may not yet be done if old version of meteo is used
+    if(ISMBEGcdf+GIMAXcdf-1<=IIFULLDOM .and. JSMBEGcdf+GJMAXcdf-1<=JJFULLDOM)then
+      call check(nf90_put_var(ncFileID, latVarID, &
+        glat_fdom(ISMBEGcdf:ISMBEGcdf+GIMAXcdf-1,JSMBEGcdf:JSMBEGcdf+GJMAXcdf-1)))
+      call check(nf90_put_var(ncFileID, longVarID, &
+        glon_fdom(ISMBEGcdf:ISMBEGcdf+GIMAXcdf-1,JSMBEGcdf:JSMBEGcdf+GJMAXcdf-1)))
+    endif
+
+  elseif(UsedProjection=='lon lat') then
+    do i=1,GIMAXcdf
+      xcoord(i)= glon_fdom(i+ISMBEGcdf-1,1)
+    enddo
+    do j=1,GJMAXcdf
+      ycoord(j)= glat_fdom(1,j+JSMBEGcdf-1)
+    enddo
+    call check(nf90_put_var(ncFileID, iVarID, xcoord(1:GIMAXcdf)) )
+    call check(nf90_put_var(ncFileID, jVarID, ycoord(1:GJMAXcdf)) )
+  else
+    xcoord(1)=(ISMBEGcdf-0.5)*GRIDWIDTH_M/1000.
+    do i=2,GIMAXcdf
+      xcoord(i)=xcoord(i-1)+GRIDWIDTH_M/1000.
+     !print *, i,xcoord(i)
+    enddo
+    call check(nf90_put_var(ncFileID, iVarID, xcoord(1:GIMAXcdf)) )
+
+    ycoord(1)=(JSMBEGcdf-0.5)*GRIDWIDTH_M/1000.
+    do j=2,GJMAXcdf
+      ycoord(j)=ycoord(j-1)+GRIDWIDTH_M/1000.
+    enddo
+    call check(nf90_put_var(ncFileID, iVarID, xcoord(1:GIMAXcdf)) )
+    call check(nf90_put_var(ncFileID, jVarID, ycoord(1:GJMAXcdf)) )
+   !write(*,*)'coord written'
+
+   !Define longitude and latitude
+   if(ISMBEGcdf+GIMAXcdf-1<=IIFULLDOM .and. JSMBEGcdf+GJMAXcdf-1<=JJFULLDOM)then
+     call check(nf90_put_var(ncFileID, latVarID, &
+       glat_fdom(ISMBEGcdf:ISMBEGcdf+GIMAXcdf-1,JSMBEGcdf:JSMBEGcdf+GJMAXcdf-1)))
+     call check(nf90_put_var(ncFileID, longVarID, &
+       glon_fdom(ISMBEGcdf:ISMBEGcdf+GIMAXcdf-1,JSMBEGcdf:JSMBEGcdf+GJMAXcdf-1)))
+     endif
+  endif
+  if(DEBUG_NETCDF) write(*,*) "NetCDF: lon lat written"
+
+  !Define vertical levels
+  if(present(KLEVcdf))then     !order is defined in KLEVcdf
+    do k=1,KMAXcdf
+      if(KLEVcdf(k)==0)then
+           !0-->surface
+         !definition of level ambiguous, since no thickness
+        Acdf(k)=A_bnd(KMAX_BND)
+        Bcdf(k)=B_bnd(KMAX_BND)
+        Aicdf(k)=A_bnd(KMAX_BND)
+        Bicdf(k)=B_bnd(KMAX_BND)
+      else
+        !1-->20;2-->19;...;20-->1
+        Acdf(k)=A_mid(KMAX_MID-KLEVcdf(k)+1)
+        Bcdf(k)=B_mid(KMAX_MID-KLEVcdf(k)+1)
+        Aicdf(k)=A_bnd(KMAX_BND-KLEVcdf(k)+1)
+        Bicdf(k)=B_bnd(KMAX_BND-KLEVcdf(k)+1)
+        if(k==KMAXcdf)then
+           Aicdf(k+1)=A_bnd(KMAX_BND-KLEVcdf(k))
+           Bicdf(k+1)=B_bnd(KMAX_BND-KLEVcdf(k))
+        endif
+      endif
+      if(DEBUG_NETCDF) write(*,*) "TESTHH netcdf KLEVcdf ", k, KLEVCDF(k),Acdf(k) 
+    enddo
+  elseif(KMAXcdf==KMAX_MID)then
+    do k=1,KMAX_MID
+        Acdf(k)=A_mid(k)
+        Bcdf(k)=B_mid(k)
+        Aicdf(k)=A_bnd(k)
+        Bicdf(k)=B_bnd(k)
+
+      if(DEBUG_NETCDF) write(*,*) "TESTHH netcdf  no KLEVcdf ", k, Acdf(k)
+    enddo
+  else
+    do k=1,KMAXcdf
+      !REVERSE order of k !
+        Acdf(k)=A_mid(KMAX_MID-k+1)
+        Bcdf(k)=B_mid(KMAX_MID-k+1)
+        Aicdf(k)=A_bnd(KMAX_BND-k+1)
+        Bicdf(k)=B_bnd(KMAX_BND-k+1)
+        if(k==KMAXcdf)then
+           Aicdf(k+1)=A_bnd(KMAX_BND-k)
+           Bicdf(k+1)=B_bnd(KMAX_BND-k)
+        endif
+!      write(*,*) "TESTHH netcdf  KMAXcdf ", k, kcoord(k)
+    enddo
+  endif
+  call check(nf90_put_var(ncFileID, hyamVarID, Acdf(1:KMAXcdf)/100.0) )
+  call check(nf90_put_var(ncFileID, hybmVarID, Bcdf(1:KMAXcdf)) )
+  call check(nf90_put_var(ncFileID, hyaiVarID, Aicdf(1:KMAXcdf+1)/100.0) )
+  call check(nf90_put_var(ncFileID, hybiVarID, Bicdf(1:KMAXcdf+1)) )
+
+  do i=1,KMAXcdf
+     kcoord(i)=Acdf(i)/Pref+Bcdf(i)
+  enddo
+  call check(nf90_put_var(ncFileID, levVarID, kcoord(1:KMAXcdf)) )
+  do i=1,KMAXcdf+1
+     kcoord(i)=Aicdf(i)/Pref+Bicdf(i)
+  enddo
+  call check(nf90_put_var(ncFileID, ilevVarID, kcoord(1:KMAXcdf+1)) )
+
+
+  call check(nf90_close(ncFileID))
+  if(DEBUG_NETCDF)write(*,*)'NetCDF: file created, end of CreatenetCDFfile ',ncFileID
+end subroutine CreatenetCDFfile_Eta
+
 
 !_______________________________________________________________________
 
-subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,ist,jst,ien,jen,ik,fileName_given,overwrite,create_var_only)
+subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,ist,jst,ien,jen,ik,&
+                      fileName_given,overwrite,create_var_only,chunksizes)
+!The use of fileName_given is probably slower than the implicit filename used by defining iotyp.
 
-  !The use of fileName_given is probably slower than the implicit filename used by defining iotyp.
-
-
-  integer ,intent(in) :: ndim,kmax
-  type(Deriv),     intent(in) :: def1 ! definition of fields
-  integer,                         intent(in) :: iotyp
-  real    ,intent(in) :: scale
+! Mandatary arguments:
+  integer ,    intent(in) :: ndim,kmax
+  type(Deriv), intent(in) :: def1 ! definition of fields
+  integer,     intent(in) :: iotyp
+  real,        intent(in) :: scale
   real, dimension(MAXLIMAX,MAXLJMAX,KMAX), intent(in) :: dat ! Data arrays
-  integer, optional, intent(in) :: ist,jst,ien,jen,ik !start and end of saved area.
-                                                      !Only level ik is written if defined
-  integer, optional, intent(in) :: CDFtype != OUTtype. (Integer*1, Integer*2,Integer*4, real*8 or real*4)
-  character (len=*),optional, intent(in):: fileName_given!filename to which the data must be written
-  !NB if the file fileName_given exist (also from earlier runs) it will be appended
-
-  logical, optional, intent(in) :: overwrite !overwrite if file already exists (in case fileName_given)
-  logical, optional, intent(in) :: create_var_only !only create the variable, without writing the data content
+! Optional arguments:
+  integer, optional, intent(in) :: &
+    ist,jst,ien,jen,ik, & ! start and end of saved area. Only level ik is written if defined
+    CDFtype               != OUTtype. (Integer*1, Integer*2,Integer*4, real*8 or real*4)
+  character (len=*),optional, intent(in) :: &
+    fileName_given ! filename to which the data must be written
+                   !NB if the file fileName_given exist (also from earlier runs) it will be appended
+  logical, optional, intent(in) :: &
+    overwrite,      &     ! overwrite if file already exists (in case fileName_given)
+    create_var_only       ! only create the variable, without writing the data content
+  integer, dimension(ndim), intent(in), optional :: &
+    chunksizes            ! nc4zip outpur writen in slizes, see NETCDF_COMPRESS_OUTPUT
   logical:: create_var_only_local !only create the variable, without writing the data content
 
   character(len=len(def1%name)) :: varname
@@ -607,6 +1003,12 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,ist,jst,ien,jen,ik,
               call check(nf90_inq_dimid(ncid = ncFileID, name = "i", dimID = idimID))
               call check(nf90_inq_dimid(ncid = ncFileID, name = "j", dimID = jdimID))
            endif
+
+          ! only  i,j coords can be handled for PS so far. Posisble x,y would
+          ! give wrong dimID. 
+           call CheckStop(idimID <0 ,&
+             "ReadField_CDF: no dimID found for"//trim(fileName_given))
+
            call check(nf90_inq_dimid(ncid = ncFileID, name = "k", dimID = kdimID))
            call check(nf90_inquire_dimension(ncid=ncFileID,dimID=idimID,len=GIMAX_old))
            call check(nf90_inquire_dimension(ncid=ncFileID,dimID=jdimID,len=GJMAX_old))
@@ -693,16 +1095,20 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,ist,jst,ien,jen,ik,
         endif
      endif
 
-     !test first if the variable is already defined:
-     status = nf90_inq_varid(ncid = ncFileID, name = varname, varID = VarID)
-
-     if(status == nf90_noerr) then
-!             print *, 'variable exists: ',varname
-        if (DEBUG_NETCDF) write(6,*) 'Out_NetCDF: variable exists: ',varname
-     else
-        if (DEBUG_NETCDF) write(6,*) 'Out_NetCDF: creating variable: ',varname
-        call  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype)
-     endif
+    !test first if the variable is already defined:
+    status = nf90_inq_varid(ncid = ncFileID, name = varname, varID = VarID)
+    if(status == nf90_noerr) then
+!     print *, 'variable exists: ',varname
+      if(DEBUG_NETCDF) write(*,*) 'Out_NetCDF: variable exists: ',varname
+    else
+      if(DEBUG_NETCDF) write(*,*) 'Out_NetCDF: creating variable: ',varname
+      if(create_var_only_local) &
+        call check(nf90_set_fill(ncFileID,NF90_NOFILL,ijk))
+      if(present(chunksizes))&
+        call CheckStop(chunksizes(1)/=(i2-i1+1).or.chunksizes(2)/=(j2-j1+1),&
+          "NetCDF_ml: chunksizes has wrong dimensions")
+      call createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype,chunksizes=chunksizes)
+    endif
   endif!MasterProc
 
   if(create_var_only_local)then
@@ -942,19 +1348,20 @@ end subroutine Out_netCDF
 !_______________________________________________________________________
 
 
-subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype)
+subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype,chunksizes)
 
   !create new netCDF variable
 
   implicit none
 
   type(Deriv),     intent(in) :: def1 ! definition of fields
-  character (len = *),intent(in) ::varname
-  integer ,intent(in) ::ndim,ncFileID,OUTtype
-  integer, dimension(:) ,intent(in) ::  ndate
+  character(len=*),intent(in) :: varname
+  integer,         intent(in) :: ndim,ncFileID,OUTtype
+  integer,dimension(:),intent(in) :: ndate
+  integer,dimension(ndim),intent(in), optional :: chunksizes
 
   integer :: iDimID,jDimID,kDimID,timeDimID
-  integer :: varID,nrecords
+  integer :: varID,nrecords,status
   real :: scale
   integer :: OUTtypeCDF !NetCDF code for type
 
@@ -984,7 +1391,10 @@ subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype)
      call check(nf90_inq_dimid(ncid = ncFileID, name = "j", dimID = jdimID))
   endif
 
-  call check(nf90_inq_dimid(ncid = ncFileID, name = "k", dimID = kdimID))
+  status=nf90_inq_dimid(ncid = ncFileID, name = "k", dimID = kdimID)
+  if(status /= nf90_noerr)then
+     call check(nf90_inq_dimid(ncid = ncFileID, name = "lev", dimID = kdimID))
+  endif
   call check(nf90_inq_dimid(ncid = ncFileID, name = "time", dimID = timeDimID))
 
   !define new variable
@@ -998,8 +1408,11 @@ subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype)
      print *, 'createnewvariable: unexpected ndim ',ndim
   endif
 !define variable as to be compressed
-  if(NETCDF_COMPRESS_OUTPUT) &
-    call check(nf90_def_var_deflate(ncFileid ,varID,shuffle=0,deflate=1 ,deflate_level=4) )
+  if(NETCDF_COMPRESS_OUTPUT) then
+    call check(nf90_def_var_deflate(ncFileid,varID,shuffle=0,deflate=1,deflate_level=4))
+    if(present(chunksizes)) &     ! set chunk-size for 2d slices of 3d output
+      call check(nf90_def_var_chunking(ncFileID,varID,NF90_CHUNKED,chunksizes(:)))
+  endif
   !     FillValue=0.
   scale=1.
   !define attributes of new variable
@@ -1535,6 +1948,7 @@ else
    call StopAll('interpolation method not recognized')
 endif
 
+  call check(nf90_close(ncFileID))
 
 deallocate(Rlon)
 deallocate(Rlat)
@@ -1640,7 +2054,7 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
   integer, allocatable:: Ivalues(:)  ! I counts all data
   integer, allocatable:: Nvalues(:)  !ds counts all values
   real, allocatable:: Rvalues(:),Rlon(:),Rlat(:)
-  real ::lat,lon,maxlon,minlon,maxlat,minlat
+  real ::lat,lon,maxlon,minlon,maxlat,minlat,maxlon_var,minlon_var,maxlat_var,minlat_var
   logical ::fileneeded, debug,data3D
   character(len = 50) :: interpol_used, data_projection=""
   real :: ir,jr,Grid_resolution
@@ -1662,7 +2076,7 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
   real ::buffer1(MAXLIMAX, MAXLJMAX),buffer2(MAXLIMAX, MAXLJMAX)
   real, allocatable ::fraction_in(:,:)
   integer, allocatable ::CC(:,:),Ncc(:)
-  real ::total
+  real ::total,UnDef_local
   integer ::N_out,Ng,Nmax
 
   !_______________________________________________________________________________
@@ -1718,9 +2132,89 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
         call CheckStop(fileneeded, "ReadField_CDF : variable needed but not found")
      else
         print *, 'variable does not exist (but not needed): ',trim(varname),nf90_strerror(status)
+        call check(nf90_close(ncFileID))
         return
      endif
   endif
+
+  fractions=.false.
+  if(present(fractions_out))fractions=.true.
+
+  UnDef_local=0.0
+  if(present(UnDef))UnDef_local=UnDef
+
+  data3D=.false.
+  if(present(kstart).or.present(kend))then
+     call CheckStop((.not. present(kend).or. .not. present(kend)), &
+          "ReadField_CDF : both or none kstart and kend should be present")
+     data3D=.true.
+  endif
+
+!Check first that variable has data covering the relevant part of the grid:
+
+  !Find chunk of data required (local)
+  maxlon=max(maxval(gl_stagg),maxval(glon))
+  minlon=min(minval(gl_stagg),minval(glon))
+  maxlat=max(maxval(gb_stagg),maxval(glat))
+  minlat=min(minval(gb_stagg),minval(glat))
+
+  !Read the extension of the data in the file (if available)
+  status = nf90_get_att(ncFileID, VarID, "minlat", minlat_var  )
+  if(status == nf90_noerr)then
+     !found minlat, therfore the other (maxlat,minlon,maxlat) expected too
+     if ( debug ) write(*,*) 'minlat attribute found: ',minlat_var
+     call CheckStop(fractions, &
+          "ReadField_CDF: minlat not implemented for fractions")     
+     k2=1
+     if(data3D)k2=kend-kstart+1
+     ijk=MAXLIMAX*MAXLJMAX*k2
+     if(minlat_var>maxlat)then
+        !the data is outside range. put zero or Undef.
+        Rvar(1:ijk)=UnDef_local
+        if ( debug ) write(*,*) 'data out of maxlat range ',maxlat
+        call check(nf90_close(ncFileID))
+        return
+     endif
+     status = nf90_get_att(ncFileID, VarID, "maxlat", maxlat_var  )
+     if(status == nf90_noerr)then
+        if ( debug ) write(*,*) 'maxlat attribute found: ',maxlat_var
+        if(maxlat_var<minlat)then
+           !the data is outside range. put zero or Undef.
+           Rvar(1:ijk)=UnDef_local
+           if ( debug ) write(*,*) 'data out of minlat range ',minlat
+           call check(nf90_close(ncFileID))
+           return
+        endif
+     endif
+     status = nf90_get_att(ncFileID, VarID, "minlon", minlon_var  )
+     if(status == nf90_noerr)then
+        if ( debug ) write(*,*) 'minlon attribute found: ',minlon_var
+        if(minlon_var>maxlon)then
+           !the data is outside range. put zero or Undef.
+           Rvar(1:ijk)=UnDef_local
+           if ( debug ) write(*,*) 'data out of minlon range ',minlon
+           call check(nf90_close(ncFileID))
+           return
+        endif
+     endif
+     status = nf90_get_att(ncFileID, VarID, "maxlon", maxlon_var  )
+     if(status == nf90_noerr)then
+        if ( debug ) write(*,*) 'maxlon attribute found: ',maxlon_var
+        if(maxlon_var<minlon)then
+           !the data is outside range. put zero or Undef.
+           Rvar(1:ijk)=UnDef_local
+           if ( debug ) write(*,*) 'data out of maxlon range ',maxlon
+           call check(nf90_close(ncFileID))
+           return
+        endif
+     endif
+  else
+     !dont expect to find maxlat,minlon or maxlat, therfore don't check
+     if ( debug ) write(*,*) 'minlat attribute not found for ',trim(varname)
+  endif
+  
+
+
 
   !get dimensions id
   call check(nf90_Inquire_Variable(ncFileID,VarID,name,&
@@ -1755,12 +2249,6 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
      if ( debug ) write(*,*) 'ReadCDF size variable ',i,dims(i)
   enddo
 
-  data3D=.false.
-  if(present(kstart).or.present(kend))then
-     call CheckStop((.not. present(kend).or. .not. present(kend)), &
-          "ReadField_CDF : both or none kstart and kend should be present")
-     data3D=.true.
-  endif
 
   if( present(known_projection) ) then
      data_projection = trim(known_projection)
@@ -1803,6 +2291,9 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
 
   Flight_Levels=.false.
 
+  
+  call CheckStop(fractions.and.trim(data_projection)/="lon lat", &
+       "ReadField_CDF: only implemented lon lat projection for fractions")     
 
 
      if ( debug .and. filename == "DegreeDayFac.nc" ) print *, 'ABCD2 got to here'
@@ -1861,11 +2352,6 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
     endif
     if ( debug ) write(*,*) 'interpol_used: ',interpol_used
 
-     !Find chunk of data required (local)
-     maxlon=max(maxval(gl_stagg),maxval(glon))
-     minlon=min(minval(gl_stagg),minval(glon))
-     maxlat=max(maxval(gb_stagg),maxval(glat))
-     minlat=min(minval(gb_stagg),minval(glat))
 
      if(debug) then
          write(*,*) "SET Grid resolution:" // trim(fileName), Grid_resolution

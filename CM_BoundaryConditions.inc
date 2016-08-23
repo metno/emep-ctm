@@ -1,5 +1,5 @@
 !---- Boundary conditions -------
-!---- SECTION BICs /home/birthems/Unimod/ZCM_EmChem09/EmChem09base
+!---- SECTION BICs 
   !Available BCs are indexed:
   !use GlobalBCs_ml,  only:  NGLOB_BC  &!  indices from UiO model
   !              ,IBC_SO2, IBC_SO4, IBC_HCHO, IBC_CH3CHO &
@@ -91,7 +91,7 @@
 !!bc2xn_adv(IBC_OH      ,IXADV_OH      )   =  -1.0   ! Short-lived
 !!bc2xn_adv(IBC_O3NO    ,IXADV_O3NO    )   =  -1.0   ! Excluded
 !!bc2xn_adv(IBC_DMS     ,IXADV_DMS     )   =  -1.0   ! Query ????
-!---- SECTION BICs /home/birthems/Unimod/ZCM_EmChem09/SeaSalt
+!---- SECTION BICs 
   !Available BCs are indexed:
   !use GlobalBCs_ml,  only:  NGLOB_BC  &!  indices from UiO model
   !              ,IBC_SO2, IBC_SO4, IBC_HCHO, IBC_CH3CHO &
@@ -107,7 +107,7 @@
 
 ! Skipped:
 !  bc2xn_adv(IBC_SEASALT_G  ,IXADV_SEASALT_G  )   =   1.0
-!---- SECTION BICs /home/birthems/Unimod/ZCM_EmChem09/Dust
+!---- SECTION BICs 
   !Available BCs are indexed:
   !use GlobalBCs_ml,  only:  NGLOB_BC  &!  indices from UiO model
   !              ,IBC_SO2, IBC_SO4, IBC_HCHO, IBC_CH3CHO &
@@ -121,4 +121,3 @@
   bc2xn_adv(IBC_DUST_f  ,IXADV_DUST_SAH_F )  = 1.0  !Dust
   bc2xn_adv(IBC_DUST_c  ,IXADV_DUST_SAH_C )  = 1.0  !Dust
 
-!---- SECTION BICs /home/birthems/Unimod/ZCM_EmChem09/Isotopes

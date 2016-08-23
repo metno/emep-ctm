@@ -47,13 +47,19 @@ implicit none
    ,IO_MYTIM    = 20  &! Unimod.f90(c)-output mytim.out 
    ,IO_RES      = 25  &! o3mod,massbud(o) 
    ,IO_DEBUG    = 26  &! keep open, use where needed
-   ,IO_TMP      = 27   ! General IO number (files *must* be type (c))
+   ,IO_TMP      = 27  &! General IO number (files *must* be type (c))
+   ,IO_NML      = 28   ! For namelist file (o)
 
 
   integer, parameter, public  :: &
     IO_SONDES   = 30  &! siteswrt_ml(o)  for output of sonde data
    ,IO_WRTCHEM  = 118 &! Used in Wrtchem (c) for AOT and BCs
-   ,IO_HOURLY   = 119  ! hourly_out(o)
+   ,IO_HOURLY   = 119 &! hourly_out(o)
+   ,IO_SPOD     = 120  ! Used in DryDep (c) for ozone-flux
+      ! ****************** !
+      ! CAREFUL. Code uses IO_SPOD + me, so potentally 120..very high IO num
+      ! ****************** !
+
 
   !(some subroutine names are a bit outdated:)
   integer, parameter, public  :: &
