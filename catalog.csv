@@ -65,12 +65,12 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201304,meteo,2010,,{FTP}/met2010/meteo201011.tar.bz2,,1077552286,f584635b85479ee4a6d5fab22b34dfc2
 201304,meteo,2010,,{FTP}/met2010/meteo201012.tar.bz2,,1136882158,a343dc09bdefbd0421f98294ce206919
 201304,input,2010,rv4_3,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,262083439,eb42df889afdbfc4ac8590e090710028
-201304,source,,rv4_3,{FTP}/{REL}/model_code/EMEP_MSC-W_model.rv4_3.OpenSource.tar.gz,,528631,7aacb4f5d11bbfdb71e66c8db56d40df
+201304,source,,rv4_3,{GIT}/archive/{MOD}.tar.gz,,525582,70b0af3be8616deda99234117253fa71
 201304,output,2010,rv4_3,{FTP}/{REL}/model_results_rv4_3_2010/Base_model_rv4_3_results.tar.bz2,,3929661092,4bbcf7ea1e0dc9c07ae378867eaac32e
 201304,other,,,{FTP}/{REL}/mscw-osrc_ncl.tar.gz,,303521340,56b102916af6f3209c52742737372e4f
-201304,source,,rv4_3,{FTP}/{REL}/README_rv4_3special.txt,,1394,7169a884114727c0ca5b37555381c8ce
+201304,source,,rv4_3,{GIT}/releases/download/{MOD}/README_rv4_3special.txt,,1394,7169a884114727c0ca5b37555381c8ce
 201304,output,2010,rv4_3,{FTP}/{REL}/README_rv4_3special.txt,,1394,7169a884114727c0ca5b37555381c8ce
-201304,docs,,rv4_3,{FTP}/{REL}/userguide_rv4_3.pdf,,412260,0a500dec4b4e8e00233a2d0d8c38109c
+201304,docs,,rv4_3,{GIT}/releases/download/{MOD}/User_Guide.pdf,,412260,0a500dec4b4e8e00233a2d0d8c38109c
 201309,meteo,2011,,{FTP}/{REL}/input_data_2011/meteo/meteo201101.tar.bz2,,1248517233,3f245b0148a22f9b94b853d660a458d7
 201309,meteo,2011,,{FTP}/{REL}/input_data_2011/meteo/meteo201102.tar.bz2,,1137706586,77c0f2cb0b56b896078088f6001c2516
 201309,meteo,2011,,{FTP}/{REL}/input_data_2011/meteo/meteo201103.tar.bz2,,1259347182,ab30f4889e8ae275b29a661b464cda02
