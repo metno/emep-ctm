@@ -33,43 +33,46 @@ module PhyChem_ml
 !     Output of hourly data
 !
 !-----------------------------------------------------------------------------
-   use CoDep_ml, only : make_so2nh3_24hr
-   use ChemSpecs_adv_ml, only : IXADV_SO2, IXADV_NH3, IXADV_O3
-   use My_Outputs_ml , only : NHOURLY_OUT, FREQ_SITE, FREQ_SONDE, FREQ_HOURLY
-   use My_Timing_ml,   only : Code_timer, Add_2timing, tim_before, tim_after
-
-   use Advection_ml,   only:  advecdiff_poles,adv_int
-   use Chemfields_ml,  only : xn_adv,cfac,xn_shl
-   use Derived_ml,     only : DerivedProds, Derived, num_deriv2d
-   use DerivedFields_ml,  only : d_2d, f_2d
-   use DryDep_ml,      only : init_drydep
-   use Emissions_ml,   only : EmisSet
-   use GridValues_ml,  only : debug_proc, debug_li,debug_lj,& !ds jun2005
-                             glon, glat, projection, Pole_included
-   use Met_ml,         only : metint
-   use MetFields_ml,   only : ps, roa,z_bnd,z_mid, cc3dmax, &
-                               zen,coszen,Idirect,Idiffuse
-   use ModelConstants_ml, only : KMAX_MID, nmax, nstep &
-                        ,dt_advec       & ! time-step for phyche/advection
-                        ,DEBUG_PHYCHEM, PPBINV  & 
-                        ,END_OF_EMEPDAY & ! (usually 6am)
-                        ,IOU_INST       & !
-                        ,FORECAST       & !use advecdiff_poles on FORECAST mode
-                        ,SOURCE_RECEPTOR
-   use Nest_ml,        only : readxn, wrtxn
-   use Par_ml,         only : me, MAXLIMAX, MAXLJMAX
-   use SoilWater_ml,   only : Set_SoilWater
-   use TimeDate_ml,       only : date,daynumber,day_of_year, add_secs, &
-                                 current_date, timestamp,  &
-                                 make_timestamp, make_current_date
-   use Trajectory_ml,  only : trajectory_out     ! 'Aircraft'-type  outputs
-   use Radiation_ml,   only : SolarSetup,       &! sets up radn params
-                              ZenithAngle,      &! gets zenith angle
-                              ClearSkyRadn,     &! Idirect, Idiffuse
-                              CloudAtten         !
-   use Runchem_ml,     only : runchem   ! Calls setup subs and runs chemistry
-   use Sites_ml,       only: siteswrt_surf, siteswrt_sondes    ! outputs
-   use Timefactors_ml, only : NewDayFactors
+use Biogenics_ml,     only: Set_SoilNOx
+use CoDep_ml,         only: make_so2nh3_24hr
+use ChemSpecs_adv_ml, only: IXADV_SO2, IXADV_NH3, IXADV_O3
+use My_Outputs_ml ,   only: NHOURLY_OUT, FREQ_SITE, FREQ_SONDE, FREQ_HOURLY
+use My_Timing_ml,     only: Code_timer, Add_2timing, tim_before, tim_after
+use Advection_ml,     only:  advecdiff_poles,advecdiff_Eta,adv_int
+use Chemfields_ml,    only: xn_adv,cfac,xn_shl
+use Derived_ml,       only: DerivedProds, Derived, num_deriv2d
+use DerivedFields_ml, only: d_2d, f_2d
+use DryDep_ml,        only: init_drydep
+use Emissions_ml,     only: EmisSet
+use GridValues_ml,    only: debug_proc,debug_li,debug_lj,&
+                            glon,glat,projection
+use Met_ml,           only: metint
+use MetFields_ml,     only: ps,roa,z_bnd,z_mid,cc3dmax, &
+                            zen,coszen,Idirect,Idiffuse
+use ModelConstants_ml,only: KMAX_MID, nmax, nstep &
+                           ,dt_advec       & ! time-step for phyche/advection
+                           ,DEBUG_PHYCHEM, PPBINV  & 
+                           ,END_OF_EMEPDAY & ! (usually 6am)
+                           ,IOU_INST       & !
+                           ,FORECAST       & !use advecdiff_poles on FORECAST mode
+                           ,ANALYSIS       & ! 3D-VAR Analysis
+                           ,SOURCE_RECEPTOR&
+                           ,USE_POLLEN, USE_EtaCOORDINATES
+use Nest_ml,          only: readxn, wrtxn
+use Par_ml,           only: me, MAXLIMAX, MAXLJMAX
+use SoilWater_ml,     only: Set_SoilWater
+use TimeDate_ml,      only: date,daynumber,day_of_year, add_secs, &
+                            current_date, timestamp,  &
+                            make_timestamp, make_current_date
+use Trajectory_ml,    only: trajectory_out     ! 'Aircraft'-type  outputs
+use Radiation_ml,     only: SolarSetup,       &! sets up radn params
+                            ZenithAngle,      &! gets zenith angle
+                            ClearSkyRadn,     &! Idirect, Idiffuse
+                            CloudAtten         !
+use Runchem_ml,       only: runchem   ! Calls setup subs and runs chemistry
+use Sites_ml,         only: siteswrt_surf, siteswrt_sondes    ! outputs
+use Timefactors_ml,   only: NewDayFactors
+use DA_3DVar_ml,      only: main_3dvar   ! 3D-VAR Analysis
 !-----------------------------------------------------------------------------
 implicit none
 private
@@ -117,10 +120,12 @@ contains
         if (me == 0) write(6,"(a15,i6,f8.3)") 'timestep nr.',nstep,thour
 
         call Code_timer(tim_before)
-        call wrtxn(current_date,.false.) !Write xn_adv for future nesting
-        call Add_2timing(18,tim_after,tim_before,"nest: Write")
         call readxn(current_date) !Read xn_adv from earlier runs
         call Add_2timing(19,tim_after,tim_before,"nest: Read")
+        if(ANALYSIS.and.numt==2.and.nstep==1)then
+          call main_3dvar()   ! 3D-VAR Analysis for "Zero hour"
+          call Add_2timing(46,tim_after,tim_before,'3DVar: Total.')
+        endif
         if(FORECAST.and.numt==2.and.nstep==1)call hourly_out()!Zero hour output
         call Add_2timing(35,tim_after,tim_before,"phyche:outs")
 
@@ -157,23 +162,21 @@ contains
 
 
         !================
-! Use advecdiff_poles on FORECAST mode:
 ! advecdiff_poles considers the local courant number along a 1D line
 ! and divides the advection step "locally" in a number of substeps.
-! Up north in the EMEP-CWF domain, mapfactors go up to four,
+! Up north in a LatLong domain such as MACC02, mapfactors go up to four,
 ! so using advecdiff_poles pays off, even though none of the poles are
 ! included in the domain.
 ! For efficient parallellisation each subdomain needs to have the same work 
 ! load; this can be obtained by setting NPROCY=1 (number of subdomains in 
 ! latitude- or y-direction).
 ! Then, all subdomains have exactly the same geometry.
-!        if( (Pole_included==1.or.FORECAST).and. &
-!            trim(projection)==trim('lon lat'))then
 
+        if(USE_EtaCOORDINATES)then
+           call advecdiff_Eta
+        else
            call advecdiff_poles
-!        else
-!           call advecdiff
-!        endif
+        endif
 
         call Add_2timing(17,tim_after,tim_before,"phyche:advecdiff")
         !================
@@ -191,6 +194,7 @@ contains
 
          !===================================
            call Set_SoilWater()
+           call Set_SoilNOx()
 
          !===================================
            call init_drydep()
@@ -241,8 +245,13 @@ contains
           current_date = make_current_date(ts_now)
 
           !====================================
-
-
+          call Add_2timing(35,tim_after,tim_before,"phyche:outs")
+          if(ANALYSIS)then
+            call main_3dvar()   ! 3D-VAR Analysis for "non-Zero hours"
+            call Add_2timing(46,tim_after,tim_before,'3DVar: Total.')
+          endif
+          call wrtxn(current_date,.false.) !Write xn_adv for future nesting
+          call Add_2timing(18,tim_after,tim_before,"nest: Write")
 
           End_of_Day = (current_date%seconds == 0 .and. &
                         current_date%hour    == END_OF_EMEPDAY)

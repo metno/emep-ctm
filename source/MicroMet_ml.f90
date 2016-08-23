@@ -26,6 +26,7 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
 module Micromet_ml
+  use ModelConstants_ml, only: FluxPROFILE
 !____________________________________________________________________
 ! Miscellaneous collection of "standard" micromet functions
 ! Including PsiM, PsiH, AerRes
@@ -51,6 +52,8 @@ module Micromet_ml
   public :: PsiH
 
   public :: PsiM
+
+  public :: Launiainen1995
 
   public :: wind_at_h   !wind for given height
 
@@ -147,6 +150,7 @@ module Micromet_ml
   function PsiH(zL) result (stab_h)
     !  PsiH = integral flux-gradient stability function for heat 
     !  Ref: Garratt, 1994, pp52-54
+    !  VDHH modified - use van der Hurk + Holtslag?
 
     ! In:
     real, intent(in) :: zL   ! surface layer stability parameter, (z-d)/L 
@@ -156,12 +160,17 @@ module Micromet_ml
     
    ! Local
    real :: x
+   real, parameter :: a=1, b=0.667, c=5.0, d=0.35
  
     if (zL <  0) then !unstable
         x    = sqrt(1.0 - 16.0 * zL)
         stab_h = 2.0 * log( (1.0 + x)/2.0 )
     else             !stable
-        stab_h = -5.0 * zL
+        if ( FluxPROFILE == "Ln95" ) then
+           stab_h = -( (1+2*a/3.0*zL)**1.5 + b*(zL-c/d)* exp(-d*zL) + (b*c/d-1) )
+        else 
+           stab_h = -5.0 * zL
+        end if
     end if
 
   end function PsiH
@@ -176,15 +185,57 @@ module Micromet_ml
                                ! notation must be preserved         
     real :: stab_m
     real  :: x
+   real, parameter :: a=1, b=0.667, c=5.0, d=0.35
  
     if( zL < 0) then !unstable
        x    = sqrt(sqrt(1.0 - 16.0*zL))
        stab_m = log( 0.125*(1.0+x)*(1.0+x)*(1.0+x*x) ) +  PI/2.0 - 2.0*atan(x)
     else             !stable
-       stab_m = -5.0 * zL
+        if ( FluxPROFILE == "Ln95" ) then
+           stab_m = -( a*zL + b*(zl-c/d)*exp(-d*zL) + b*c/d)
+        else
+           stab_m = -5.0 * zL
+        end if
     end if
 
   end function PsiM
+
+!--------------------------------------------------------------------
+subroutine Launiainen1995 (u, z, z0m, z0mh, theta0, theta, invL)
+  real, intent(in) :: u  ! winds
+  real, intent(in) :: z ! mid-cell height
+  real, intent(in) :: z0m ! roughness ht., momentum
+  real, intent(in) :: z0mh ! ration roughness ht., momentum
+  real, intent(in) :: theta0  !pot. temp at surface
+  real, intent(in) :: theta   !pot. temp at ref ht.
+  real, intent(out) :: invL
+  integer :: k
+  real :: zeta  ! z/L
+  real :: z0h, logzz0m, Rib
+  z0h = z0m/ z0mh
+
+   ! Ignoring virtual temp (and Lau has no z0):
+
+       !Rib =      GRAV * z * (theta-theta0 ) / &
+       Rib =      9.81 * z * (theta-theta0 ) / &
+                    ( theta0 *  u**2 + 0.001 ) !!! EPS )
+
+       logzz0m = log(z/z0m)
+      if ( Rib <0.0 ) then
+
+          Rib = max ( -3.0, Rib)  ! Limit used by van der Hurk + Holtslag, 1996
+          zeta = ( logzz0m**2/log(z/z0h) - 0.55 ) * Rib
+
+
+       else
+
+         Rib = min ( 1.0, Rib)  ! Limit used by van der Hurk + Holtslag, 1996
+         zeta =(  1.89  * logzz0m + 44.2 )*Rib**2 + ( 1.18*logzz0m -1.37) * Rib
+         if( Rib > 0.08 ) zeta = zeta - 1.5*log(z0m/z0h)*Rib
+       end if
+       invL = zeta/z
+
+end subroutine Launiainen1995
 
 !--------------------------------------------------------------------
   function Wind_at_h(u_ref, z_ref, zh, d, z0, Linv) result (u_zh)

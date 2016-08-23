@@ -46,7 +46,7 @@ module AirEmis_ml
    implicit none
    private
 
-   real, public, dimension(KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX), save :: &
+   real, public, dimension(:,:,:), save,allocatable :: &
                   airn                 & ! aircraft  NOx emissions
                  ,airlig                 ! lightning NOx emissions
 
@@ -57,7 +57,6 @@ module AirEmis_ml
    include 'mpif.h'
    
    integer STATUS(MPI_STATUS_SIZE),INFO
-   real MPIbuff
    integer,private ,parameter :: ILEV=18
    logical, parameter :: MY_DEBUG = .false.
 
@@ -90,7 +89,7 @@ module AirEmis_ml
                                                      ! molecules/cm3/s 
             
 
-      character*20 fname
+      character(len=20) :: fname
 
       data ygrdum / 85.76058712, 80.26877907, 74.74454037, &
                 69.21297617, 63.67863556, 58.14295405, &
@@ -112,6 +111,11 @@ module AirEmis_ml
 
       secmonth = 1.
       flux(:,:,:) = 0.
+
+      
+      if(.not.allocated(airlig))then
+         allocate(airlig(KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX))
+      endif
 
 ! --- Read Emission data received from DLR 
 
@@ -349,8 +353,7 @@ module AirEmis_ml
          end do
       end do
 
-        MPIbuff=sum2
-        CALL MPI_ALLREDUCE(MPIbuff,sum2, 1, &
+        CALL MPI_ALLREDUCE(MPI_IN_PLACE,sum2, 1, &
         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO) 
       if(me == 0.and.MY_DEBUG) write(6,*) 'ancat on limited area:',sum,sum2
 

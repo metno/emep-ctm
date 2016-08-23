@@ -1,4 +1,4 @@
-! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <AODrh_PM_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
@@ -27,13 +27,7 @@
 !*****************************************************************************! 
 
 
- module AOD_PM_ml
-
- !***********************************************************************
- ! The parameterisation is under delevopment and testing. It is to be
- ! updated in the nearest future. Please, contact us for the update, if
- ! you have a particular interest to aerosol optics calculations
- !***********************************************************************
+ module AODrh_PM_ml
 
   !-----------------------------------------------------------------------! 
   ! Calculates Aerosol Optical Depth (AOD) for 0.5 um radiation based on 
@@ -41,36 +35,25 @@
   ! based on Tegen et al. JGR (1997) and Kinne et al., ACP (2005)
   ! (implicit assumption on wetted aerosols)
   !-----------------------------------------------------------------------!
- use Chemfields_ml,        only : AOD, Extin_coeff
+ use Chemfields_ml,        only : AOD, Extin_coeff              
  use ChemChemicals_ml,     only : species  
  use ChemGroups_ml,        only : AOD_GROUP
  use ChemSpecs_tot_ml
- use Derived_ml,           only : &
-    spec_SO4,spec_NO3_F,spec_NO3_C,spec_NH4_F,       &
-    spec_EC_F_WOOD_AGE,spec_EC_F_FFUEL_AGE,          &
-    spec_EC_F_WOOD_NEW,spec_EC_F_FFUEL_NEW,          &
-    spec_EC_C_WOOD,spec_EC_C_FFUEL,spec_POM_C_FFUEL, &
-    spec_PART_OM_F,spec_SEASALT_F,spec_SEASALT_C,    &
-    spec_REMPPM25,spec_REMPPM_C,spec_DUST_WB_F,      &
-    spec_DUST_WB_C,spec_DUST_SAH_F,spec_DUST_SAH_C,  &
-    spec_DUST_ROAD_F,spec_DUST_ROAD_C,spec_FFIRE_BC, &
-    spec_FFIRE_OM,spec_FFIRE_REMPPM25
  use GridValues_ml,        only : i_fdom, j_fdom
  use MetFields_ml,         only : z_bnd
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, KCHEMTOP,   &
                                   MasterProc, NPROC, DEBUG_i, DEBUG_j
  use Par_ml,               only : MAXLIMAX,MAXLJMAX   ! => x, y dimensions
  use PhysicalConstants_ml, only : AVOG
- use Setup_1dfields_ml,    only : xn_2d, rh
+ use Setup_1dfields_ml,    only : xn_2d, rh 
 
   implicit none
   private
   !-----------------------------------------------------------------------!
  !// subroutines
-  public ::   AOD_calc, &
-              AOD_Ext
+  public ::   AOD_Ext 
 
-  real :: kext 
+  logical, private, save :: my_first_call = .true.
 
   contains
 
@@ -89,14 +72,13 @@
    logical, intent(in) :: debug
 
    integer :: k, n, itot, irh
-   integer, parameter :: Nrh = 7
    real, parameter :: lambda = 0.55e-6
    real, parameter :: rhoSO4=1.6, rhoOC=1.8, rhoEC=1.0,   &
                       rhoDU=2.6,  rhoSS=2.2 
    real, parameter :: Reff_SO4 = 0.156, Reff_OC = 0.087, Reff_EC = 0.039, &
                       Reff_DUf = 0.80,  Reff_DUc = 4.5, Reff_SSf = 0.80,  &
                       Reff_SSc = 5.73
-   real, parameter, dimension(Nrh) ::    &
+   real, parameter, dimension(7) ::    &
        RelHum = (/ 0.0,  0.5, 0.7, 0.8, 0.9, 0.95, 0.99 /),  &
        GF_SO4 = (/ 1.0,  1.4, 1.5, 1.6, 1.8,  1.9,  2.2 /),  &
        GF_OC  = (/ 1.0,  1.2, 1.4, 1.5, 1.6,  1.8,  2.2 /),  &
@@ -110,7 +92,7 @@
        Ex_SSc = (/ 2.143, 2.103, 2.090, 2.106, 2.084, 2.070, 2.064/)
   real, dimension(KMAX_MID):: ext_SO4, ext_NO3, ext_NH4, ext_EC,       &
                               ext_OM, ext_SS, ext_DU, kext
-  real :: rh_actual, rh_corr, gfSO4, gfOC, gfEC, gfSS, &
+  real :: gfSO4, gfOC, gfEC, gfSS, &
           rhoSO4_wet, rhoOC_wet, rhoEC_wet, rhoSS_wet, rhoNO3c_wet,  &
           massGF_SO4, massGF_OC, massGF_EC, massGF_SS,               &
           extSO4, extEC, extOC, extSSf, extSSc,    AOD_old,          &                       
@@ -147,11 +129,49 @@
 !..   according to Chin et.al (J. Atm.Sci., 59, 2001)
 
 
-  RHloop: do irh = 2, Nrh
+  RHloop: do irh = 2, 7
+    if ( rh(k) <= RelHum (irh) ) then
 
-    rh_actual = min( rh(k), RelHum (Nrh) )
+!.. Find actual growth factor by interpolation
+        
+      gfSO4 = GF_SO4(irh-1) + ( (GF_SO4(irh) - GF_SO4(irh-1)) /    &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                      ( rh(k) - RelHum(irh-1)   )
+      gfOC  = GF_OC(irh-1) + ( (GF_OC(irh) - GF_OC(irh-1)) /       &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
+      gfEC  = GF_EC(irh-1) + ( (GF_EC(irh) - GF_EC(irh-1)) /       &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
+      gfSS  = GF_SS(irh-1) + ( (GF_SS(irh) - GF_SS(irh-1)) /       &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
+!.. Extinction efficiencies
+      extSO4 = Ex_SO4(irh-1) + ( (Ex_SO4(irh) - Ex_SO4(irh-1)) /   &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                      ( rh(k) - RelHum(irh-1)   )
+      extOC  = Ex_OC(irh-1)  + ( (Ex_OC(irh) - Ex_OC(irh-1)) /     &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
+      extEC  = Ex_EC(irh-1)  + ( (Ex_EC(irh) - Ex_EC(irh-1)) /     &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
+      extSSf = Ex_SSf(irh-1) + ( (Ex_SSf(irh) - Ex_SSf(irh-1)) /   &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
+      extSSc = Ex_SSc(irh-1) + ( (Ex_SSc(irh) - Ex_SSc(irh-1)) /   &
+                                (RelHum(irh) - RelHum(irh-1) ) ) * &
+                                     ( rh(k) - RelHum(irh-1)   )
 
-   if ( rh_actual == RelHum(irh-1) ) then     
+  if(debug .and. (k == KMAX_MID) ) write(6,'(a15,i3,5f8.2)') '## Rh >> ', &
+  irh, rh(k), RelHum(irh), RelHum(irh-1), GF_SO4(irh), GF_SO4(irh-1)
+   if(debug .and. (k == KMAX_MID) ) write(6,'(a15,i3,f8.2,3f10.3)')   &
+   '## Ext > ', irh, rh(k),  Ex_SO4(irh-1), Ex_SO4(irh), extSO4
+
+!.. end leave Rh loop
+      exit RHloop
+
+    else 
       gfSO4 = 1.0
       gfOC  = 1.0
       gfEC  = 1.0
@@ -162,32 +182,7 @@
       extSSf = Ex_SSf(1)
       extSSc = Ex_SSc(1)
       cycle 
- 
-    elseif ( rh_actual <= RelHum (irh) ) then
-!st    if ( rh(k) <= RelHum (irh) ) then
-      rh_corr = (rh_actual - RelHum(irh-1)) / (RelHum(irh) - RelHum(irh-1))        
-
-!.. Find actual growth factor by interpolation
-        
-      gfSO4 = GF_SO4(irh-1) + (GF_SO4(irh) - GF_SO4(irh-1)) *rh_corr
-      gfOC  = GF_OC(irh-1)  + (GF_OC(irh)  - GF_OC(irh-1))  *rh_corr
-      gfEC  = GF_EC(irh-1)  + (GF_EC(irh)  - GF_EC(irh-1))  *rh_corr
-      gfSS  = GF_SS(irh-1)  + (GF_SS(irh)  - GF_SS(irh-1))  *rh_corr
-!.. Extinction efficiencies
-      extSO4 = Ex_SO4(irh-1) + (Ex_SO4(irh) - Ex_SO4(irh-1)) *rh_corr
-      extOC  = Ex_OC(irh-1)  + (Ex_OC(irh)  - Ex_OC(irh-1))  *rh_corr 
-      extEC  = Ex_EC(irh-1)  + (Ex_EC(irh)  - Ex_EC(irh-1))  *rh_corr
-      extSSf = Ex_SSf(irh-1) + (Ex_SSf(irh) - Ex_SSf(irh-1)) *rh_corr
-      extSSc = Ex_SSc(irh-1) + (Ex_SSc(irh) - Ex_SSc(irh-1)) *rh_corr
-
-  if(debug .and. (k == KMAX_MID) ) write(6,'(a15,i3,5f8.2)') '## Rh >> ', &
-  irh, rh_actual, RelHum(irh), RelHum(irh-1), GF_SO4(irh), GF_SO4(irh-1)
-   if(debug .and. (k == KMAX_MID) ) write(6,'(a15,i3,f8.2,3f10.3)')   &
-   '## Ext > ', irh, rh_actual,  Ex_SO4(irh-1), Ex_SO4(irh), extSO4
-
-!.. end leave Rh loop
-      exit RHloop
-   
+    
     endif
   enddo RHloop
 
@@ -261,44 +256,42 @@
 
 !.. Extinction coefficients for individual components
 
- ext_SO4(k) =  xn_2d(spec_SO4,k) * species(spec_SO4)%molwt * SpecExt_SO4 * 1.0e6 / AVOG
+ ext_SO4(k) =  xn_2d(SO4,k) * species(SO4)%molwt * SpecExt_SO4 * 1.0e6 / AVOG
 
- ext_NO3(k) = ((xn_2d(spec_NO3_F,k) + 0.3*xn_2d(spec_NO3_C,k)) * SpecExt_NO3f +  &
-                0.7*xn_2d(spec_NO3_C,k)                        * SpecExt_NO3c )  &
-                                         * species(NO3_F)%molwt * 1.0e6 / AVOG
+ ext_NO3(k) = ((xn_2d(NO3_F,k) + 0.3*xn_2d(NO3_C,k)) * SpecExt_NO3f +  &
+                0.7*xn_2d(NO3_C,k)                   * SpecExt_NO3c )  &
+                                            * species(NO3_F)%molwt * 1.0e6 / AVOG
 
- ext_NH4(k) =  xn_2d(spec_NH4_F,k) * SpecExt_NH4 * species(spec_NH4_F)%molwt     &
-                                                                * 1.0e6 / AVOG
+ ext_NH4(k) =  xn_2d(NH4_F,k) * SpecExt_NH4 * species(NH4_F)%molwt * 1.0e6 / AVOG
 
- ext_EC(k)  = (( xn_2d(spec_EC_F_FFUEL_NEW,k) + xn_2d(spec_EC_F_FFUEL_AGE,k) +   &
-                    xn_2d(spec_EC_F_WOOD_NEW,k)  + xn_2d(spec_EC_F_WOOD_AGE,k) ) &
-                  * SpecExt_EC           * species(spec_EC_F_FFUEL_NEW)%molwt + &
-                    xn_2d(spec_FFIRE_BC,k) * SpecExt_EC  &
-                               * species(spec_FFIRE_BC)%molwt ) * 1.0e6 / AVOG
-!                +( xn_2d(spec_EC_C_FFUEL,k) + xn_2d(spec_EC_C_WOOD,k))            &
-!                     * SpecExt_ECc * species(spec_EC_C_FFUEL)%molwt
+ ext_EC(k)  = (( xn_2d(EC_F_FFUEL_NEW,k) + xn_2d(EC_F_FFUEL_AGE,k) +           &
+                    xn_2d(EC_F_WOOD_NEW,k)  + xn_2d(EC_F_WOOD_AGE,k)  )        &
+                  * SpecExt_EC              * species(EC_F_FFUEL_NEW)%molwt +  &
+                    xn_2d(FFIRE_BC,k) * SpecExt_EC * species(FFIRE_BC)%molwt ) &
+                                                                   * 1.0e6 / AVOG
+!                +( xn_2d(EC_C_FFUEL,k) + xn_2d(EC_C_WOOD,k))            &
+!                     * SpecExt_ECc * species(EC_C_FFUEL)%molwt
 
-! ext_POM(k) = ( xn_2d(spec_POM_F_FFUEL,k) * species(spec_POM_F_FFUEL)%molwt +    &
-!                xn_2d(spec_POM_F_WOOD,k)  * species(spec_POM_F_WOOD)%molwt    )  &
+! ext_POM(k) = ( xn_2d(POM_F_FFUEL,k) * species(POM_F_FFUEL)%molwt +    &
+!                xn_2d(POM_F_WOOD,k)  * species(POM_F_WOOD)%molwt    )  &
 !                                     * SpecExt_OC * 1.0e6 / AVOG
-!!             + xn_2d(spec_POM_C_FFUEL,k) * species(spec_POM_C_FFUEL)%molwt * SpecExt_OCc
+!!             + xn_2d(POM_C_FFUEL,k) * species(POM_C_FFUEL)%molwt * SpecExt_OCc
    
- ext_OM(k)  = ( xn_2d(spec_PART_OM_F,k) * species(spec_PART_OM_F)%molwt * SpecExt_OC   &
-              + xn_2d(spec_FFIRE_OM,k)  * species(spec_FFIRE_OM)%molwt  * SpecExt_OC ) &
-!             + xn_2d(POM_C_FFUEL,k) * species(spec_POM_C_FFUEL)%molwt * SpecExt_OCc
-                                                                * 1.0e6 / AVOG
+ ext_OM(k)  = ( xn_2d(PART_OM_F,k) * species(PART_OM_F)%molwt * SpecExt_OC   &
+              + xn_2d(FFIRE_OM,k)  * species(FFIRE_OM)%molwt  * SpecExt_OC ) &
+!             + xn_2d(POM_C_FFUEL,k) * species(POM_C_FFUEL)%molwt * SpecExt_OCc
+                                                                  * 1.0e6 / AVOG
 
- ext_SS(k)  = ( xn_2d(spec_SEASALT_F,k)  * SpecExt_SSf +   &
-                xn_2d(spec_SEASALT_C,k)  * SpecExt_SSc   ) &
-                                * species(spec_SEASALT_F)%molwt * 1.0e6 / AVOG
+ ext_SS(k)  = ( xn_2d(SEASALT_F,k)  * SpecExt_SSf +   &
+                xn_2d(SEASALT_C,k)  * SpecExt_SSc   ) &
+                                    * species(SEASALT_F)%molwt * 1.0e6 / AVOG
 
- ext_DU(k)  = ( (xn_2d(spec_REMPPM25,k) + xn_2d(spec_DUST_WB_F,k) +            &
-                 xn_2d(spec_DUST_SAH_F,k))    * SpecExt_DUf                    &
-               +(xn_2d(spec_REMPPM_C,k) + xn_2d(spec_DUST_WB_C,k)+             &
-                 xn_2d(spec_DUST_SAH_C,k)) * SpecExt_DUc )                     &
-                                * species(spec_DUST_WB_F)%molwt * 1.0e6 / AVOG &
-               + xn_2d(spec_FFIRE_REMPPM25,k) * SpecExt_DUf                    &
-                           * species(spec_FFIRE_REMPPM25)%molwt * 1.0e6 / AVOG
+ ext_DU(k)  = ( (xn_2d(REMPPM25,k) + xn_2d(DUST_WB_F,k)+ xn_2d(DUST_SAH_F,k))   &
+                 * SpecExt_DUf  &
+               +(xn_2d(REMPPM_C,k) + xn_2d(DUST_WB_C,k)+ xn_2d(DUST_SAH_C,k))   &
+                 * SpecExt_DUc )    * species(DUST_WB_F)%molwt     * 1.0e6 / AVOG &
+               + xn_2d(FFIRE_REMPPM25,k) * SpecExt_DUf                     &
+                                   * species(FFIRE_REMPPM25)%molwt * 1.0e6 / AVOG
 
 
  Extin_coeff(i,j,k) =  ext_SO4(k) + ext_NO3(k) + ext_NH4(k) + ext_EC(k)   &
@@ -330,75 +323,6 @@
 
 
    end subroutine AOD_Ext
-! <---------------------------------------------------------->
-! <---------------------------------------------------------->
 
-    subroutine AOD_calc (i,j,debug)
-
- !------------------------------------------------
- ! Calculates AOD.... old, cruder routine
- !-------------------------------------------------
-
- implicit none
-
-
-   integer, intent(in) :: i,j    ! coordinates of column
-   logical, intent(in) :: debug
-
-   integer :: k, n, itot
-   real, parameter ::  lambda = 0.55e-6
-
-!-----------------------------------------------------------------
-!   AOD_GROUP = (/ SO4, NO3_F, NH4_F, EC_F_NEW, EC_F_AGE, POC_F, &
-!       EXTC  = (/ 8.5, 8.5,   8.5,   7.5,      11.0,     5.7,   &
-!                  SEASALT_F, SEASALT_C, DUST_NAT_F, DUST_NAT_C /)
-!                  3.0,        0.4       1.0,         0.3,      /)
-!__________________________________________________________________
-
-
-  AOD(i,j)     = 0.0
-
-  do k =  KCHEMTOP, KMAX_MID   !_______________ vertical layer loop
-
-!   kext(i,j,k)  = 0.0
- 
-!.. ===========================================================================
-!..  Extinction coefficients: Kext [1/m] = SpecExtCross [m2/g] * mass [g/m3]
-!..                           summed up for all components  
-!..    xn_2d(ispec,k)*1.e15 *species(ispec)%molwt/AVOG   [molec/m3] -> [ng/m3]
-!..                                                   [ng/m3 ] * 1e-9 -> [g/m3]
-!..=>  xn_2d(ispec,k) * species(ispec)%molwt * 1.e6 / AVOG  [g/m3]
-!.. ===========================================================================
-
-   kext  = 0.0
-   do n = 1, size(AOD_GROUP)
-      itot = AOD_GROUP(n)
-
-      kext= kext +   &
-                    xn_2d(itot,k) * species(itot)%molwt * species(itot)%ExtC        
-    enddo
-
-     kext = kext * 1.0e6 / AVOG 
-
-!     if(debug .and. (k == 18 .or. k == KMAX_MID) )  &
-!            write(6,'(a17,i4,es15.3)') '> Ext. coeff', k, kext
-
-!.. Aerosol extinction optical depth : integral over all vertical layers
-!.. [1/m} * [m]
-
-      AOD(i,j) = AOD(i,j) + kext * (z_bnd(i,j,k)-z_bnd(i,j,k+1))
-
-!      if(debug .and. (k == 18 .or. k == KMAX_MID) )  & 
-!      write(6,'(a25,i4,2es15.4,2f8.1)') '>> Kext AOD for layer', k,  &
-!                kext, AOD(i,j), z_bnd(i,j,k), z_bnd(i,j,k+1)
-
-  enddo                        !_______________ vertical layer loop
-
-  if(debug )  write(6,'(a30,2i4,es15.3)') '>>>  AOD  <<<',   &
-              i_fdom(i), j_fdom(j), AOD(i,j)
-
-
-   end subroutine AOD_calc
-
- end module AOD_PM_ml
+ end module AODrh_PM_ml
 

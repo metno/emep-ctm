@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,7 +46,7 @@ use My_Outputs_ml, only : &  ! for sitesout
 
 use DerivedFields_ml,  only : f_2d, d_2d  ! not used:, d_3d
 use Functions_ml,      only : Tpot_2_T    ! Conversion function
-use GridValues_ml,     only : sigma_bnd, sigma_mid, lb2ij, i_fdom, j_fdom &
+use GridValues_ml,     only : lb2ij, i_fdom, j_fdom &
                               , i_local, j_local, A_mid, B_mid
 use Io_ml,             only : check_file,open_file,ios &
                               , fexist, IO_SITES, IO_SONDES &
@@ -59,7 +59,7 @@ use MetFields_ml,      only : t2_nwp, th, pzpbl  &  ! output with concentrations
                               , z_bnd, z_mid, roa, Kz_m2s, q
 use MetFields_ml,      only : u_xmj, v_xmi, ps
 use ModelConstants_ml, only : NMET,PPBINV,PPTINV, KMAX_MID, MasterProc &
-                              ,KMAX_BND,PT,ATWAIR, NPROC, DEBUG_SITES &
+                              ,KMAX_BND,PT,ATWAIR, NPROC, DEBUG => DEBUG_SITES &
                               ,DomainName, RUNDOMAIN, IOU_INST, SOURCE_RECEPTOR
 use Par_ml,            only : li0,lj0,li1,lj1 &
                               ,GIMAX,GJMAX &
@@ -67,6 +67,7 @@ use Par_ml,            only : li0,lj0,li1,lj1 &
 use SmallUtils_ml,     only : find_index
 use Tabulations_ml,    only : tab_esat_Pa
 use TimeDate_ml,       only : current_date
+use TimeDate_ExtraUtil_ml,   only : date2string
 use KeyValue_ml,       only : KeyVal, KeyValue, LENKEYVAL
 
 implicit none
@@ -87,23 +88,25 @@ private :: siteswrt_out     ! Collects output from all nodes and prints
 
 INCLUDE 'mpif.h'
 INTEGER STATUS(MPI_STATUS_SIZE),INFO
-integer, private, save :: nglobal_sites, nlocal_sites
+integer, public, save :: nglobal_sites, nlocal_sites
 integer, private, save :: nglobal_sondes, nlocal_sondes
 
 ! site_gindex stores the global index n asociated
 ! with each processor and local site
 
-integer, private, save, dimension (0:NPROC-1,NSITES_MAX)  :: site_gindex
-integer, private, save, dimension (0:NPROC-1,NSONDES_MAX) :: sonde_gindex
+integer, private, save, allocatable,dimension (:,:)  :: site_gindex
+integer, private, save, allocatable,dimension (:,:) :: sonde_gindex
+
+integer, public, save, dimension (NSITES_MAX) :: &
+        site_x, site_y, site_z      &! local coordinates
+       , site_gn                        ! number in global
 
 integer, private, save, dimension (NSITES_MAX) :: &
-         site_gx, site_gy, site_gz   & ! global coordinates
-       , site_x, site_y, site_z      & ! local coordinates
-       , site_n                        ! number in global
+         site_gx, site_gy, site_gz    ! global coordinates
 integer, private, save, dimension (NSONDES_MAX) ::  &
          sonde_gx, sonde_gy   &        ! global coordinates
        , sonde_x, sonde_y     &        ! local coordinates
-       , sonde_n                       ! number in global
+       , sonde_gn                       ! number in global
 
 ! Values from My_Outputs_ml gives ... =>
 integer, private, parameter :: & ! Total No., without counting levels
@@ -113,7 +116,7 @@ integer, public, parameter :: & ! Total No., levels included
    NOUT_SITE  = NSPC_SITE * 1 &
   ,NOUT_SONDE = NSPC_SONDE* NLEVELS_SONDE
 
-character(len=50), private, save, dimension(NSITES_MAX) :: site_name
+character(len=50), public, save, dimension(NSITES_MAX) :: site_name
 character(len=50), private, save, dimension(NSONDES_MAX):: sonde_name
 character(len=20), private, save, dimension(NSPC_SITE)  :: site_species
 character(len=20), private, save, dimension(NSPC_SONDE) :: sonde_species
@@ -122,8 +125,6 @@ character(len=70), private :: errmsg ! Message text
 integer, private :: d                 ! processor index
 integer, private :: i, n, nloc, ioerr ! general integers
 
-! Debugging parameter:
-logical, private, parameter :: MY_DEBUG = .false.
 
 contains
 
@@ -143,22 +144,25 @@ subroutine sitesdef()
   sonde_gz(:) = 0
   sonde_z(:)  = 0
 
+  allocate(site_gindex(0:NPROC-1,NSITES_MAX))
+  allocate(sonde_gindex(0:NPROC-1,NSONDES_MAX))
+
   call Init_sites("sites",IO_SITES,NSITES_MAX, &
         nglobal_sites,nlocal_sites, &
         site_gindex, site_gx, site_gy, site_gz, &
-        site_x, site_y, site_z, site_n, &
+        site_x, site_y, site_z, site_gn, &
         site_name)
 
   call Init_sites("sondes",IO_SONDES,NSONDES_MAX, &
         nglobal_sondes,nlocal_sondes, &
         sonde_gindex, sonde_gx, sonde_gy, sonde_gz, &
-        sonde_x, sonde_y, sonde_z, sonde_n, &
+        sonde_x, sonde_y, sonde_z, sonde_gn, &
         sonde_name)
 
   call set_species(SITE_ADV,SITE_SHL,SITE_XTRA,site_species)
   call set_species(SONDE_ADV,SONDE_SHL,SONDE_XTRA,sonde_species)
 
-  if ( MY_DEBUG ) then
+  if ( DEBUG ) then
      write(6,*) "sitesdef After nlocal ", nlocal_sites, " on me ", me
      do i = 1, nlocal_sites
        write(6,*) "sitesdef After set_species x,y ", &
@@ -292,7 +296,8 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       s_gy(n)   = iy
       s_gz(n)   = lev
 
-      s_name(n)  = s // comment
+      s_name(n)  = s !!! remove comments// comment
+      if (DEBUG) write(6,"(a,i3,i4,a)") "sitesdef s_name : ", me, n, trim(s_name(n))
     endif
 
   enddo SITELOOP
@@ -322,17 +327,19 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       s_z(nlocal) = s_gz(n)
       s_n(nlocal) = n
 
-      if (MY_DEBUG) &
-        write(6,*) "sitesdef Site on me : ", me, " No. ", nlocal, &
-          s_gx(n), s_gy(n) , s_gz(n), " =>  ", &
+      if (DEBUG) &
+        write(6,"(a,i3,a,2i3,3i4,a,3i4)") "sitesdef Site on me : ", me, &
+         " Nos. ", n, nlocal, s_gx(n), s_gy(n) , s_gz(n), " =>  ", &
           s_x(nlocal), s_y(nlocal), s_z(nlocal)
+        write(6,"(a,i3,a,2i3,4a)") "SPODsite : "// trim(fname), me, &
+         " Nos. ", n, nlocal, " ", trim(s_name(n)), " => ", trim(s_name(nlocal))
 
      endif
 
   enddo ! nglobal
 
   ! inform me=0 of local array indices:
-  if(MY_DEBUG) write(6,*) "sitesdef ", fname, " before gc NLOCAL_SITES", &
+  if(DEBUG) write(6,*) "sitesdef ", fname, " before gc NLOCAL_SITES", &
                            me, nlocal
 
   if ( .not.MasterProc ) then
@@ -340,7 +347,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
     if(nlocal>0) call MPI_SEND(s_n, 4*nlocal, MPI_BYTE, 0, 334, &
                                MPI_COMM_WORLD, INFO)
   else
-    if(DEBUG_SITES) write(6,*) "sitesdef for me =0 LOCAL_SITES", me, nlocal
+    if(DEBUG) write(6,*) "sitesdef for me =0 LOCAL_SITES", me, nlocal
     do n = 1, nlocal
       s_gindex(me,n) = s_n(n)
     enddo
@@ -348,17 +355,17 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 333, MPI_COMM_WORLD,STATUS, INFO)
       if(nloc>0) call MPI_RECV(s_n_recv, 4*nloc, MPI_BYTE, d, 334, &
                                MPI_COMM_WORLD,STATUS, INFO)
-      if(DEBUG_SITES) write(6,*) "sitesdef: recv d ", fname, d,  &
+      if(DEBUG) write(6,*) "sitesdef: recv d ", fname, d,  &
                   " zzzz nloc : ", nloc, " zzzz me0 nlocal", nlocal
       do n = 1, nloc
         s_gindex(d,n) = s_n_recv(n)
-        if(DEBUG_SITES) write(6,*) "sitesdef: for d =", fname, d, &
+        if(DEBUG) write(6,*) "sitesdef: for d =", fname, d, &
           " nloc = ", nloc, " n: ",  n,  " gives nglob ", s_gindex(d,n)
       enddo ! n
     enddo ! d
   endif ! MasterProc
 
-  if ( DEBUG_SITES ) write(6,*) 'sitesdef on me', me, ' = ', nlocal
+  if ( DEBUG ) write(6,*) 'sitesdef on me', me, ' = ', nlocal
 
 end subroutine Init_sites
 !==================================================================== >
@@ -383,7 +390,7 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
 
   real,dimension(NOUT_SITE,NSITES_MAX) :: out  ! for output, local node
 
-  if ( DEBUG_SITES ) then
+  if ( DEBUG ) then
     write(6,*) "sitesdef Into surf  nlocal ", nlocal_sites, " on me ", me
     do i = 1, nlocal_sites
       write(6,*) "sitesdef Into surf  x,y ",site_x(i),site_y(i),&
@@ -398,7 +405,7 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
       enddo
       write(6,*) "======= site_end    ======== sitesdef ============"
     endif ! MasterProc
-  endif ! DEBUG_SITES
+  endif ! DEBUG
 
   ! assign local data to out
 
@@ -416,7 +423,6 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
       endif
     enddo
 
-    my_first_call = .false.
 
     do ispec = 1, NSHL_SITE
       out(NADV_SITE+ispec,i)  = xn_shl( SITE_SHL(ispec) ,ix,iy,iz )
@@ -442,19 +448,32 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
           "ABS(SITES OUT: '"//trim(SITE_XTRA_MISC(ispec))//"') TOO BIG" )
       end do
       do ispec = 1, NXTRA_SITE_D2D
-        nn=nn+1
         d2code      = SITE_XTRA_D2D(ispec)
         d2index     = find_index(d2code, f_2d(:)%name)
-        call CheckStop( d2index<1, "SITES D2D NOT FOUND"//trim(d2code) )
-        out(nn,i)   = d_2d(d2index,ix,iy,IOU_INST)
-        if( DEBUG_SITES ) &
-          write(6,"(a,3i3,a,i4,es10.3)") "DEBUG_SITES ", me, nn, i,&
+        nn=nn+1
+
+        if ( d2index < 1 ) then
+           if( my_first_call) write(*,*) &
+                 "WARNING: SITES D2D NOT FOUND"//trim(d2code)
+           !cycle
+           out(nn,i)   = -999.9
+        else
+           !call CheckStop( d2index<1, "SITES D2D NOT FOUND"//trim(d2code) )
+           out(nn,i)   = d_2d(d2index,ix,iy,IOU_INST)
+        end if
+
+        !May25 call CheckStop( d2index<1, "SITES D2D NOT FOUND"//trim(d2code) )
+        !May25 out(nn,i)   = d_2d(d2index,ix,iy,IOU_INST)
+        if( DEBUG ) &
+          write(6,"(a,3i3,a,i4,es10.3)") "DEBUG ", me, nn, i,&
             trim(d2code), d2index, out(nn,i)
         call CheckStop( abs(out(nn,i))>1.0e99, &
           "ABS(SITES OUT: '"//trim(SITE_XTRA_D2D(ispec))//"') TOO BIG" )
       enddo
     endif
   enddo
+
+    my_first_call = .false.
 
   ! collect data into gout on me=0 t
 
@@ -478,13 +497,13 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
 
   ! Local variables
   integer :: n, i, k,  ix, iy, nn, ispec   ! Site and chem indices
-  integer, parameter ::  KTOP_SONDE = KMAX_MID - NLEVELS_SONDE + 1
+  integer ::  KTOP_SONDE 
   integer, dimension(NLEVELS_SONDE)      :: itemp
   real, dimension(KMAX_MID)              :: pp, temp, qsat, rh, sum_PM, sum_NOy
   real, dimension(NOUT_SONDE,NSONDES_MAX):: out
 
   ! Consistency check
-
+  KTOP_SONDE = KMAX_MID - NLEVELS_SONDE + 1
   do ispec = 1, NXTRA_SONDE
     select case ( SONDE_XTRA(ispec) )
       case ( "PM25 " ,"PMco " , "NOy ", "RH ","z_mid", "p_mid", &
@@ -497,7 +516,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
   enddo
 
   do i = 1, nlocal_sondes
-    n  = sonde_n(i)
+    n  = sonde_gn(i)
     ix = sonde_x(i)
     iy = sonde_y(i)
     nn = 0
@@ -624,12 +643,14 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
 
   ! Local
   real,dimension(nout,nglobal) :: g_out ! for output, collected
-  integer :: nglob, nloc        ! Site indices
+  integer :: nglob, nloc         ! Site indices
   character(len=40)  :: outfile
   character(len=4)   :: suffix
   integer, parameter :: NTYPES = 2      ! No. types, now 2 (sites, sondes)
   integer ::  type=-1                   ! = 1 for sites, 2 for sondes
   integer, save, dimension(NTYPES):: prev_month = (/ -99, -99 /) ! Initialise
+  integer, save, dimension(NTYPES):: prev_year = (/ -99, -99 /) ! Initialise
+  integer :: ii
 
   select case (fname)
     case ("sites" )
@@ -641,28 +662,33 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       return
   end select
 
-  if ( MasterProc .and. current_date%month /= prev_month(type)) then
+!  if ( MasterProc .and. current_date%month /= prev_month(type)) then
+  if (MasterProc .and. current_date%year /= prev_year(type) ) then
 
-    if ( prev_month(type) > 0 ) close(io_num)  ! Close last-months file
-    prev_month(type) = current_date%month
+     if ( prev_year(type) > 0 ) close(io_num)  ! Close last-months file
+     prev_year(type) = current_date%year
 
-    ! Open new file for write-out
+     ! Open new file for write-out
 
-    write(suffix,fmt="(2i2.2)") current_date%month, &
-                                modulo(current_date%year,100)
-    outfile = fname // "." // suffix
-    open(file=outfile,unit=io_num,action="write")
+     write(suffix,fmt="(i4)") current_date%year
+     outfile = fname // "_" // suffix // ".csv"
 
-    write(io_num,"(i3,2x,a,a, 4i4)") nglobal, fname, " in domain",RUNDOMAIN
-    write(io_num,"(i3,a)") f, " Hours between outputs"
+     open(file=outfile,unit=io_num,action="write",form='FORMATTED')
 
-    write(io_num,"(1(a50,3i4))")(s_name(n), s_gx(n), s_gy(n),s_gz(n),&
-                                n=1,nglobal)
+     write(io_num,"(i3,2x,a,a, 4i4)") nglobal, fname, " in domain",RUNDOMAIN
+     write(io_num,"(i3,a)") f, " Hours between outputs"
 
-    write(io_num,"(i3,a)") size(s_species), " Variables:"
-    write(io_num,"(1(i3,2x,a))")(n, s_species(n), n=1,size(s_species))
+     do n = 1, nglobal
+        write(io_num,'(a50,3(",",i4))') s_name(n), s_gx(n), s_gy(n),s_gz(n)
+     end do ! nglobal
 
-  endif ! New month
+     write(io_num,'(i3,a)') size(s_species), " Variables units: ppb"
+     !MV write(io_num,'(a9,<size(s_species)>(",",a))')"site,date",(trim(s_species(i)),i=1,size(s_species))
+     write(io_num,'(9999a)')"site,date", (",", (trim(s_species(i)) ),i=1,size(s_species))
+
+  endif ! first call
+
+
 
   if ( .not.MasterProc ) then   ! send data to me=0 (MasterProc)
 
@@ -672,7 +698,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   else ! MasterProc
 
     ! first, assign me=0 local data to g_out
-    if ( DEBUG_SITES ) print *, "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
+    if ( DEBUG ) print *, "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
 
     do n = 1, nlocal
       nglob = s_gindex(0,n)
@@ -695,8 +721,15 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
 
     ! Final output
     do n = 1, nglobal
-      write(io_num,"(a20,i5,3i3,i5)") s_name(n), current_date
-      write(io_num,"(10es11.3)") g_out(:,n)
+
+!! Massimo Vieno change the ouput style make the output csv
+!! Oct 2012 Formatting changed (DS,AMV) for gfortran compliance
+!! and compactness. 
+         write (io_num,'(a,9999(:,",",es10.3))') & 
+          trim(s_name(n)) // date2string(", DD/MM/YYYY hh:00",current_date),& 
+             ( g_out(ii,n), ii =1, nout ) 
+           ! (The ':' format control item will stop processing once the g_out
+           !  is done, avoiding runtime warnings.)
     enddo ! n
 
   endif ! MasterProc

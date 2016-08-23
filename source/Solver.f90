@@ -1,9 +1,10 @@
+
 ! <Solver.f90 - A component of the EMEP MSC-W Unified Eulerian
 !          Chemical transport Model>
-!*****************************************************************************! 
-!* 
+!*****************************************************************************!
+!*
 !*  Copyright (C) 2007-2011 met.no
-!* 
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +12,20 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
 !_____________________________________________________________________________
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
@@ -35,8 +36,8 @@
 
   !=======================================================================!
   ! The following chemical solver uses variable chemical timesteps and
-  ! is based on the scheme suggested in J.G. Verwer and D. Simpson (1995) 
-  ! "Explicit methods for stiff ODEs from atmospheric chemistry", 
+  ! is based on the scheme suggested in J.G. Verwer and D. Simpson (1995)
+  ! "Explicit methods for stiff ODEs from atmospheric chemistry",
   ! Aplied Numerical Mathematics 18 (1995) 413.
   !
   ! Note that the exact formula used have been re-arranged for greater
@@ -45,18 +46,18 @@
   ! Note: decoupling of (NO3,N2O5), (PAN,CH3COO2), (MPAN,MACRO2)
   ! variable timestep (Peter Wind)
   !=======================================================================!
- 
-    use Aqueous_ml,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3   
-    use Biogenics_ml,      only: BIO_ISOP, BIO_TERP
+
+    use Aqueous_ml,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3
     use CheckStop_ml,      only: CheckStop
     use DefPhotolysis_ml         ! => IDHNO3, etc.
-    use EmisDef_ml,        only: QSSFI, QSSCO, QSSGI
-    use Emissions_ml,      only: KEMISTOP    
+    !ESX use EmisDef_ml,        only: QSSFI, QSSCO, QDUFI, QDUCO, QPOL, &
+    !ESX                              QROADDUST_FI, QROADDUST_CO
+    use Emissions_ml,      only: KEMISTOP
     use ChemGroups_ml,     only: RO2_POOL, RO2_GROUP
     use ChemSpecs_tot_ml           ! => NSPEC_TOT, O3, NO2, etc.
-    use Chemfields_ml, only : NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn 
+    use Chemfields_ml, only : NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
     use ChemRates_rct_ml,   only: rct
-    use ChemRates_rcmisc_ml,only: rcmisc
+    !ESX use ChemRates_rcmisc_ml,only: rcmisc
     use GridValues_ml,     only : GRIDWIDTH_M
     use Io_ml,             only : IO_LOG, datewrite
     use ModelConstants_ml, only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv, &
@@ -65,13 +66,11 @@
     use Par_ml,            only: me, MAXLIMAX, MAXLJMAX
     use PhysicalConstants_ml, only:  RGAS_J
     use Setup_1dfields_ml, only: rcemis,        & ! photolysis, emissions
-                                 rc_Rn222,      & ! Pb210
-                                 xn_2d,         & 
-                                 rh,            & 
+                                 xn_2d,         &
+                                 rh,            &
                                  Fgas,   & ! fraction in gas-phase, for SOA
-                                 rcss,amk,      & ! Sea salt emission rate
+                                 amk
                                  !FUTURE rcnh3,         & ! NH3emis
-                                 rcbio            ! bvoc
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
     use ChemFunctions_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
   implicit none
@@ -84,7 +83,7 @@
   integer::  STATUS(MPI_STATUS_SIZE),INFO
      integer, parameter:: nchemMAX=15
   integer, parameter:: NUM_INITCHEM=5    ! Number of initial time-steps with shorter dt
-  real, save::         DT_INITCHEM=20.0  ! shorter dt for initial time-steps, reduced for 
+  real, save::         DT_INITCHEM=20.0  ! shorter dt for initial time-steps, reduced for
   integer, parameter  :: EXTRA_ITER = 1    ! Set > 1 for even more iteration
 
 
@@ -99,8 +98,8 @@ contains
     integer, intent(in) ::  i,j       ! Coordinates (needed for Dchem)
     logical, intent(in) :: debug_flag
 
-    real, dimension(NSPEC_TOT,KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX), save :: &
-                    Dchem=0.0  ! Concentration increments due to chemistry
+    real, dimension(:,:,:,:), save,allocatable :: &
+                    Dchem  ! Concentration increments due to chemistry
 
     logical, save ::  first_call = .true.
 
@@ -110,12 +109,12 @@ contains
     integer, dimension(KCHEMTOP:KMAX_MID) :: toiter
     integer ::  k, ichem, iter,n    ! Loop indices
     integer, save ::  nchem         ! No chem time-steps
-    real    ::  dt2 
+    real    ::  dt2
     real    ::  P, L                ! Production, loss terms
     real    :: xextrapol   !help variable
 
     ! Concentrations : xold=old, x=current, xnew=predicted
-    ! - dimensioned to have same size as "x" 
+    ! - dimensioned to have same size as "x"
 
     real, dimension(NSPEC_TOT)      :: &
                         x, xold ,xnew   ! Working array [molecules/cm3]
@@ -123,11 +122,12 @@ contains
                         dti             ! variable timestep*(c+1)/(c+2)
     real, dimension(nchemMAX), save :: &
                         coeff1,coeff2,cc ! coefficients for variable timestep
-    integer :: nextraiter
 
 !======================================================
 
     if ( first_call ) then
+       allocate( Dchem(NSPEC_TOT,KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX))
+       Dchem=0.0
        call makedt(dti,nchem,coeff1,coeff2,cc)
        if ( MasterProc ) then
            write(IO_LOG,"(a,i4)") 'Chem dts: nchemMAX: ', nchemMAX
@@ -143,15 +143,15 @@ contains
 !======================================================
 
 
-    !**  toiter gives the number of iterations used in TWOSTEP. 
+    !**  toiter gives the number of iterations used in TWOSTEP.
     !**  Use more iterations near ground:
 
     toiter(KCHEMTOP:5)        = 1    ! Upper levels - slow chemistry
-    toiter(6:KEMISTOP-1)      = 2    ! Medium and cloud levels 
+    toiter(6:KEMISTOP-1)      = 2    ! Medium and cloud levels
     toiter(KEMISTOP:KMAX_MID) = 3    ! Near-ground, emis levels
 
    ! to get better accuracy if wanted (at CPU cost)
-    toiter = toiter * EXTRA_ITER  
+    toiter = toiter * EXTRA_ITER
 
 
     !** Establishment of initial conditions:
@@ -166,7 +166,7 @@ contains
        x(:)    = xn_2d(:,k) - Dchem(:,k,i,j)*dti(1)*1.5
        x(:)    = max (x(:), 0.0)
 
- 
+
        !*************************************
        !     Start of integration loop      *
        !*************************************
@@ -178,6 +178,7 @@ contains
 
              xextrapol = xnew(n) + (xnew(n)-x(n)) *cc(ichem)
              xold(n) = coeff1(ichem)*xnew(n) - coeff2(ichem)*x(n)
+             xold(n) = max( xold(n), 0.0 )
              x(n) = xnew(n)
              xnew(n) = xextrapol
 
@@ -185,7 +186,7 @@ contains
 
           dt2  =  dti(ichem) !*(1.0+cc(ichem))/(1.0+2.0*cc(ichem))
 
-          where ( xnew(:) < CPINIT  ) 
+          where ( xnew(:) < CPINIT  )
              xnew(:) = CPINIT
           end where
 
@@ -222,14 +223,14 @@ contains
                 !endif
             end do !! End iterations
           ! Just before SO4, look after slower? species
-          end if ! DEBUG_DRYRUN 
 
           !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
            include 'CM_Reactions2.inc'
           !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          end if ! DEBUG_DRYRUN
 
-       end do ! ichem 
- 
+       end do ! ichem
+
        !*************************************
        !     End of integration loop        *
        !*************************************
@@ -240,10 +241,6 @@ contains
             Dchem(:,k,i,j) = (xnew(:) - xn_2d(:,k))*dt_advec_inv
             xn_2d(:,k) = xnew(:)
 
-        if (debug_flag.and.k==KMAX_MID) then
-          write(*,"(a,2i4,3es10.3)") "SOLVER ", C5H8, BIO_ISOP,&
-             RCEMIS(C5H8,K), RCBIO(BIO_ISOP,K), xn_2d(C5H8,k)
-        end if
 
     enddo ! End of vertical k-loop
 
@@ -270,9 +267,9 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
  real, dimension(nchemMAX),intent(out) :: dti,coeff1,coeff2,cc
  integer,                  intent(out) :: nchem
 
- real    :: ttot,step,dt(nchemMAX)
+ real    :: ttot, dt(nchemMAX)
  real :: dt_init   ! time (seconds) with initially short time-steps
- integer :: i,j
+ integer :: i
 !_________________________
 
   nchem=nchemMax !number of chemical timesteps inside dt_advec
@@ -288,9 +285,9 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 !/ Used for >21km resolution and dt_advec>520 seconds:
 !.. timesteps from 6 to nchem
 
-   dt=(dt_advec - dt_init )/(nchem-NUM_INITCHEM) 
+   dt=(dt_advec - dt_init )/(nchem-NUM_INITCHEM)
 
-   dt(1:NUM_INITCHEM)=DT_INITCHEM     !.. first five timesteps 
+   dt(1:NUM_INITCHEM)=DT_INITCHEM     !.. first five timesteps
 
    if(dt_advec<= dt_init )then
       nchem=int(dt_advec/DT_INITCHEM)+1
@@ -322,7 +319,7 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 
     endif
 
-!.. Help variables from Verwer & Simpson 
+!.. Help variables from Verwer & Simpson
        cc(1)=1.0
        coeff2(1)=1.0/(cc(1)**2+2*cc(1))
        coeff1(1)=(cc(1)+1)**2*coeff2(1)

@@ -38,7 +38,7 @@ use My_Outputs_ml,     only: NBDATES, wanted_dates_inst,            &
 use Io_ml,             only: IO_WRTCHEM, datewrite
 use ModelConstants_ml, only: nprint, END_OF_EMEPDAY, KMAX_MID, MasterProc&
                             ,DEBUG => DEBUG_OUTPUTCHEM &
-                            ,IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY
+                            ,IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_MAX_MAX
 use NetCDF_ml,         only: CloseNetCDF, Out_netCDF
 use OwnDataTypes_ml,   only: Deriv, print_deriv_type
 use Par_ml,            only: MAXLIMAX,MAXLJMAX,GIMAX,GJMAX,     &
@@ -188,13 +188,25 @@ end subroutine Wrtchem
 
 subroutine Output_fields(iotyp)
   integer, intent(in) :: iotyp
+  logical, dimension(IOU_MAX_MAX),save       :: myfirstcall = .true.
+  logical             :: Init_Only
+  if(myfirstcall(iotyp))then
+     !only predefine the fields. For increased performance 
+     Init_Only = .true.
+     if(num_deriv2d > 0) call Output_f2d(iotyp,num_deriv2d,nav_2d,f_2d,d_2d,Init_Only)
+     if(num_deriv3d > 0) call Output_f3d(iotyp,num_deriv3d,nav_3d,f_3d,d_3d,Init_Only)
+     myfirstcall(iotyp) = .false.
+     IF(DEBUG.and.MasterProc)write(*,*)'2d and 3D OUTPUT INITIALIZED',iotyp
+  endif
+  Init_Only = .false.
+  IF(DEBUG.and.MasterProc)write(*,*)'2d and 3D OUTPUT WRITING',iotyp
   !*** 2D fields, e.g. surface SO2, SO4, NO2, NO3 etc.; AOT, fluxes
   !--------------------
-  if(num_deriv2d > 0) call Output_f2d(iotyp,num_deriv2d,nav_2d,f_2d,d_2d)
+  if(num_deriv2d > 0) call Output_f2d(iotyp,num_deriv2d,nav_2d,f_2d,d_2d,Init_Only)
 
   !*** 3D concentration fields, e.g. O3
   !--------------------
-  if(num_deriv3d > 0) call Output_f3d(iotyp,num_deriv3d,nav_3d,f_3d,d_3d)
+  if(num_deriv3d > 0) call Output_f3d(iotyp,num_deriv3d,nav_3d,f_3d,d_3d,Init_Only)
 
   call CloseNetCDF
 end subroutine Output_fields
@@ -207,7 +219,7 @@ function wanted_iou(iou,iotype) result(wanted)
   if(present(iotype))wanted=wanted.and.(iou<=iotype)
 end function wanted_iou
 
-subroutine Output_f2d (iotyp, dim, nav, def, dat)
+subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
 !---------------------------------------------------------------------
 ! Sends fields to NetCDF output routines
 !---------------------------------------------------------------------
@@ -216,13 +228,13 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat)
   integer, dimension(dim,LENOUT2D),intent(in) :: nav ! No. items averaged
   type(Deriv), dimension(dim),     intent(in) :: def ! Definition of fields
   real, dimension(dim,MAXLIMAX,MAXLJMAX,LENOUT2D), intent(in) :: dat
+  logical,                         intent(in) :: Init_Only! only define fields
 
   integer :: icmp       ! component index
   real    :: scale      ! Scaling factor
 !---------------------------------------------------------------------
 
   do icmp = 1, dim
-    !FEB2011. QUERY on INST ??
     if ( wanted_iou(iotyp,def(icmp)%iotype) ) then
       scale  = def(icmp)%scale
       if (iotyp /= IOU_INST ) scale = scale / max(1,nav(icmp,iotyp))
@@ -240,13 +252,13 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat)
           endif
         endif
 
-      call Out_netCDF(iotyp,def(icmp),2,1,dat(icmp,:,:,iotyp),scale)
+      call Out_netCDF(iotyp,def(icmp),2,1,dat(icmp,:,:,iotyp),scale,create_var_only=Init_Only)
     endif     ! wanted
   enddo       ! component loop
 
 end subroutine Output_f2d
 
-subroutine  Output_f3d (iotyp, dim, nav, def, dat)
+subroutine  Output_f3d (iotyp, dim, nav, def, dat, Init_Only)
 !---------------------------------------------------------------------
 ! Sends fields to NetCDF output routines
 !---------------------------------------------------------------------
@@ -256,6 +268,7 @@ subroutine  Output_f3d (iotyp, dim, nav, def, dat)
   integer, dimension(dim,LENOUT3D),intent(in) :: nav ! No. items averaged
   type(Deriv), dimension(dim),     intent(in) :: def ! definition of fields
   real, dimension(dim,MAXLIMAX,MAXLJMAX,KMAX_MID,LENOUT3D), intent(in):: dat
+  logical,                         intent(in) :: Init_Only! only define fields
 
   integer :: icmp       ! component index
   real    :: scale      ! Scaling factor
@@ -267,7 +280,7 @@ subroutine  Output_f3d (iotyp, dim, nav, def, dat)
       scale = def(icmp)%scale
       if (iotyp /= IOU_INST) scale = scale /max(1,nav(icmp,iotyp))
 
-      call Out_netCDF(iotyp,def(icmp),3,KMAX_MID,dat(icmp,:,:,:,iotyp),scale)
+      call Out_netCDF(iotyp,def(icmp),3,KMAX_MID,dat(icmp,:,:,:,iotyp),scale,create_var_only=Init_Only)
     endif     ! wanted
   enddo       ! component loop
 

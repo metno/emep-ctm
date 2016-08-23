@@ -56,8 +56,8 @@
   integer, public, parameter :: &
              NRCPHOT      = 17   ! Number of photolytic reactions
    
-   real, public, dimension(NRCPHOT,KCHEMTOP:KMAX_MID), &
-        save :: rcphot       ! photolysis rates    -   main output
+   real, allocatable,save,public, dimension(:,:) &
+         :: rcphot       ! photolysis rates    -   main output
 
    real, public, save :: sum_rcphot     !  for debug only
    logical, public, parameter :: DEBUG_DJ = .false.
@@ -66,14 +66,14 @@
                HORIZON    = 90     & ! Integer solar zenith angle at sunset
              , CLOUDTOP   = 6        ! k-value above which clear-sky dj assumed
                                      ! (since..... Joffen?)
-
+   integer, parameter, private :: KMAX20=20
    integer, parameter, private :: &
                NPHODIS = 17       &  ! Max possible NRCPHOT
               ,NLAT    = 6           ! No. latitude outputs
 
-    real, private, dimension(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON,NLAT) :: dj
+    real, allocatable,save, private, dimension(:,:,:,:) :: dj
 
-    real, private, dimension(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON) :: &
+    real, allocatable,save, private, dimension(:,:,:) :: &
                    djcl1        &
                   ,djcl3
 
@@ -108,10 +108,15 @@
         real myz
         character*20 fname1, fname2, fname3
 
+        logical,save:: first_call=.true.
 
 
-
-
+        if(first_call)then
+           allocate(rcphot(NRCPHOT,KCHEMTOP:KMAX_MID))
+           allocate(dj(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON,NLAT))
+           allocate(djcl1(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON))
+           allocate(djcl3(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON))
+        endif
 !    Open, read and broadcast clear sky rates
 !---------------
 
@@ -130,10 +135,16 @@
 
           do la = 1,NLAT
             do izn = 1,HORIZON
-              do k = 1,KCHEMTOP
-                read(IO_DJ,999) myz,(dj(nr,KCHEMTOP,izn,la),nr=1,NPHODIS)
-              end do
-              do k = KCHEMTOP+1,KMAX_MID
+               do k = 1,KCHEMTOP
+                  read(IO_DJ,999) myz,(dj(nr,KCHEMTOP,izn,la),nr=1,NPHODIS)
+               end do
+               do k = 2,KMAX_MID-KMAX20+2
+                  do nr=1,NPHODIS
+                     dj(nr,k,izn,la)=dj(nr,KCHEMTOP,izn,la)
+                  enddo
+               enddo
+              do k = KMAX_MID-KMAX20+3,KMAX_MID
+!TEMPORARY FIX  do k = KCHEMTOP+1,KMAX_MID
                 read(IO_DJ,999) myz,(dj(nr,k,izn,la),nr=1,NPHODIS)
               end do   ! k
             end do    ! izn
@@ -162,7 +173,13 @@
             do k = 1,KCHEMTOP
               read(IO_DJ,999) myz,(djcl1(nr,KCHEMTOP,izn),nr=1,NPHODIS)
             end do
-            do k = KCHEMTOP+1,KMAX_MID
+               do k = 2,KMAX_MID-KMAX20+2
+                  do nr=1,NPHODIS
+                     djcl1(nr,K,izn)=djcl1(nr,KCHEMTOP,izn)
+                  enddo
+               enddo
+              do k = KMAX_MID-KMAX20+3,KMAX_MID
+!TEMPORARY FIX              do k = KCHEMTOP+1,KMAX_MID
               read(IO_DJ,999) myz,(djcl1(nr,k,izn),nr=1,NPHODIS)
             end do
           end do  ! izn
@@ -198,7 +215,13 @@
             do k = 1,KCHEMTOP
               read(IO_DJ,999) myz,(djcl3(nr,KCHEMTOP,izn),nr=1,NPHODIS)
             end do
-            do k = KCHEMTOP+1,KMAX_MID
+               do k = 2,KMAX_MID-KMAX20+2
+                  do nr=1,NPHODIS
+                     djcl3(nr,K,izn)=djcl3(nr,KCHEMTOP,izn)
+                  enddo
+               enddo
+              do k = KMAX_MID-KMAX20+3,KMAX_MID
+!TEMPORARY FIX              do k = KCHEMTOP+1,KMAX_MID
               read(IO_DJ,999) myz,(djcl3(nr,k,izn),nr=1,NPHODIS)
             end do  ! k
           end do   ! izn
@@ -223,7 +246,7 @@
 !           write(6,*) (djcl3(1,k,nr),nr=1,4)
 !         end do
 !       end if
-
+        first_call=.false.
         return
 
         end subroutine readdiss

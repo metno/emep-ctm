@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,20 +43,33 @@
 !  
 !  Sets the day/night emissions variation in day_factor
 !
-!  D. Simpson,    3/2/99
+!  D. Simpson,    3/2/99-11 0 H. Fagerli, 2011
 !_____________________________________________________________________________
+
   use CheckStop_ml, only : CheckStop
   use Country_ml,   only : NLAND
-  use My_Emis_ml,   only : NEMIS_FILES, EMIS_NAME
-  use EmisDef_ml,   only : NSECTORS
+  use EmisDef_ml,   only : NSECTORS, NEMIS_FILE, EMIS_FILE, ISNAP_DOM
+  use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
+  use InterpolationRoutines_ml, only : Averageconserved_interpolate
+  use Met_ml,       only : Getmeteofield
+  use ModelConstants_ml, only : MasterProc, DEBUG => DEBUG_EMISTIMEFACS
+  use ModelConstants_ml, only : IIFULLDOM, JJFULLDOM
+  use ModelConstants_ml, only : iyr_trend
+  use ModelConstants_ml, only : INERIS_SNAP1, INERIS_SNAP2
+  use NetCDF_ml,    only : GetCDF 
+  use Par_ml,       only : MAXLIMAX,MAXLJMAX, me, li0, lj0, li1, lj1
+  use Par_ml,       only : IRUNBEG, JRUNBEG, MSG_READ8
+  use PhysicalConstants_ml, only : PI
+  use Io_ml,        only :            &
+                     open_file,       & ! subroutine
+                     check_file,       & ! subroutine
+                     PrintLog,        &
+                     ios,  IO_TIMEFACS  ! i/o error number, i/o label
   use TimeDate_ml,  only:            &  ! subroutine, sets:
                      date,           &  ! date-type definition
                      nmdays, nydays, &  ! days per month (12), days per year
                      day_of_week,&      ! weekday
                      day_of_year        ! day count in year
-  use Io_ml,        only :            &
-                     open_file,       & ! subroutine
-                     ios,  IO_TIMEFACS  ! i/o error number, i/o label
 
   implicit none
   private
@@ -65,21 +78,36 @@
 
   public :: NewDayFactors
   public :: timefactors
+  public :: DegreeDayFactors
 
   !-- time factor stuff: 
 
   real, public, save, &
-     dimension(NLAND,NSECTORS,NEMIS_FILES) :: timefac ! overall emission 
+     dimension(NLAND,NSECTORS,NEMIS_FILE) :: timefac ! overall emission 
                                                       ! timefactor 
                                                       ! calculated daily
   real, public, save,  &
-     dimension(NLAND,12,NSECTORS,NEMIS_FILES) :: fac_emm  ! Monthly factors
+     dimension(NLAND,12,NSECTORS,NEMIS_FILE) :: fac_emm  ! Monthly factors
+
+ ! Hourly for each day ! From EURODELTA/INERIS
   real, public, save,  &
-     dimension(NLAND, 7,NSECTORS,NEMIS_FILES) :: fac_edd  ! Daily factors
+     dimension(NSECTORS,24,7) :: fac_ehh24x7  !  Hour factors for 7 days
 
-  real, public, save, dimension(NSECTORS,0:1):: day_factor  ! Day/night factor 
+ ! We keep track of min value for degree-day work
+ !
+  real, public, save,  &
+     dimension(NLAND,NSECTORS,NEMIS_FILE) :: fac_min ! Min of Monthly factors
+ !
+  real, public, save,  &
+     dimension(12) :: fac_cemm  ! Change in monthly factors over the years
 
-  logical, private, parameter :: DEBUG = .false.
+  real, public, save,  &
+     dimension(NLAND, 7,NSECTORS,NEMIS_FILE) :: fac_edd  ! Daily factors
+
+  ! Heating-degree day factor for SNAP-2. Independent of country:
+  logical, public, save :: Gridded_SNAP2_Factors = .false.
+  real, public, allocatable,dimension (:,:), save :: gridfac_HDD
+  !real, private, dimension (MAXLIMAX,MAXLJMAX), save :: tmpt2
 
   ! Used for general file calls and mpi routines below
 
@@ -107,33 +135,20 @@ contains
 
   !-- local
   integer ::  inland, insec     ! Country and sector value read from femis
-  integer ::  i, ic, isec, n, idd, iday, mm, mm2 ! Loop and count variables
+  integer ::  i, ic, isec, n 
+  integer ::  idd, idd2, ihh, iday, mm, mm2 , mm0! Loop and count variables
   integer ::  iemis             ! emission count variables
 
   integer :: weekday            ! 1=monday, 2=tuesday etc.
   real    :: xday, sumfac       ! used in interpolation, testing
+  real    :: tmp24(24)          ! used for hourly factors
   character(len=100) :: errmsg
+  character(len=200) :: inputline
+  real :: fracchange
+  real, dimension(NLAND,NEMIS_FILE):: sumfacc !factor to normalize monthly changes                                                         
+  real :: Start, Endval, Average, x
 
-
-! Factor giving nighttime  emission ratio. 
-! Note this is hard-coded with NSECTORS=11. 
-
-   real, parameter, dimension(NSECTORS) ::  & 
-        DAY_NIGHT = (/      & 
-                       1.0  &! 1.  Power production
-                     , 0.8  &! 2.  Comm/res. combustion
-                     , 0.8  &! 3.  Industrial combustion
-                     , 1.0  &! 4.  Non-industrial combustion
-                     , 1.0  &! 5.  Processes
-                     , 0.5  &! 6.  Solvent use
-                     , 0.5  &! 7.  Road transport
-                     , 0.8  &! 8.  Other transport
-                     , 1.0  &! 9.  Waste
-                     , 0.6  &! 10. Agriculture
-                     , 1.0  &! 11. Nature
-                     /)
-
-  if (DEBUG) write(unit=6,fmt=*) "into timefactors.f "
+  if (DEBUG) write(unit=6,fmt=*) "into timefactors "
 
    call CheckStop( nydays < 365, &
       "Timefactors: ERR:Call set_nmdays before timefactors?")
@@ -143,13 +158,32 @@ contains
 
 
 !  #################################
-!  1) Read in Monthly factors
+!  1) Read in Monthly factors, and determine min value (for baseload)
 
    fac_emm(:,:,:,:) = 1.0
+   fac_min(:,:,:) = 1.0
 
-   do iemis = 1, NEMIS_FILES
+  ! Summer/winter SNAP1 ratios reduced from 1990 to 2010:
+   fac_cemm(:) = 1.0
+   fracchange=0.005*(iyr_trend -1990)
+   fracchange=max(0.0,fracchange) !do not change before 1990
+   fracchange=min(0.1,fracchange) !stop change after 2010 
+                                  !equal 1.1/0.9=1.22 summer/winter change
+   write(unit=6,fmt=*) "Change summer/winter ratio in SNAP1 by ", fracchange
 
-       fname2 = "MonthlyFac." // trim ( EMIS_NAME(iemis) )
+   do mm=1,12
+      !Assume max change for august and february
+      fac_cemm(mm)  = 1.0 + fracchange * cos ( 2 * PI * (mm - 8)/ 12.0 )
+      write(unit=6,fmt="(a,i3,f8.3,a,f8.3)") "Change in fac_cemm ", mm,fac_cemm(mm)
+   enddo
+   write(*,"(a,f8.4)") "Mean fac_cemm ", sum( fac_cemm(:) )/12.0
+
+   if( INERIS_SNAP1 ) fac_cemm(:) = 1.0
+
+
+   do iemis = 1, NEMIS_FILE
+
+       fname2 = "MonthlyFac." // trim ( EMIS_FILE(iemis) )
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
 
        call CheckStop( ios, &
@@ -161,6 +195,14 @@ contains
              (fac_emm(inland,mm,insec,iemis),mm=1,12)
            if ( ios <  0 ) exit     ! End of file
 
+           !defined after renormalization and send to al processors:
+           ! fac_min(inland,insec,iemis) = minval( fac_emm(inland,:,insec,iemis) )
+
+           if( DEBUG.and.insec==ISNAP_DOM  ) &
+              write(*,"(a,3i3,f7.3,a,12f6.2)") "emm tfac ", &
+               inland,insec,iemis, fac_min(inland,insec,iemis),&
+                 " : ",  ( fac_emm(inland,mm,insec,iemis), mm=1,12)
+
            call CheckStop( ios, "Timefactors: Read error in Monthlyfac")
 
            n = n + 1
@@ -168,6 +210,20 @@ contains
 
        close(IO_TIMEFACS)
 
+      ! Apply change in monthly factors for SNAP 1
+       sumfacc(:,:)=0.0
+       do ic = 1, NLAND
+          do mm=1,12
+               fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*fac_cemm(mm)
+               sumfacc(ic,iemis)=sumfacc(ic,iemis)+fac_emm(ic,mm,1,iemis)
+          enddo
+       enddo
+      ! normalize
+       do ic = 1, NLAND
+          do mm=1,12
+             fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*12./sumfacc(ic,iemis)
+          enddo
+       enddo
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2 
    enddo  ! iemis
 
@@ -177,13 +233,12 @@ contains
 
   fac_edd(:,:,:,:) = 1.0
 
-  do iemis = 1, NEMIS_FILES
+  do iemis = 1, NEMIS_FILE
 
-       fname2 = "DailyFac." // trim ( EMIS_NAME(iemis) )
+       fname2 = "DailyFac." // trim ( EMIS_FILE(iemis) )
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
 
-       call CheckStop( ios, &
-        "Timefactors: Opening error in Dailyfac")
+       call CheckStop( ios, "Timefactors: Opening error in Dailyfac")
 
        n = 0
        do
@@ -206,10 +261,70 @@ contains
        close(IO_TIMEFACS)
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2
 
-  enddo  ! NEMIS_FILES
+  enddo  ! NEMIS_FILE
+
+!  #################################
+!  3) Read in hourly (24x7) factors, options set in run script.
+   ! INERIS option has 11x24x7 emissions factor
+   ! TNO2005 option has 11x24 
+   ! EMEP2003 option has very simple day night
+!
+       fname2 = "HOURLY-FACS"  ! From EURODELTA/INERIS/TNO or EMEP2003
+       write(unit=6,fmt=*) "Starting HOURLY-FACS"
+       call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
+
+       fac_ehh24x7 = -999.
+
+       n = 0
+       do 
+          read(IO_TIMEFACS,"(a)",iostat=ios) inputline
+          n = n + 1
+          if(DEBUG)write(*,*) "HourlyFacs ", n, trim(inputline)
+          if ( ios <  0 ) exit     ! End of file
+          if( index(inputline,"#")>0 ) then ! Headers
+            if(n==1) call PrintLog(trim(inputline))
+            cycle
+          else
+            read(inputline,fmt=*,iostat=ios) idd, insec, &
+              (tmp24(ihh),ihh=1,24)
+            if( DEBUG ) write(*,*) "HOURLY=> ",idd, insec, tmp24(1), tmp24(13)
+          end if
+
+            if(  idd == 0 ) then ! same values very day
+              do idd2 = 1, 7
+                fac_ehh24x7(insec,:,idd2) = tmp24(:)
+              end do
+              idd = 1 ! Used later
+            else
+                fac_ehh24x7(insec,:,idd) = tmp24(:)
+            end if
+
+             !(fac_ehh24x7(insec,ihh,idd),ihh=1,24)
+
+           ! Use sumfac for mean, and normalise within each day/sector
+           ! (Sector 10 had a sum of 1.00625)
+           sumfac = sum(fac_ehh24x7(insec,:,idd))/24.0
+           if(DEBUG .and. MasterProc) write(*,"(a,2i3,3f12.5)") &
+              'HOURLY-FACS mean min max', idd, insec, sumfac, &
+                minval(fac_ehh24x7(insec,:,idd)), &
+                maxval(fac_ehh24x7(insec,:,idd))
+
+           fac_ehh24x7(insec,:,idd) = fac_ehh24x7(insec,:,idd) * 1.0/sumfac
+
+       !    if ( ios <  0 ) exit     ! End of file
+       end do
+       !do insec=1, 11; do idd   =1, 7; do ihh   =1, 24
+       !    if( fac_ehh24x7(insec,ihh,idd)  < 0.0 ) then 
+       !       print *, "Unfilled ", insec, idd, ihh, fac_ehh24x7(insec,ihh,idd)
+       !    end if
+       !end do; end do; end do
+       !call CheckStop ( any(fac_ehh24x7 < 0.0 ) , "Unfilled efac_ehh24x7")
+       if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2
+       call CheckStop ( any(fac_ehh24x7 < 0.0 ) , "Unfilled efac_ehh24x7")
+
 
 ! #######################################################################
-! 3) Normalise the monthly-daily factors. This is needed in order to
+! 4) Normalise the monthly-daily factors. This is needed in order to
 !    account for leap years (nydays=366) and for the fact that different
 !    years have different numbers of e.g. Saturdays/Sundays. 
 !    Here we execute the same interpolations which are later done
@@ -218,7 +333,7 @@ contains
 
   write(unit=6,fmt="(a,I6,a,I5)")" Time factors normalisation: ",nydays,' days in ',year 
 
-  do iemis = 1, NEMIS_FILES
+  do iemis = 1, NEMIS_FILE
        n = 0
        do isec = 1, NSECTORS
            do ic = 1, NLAND
@@ -234,20 +349,21 @@ contains
 
                    mm2 = mm + 1 
                    if( mm2  > 12 ) mm2 = 1          ! December+1 => January
-
-                   xday = real(idd-1) /real(nmdays(mm))
-
-                   sumfac = sumfac +                            &  ! timefac 
-                      ( fac_emm(ic,mm,isec,iemis) +             &
-                        ( fac_emm(ic,mm2,isec,iemis)            &
-                         - fac_emm(ic,mm,isec,iemis) ) * xday ) &
-                      * fac_edd(ic,weekday,isec,iemis)   
+                   mm0 = mm - 1 
+                   if( mm0 < 1   ) mm0 = 12          ! December+1 => January
+                   Start= 0.5*(fac_emm(ic,mm0,isec,iemis)+fac_emm(ic,mm,isec,iemis))
+                   Endval= 0.5*(fac_emm(ic,mm,isec,iemis)+fac_emm(ic,mm2,isec,iemis))                   
+                   Average=fac_emm(ic,mm,isec,iemis)
+                   !limit values, to ensure that x never can be negative
+                   Start=min(Start,2*Average,2*fac_emm(ic,mm0,isec,iemis))
+                   Endval=min(Endval,2*Average,2*fac_emm(ic,mm2,isec,iemis))
+                   call Averageconserved_interpolate(Start,Endval,Average,nmdays(mm),idd,x)
+                   sumfac = sumfac + x * fac_edd(ic,weekday,isec,iemis)   
 
                 end do ! idd
              end do ! mm
 
              sumfac = real(nydays)/sumfac    
-
 
               if ( sumfac < 0.97 .or. sumfac > 1.03 ) then
                  write(unit=errmsg,fmt=*) &
@@ -255,44 +371,36 @@ contains
                  call CheckStop(errmsg)
               end if
 
-             if ( sumfac < 0.999 .or. sumfac > 1.001 ) then
-                 n = n+1
+             ! can be caused by variable number of sundays in a month for instance
              ! Slight adjustment of monthly factors
-                  do mm = 1, 12
-                    fac_emm(ic,mm,isec,iemis)  =  &
+              do mm = 1, 12
+                 fac_emm(ic,mm,isec,iemis)  =  &
                        fac_emm(ic,mm,isec,iemis) * sumfac
-                  end do ! mm
-             end if
+              end do ! mm
+       if ( debug .and. abs(sumfac-1.0)>0.001) &
+            write(unit=6,fmt=*)  &
+           "needed for country, isec, iemis, sumfac = " ,ic, isec, iemis, sumfac
 
           end do ! ic
        enddo ! isec
 
-       if ( n ==  0 ) &
-            write(unit=6,fmt=*)  &
-           "Correction not needed for iemis, sumfac = " ,iemis, sumfac
 
       enddo ! iemis
 
 
 !#########################################################################
 !
-! Day/night factors are set from parameter DAY_NIGHT in emisdef_ml
-! daytime = 2 - nightime :
-
-  day_factor(:,0)  =  DAY_NIGHT(:)             ! Night
-  day_factor(:,1) = 2.0 - day_factor(:,0)      ! Day
-
-!#################################
-
     if (DEBUG) write(unit=6,fmt=*) "End of subroutine timefactors"
 
     if (DEBUG ) then 
-       print *, " test of time factors, UK: "
+       write( *,*) " test of time factors, UK: "
        do mm = 1, 12
-           print "(i2,i6,f8.3,3f8.4)", mm, nydays, sumfac,  &
+           write(*, "(i2,i6,f8.3,3f8.4)") mm, nydays, sumfac,  &
             fac_emm(27,mm,2,1), fac_edd(27,1,2,1), fac_edd(27,7,2,1)
        end do ! mm
-       print *, " day factors traffic are", day_factor(7,0), day_factor(7,1)
+       write(*,"(a,4f8.3)") " day factors traffic 24x7", &
+           fac_ehh24x7(7,1,4),fac_ehh24x7(7,13,4), &
+              minval(fac_ehh24x7), maxval(fac_ehh24x7)
     end if ! DEBUG
 
  end subroutine timefactors
@@ -320,10 +428,11 @@ contains
   integer :: isec           ! index over emission sectors
   integer :: iemis          ! index over emissions (so2,nox,..)
   integer :: iland          ! index over countries 
-  integer :: nmnd, nmnd2    ! this month, next month.
+  integer :: nmnd, nmnd2, nmnd0   ! this month, next month, preceding month.
   integer :: weekday        ! 1=Monday, 2=Tuesday etc.
   real    :: xday           ! used in interpolation
   integer :: yyyy,dd 
+  real :: Start, Endval, Average, x
 
  !-----------------------------
 
@@ -338,26 +447,115 @@ contains
 
     nmnd2 = nmnd + 1                   ! Next month
     if( nmnd2 > 12 ) nmnd2 = 1         ! December+1 => January
+    nmnd0 = nmnd - 1                   ! preceding month
+    if( nmnd0 < 1 ) nmnd0 = 12         ! January-1 => December
 
     xday = real( newdate%day - 1 ) / real( nmdays(nmnd) ) 
 
 !   Calculate monthly and daily factors for emissions 
 
-    do iemis = 1, NEMIS_FILES
+    do iemis = 1, NEMIS_FILE
       do isec = 1, NSECTORS 
          do iland = 1, NLAND
-
-             timefac(iland,isec,iemis) =                           &
-                ( fac_emm(iland,nmnd,isec,iemis)  +                &
-                   ( fac_emm(iland,nmnd2,isec,iemis) -             &
-                      fac_emm(iland,nmnd,isec,iemis ) ) * xday )   &
-               *  fac_edd(iland,weekday,isec,iemis) 
-
+            
+            Start= 0.5*(fac_emm(iland ,nmnd0,isec,iemis)+fac_emm(iland ,nmnd,isec,iemis))
+            Endval= 0.5*(fac_emm(iland ,nmnd,isec,iemis)+fac_emm(iland ,nmnd2,isec,iemis))
+            Average=fac_emm(iland ,nmnd,isec,iemis)
+            !limit values, to ensure that x never can be negative
+            Start=min(Start,2*Average,2*fac_emm(iland ,nmnd0,isec,iemis))
+            Endval=min(Endval,2*Average,2*fac_emm(iland ,nmnd2,isec,iemis))
+            call Averageconserved_interpolate(Start,Endval,Average,nmdays(nmnd),dd,x)
+            timefac(iland,isec,iemis) = x *  fac_edd(iland,weekday,isec,iemis) 
+ 
          enddo ! iland  
       enddo ! isec   
    enddo ! iemis 
+
  end subroutine NewDayFactors
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+ subroutine DegreeDayFactors(daynumber)
+
+!.....................................................................
+!**    DESCRIPTION:
+!   Generally called with daynumber, and then reads the gridded degree-day
+!   based factors for emissions.
+!   If called with daynumber = 0, just checks existance of file. If not
+!   found, can use default country-based (GENEMIS) factors.
+
+    integer, intent(in) :: daynumber   ! daynumber (1,..... ,365)
+   
+    integer, save :: dd_old = -1
+    integer,dimension(2)  :: ijloc   ! debug only 
+    integer :: iii, jjj              ! debug only 
+    real :: checkmax
+    character(len=80) :: errmsg, units, varname
+    real, dimension(IIFULLDOM,JJFULLDOM) :: var2d_global
+    integer :: kmax=1, nfetch=1 ! for HDD
+
+!      Gridded_SNAP2_Factors = .false.
+!      return
+
+   !/ See if we have a file to work with....
+    if ( daynumber == 0 ) then
+      call check_file("DegreeDayFactors.nc", Gridded_SNAP2_Factors,&
+        needed=.true., errmsg=errmsg )
+      if ( Gridded_SNAP2_Factors ) then
+         call PrintLog("Found DegreeDayFactors.nc", MasterProc)
+      else
+         call PrintLog("Not-found: DegreeDayFactors.nc"//trim(errmsg), MasterProc)
+      end if
+      return
+    end if
+
+    !===============================================
+    if ( .not. Gridded_SNAP2_Factors )  return !
+    !===============================================
+
+   !/ We have a file, calculate every day ... .
+
+    if (dd_old == daynumber) return   ! Only calculate once per day max
+    dd_old= daynumber
+
+!     write(*,*) "HDD inputs", me, " Day ", daynumber
+
+   ! DegreeDays have the same domain/grid as the met data, so we can use:
+    if(MasterProc) call GetCDF('HDD_Facs','DegreeDayFactors.nc', &
+          var2d_global,IIFULLDOM,JJFULLDOM,1,daynumber,nfetch)
+
+    if(.not.allocated(gridfac_HDD))then
+       allocate(gridfac_HDD(MAXLIMAX,MAXLJMAX))
+    endif
+
+    call global2local(var2d_global,gridfac_HDD,MSG_READ8,1,IIFULLDOM,JJFULLDOM,&
+         kmax,IRUNBEG,JRUNBEG)
+         call CheckStop(errmsg=="field_not_found", "INDegreeDay field not found:")
+
+    if ( DEBUG ) then
+       ijloc = maxloc( gridfac_HDD(li0:li1,lj0:lj1))
+       iii = ijloc(1)+li0-1
+       jjj = ijloc(2)+lj0-1
+       checkmax = maxval( gridfac_HDD(li0:li1,lj0:lj1))
+
+       write(*,"(a,2i4,2f10.2,20i4)") "DEBUG GRIDFAC MAx", me, daynumber, &
+           checkmax, gridfac_HDD(iii,jjj), & !!! tmpt2(iii,jjj), &
+             ijloc(1), ijloc(2), i_fdom(iii), j_fdom(jjj)
+  
+       if( debug_proc ) then
+           write(*,"(a,i4,f12.3)") "GRIDFACDAY ", daynumber, &
+             gridfac_HDD(debug_li,debug_lj)
+       end if
+    end if
+
+
+    if ( DEBUG .and. debug_proc ) then
+       iii = debug_li
+       jjj = debug_lj
+       write(*,*) "DEBUG GRIDFAC", me, daynumber, iii, jjj, gridfac_HDD(iii, jjj)
+    end if
+
+
+   end subroutine DegreeDayFactors
 
 end module Timefactors_ml
 

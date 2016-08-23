@@ -111,14 +111,14 @@ contains
           endif
           iii = 1
 
-!su    read on node 0
+!    read on node 0
 912       continue
-!su    now distribute
+!    now distribute
           CALL MPI_BCAST( iimax ,4*1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
           CALL MPI_BCAST( rhour ,8*iimax+1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
           CALL MPI_BCAST( kfalc ,8*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
           CALL MPI_BCAST( fapos ,4*2*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-!su    all distributed
+!    all distributed
        endif
     endif
 
@@ -147,8 +147,8 @@ contains
           
           if (ttt > rhour(iii)     &
                .and. ttt < rhour(iii+1)) then
-!su    we have to synchronise the processors, since for next jjj(iii)
-!su    the aircraft can be on another processor !!!!
+!    we have to synchronise the processors, since for next jjj(iii)
+!    the aircraft can be on another processor !!!!
 
              CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
 
@@ -167,7 +167,6 @@ contains
                       write(6,*) 'inne i tidsjekk4',me,kfalc(iii)
                       open(IO_AIRCR,file='aircraft.dat'     &
                            ,position='append')
-!ds uni.1: remove IXADV_O3 and replace by loop over FLIGHT_ADV
                       write(IO_AIRCR,*) ttt                 &
                            ,( xn_adv( FLIGHT_ADV(i),ii,jj,k)*PPBINV,& 
                            i=1, NADV_FLIGHT),k,z_mid(ii,jj,k),&

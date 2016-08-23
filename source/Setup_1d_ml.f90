@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,64 +36,65 @@
   !-----------------------------------------------------------------------!
   !FUTURE use NH3variables_ml,       only : NNH3 ! hb NH3emis
   use AirEmis_ml,            only :  airn, airlig   ! airborne NOx emissions
+  use Biogenics_ml,        only : SoilNOx
+  use Biogenics_ml,        only : EMIS_BioNat, EmisNat  
   use Chemfields_ml,         only :  xn_adv,xn_bgn,xn_shl, &
                                    NSPEC_COL, NSPEC_BGN, xn_2d_bgn
   use CheckStop_ml,          only :  CheckStop
   use DerivedFields_ml,            only : d_2d
-  use DustProd_ml,           only :  DU_prod   ! Dust
-  use EmisDef_ml,            only : NSS, NDU  !SeaS, Dust
                                   !FUTURE ,NH3EMIS_VAR ! FUTURE NH3Emis
-  use EmisGet_ml,            only :  nrcemis, iqrc2itot  !DSRC added nrcemis
-  use Emissions_ml,          only :  gridrcemis, KEMISTOP, SoilNOx
-  use ForestFire_ml,         only : Fire_rcemis, burning
-  use Functions_ml,          only :  Tpot_2_T
-  use ChemChemicals_ml,      only :  species
-  use ChemSpecs_tot_ml,      only :  SO4,C5H8,NO,NO2,SO2,CO
-  use ChemSpecs_adv_ml,      only :  NSPEC_ADV, IXADV_NO2, IXADV_O3, &
-                                      IXADV_SO4, IXADV_NO3_f, IXADV_NH4_F
-  use ChemSpecs_shl_ml,      only :  NSPEC_SHL
-  use ChemRates_rct_ml,      only :  set_rct_rates, rct
-  use ChemRates_rcmisc_ml,   only :  rcmisc, set_rcmisc_rates
-  use GridValues_ml,         only :  sigma_mid, xmd, GridArea_m2, & 
+  use EmisGet_ml,            only:  nrcemis, iqrc2itot  !DSRC added nrcemis
+  use Emissions_ml,          only:  gridrcemis, gridrcroadd, KEMISTOP
+  use ForestFire_ml,         only: Fire_rcemis, burning
+  use Functions_ml,          only:  Tpot_2_T
+  use ChemChemicals_ml,      only:  species
+  use ChemSpecs_tot_ml,      only:  SO4,C5H8,NO,NO2,SO2,CO
+  use ChemSpecs_adv_ml,      only:  NSPEC_ADV, IXADV_NO2, IXADV_O3, &
+                                    IXADV_SO4, IXADV_NO3_f, IXADV_NH4_F
+  use ChemSpecs_shl_ml,      only:  NSPEC_SHL
+  use ChemRates_rct_ml,      only:  set_rct_rates, rct
+  use GridValues_ml,         only:  xmd, GridArea_m2, & 
                                      debug_proc, debug_li, debug_lj,&
                                      A_mid,B_mid,gridwidth_m,dA,dB,&
                                      i_fdom, j_fdom
-  use LocalVariables_ml,     only :  Grid
-  use MassBudget_ml,         only :  totem    ! sum of emissions
-  use MetFields_ml,          only :  ps
-  use MetFields_ml,          only :  roa, th, q, t2_nwp, cc3dmax &
-                                    ,zen, Idirect, Idiffuse,z_bnd
-  use ModelConstants_ml,     only :  &
+  use Io_Progs_ml,           only: datewrite !MASS
+  use LocalVariables_ml,     only: Grid
+  use MassBudget_ml,         only: totem    ! sum of emissions
+  use MetFields_ml,          only: ps
+  use MetFields_ml,          only: roa, th, q, t2_nwp, cc3dmax &
+                                  ,zen, Idirect, Idiffuse,z_bnd
+  use ModelConstants_ml,     only:   &
      ATWAIR                          &
     ,DEBUG_SETUP_1DCHEM              &
     ,DEBUG_SETUP_1DBIO               &
+    ,DEBUG_MASS                      &
     ,dt_advec                        & ! time-step
     ,PT                              & ! Pressure at top
     ,MFAC                            & ! converts roa (kg/m3 to M, molec/cm3)
     ,USE_FOREST_FIRES                & !
+!FUTURE    ,USE_POLLEN                      & ! Pollen
     ,USE_SEASALT                     &
-    ,USE_LIGHTNING_EMIS              & !
-    ,USE_SOIL_NOX, USE_DUST          & !
+    ,USE_LIGHTNING_EMIS, USE_AIRCRAFT_EMIS              & !
+    ,USE_GLOBAL_SOILNOX, USE_DUST, USE_ROADDUST    & !
+    ,USE_EMERGENCY,DEBUG_EMERGENCY   & ! Emergency: Volcanic Eruption
     ,KMAX_MID ,KMAX_BND, KCHEMTOP    & ! Start and upper k for 1d fields
     ,DEBUG_i, DEBUG_j  !FUTURE , DEBUG_NH3 !NH3emis
-  use Landuse_ml,            only : water_cover, ice_landcover
-  use Par_ml,                only :  me,MAXLIMAX,MAXLJMAX & 
+  use Landuse_ml,            only: water_fraction, ice_landcover
+  use Par_ml,                only:  me,MAXLIMAX,MAXLJMAX & 
                              ,gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG
-  use PhysicalConstants_ml,  only :  AVOG, PI, GRAV
-  use Radiation_ml,          only : PARfrac, Wm2_uE
-  use Setup_1dfields_ml,     only : &
+  use PhysicalConstants_ml,  only:  AVOG, PI, GRAV
+  use Radiation_ml,          only: PARfrac, Wm2_uE
+  use Setup_1dfields_ml,     only: &
      xn_2d                &  ! concentration terms
     ,rcemis               &  ! emission terms
-    ,rc_Rn222             &  ! for Pb210
-    ,rcss, rcwbd          &  !Sea salt, Dust
     ,rh, temp, tinv, itemp,pp      &  !
-    ,amk, o2, n2, h2o     &  ! Air concentrations
-    ,rcbio                   ! BVOC
+    ,amk, o2, n2, h2o    ! &  ! Air concentrations
 !FUTURE    ,rcnh3                   ! NH3emis
-  use SeaSalt_ml,        only : SS_prod
-  use Tabulations_ml,    only :  tab_esat_Pa
-  use TimeDate_ml,       only :  current_date, date
+  use SmallUtils_ml,          only: find_index
+  use Tabulations_ml,         only: tab_esat_Pa
+  use TimeDate_ml,            only: current_date, date
   use Volcanos_ml
+  use Emergency_ml,           only: EmergencyRate
   implicit none
   private
   !-----------------------------------------------------------------------!
@@ -102,6 +103,15 @@
   public :: setup_rcemis ! Emissions  (formerly "poll")
  !FUTURE public :: setup_nh3 ! NH3emis   , experimental version
   public :: reset_3d     ! Exports results for i,j column to 3-D fields
+
+! Indices for the species defined in this routine. Only set if found
+ ! Hard-coded for 2 specs just now. Could extend and allocate.
+  integer, private, parameter :: NROADDUST = 2
+  integer, private, parameter :: iROADF=1,  iROADC=2
+  integer, private, save :: inat_RDF,  inat_RDC, inat_Rn222
+  integer, private, save :: itot_RDF=-999,  itot_RDC=-999, itot_Rn222=-999
+
+  !DUST_ROAD_F
 
 contains
  !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -175,22 +185,15 @@ contains
    tinv(:) = 1./temp(:)
 
 
+
   ! 5 ) Rates  (!!!!!!!!!! NEEDS TO BE AFTER RH, XN, etc. !!!!!!!!!!)
 
 
    call set_rct_rates()
 
-
-   call set_rcmisc_rates()
-
   if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
             i==debug_li .and. j==debug_lj .and. &
             current_date%seconds == 0 ) then
-      write(*,"(a,f7.2,10es10.3)") " DEBUG_SETUP_1DCHEM ", &
-            1.0/tinv(KMAX_MID), o2(KMAX_MID), &
-            rcmisc(3,KMAX_MID), rcmisc(4,KMAX_MID), &
-            rcmisc(10,KMAX_MID), rcmisc(11,KMAX_MID), &
-            rcmisc(8,KMAX_MID), rcmisc(10,KMAX_MID)
       write(*,"(a,10es10.3)") " DEBUG_SETUP_1DCHEM RCT ", &
             rct(3,KMAX_MID), rct(4,KMAX_MID)
       write(*,"(a,10es10.3)") " DEBUG_SETUP_1DCHEM XN  ", &
@@ -198,8 +201,7 @@ contains
           xn_2d(IXADV_NO2+NSPEC_SHL,KMAX_MID)
       write(*,"(a,10es10.3)") " DEBUG_SETUP_1D-Riemer",&
         xn_2d(IXADV_SO4+NSPEC_SHL,KMAX_MID) &
-       ,xn_2d(IXADV_NO3_F+NSPEC_SHL,KMAX_MID) &
-       ,rcmisc(19,KMAX_MID)
+       ,xn_2d(IXADV_NO3_F+NSPEC_SHL,KMAX_MID)
   end if
 
 
@@ -219,15 +221,24 @@ contains
 
    !  local
      integer ::  iqrc,k, itot
-     real    :: scaling, scaling_k
      real    :: eland   ! for Pb210  - emissions from land
 
     integer ::  i_help,j_help,i_l,j_l
+    logical, save     :: first_call = .true. 
 
-! initilize
+    if ( first_call ) then
+      inat_RDF = find_index( "DUST_ROAD_F", EMIS_BioNat(:) )
+      inat_RDC = find_index( "DUST_ROAD_C", EMIS_BioNat(:) )
+      itot_RDF = find_index( "DUST_ROAD_F", species(:)%name    )
+      itot_RDC = find_index( "DUST_ROAD_C", species(:)%name    )
+      itot_Rn222= find_index( "RN222", species(:)%name    )
+      first_call = .false.
+    end if 
+
+! initilize ! initilize ! initilize ! initilize
     rcemis(:,:)=0.
-    rcss(:,:) = 0.  !SeaS
-    rcwbd(:,:) = 0.  ! Dust
+! initilize ! initilize ! initilize ! initilize
+
      do k=KEMISTOP,KMAX_MID
 
         do iqrc = 1, NRCEMIS
@@ -262,6 +273,12 @@ contains
 
      endif ! VOLCANOES
 
+! Contribution from Emergeny scenarios:
+!   Volcanic eruption scenarios set SO2 and ASH tracers emission rates.
+!   NPP accident scenarios set redoactive tracers emission rates.
+!   EmergencyRate(i,j) returns an array of rcemis size.
+    if(USE_EMERGENCY) rcemis(:,:)=rcemis(:,:)+EmergencyRate(i,j)
+
     !/** lightning and aircraft ... Airial NOx emissions if required:
 
      if ( USE_LIGHTNING_EMIS  ) then
@@ -269,88 +286,68 @@ contains
         do k=KCHEMTOP, KMAX_MID
 
           rcemis(NO,k)  = rcemis(NO,k) &
-                              + 0.95 * (airn(k,i,j)+airlig(k,i,j))
+                              + 0.95 * airlig(k,i,j)
           rcemis(NO2,k) = rcemis(NO2,k) &
-                              + 0.05 * (airn(k,i,j)+airlig(k,i,j))
+                              + 0.05 * airlig(k,i,j)
 
         enddo
         if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
                i==debug_li .and. j==debug_lj ) write(*,"(a,10es10.3)") &
                  " DEBUG_SETUP_AIRNOX ", airn(KMAX_MID,i,j),airlig(KMAX_MID,i,j)
 
-     end if ! AIRNOX
+     end if ! LIGHTNING_EMIS
+     if ( USE_AIRCRAFT_EMIS  ) then
+
+        do k=KCHEMTOP, KMAX_MID
+
+          rcemis(NO,k)  = rcemis(NO,k) &
+                              + 0.95 * airn(k,i,j)
+          rcemis(NO2,k) = rcemis(NO2,k) &
+                              + 0.05 * airn(k,i,j)
+
+        enddo
+        if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
+               i==debug_li .and. j==debug_lj ) write(*,"(a,10es10.3)") &
+                 " DEBUG_SETUP_AIRNOX ", airn(KMAX_MID,i,j),airlig(KMAX_MID,i,j)
+
+     end if ! AIRCRAFT NOX
 
      !/** Add sea salt production
 
-     if ( USE_SEASALT  ) then
+     if ( USE_ROADDUST .and. itot_RDF>0  ) then  ! Hard-code indices for now
 
-          do iqrc = 1, NSS
-            rcss(iqrc,KMAX_MID) = SS_prod(iqrc,i,j)
-          enddo
-
+        rcemis(itot_RDF,KMAX_MID) = gridrcroadd(1,i,j)
+        rcemis(itot_RDC,KMAX_MID) = gridrcroadd(2,i,j)
      endif
 
-     !/** Add windblown dust production
 
-     if ( USE_DUST  ) then
-
-          do iqrc = 1, NDU
-            rcwbd(iqrc,KMAX_MID) = DU_prod(iqrc,i,j)
-
-!       if(debug) write(6,'(a25,3i4,2es12.3)') '>> WBDust emissions >>',   &
-!             i_fdom(i), j_fdom(j), iqrc, DU_prod(iqrc,i,j), rcwbd(iqrc,KMAX_MID)
-          enddo
-
-     endif
-
-     if ( USE_FOREST_FIRES  .and. burning(i,j)  ) then
+     if ( USE_FOREST_FIRES   ) then
+     if ( burning(i,j)  ) then
 
        call Fire_rcemis(i,j)
 
+     endif 
      endif  !ForestFires
 
    !Soil NOx
-     if( USE_SOIL_NOX)then
+     if( USE_GLOBAL_SOILNOX)then !NEEDS CHECKING NOV2011
         rcemis(NO,KMAX_MID)=rcemis(NO,KMAX_MID)+SoilNOx(i,j)
      endif
 
-   !Mass Budget calculations
-   !   Adding up the emissions in each timestep
-
-
-   scaling = dt_advec * xmd(i,j)* gridwidth_m*gridwidth_m / GRAV
-
-   do k = KCHEMTOP,KMAX_MID
-
-
-       scaling_k = scaling * (dA(k) + dB(k)*ps(i,j,1))/amk(k)
-
-       do iqrc = 1, NSPEC_ADV
-
-          itot = iqrc + NSPEC_SHL
-          totem( iqrc ) = totem( iqrc ) + &
-                rcemis( itot, k ) * scaling_k
-          !if ( DEBUG_SETUP_1DCHEM .and. debug_proc .and.  &
-          !    i==debug_li .and. j==debug_lj ) then
-          ! write(6,"(a,2i3,es10.3,2i4)") "MASSEQV:", iqrc, &
-          ! rcemis( iqrc,k), qrc2ixadv(iqrc)
-          !end if
-       end do
-
-   end do ! k loop
 
   ! Soil Rn222 emissions from non-ice covered land, + water
   ! at rate of 1 atom/cm2/s
 
-     eland = 1.0 - water_cover(i,j) - ice_landcover(i,j)
-
-! initialize, needed in My_Reactions
-     rc_Rn222(:)=0.0
+     eland = 1.0 - water_fraction(i,j) - ice_landcover(i,j)
 
 ! z_bnd is in m, not cm, so need to divide by 100.
-     rc_Rn222(KMAX_MID) = &
-            ( 0.00182 * water_cover(i,j)  + eland ) / &
+
+    if ( itot_Rn222 > 0 ) rcemis( itot_Rn222,KMAX_MID )  = & 
+            ( 0.00182 * water_fraction(i,j)  + eland ) / &
             ((z_bnd(i,j,KMAX_BND-1) - z_bnd(i,j,KMAX_BND))*100.)
+
+!ESX     rc_Rnwater(KMAX_MID) = water_fraction(i,j)  / &
+!ESX            ((z_bnd(i,j,KMAX_BND-1) - z_bnd(i,j,KMAX_BND))*100.)
 
   end subroutine setup_rcemis
 

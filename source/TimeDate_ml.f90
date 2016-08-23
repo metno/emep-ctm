@@ -34,7 +34,6 @@ MODULE TimeDate_ml
 ! ndiy -> day_of_year. Change IFIX to INT, FLOAT to REAL, MAX0 to MAX, etc.
 !===================Routines =================================================
 
-!FEB2011 use ModelConstants_ml, only : METSTEP,MasterProc
 
 IMPLICIT NONE
 
@@ -122,7 +121,7 @@ FUNCTION make_current_date (ts) RESULT (cd)
   INTEGER                       :: yy,mm,dd,hh,min,sc
   call get_ymd(ts%jdate,yy,mm,dd)
   call get_hms(ts%secs,hh,min,sc)
-  cd=date(yy,mm,dd,hh,min*60.0+sc)
+  cd=date(yy,mm,dd,hh,min*60+sc)
 END FUNCTION make_current_date
 
 SUBROUTINE dup_timestamp (ts1,ts2)

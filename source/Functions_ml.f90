@@ -1,9 +1,9 @@
 ! <Functions_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
 !          Chemical transport Model>
-!*****************************************************************************! 
-!* 
+!*****************************************************************************!
+!*
 !*  Copyright (C) 2007-2011 met.no
-!* 
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,24 +11,24 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
 module Functions_ml
 !____________________________________________________________________
 ! Miscellaneous collection of "standard" (or guessed ) functions
-! Including Troe, sine and cosine curves, 
+! Including Troe, sine and cosine curves,
 ! and Standard Atmosphere p -> H conversion
 !____________________________________________________________________
 !
@@ -49,6 +49,8 @@ module Functions_ml
 
   public :: great_circle_distance!distance between two points following the surface on a unit sphere
 
+  public :: heaviside ! The heaviside function, 0 for x<0 and 1 for x>0 (x==0?)
+
  !/- Exner subroutines: ------------------------------------------------------
 
  public :: Exner_nd        ! (p/P0)**KAPPA
@@ -61,7 +63,7 @@ module Functions_ml
  !/- Interpolation constants
 
  real, private, parameter  ::    &
-       PINC=1000.0              &  
+       PINC=1000.0              &
       ,P0  =1.0e5               &    ! Standard pressure
       ,PBAS=-PINC
 
@@ -84,7 +86,7 @@ module Functions_ml
      integer, intent(in)  :: ndays        ! No. days per year   (365/366)
 
      real, dimension(ndays) :: daily
-     integer    :: d           
+     integer    :: d
      real, save :: twopi                  ! Could use PhysiclConstants_ml
      twopi = 8.0 * atan(1.0)              ! but I prefer to keep Functions_ml
                                           ! standalone
@@ -94,7 +96,7 @@ module Functions_ml
      end do
 
   end function Daily_cosine
-  
+
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   function Daily_sine(mean, amp, dmax, ndays) result (daily)
@@ -108,8 +110,8 @@ module Functions_ml
      integer, intent(in)  :: ndays        ! No. days per year   (365/366)
 
      real, dimension(ndays) :: daily
-     integer    :: d           
-     real, save :: shift                  ! Shifts sine curve to give max 
+     integer    :: d
+     real, save :: shift                  ! Shifts sine curve to give max
                                           ! when d = dmax
      real, save :: twopi                  ! Could use PhysiclConstants_ml
      twopi = 8.0 * atan(1.0)              ! but I prefer to keep Functions_ml
@@ -121,7 +123,7 @@ module Functions_ml
      end do
 
   end function Daily_sine
-  
+
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   function Daily_halfsine(base, amp, ndays) result (daily)
@@ -133,7 +135,7 @@ module Functions_ml
      integer, intent(in)  :: ndays        ! No. days per year   (365/366)
 
      real, dimension(ndays) :: daily
-     integer    :: d           
+     integer    :: d
      real, save :: pi                     ! Could use PhysiclConstants_ml
      pi = 4.0 * atan(1.0)                 ! but I prefer to keep Functions_ml
                                           ! standalone
@@ -165,9 +167,9 @@ module Functions_ml
       p_kPa = 101.325*exp(-5.255876*log(288.15/(288.15-6.5*h_km)))
    else
       p_kPa =  22.632*exp(-0.1576884*(h_km - 11.0)  )
-      
+
    end if
-   
+
  end function StandardAtmos_km_2_kPa
 
  !=======================================================================
@@ -259,7 +261,7 @@ module Functions_ml
      integer :: ix1
 
         x1 = (p-PBAS)/PINC
-        ix1 = x1
+        ix1 = int( x1 )
         fTpot =  tab_exf(ix1) + (x1-ix1)*(tab_exf(ix1+1) - tab_exf(ix1))
 
   end function Tpot_2_T
@@ -273,7 +275,7 @@ module Functions_ml
      integer :: ix1
 
         x1 = (p-PBAS)/PINC
-        ix1 = x1
+        ix1 = int( x1 )
         exf =  tab_exf(ix1) + (x1-ix1)*(tab_exf(ix1+1) - tab_exf(ix1))
         fT = 1.0/exf
 
@@ -298,7 +300,7 @@ module Functions_ml
 
   end function ERFfunc
 !--------------------------------------------------------------------
-   
+
   subroutine calerf(arg,result,jint)
 !--------------------------------------------------------------------
     ! This packet evaluates erf(x), erfc(x), and exp(x*x)*erfc(x)
@@ -306,26 +308,26 @@ module Functions_ml
     ! subprograms: erf, erfc, and erfcx (or derf, derfc, and derfcx),
     ! and one subroutine type subprogram, calerf.  The calling
     ! statements for the primary entries are:
-    
+
     ! y=erf(x)     (or   y=derf(x)),
     ! y=erfc(x)    (or   y=derfc(x)),
     ! and
     ! y=erfcx(x)   (or   y=derfcx(x)).
-    
+
     ! The routine  calerf  is intended for internal packet use only,
     ! all computations within the packet being concentrated in this
     ! routine.  The function subprograms invoke  calerf  with the
     ! statement
     ! call calerf(arg,result,jint)
     ! where the parameter usage is as follows
-    
+
     ! Function                     Parameters for calerf
     ! Call              Arg                  Result          Jint
-    ! 
+    !
     ! erf(arg)      any real argument         erf(arg)          0
     ! erfc(arg)     abs(arg)  <  xbig        erfc(arg)          1
     ! erfcx(arg)    xneg  <  arg  <  xmax   erfcx(arg)          2
-    
+
     ! The main computation evaluates near-minimax approximations:
     ! from "Rational Chebyshev Approximations for the Error Function"
     ! by W. J. Cody, Math. Comp., 1969, pp. 631-638.  This
@@ -334,7 +336,7 @@ module Functions_ml
     ! decimal digits.  The accuracy achieved depends on the arithmetic
     ! system, the compiler, the intrinsic functions, and proper
     ! selection of the machine-dependent constants.
-    
+
     ! Explanation of machine-dependent constants:
     ! xmin   = The smallest positive floating-point number.
     ! xinf   = The largest positive finite floating-point number.
@@ -353,7 +355,7 @@ module Functions_ml
     ! 1/[2*sqrt(xsmall)]
     ! xmax   = Largest acceptable argument to erfcx; the minimum
     ! of xinf and 1/[sqrt(pi)*xmin].
-    
+
     ! Approximate values for some important machines are:
     ! xmin       xinf        xneg     xsmall
     ! CDC 7600      (s.p.)  3.13e-294   1.26e+322   -27.220  7.11e-15
@@ -366,7 +368,7 @@ module Functions_ml
     ! Univac 1108   (d.p.)  2.78d-309   8.98d+307   -26.615  1.73d-18
     ! Vax d-format  (d.p.)  2.94d-39    1.70d+38     -9.345  1.39d-17
     ! Vax g-format  (d.p.)  5.56d-309   8.98d+307   -26.615  1.11d-16
-    
+
     ! xbig       xhuge       xmax
     ! CDC 7600      (s.p.)  25.922      8.39e+6     1.80x+293
     ! Cray-1        (s.p.)  75.326      8.39e+6     5.45e+2465
@@ -378,16 +380,16 @@ module Functions_ml
     ! Univac 1108   (d.p.)  26.582      5.37d+8     8.98d+307
     ! Vax d-format  (d.p.)   9.269      1.90d+8     1.70d+38
     ! Vax g-format  (d.p.)  26.569      6.71d+7     8.98d+307
-    
+
     ! Error returns:
     ! The program returns  erfc = 0      for  arg  >=  xbig;
     ! erfcx = xinf  for  arg  <  xneg;
     ! and
     ! erfcx = 0     for  arg  >=  xmax.
-    
+
     ! Intrinsic functions required are:
     ! abs, aint, exp
-    
+
     ! Author: W. J. Cody
     ! Mathematics And Computer Science Division
     ! Argonne National Laboratory
@@ -397,23 +399,23 @@ module Functions_ml
     integer :: i,jint
     real    :: result, x, &
                arg,del,xden,xnum, y,ysq
-    
+
     ! Mathematical constants
     real :: four = 4.,one = 1.,half = 0.5,two = 2.,zero = 0., &
          sqrpi = 5.6418958354775628695e-1,thresh=0.46875, &
          sixten=16.0
-    
+
     ! Machine-dependent constants
     real :: xinf=3.40e+38,xneg=-9.382e0,xsmall=5.96e-8, &
          xbig=9.194, xhuge=2.90e3,xmax=4.79e37
-    
+
     ! Coefficients for approximation to  erf  in first interval
     real, dimension(5) :: a =(/3.16112374387056560e00,1.13864154151050156e02, &
          3.77485237685302021e02,3.20937758913846947e03, &
          1.85777706184603153e-1/)
     real, dimension(4) :: b =(/2.36012909523441209e01,2.44024637934444173e02, &
          1.28261652607737228e03,2.84423683343917062e03/)
-    
+
     ! Coefficients for approximation to  erfc  in second interval
     real, dimension(9) ::  c = &
        (/5.64188496988670089e-1, 8.88314979438837594e0, &
@@ -426,7 +428,7 @@ module Functions_ml
          5.37181101862009858e02,1.62138957456669019e03, &
          3.29079923573345963e03,4.36261909014324716e03, &
          3.43936767414372164e03,1.23033935480374942e03/)
-    
+
     ! Coefficients for approximation to  erfc  in third interval
     real, dimension(6) :: p =  &
        (/3.05326634961232344e-1, 3.60344899949804439e-1, &
@@ -436,7 +438,7 @@ module Functions_ml
        (/2.56852019228982242e0 ,1.87295284992346047e0 , &
          5.27905102951428412e-1,6.05183413124413191e-2, &
          2.33520497626869185e-3/)
-    
+
     ! Main Code
     x=arg
     y=abs(x)
@@ -517,9 +519,9 @@ module Functions_ml
   !-------------------------------------------------------------------
 
 
-  function great_circle_distance(fi1,lambda1,fi2,lambda2) result(dist)
+  PURE function great_circle_distance(fi1,lambda1,fi2,lambda2) result(dist)
 
-    !compute the great circle distance between to points given in 
+    !compute the great circle distance between to points given in
     !spherical coordinates. Sphere has radius 1.
     real, intent(in) ::fi1,lambda1,fi2,lambda2 !NB: in DEGREES here
     real :: dist
@@ -534,6 +536,25 @@ module Functions_ml
            sin(DEG2RAD*0.5*(fi1-fi2))**2))
 
   end function great_circle_distance
+
+!-----------------------------------------------------------------------
+! The heaviside function, 0 for x<0 and 1 for x>0 (x==0?)
+! For x=0, one could have 0.5, but numerically this is too tricky to code
+! and with double precision a very rare event.
+  function heaviside(x)
+
+   real, intent(in) :: x
+   real             :: heaviside
+
+
+   if (x<0) then
+     heaviside = 0.0
+   else
+     heaviside = 1.0
+   end if
+
+  end function heaviside
+!-----------------------------------------------------------------------
 
 
 !program Test_exn
@@ -553,7 +574,7 @@ module Functions_ml
 !     print "(f8.3,4f12.5)", 1.0e-2*p, exf1, exf2, Tpot_2_T(p), T_2_Tpot(p)
 !  end do
 !end program Test_exn
-    
+
 ! Results:
 ! p(mb)        exf1         exf2      Tpot_2_T    T_2_Tpot
 !  50.000     0.42471     0.42471     0.42471     2.35455

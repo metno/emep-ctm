@@ -47,21 +47,21 @@ use AirEmis_ml,       only: lightning
 use Biogenics_ml,     only: Init_BVOC, SetDailyBVOC
 use BoundaryConditions_ml, only: BoundaryConditions
 use CheckStop_ml,     only: CheckStop
+use Chemfields_ml,    only: alloc_ChemFields
 use ChemChemicals_ml, only: define_chemicals
 use ChemGroups_ml,    only: Init_ChemGroups
 use DefPhotolysis_ml, only: readdiss
 use Derived_ml,       only: Init_Derived, iou_min, iou_max
 use DerivedFields_ml, only: f_2d, f_3d
-use DO3SE_ml,         only: Init_DO3SE 
 use EcoSystem_ml,     only: Init_EcoSystems
 use Emissions_ml,     only: Emissions, newmonth
 use ForestFire_ml,    only: Fire_Emis
-use GridValues_ml,    only: MIN_ADVGRIDS, GRIDWIDTH_M, Poles
+use GridValues_ml,    only: MIN_ADVGRIDS, GRIDWIDTH_M, Poles, DefDebugProc, GridRead
 use Io_ml,            only: IO_MYTIM,IO_RES,IO_LOG,IO_TMP,IO_DO3SE
 use Io_Progs_ml,      only: read_line, PrintLog
 use Landuse_ml,       only: InitLandUse, SetLanduse, Land_codes
 use MassBudget_ml,    only: Init_massbudget, massbudget
-use Met_ml,           only: metvar, MetModel_LandUse, Meteoread, MeteoGridRead
+use Met_ml,           only: metvar, MetModel_LandUse, Meteoread
 use ModelConstants_ml,only: MasterProc, &   ! set true for host processor, me==0
                             RUNDOMAIN,  &   ! Model domain
                             NPROC,      &   ! No. processors
@@ -70,10 +70,9 @@ use ModelConstants_ml,only: MasterProc, &   ! set true for host processor, me==0
                             runlabel2,  &   ! explanatory text
                             nprint,nterm,iyr_trend,                       &
                             IOU_INST,IOU_HOUR, IOU_YEAR,IOU_MON, IOU_DAY, &
-                            USE_CONVECTION, USE_SOILWATER, USE_SOIL_NOX,  &
-                            USE_FOREST_FIRES, USE_DUST,DO_SAHARA, &
-                            USE_LIGHTNING_EMIS,       &
+                            USE_FOREST_FIRES, USE_LIGHTNING_EMIS, &
                             FORECAST       ! FORECAST mode
+use ModelConstants_ml,only: Config_ModelConstants
 use NetCDF_ml,        only: Init_new_netCDF
 use OutputChem_ml,    only: WrtChem, wanted_iou
 use Par_ml,           only: me, GIMAX, GJMAX, Topology, parinit
@@ -129,27 +128,24 @@ character (len=230) :: errmsg,txt
 nproc_mpi = NPROC
 CALL MPI_INIT(INFO)
 CALL MPI_COMM_RANK(MPI_COMM_WORLD, ME, INFO)
+! Set a logical from ModelConstants, which can be used for
+!   specifying the master processor for print-outs and such
+MasterProc = ( me == 0 )
 CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nproc_mpi, INFO)
+NPROC=nproc_mpi 
+55 format(A,I5,A)
+if(MasterProc)write(*,55)' Found ',NPROC,' MPI processes available'
 
-!  MPI consistency checks
-if(nproc_mpi /= NPROC)then
-  if(me==0) print *,"Wrong processor number!", &
-  " Program was compiled with NPROC = ",NPROC, &
-  " but MPI found ", nproc_mpi," processors available.", &
-  " Please change NPROCX or NPROCY in ModelConstants_ml.f90"
-  CALL MPI_FINALIZE(INFO)
-  stop
-endif
 call CheckStop(digits(1.0)<50, &
   "COMPILED WRONGLY: Need double precision, e.g. f90 -r8")
 
-call parinit(MIN_ADVGRIDS)     !define MasterProc subdomains sizes and position
 
 if (MasterProc) then
-  open(IO_RES,file='eulmod.res')
   open(IO_LOG,file='RunLog.out')
   open(IO_TMP,file='INPUT.PARA')
 endif
+
+call Config_ModelConstants(IO_LOG)
 
 call read_line(IO_TMP,txt,status(1))
 read(txt,*) iyr_trend
@@ -158,8 +154,10 @@ call read_line(IO_TMP,runlabel1,status(1))! explanation text short
 call read_line(IO_TMP,runlabel2,status(1))! explanation text long
 call read_line(IO_TMP,txt,status(1))  ! meteo year,month,day to start the run
 read(txt,*)startdate(1:3)             ! meteo hour to start the run is set in assign_NTERM
+startdate(4)=0
 call read_line(IO_TMP,txt,status(1))  ! meteo year,month,day to end the run
 read(txt,*)enddate(1:3)               ! meteo hour to end the run is set in assign_NTERM
+enddate(4)=0
 
 if(FORECAST)then  ! read dates of nested outputs on FORECAST mode
   do i=1,FORECAST_NDUMP
@@ -177,19 +175,8 @@ if( MasterProc ) then
   call PrintLog( date2string("startdate = YYYYMMDD",startdate(1:3)) )
   call PrintLog( date2string("enddate   = YYYYMMDD",enddate  (1:3)) )
   write(unit=txt,fmt="(a,i4)") "iyr_trend= ", iyr_trend
-  call PrintLog( trim(txt) )
-  write(unit=IO_LOG,fmt="(a12,4i4)")"RunDomain:  ", RUNDOMAIN
+!  call PrintLog( trim(txt) )
 
-  ! And record some settings to RunLog (will recode later)
-  if(  FORECAST       ) call PrintLog("Forecast mode on")
-  call PrintLog("Options used of (convec., soilwater, soilnox, forest fires)")
-  if(  USE_CONVECTION ) call PrintLog("Convection used")
-  if(  USE_SOILWATER  ) call PrintLog("SoilWater  switch on")
-  if(  USE_SOIL_NOX   ) call PrintLog("SoilNOx    switch on")
-  if(  USE_FOREST_FIRES)call PrintLog("ForestFires switch on")
-  call PrintLog("Options used of (dust, sahara)")
-  if(  USE_DUST        )call PrintLog("Dust switch on")
-  if(  DO_SAHARA       )call PrintLog("Sahara switch on")
 endif
 
 !*** Timing ********
@@ -197,10 +184,21 @@ call Init_timing()
 call Code_Timer(tim_before0)
 tim_before = tim_before0
 
-call MeteoGridRead(cyclicgrid)    ! define grid projection and parameters
+
+call GridRead(cyclicgrid)    !define: 1)grid sizes (IIFULLDOM, JJFULLDOM),
+                             !        2)projection (lon lat or Stereographic etc and Poles),
+                             !        3)rundomain size (GIMAX, GJMAX, IRUNBEG, JRUNBEG)
+                             !        4)subdomain partition (NPROCX, NPROCY, limax,ljmax)
+                             !        5)topology (neighbor, poles)
+                             !        5)grid properties arrays (xm, i_local, j_local etc.)
+
 call Topology(cyclicgrid,Poles)   ! def GlobalBoundaries & subdomain neighbors
+call DefDebugProc()               ! Sets debug_proc, debug_li, debuglj
 call assign_NTERM(NTERM)          ! set NTERM, the number of 3-hourly periods
 call assign_dtadvec(GRIDWIDTH_M)  ! set dt_advec
+
+! daynumber needed  for BCs, so call here to get initial
+daynumber=day_of_year(current_date%year,current_date%month,current_date%day)
 
 !     Decide the frequency of print-out
 !
@@ -216,6 +214,7 @@ if (MasterProc) print *,'nterm, nprint:',nterm, nprint
 !
 call Add_2timing(1,tim_after,tim_before,"Before define_Chemicals")
 
+call alloc_ChemFields     !allocate chemistry arrays
 call define_chemicals()    ! sets up species details
 call Init_ChemGroups()    ! sets up species details
 
@@ -224,6 +223,8 @@ call assign_nmax(METSTEP)   ! No. timesteps in inner loop
 call trajectory_init()
 
 call Add_2timing(2,tim_after,tim_before,"After define_Chems, readpar")
+
+call SetLandUse() !  Reads Inputs.Landuse, Inputs.LandPhen
 
 call MeteoRead(1)
 
@@ -234,17 +235,7 @@ if (MasterProc.and.DEBUG_UNI) print *,"Calling emissions with year",current_date
 call Emissions(current_date%year)
 
 
-! daynumber needed  for BCs, so call here to get initial
-daynumber=day_of_year(current_date%year,current_date%month,current_date%day)
-
 call MetModel_LandUse(1)   !
-
-call InitLandUse()  !  Reads Inputs.Landuse, Inputs.LandPhen
-
-! Read data for DO3SE (deposition O3 and  stomatal exchange) module
-! (also used for other gases!)
-call Init_DO3SE(IO_DO3SE,"Inputs_DO3SE.csv",Land_codes, errmsg)
-call CheckStop(errmsg, "Reading DO3SE ")
 
 call Init_EcoSystems()     ! Defines ecosystem-groups for dep output
 
@@ -273,8 +264,8 @@ if (MasterProc.and.DEBUG_UNI) print *,"vgrid finish"
     call Init_new_netCDF(trim(runlabel1)//'_fullrun.nc',IOU_YEAR)
   if (wanted_iou(IOU_INST)) &
     call Init_new_netCDF(trim(runlabel1)//'_inst.nc',IOU_INST)
-  if (wanted_iou(IOU_HOUR).or.NHOURLY_OUT>0) &
-    call Init_new_netCDF(trim(runlabel1)//'_hour.nc',IOU_HOUR)
+! if (wanted_iou(IOU_HOUR).or.NHOURLY_OUT>0) &
+!   call Init_new_netCDF(trim(runlabel1)//'_hour.nc',IOU_HOUR)
   if (wanted_iou(IOU_DAY)) &
     call Init_new_netCDF(trim(runlabel1)//'_day.nc',IOU_DAY)
   if (wanted_iou(IOU_MON)) &
@@ -305,7 +296,7 @@ do numt = 2, nterm + nadd         ! 3-hourly time-loop
     case(3:5)   ;newseason = 2
     case(6:8)   ;newseason = 3
     case(9:11)  ;newseason = 4
-  end select
+  endselect
 
   ! daynumber needed for BCs
   daynumber=day_of_year(current_date%year,current_date%month,current_date%day)
@@ -334,14 +325,13 @@ do numt = 2, nterm + nadd         ! 3-hourly time-loop
 
     call Add_2timing(8,tim_after,tim_before,"init_aqueous")
   endif    ! mm_old.ne.mm
-
   call Code_timer(tim_before)
   ! Monthly call to BoundaryConditions.
   if (mm_old /= mm) then   ! START OF NEW MONTH !!!!!
     if (DEBUG_UNI) print *, "Into BCs" , me
     ! We set BCs using the specified iyr_trend
     !   which may or may not equal the meteorology year
-    call BoundaryConditions(current_date%year,iyr_trend,mm)
+    call BoundaryConditions(current_date%year,mm)
     if (DEBUG_UNI) print *, "Finished BCs" , me
   endif
 
@@ -350,6 +340,7 @@ do numt = 2, nterm + nadd         ! 3-hourly time-loop
     if (DEBUG_UNI) print *, "Finished Initmass" , me
   endif
 
+
   oldseason = newseason
   mm_old = mm
 
@@ -357,12 +348,14 @@ do numt = 2, nterm + nadd         ! 3-hourly time-loop
 
   if (DEBUG_UNI) print *, "1st Infield" , me, " numu ", numt
 
-  call Meteoread(numt)
-  call Add_2timing(10,tim_after,tim_before,"Meteoread")
-
   call SetLandUse()
   call Add_2timing(11,tim_after,tim_before,"SetLanduse")
 
+  
+  call Meteoread(numt)
+  call Add_2timing(10,tim_after,tim_before,"Meteoread")
+
+  
   call SetDailyBVOC(daynumber)
 
   if (USE_FOREST_FIRES) call Fire_Emis(daynumber)
@@ -370,10 +363,11 @@ do numt = 2, nterm + nadd         ! 3-hourly time-loop
   call Add_2timing(12,tim_after,tim_before,"Fires+BVOC")
 
   daynumber=day_of_year(current_date%year,current_date%month,current_date%day)
-  if (MasterProc) print "(a,2I2.2,I4,3x,i2.2,a,i2.2,a,i2.2)",' current date and time: ',&
-      current_date%day,current_date%month,current_date%year,&
-     current_date%hour, ':',current_date%seconds/60,':',current_date%seconds-60*(current_date%seconds/60)
-
+! if(MasterProc) print "(a,2I2.2,I4,3x,i2.2,a,i2.2,a,i2.2)",' current date and time: ',&
+!   current_date%day,current_date%month,current_date%year,&
+!   current_date%hour, ':',current_date%seconds/60,':',current_date%seconds-60*(current_date%seconds/60)
+  if(MasterProc) print "(2(1X,A))",'current date and time:',&
+    date2string("YYYY-MM-DD hh:mm:ss",current_date)
 
   call Code_timer(tim_before)
   call metvar(numt)
@@ -425,23 +419,3 @@ CALL MPI_FINALIZE(INFO)
 end program myeul
 
 !===========================================================================
-!  Experimental NH3 emissions code moved here for safety
-!FUTURE use calc_emis_potential_ml, only: NH3emis_potential,& ! NH3emis experimental
-!FUTURE                              lNH3emis_pot, readNH3emis, lEmis50_nh3
-!FUTURE use NH3Emis_variation_ml,  only: SetNH3               ! NH3emis experimental
-!FUTURE use EmisDef_ml,       only: NH3EMIS_VAR               ! NH3emis experimental
-!FUTURE                             IO_NH3_DEB                ! NH3emis experimental
-!FUTURE ! NH3emis experimental: write temporal emis variation for Tange to file
-!FUTURE if (NH3EMIS_VAR) then
-!FUTURE !  open(IO_NH3_DEB,FILE='out.Tange.dat')
-!FUTURE !  write(IO_NH3_DEB,'(4a7,18a12)')"mm","dd","hh","TIME1","ISO_STABLE",&
-!FUTURE !                 "OPEN_STABLE","STORAGE","WIN_CROP","SPR_CROP",&
-!FUTURE !                 "SPR_SBEET","SPR_GRASS","MANURE1","MANURE2","MANURE3",&
-!FUTURE !                 "MANURE4","MANURE4a","MIN_SPRING","MIN_AUTUMN",&
-!FUTURE !                 "GRAZ_CATTLE","NH3_GRASS","TRAFFIC","SUM "
-!FUTURE   call readNH3emis() !read 16.7km activity NH3 emissions
-!FUTURE   print *,'New ammonia emissions on proc ',me,sum(lEmis50_nh3)
-!FUTURE   call NH3emis_potential(current_date%year) !calc emission potential
-!FUTURE   print *,'Potential emissions on proc '  ,me,sum(lNH3emis_pot)
-!FUTURE endif
-!FUTURE 

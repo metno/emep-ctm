@@ -31,6 +31,7 @@ module LandDefs_ml
  use KeyValue_ml, only :  KeyVal
  use LandPFT_ml,  only : PFT_CODES
  use ModelConstants_ml, only : NLANDUSEMAX, MasterProc, DEBUG_LANDDEFS
+ use ModelConstants_ml, only :  FLUX_VEGS
  use SmallUtils_ml, only : find_index
   implicit none
   private
@@ -66,16 +67,15 @@ interface Check_LandCoverPresent
 end interface Check_LandCoverPresent
 
  real, public, parameter :: STUBBLE  = 0.01 ! Veg. ht. out of season
- integer, public :: NLanduse_DEF ! No. of landuse categories actually defined
- integer, public, parameter :: NLANDUSE_EMEP=19 !No. of categories defined 
-                                                !in EMEP grid (per April 2009)
+ integer, public, parameter :: NLANDUSE_EMEP=29 !No. of categories defined 
+                                                !in EMEP grid (per April 2013)
  integer, public, save :: iLC_grass    ! Used with clover outputs
 
  !/*****   Data to be read from Phenology_inputs.dat:
 
   type, public :: land_input
      character(len=15) :: name
-     character(len=9) :: code
+     character(len=15) :: code
      character(len=3) :: type   ! Ecocystem type, see headers
      character(len=5) :: LPJtype   ! Simplified LPJ assignment
      real    ::  hveg_max
@@ -147,24 +147,34 @@ contains
   end subroutine Growing_season
 
   !=======================================================================
-  subroutine Init_LandDefs(wanted_codes)
+  subroutine Init_LandDefs(ncodes, wanted_codes)
   !=======================================================================
       !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       ! Reads file Inputs_LandDefs.csv and extracts land-defs. Checks that
       ! codes match the "wanted_codes" which have been set in Inputs-Landuse
+      integer, intent(in) :: ncodes  ! Num. land codes found in mapped data
       character(len=*), dimension(:), intent(in) :: wanted_codes
       character(len=20), dimension(25) :: Headers
       character(len=200) :: txtinput  ! Big enough to contain one input record
       type(KeyVal), dimension(2) :: KeyValues ! Info on units, coords, etc.
       character(len=50) :: errmsg, fname
-      integer :: n, NHeaders, NKeys
+      integer :: n, nn, NHeaders, NKeys
 
+
+      ! Quick safety check (see Landuse_ml for explanation)
+       call CheckStop(&
+         maxval( len_trim(wanted_codes(:))) >= len(LandInput%code),& 
+          "LandDefs: increase size of character array" )
 
       ! Read data
 
 
       fname = "Inputs_LandDefs.csv"
       if ( MasterProc ) then
+         write(*,*) "INIT_LANDDEFS for Ncodes= ", ncodes
+         do n = 1, ncodes
+            write(*,*) "INLC ",n, trim(wanted_codes(n))
+         end do
          call open_file(IO_TMP,"r",fname,needed=.true.)
          call CheckStop(ios,"open_file error on " // fname )
       end if
@@ -177,7 +187,7 @@ contains
       !------ Read in file. Lines beginning with "!" are taken as
       !       comments and skipped
 
-       n = 0     
+       nn = 0     
        do
             call read_line(IO_TMP,txtinput,ios)
             if ( ios /= 0 ) then
@@ -188,14 +198,20 @@ contains
             end if
             read(unit=txtinput,fmt=*,iostat=ios) LandInput
             call CheckStop ( ios, fname // " txt error:" // trim(txtinput) )
-            n = n + 1
+            n = find_index( LandInput%code, wanted_codes )!index in map data?
+            if ( n < 1 ) then
+                if ( MasterProc ) write(*,*) "LandDefs skipping ", &
+                    trim(LandInput%code)
+                cycle
+            end if
            !############################
             LandDefs(n) = LandInput
+            nn = nn + 1
            !############################
             if ( DEBUG_LANDDEFS .and. MasterProc ) then
                  !write(*,"(a)") trim(txtinput)
-                 write(unit=*,fmt="(a,i3,a,a,f7.3,f10.3)") "LANDDEFS N ", n, &
-                   trim(LandInput%name), trim(LandInput%code),&
+                 write(unit=*,fmt="(a,2i3,a,a,f7.3,f10.3)") "LANDDEFS N ", &
+                  n,nn, trim(LandInput%name), trim(LandInput%code),&
                     LandDefs(n)%LAImax, LandDefs(n)%Emtp
             end if
 
@@ -207,9 +223,9 @@ contains
 
             if ( DEBUG_LANDDEFS .and. MasterProc ) then
                  write(*,"(a)") trim(txtinput)
-                 write(unit=*,fmt=*) "LANDPHEN match? ", n, &
-                   LandInput%name, trim(LandInput%code), trim(wanted_codes(n)),&
-                 len(trim(LandInput%code)), len(trim(wanted_codes(n)))
+                 write(unit=*,fmt="(a,i3,3a,2i4)") "LANDPHEN match? ", n, &
+                   trim(LandInput%name)//" ",  trim(LandInput%code)//" ", &
+                   trim(wanted_codes(n))//" "
             end if
             call CheckStop(  LandInput%code, wanted_codes(n), "MATCHING CODES in LandDefs")
 
@@ -218,9 +234,17 @@ contains
             LandType(n)%is_iam    =  LandInput%code(1:4) == "IAM_" 
             LandType(n)%is_clover =  LandInput%code(1:2) == "CV" 
             LandType(n)%flux_wanted = LandType(n)%is_iam  ! default
+           !Also:
+           if( find_index( LandInput%code, FLUX_VEGS(:) ) > 0 ) then
+             if(MasterProc) write(*,*) "FLUX_VEG LandDef'd", trim(LandInput%code)
+             LandType(n)%flux_wanted = .true.
+           end if
 
             LandType(n)%is_forest =  &
-                ( LandInput%type == "ECF" .or. LandInput%type == "EDF" )
+                (  LandDefs(n)%hveg_max > 4.0 .and. &    !  Simpler definition 
+                   LandDefs(n)%LAImax > 0.5           )  ! Excludes Urban
+               !MAR2013 ( LandInput%type == "ECF" .or. LandInput%type == "EDF" &
+               !MAR2013                          .or.  LandInput%type == "EMF" )
             LandType(n)%has_lpj   =  &
                 ( LandInput%type /= "NOLPJ" )
             LandType(n)%pft = find_index( LandDefs(n)%LPJtype, PFT_CODES)
@@ -228,6 +252,8 @@ contains
                  write(unit=*,fmt=*) "LANDPFT  match? ", n, &
                    LandInput%name, LandInput%code, wanted_codes(n), LandType(n)%pft
             end if
+           !is_decid, is_conif used mainly for BVOC and soil-NO. Not essential
+           ! for IAM-type landcover
             LandType(n)%is_conif = ( LandInput%type == "ECF"  )
             LandType(n)%is_decid = ( LandInput%type == "EDF"  )
             LandType(n)%is_crop  = ( LandInput%type == "ECR"  )
@@ -240,6 +266,8 @@ contains
        if ( MasterProc ) then 
              close(unit=IO_TMP)
        end if
+       if( MasterProc ) write(*,*) "END INIT_LANDDEFS", n, nn, ncodes
+       call CheckStop( nn /= ncodes, "Init_LandDefs didn't find all codes")
 
   end subroutine Init_LandDefs
  !=========================================================================

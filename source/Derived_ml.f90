@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,13 +52,14 @@ use My_Derived_ml, only : &
 use My_Derived_ml,  only : &
       COLUMN_MOLEC_CM2, &
       COLUMN_LEVELS   , &
-      OutputConcs,  &  ! added Feb 2011
-      WDEP_WANTED, &   ! added Jan 2011
+      OutputFields,  &
+      nOutputFields,  &
+      WDEP_WANTED, &
       D3_OTHER
-use My_Emis_ml,       only: EMIS_NAME
 
+use Aero_Vds_ml,      only: diam  !aerosol MMD (um)
 use AOTx_ml,          only: Calc_GridAOTx
-use Biogenics_ml,     only: EmisNat
+use Biogenics_ml,     only: EmisNat, NEMIS_BioNat, EMIS_BioNat
 use CheckStop_ml,     only: CheckStop, StopAll
 use Chemfields_ml,    only: xn_adv, xn_shl, cfac,xn_bgn, AOD,  &
                             PM25_water, PM25_water_rh50
@@ -66,30 +67,34 @@ use ChemGroups_ml     ! SIA_GROUP, PMCO_GROUP -- use tot indices
 use ChemSpecs_adv_ml         ! Use NSPEC_ADV amd any of IXADV_ indices
 use ChemSpecs_shl_ml
 use ChemSpecs_tot_ml
-use ChemChemicals_ml, only: species
+use ChemChemicals_ml, only: species,species_adv
 use Chemfields_ml ,   only: so2nh3_24hr,Grid_snow
 use DerivedFields_ml, only: MAXDEF_DERIV2D, MAXDEF_DERIV3D, &
                             def_2d, def_3d, f_2d, f_3d, d_2d, d_3d
 use EcoSystem_ml,     only: DepEcoSystem, NDEF_ECOSYSTEMS, &
                             EcoSystemFrac,FULL_ECOGRID
+use EmisDef_ml,       only: EMIS_FILE
 use Emissions_ml,     only: SumSnapEmis
 use GridValues_ml,    only: debug_li, debug_lj, debug_proc, sigma_mid, xm2, &
                          GRIDWIDTH_M, GridArea_m2
 use Io_Progs_ml,      only: datewrite
-use MetFields_ml,     only: roa,pzpbl,Kz_m2s,th,zen, ustar_nwp, z_bnd,u_ref,ws_10m
+use MetFields_ml,     only: roa,pzpbl,Kz_m2s,th,zen, ustar_nwp, z_bnd,u_ref,&
+         ws_10m, rh2m
 use MetFields_ml,     only: ps, t2_nwp
-use MetFields_ml,     only: SoilWater_deep, Idirect, Idiffuse
+use MetFields_ml,     only: SoilWater_deep, SoilWater_uppr, Idirect, Idiffuse
 use ModelConstants_ml, only: &
-   KMAX_MID     & ! =>  z dimension
+   KMAX_MID     & ! =>  z dimension (layer number)
+  ,KMAX_BND     & ! =>  z dimension (level number)
   ,NPROC        & ! No. processors
   ,atwS, atwN, ATWAIR, dt_advec  &
   ,PPBINV       & ! 1.0e9, for conversion of units
   ,PPTINV       & ! 1.0e12, for conversion of units
   ,MFAC         & ! converts roa (kg/m3 to M, molec/cm3)
   ,DEBUG_i, DEBUG_j &
-  ,DEBUG_AOT       &  
+  ,DEBUG_AOT       &
   ,DEBUG => DEBUG_DERIVED,  DEBUG_COLUMN, MasterProc &
   ,SOURCE_RECEPTOR &
+  ,USE_EMERGENCY,DEBUG_EMERGENCY &
   ,PT           &
   ,FORECAST     & ! only dayly (and hourly) output on FORECAST mode
   ,NTDAY        & ! Number of 2D O3 to be saved each day (for SOMO)
@@ -103,8 +108,10 @@ use Par_ml,    only: MAXLIMAX,MAXLJMAX, &   ! => max. x, y dimensions
                      gi0,gj0,IRUNBEG,JRUNBEG,&! for i_fdom, j_fdom
                      li0,lj0,limax, ljmax    ! => used x, y area
 use PhysicalConstants_ml,  only : PI,KAPPA
-use SmallUtils_ml, only: find_index, LenArray, NOT_SET_STRING
-use TimeDate_ml, only : day_of_year,daynumber,current_date
+!FUTURE use Pollen_ml,      only: AreaPOLL
+use SmallUtils_ml,  only: find_index, LenArray, NOT_SET_STRING
+use TimeDate_ml,    only: day_of_year,daynumber,current_date
+use Units_ml,       only: Units_Scale,Group_Units
 implicit none
 private
 
@@ -117,7 +124,6 @@ private
  private :: Setups
  private :: write_debug
  private :: write_debugadv
- private :: Units_Scale           ! selects unt factor
 
  public :: Derived              ! Calculations of sums, avgs etc.
  private :: voc_2dcalc          ! Calculates sum of VOC for 2d fields
@@ -149,8 +155,12 @@ private
 
 
    ! save O3 every hour during one day to find running max
-    real, save,  public :: &     ! to be used for SOMO35
-     D2_O3_DAY( MAXLIMAX, MAXLJMAX, NTDAY) = 0.
+    real, save  , allocatable , public :: &     ! to be used for SOMO35
+     D2_O3_DAY( :,:,:)
+
+   ! Fraction of NO3_c below 2.5 um (v. crude so far)
+
+     real, save, private :: fracPM25
 
 
   ! Counters to keep track of averaging
@@ -158,12 +168,6 @@ private
 
     integer, public, allocatable, dimension(:,:), save :: nav_2d
     integer, public, allocatable, dimension(:,:), save :: nav_3d
-
-   ! Note - previous versions did not have the LENOUT2D dimension
-   ! for wet and dry deposition. Why not?  Are annual or daily
-   ! depositions never printed? Since I prefer to keep all 2d
-   ! fields as similar as posisble, I have kept this dimension
-   ! for now - ds
 
 
    !-- some variables for the VOC sum done for ozone models
@@ -179,49 +183,139 @@ private
 
    integer, private :: i,j,k,n, ivoc, index    ! Local loop variables
 
+  integer, private, save :: iadv_O3=-999,     & ! Avoid hard codded IXADV_SPCS
+    iadv_EC_C_WOOD=-999,iadv_EC_C_FFUEL=-999,iadv_POM_C_FFUEL=-999,  &
+    iadv_SO4=-999,iadv_NO3_F=-999,iadv_NO3_C=-999,iadv_NH4_F=-999,   &
+    iadv_EC_F_WOOD_AGE=-999,iadv_EC_F_FFUEL_AGE=-999,                &
+    iadv_EC_F_WOOD_NEW=-999,iadv_EC_F_FFUEL_NEW=-999,                &
+    iadv_PART_OM_F=-999,iadv_SEASALT_F=-999,iadv_SEASALT_C=-999,     &
+    iadv_REMPPM25=-999,iadv_REMPPM_C=-999,iadv_DUST_WB_F=-999,       &
+    iadv_DUST_WB_C=-999,iadv_DUST_SAH_F=-999,iadv_DUST_SAH_C=-999,   &
+    iadv_DUST_ROAD_F=-999,iadv_DUST_ROAD_C=-999,iadv_FFIRE_BC=-999,  &
+    iadv_FFIRE_OM=-999, iadv_FFIRE_REMPPM25=-999
+
+  real, private, save :: ug_NO3_C=-999.0,  &             ! Avoid hard codded molwt
+    ug_EC_C_WOOD=-999.0,ug_EC_C_FFUEL=-999.0,ug_POM_C_FFUEL=-999.0
+  integer, public, save ::                                          &
+    spec_SO4=-999,spec_NO3_F=-999,spec_NO3_C=-999,spec_NH4_F=-999,   &
+    spec_EC_F_WOOD_AGE=-999,spec_EC_F_FFUEL_AGE=-999,                &
+    spec_EC_F_WOOD_NEW=-999,spec_EC_F_FFUEL_NEW=-999,                &
+    spec_EC_C_WOOD=-999,spec_EC_C_FFUEL=-999,spec_POM_C_FFUEL=-999,  &
+    spec_PART_OM_F=-999,spec_SEASALT_F=-999,spec_SEASALT_C=-999,     &
+    spec_REMPPM25=-999,spec_REMPPM_C=-999,spec_DUST_WB_F=-999,       &
+    spec_DUST_WB_C=-999,spec_DUST_SAH_F=-999,spec_DUST_SAH_C=-999,   &
+    spec_DUST_ROAD_F=-999,spec_DUST_ROAD_C=-999,spec_FFIRE_BC=-999,  &
+    spec_FFIRE_OM=-999,spec_FFIRE_REMPPM25=-999
    contains
 
-    !=========================================================================
-    subroutine Init_Derived()
+  !=========================================================================
+  subroutine Init_Derived()
+    integer :: alloc_err
 
-        integer :: alloc_err
-          if(MasterProc .and. DEBUG ) write(*,*) "INIT My DERIVED STUFF"
-          call Init_My_Deriv()  !-> wanted_deriv2d, wanted_deriv3d
+    allocate(D2_O3_DAY( MAXLIMAX, MAXLJMAX, NTDAY))
+     D2_O3_DAY = 0.0
 
-         ! get lengths of wanted arrays (excludes notset values)
-          num_deriv2d = LenArray(wanted_deriv2d,NOT_SET_STRING)
-          num_deriv3d = LenArray(wanted_deriv3d,NOT_SET_STRING)
+    if(MasterProc .and. DEBUG ) write(*,*) "INIT My DERIVED STUFF"
+    call Init_My_Deriv()  !-> wanted_deriv2d, wanted_deriv3d
 
-          call CheckStop(num_deriv2d<1,"num_deriv2d<1 !!")
+    ! get lengths of wanted arrays (excludes notset values)
+    num_deriv2d = LenArray(wanted_deriv2d,NOT_SET_STRING)
+    num_deriv3d = LenArray(wanted_deriv3d,NOT_SET_STRING)
 
-     if ( num_deriv2d > 0 ) then
-          if(DEBUG .and. MasterProc ) write(*,*) "Allocate arrays for 2d:",&
-                                                  num_deriv2d
-          allocate(f_2d(num_deriv2d),stat=alloc_err)
-          call CheckStop(alloc_err,"Allocation of f_2d")
-          allocate(d_2d(num_deriv2d,MAXLIMAX,MAXLJMAX,LENOUT2D),stat=alloc_err)
-          call CheckStop(alloc_err,"Allocation of d_2d")
-          call CheckStop(alloc_err,"Allocation of d_3d")
-          allocate(nav_2d(num_deriv2d,LENOUT2D),stat=alloc_err)
-          call CheckStop(alloc_err,"Allocation of nav_2d")
-          nav_2d = 0
-     end if
-     if ( num_deriv3d > 0 ) then
-          if(DEBUG .and. MasterProc ) write(*,*) "Allocate arrays for 3d: ",&
-                                                 num_deriv3d
-          allocate(f_3d(num_deriv3d),stat=alloc_err)
-          call CheckStop(alloc_err,"Allocation of f_3d")
-          allocate(d_3d(num_deriv3d,MAXLIMAX,MAXLJMAX,KMAX_MID,LENOUT3D),&
-                 stat=alloc_err)
-          allocate(nav_3d(num_deriv3d,LENOUT3D),stat=alloc_err)
-          call CheckStop(alloc_err,"Allocation of nav_3d")
-          nav_3d = 0
-     end if
+    call CheckStop(num_deriv2d<1,"num_deriv2d<1 !!")
 
-          call Define_Derived()
-          call Setups()
+    if(num_deriv2d > 0) then
+      if(DEBUG .and. MasterProc ) write(*,*) "Allocate arrays for 2d:",&
+                                              num_deriv2d
+      allocate(f_2d(num_deriv2d),stat=alloc_err)
+      call CheckStop(alloc_err,"Allocation of f_2d")
+      allocate(d_2d(num_deriv2d,MAXLIMAX,MAXLJMAX,LENOUT2D),stat=alloc_err)
+      call CheckStop(alloc_err,"Allocation of d_2d")
+      call CheckStop(alloc_err,"Allocation of d_3d")
+      allocate(nav_2d(num_deriv2d,LENOUT2D),stat=alloc_err)
+      call CheckStop(alloc_err,"Allocation of nav_2d")
+      nav_2d = 0
+    endif
+    if(num_deriv3d > 0) then
+      if(DEBUG .and. MasterProc ) write(*,*) "Allocate arrays for 3d: ",&
+                                              num_deriv3d
+      allocate(f_3d(num_deriv3d),stat=alloc_err)
+      call CheckStop(alloc_err,"Allocation of f_3d")
+      allocate(d_3d(num_deriv3d,MAXLIMAX,MAXLJMAX,KMAX_MID,LENOUT3D),&
+              stat=alloc_err)
+      allocate(nav_3d(num_deriv3d,LENOUT3D),stat=alloc_err)
+      call CheckStop(alloc_err,"Allocation of nav_3d")
+      nav_3d = 0
+    endif
 
-    end subroutine Init_Derived
+    ! Avoid hard codded IXADV_SPCS
+    iadv_O3         =find_index('O3'         ,species_adv(:)%name )
+    iadv_SO4        =find_index('SO4'        ,species_adv(:)%name )
+    iadv_NO3_F      =find_index('NO3_F'      ,species_adv(:)%name )
+    iadv_NO3_C      =find_index('NO3_C'      ,species_adv(:)%name )
+    iadv_NH4_F      =find_index('NH4_F'      ,species_adv(:)%name )
+    iadv_EC_F_WOOD_AGE=find_index('EC_F_WOOD_AGE',species_adv(:)%name )
+    iadv_EC_F_FFUEL_AGE=find_index('EC_F_FFUEL_AGE',species_adv(:)%name )
+    iadv_EC_F_WOOD_NEW=find_index('EC_F_WOOD_NEW',species_adv(:)%name )
+    iadv_EC_F_FFUEL_NEW=find_index('EC_F_FFUEL_NEW',species_adv(:)%name )
+    iadv_EC_C_WOOD  =find_index('EC_C_WOOD'  ,species_adv(:)%name )
+    iadv_EC_C_FFUEL =find_index('EC_C_FFUEL' ,species_adv(:)%name )
+    iadv_POM_C_FFUEL=find_index('POM_C_FFUEL',species_adv(:)%name )
+    iadv_PART_OM_F  =find_index('PART_OM_F'  ,species_adv(:)%name )
+    iadv_SEASALT_F  =find_index('SEASALT_F'  ,species_adv(:)%name )
+    iadv_SEASALT_C  =find_index('SEASALT_C'  ,species_adv(:)%name )
+    iadv_REMPPM25   =find_index('REMPPM25'   ,species_adv(:)%name )
+    iadv_REMPPM_C   =find_index('REMPPM_C'   ,species_adv(:)%name )
+    iadv_DUST_WB_F  =find_index('DUST_WB_F'  ,species_adv(:)%name )
+    iadv_DUST_WB_C  =find_index('DUST_WB_C'  ,species_adv(:)%name )
+    iadv_DUST_SAH_F =find_index('DUST_SAH_F' ,species_adv(:)%name )
+    iadv_DUST_SAH_C =find_index('DUST_SAH_C' ,species_adv(:)%name )
+    iadv_DUST_ROAD_F=find_index('DUST_ROAD_F',species_adv(:)%name )
+    iadv_DUST_ROAD_C=find_index('DUST_ROAD_C',species_adv(:)%name )
+
+    iadv_FFIRE_BC   =find_index('FFIRE_BC'   ,species_adv(:)%name )
+    iadv_FFIRE_OM   =find_index('FFIRE_OM'   ,species_adv(:)%name )
+    iadv_FFIRE_REMPPM25=find_index('FFIRE_REMPPM25',species_adv(:)%name )
+
+    if(iadv_NO3_C      >0)ug_NO3_C      =Units_Scale('ug', iadv_NO3_C      )
+    if(iadv_EC_C_WOOD  >0)ug_EC_C_WOOD  =Units_Scale('ug', iadv_EC_C_WOOD  )
+    if(iadv_EC_C_FFUEL >0)ug_EC_C_FFUEL =Units_Scale('ug', iadv_EC_C_FFUEL )
+    if(iadv_POM_C_FFUEL>0)ug_POM_C_FFUEL=Units_Scale('ug', iadv_POM_C_FFUEL)
+
+    if(iadv_SO4        >0) spec_SO4   = iadv_SO4 + NSPEC_SHL
+    if(iadv_NO3_F      >0) spec_NO3_F = iadv_NO3_F + NSPEC_SHL
+    if(iadv_NO3_C      >0) spec_NO3_C = iadv_NO3_C + NSPEC_SHL
+    if(iadv_NH4_F      >0) spec_NH4_F = iadv_NH4_F + NSPEC_SHL
+    if(iadv_EC_F_WOOD_AGE>0) spec_EC_F_WOOD_AGE = iadv_EC_F_WOOD_AGE + NSPEC_SHL
+    if(iadv_EC_F_FFUEL_AGE>0) spec_EC_F_FFUEL_AGE = iadv_EC_F_FFUEL_AGE + NSPEC_SHL
+    if(iadv_EC_F_WOOD_NEW>0) spec_EC_F_WOOD_NEW = iadv_EC_F_WOOD_NEW + NSPEC_SHL
+    if(iadv_EC_F_FFUEL_NEW>0) spec_EC_F_FFUEL_NEW = iadv_EC_F_FFUEL_NEW + NSPEC_SHL
+    if(iadv_PART_OM_F  >0) spec_PART_OM_F  = iadv_PART_OM_F   + NSPEC_SHL
+    if(iadv_SEASALT_F  >0) spec_SEASALT_F  = iadv_SEASALT_F   + NSPEC_SHL
+    if(iadv_SEASALT_C  >0) spec_SEASALT_C  = iadv_SEASALT_C   + NSPEC_SHL
+    if(iadv_REMPPM25   >0) spec_REMPPM25   = iadv_REMPPM25    + NSPEC_SHL
+    if(iadv_REMPPM_C   >0) spec_REMPPM_C   = iadv_REMPPM_C    + NSPEC_SHL
+    if(iadv_DUST_WB_F  >0) spec_DUST_WB_F  = iadv_DUST_WB_F   + NSPEC_SHL
+    if(iadv_DUST_WB_C  >0) spec_DUST_WB_C  = iadv_DUST_WB_C   + NSPEC_SHL
+    if(iadv_DUST_SAH_F >0) spec_DUST_SAH_F = iadv_DUST_SAH_F  + NSPEC_SHL
+    if(iadv_DUST_SAH_C >0) spec_DUST_SAH_C = iadv_DUST_SAH_C  + NSPEC_SHL
+    if(iadv_DUST_ROAD_F>0) spec_DUST_ROAD_F= iadv_DUST_ROAD_F + NSPEC_SHL
+    if(iadv_DUST_ROAD_C>0) spec_DUST_ROAD_C= iadv_DUST_ROAD_C + NSPEC_SHL
+    if(iadv_FFIRE_BC   >0) spec_FFIRE_BC   = iadv_FFIRE_BC    + NSPEC_SHL
+    if(iadv_FFIRE_OM   >0) spec_FFIRE_OM   = iadv_FFIRE_OM    + NSPEC_SHL
+    if(iadv_FFIRE_REMPPM25 >0) spec_FFIRE_REMPPM25 = iadv_FFIRE_REMPPM25+ NSPEC_SHL
+
+    call Define_Derived()
+    call Setups()  ! just for VOC now
+
+    select case(nint(diam(2)*1e7))
+    case(25);fracPM25=0.37
+    case(30);fracPM25=0.27
+    endselect
+    if(DEBUG)print *,  ' CFAC INIT PMFRACTION ', fracPM25, diam(2), nint(1.0e7*diam(2))
+    call CheckStop( fracPM25 < 0.01, "NEED TO SET FRACPM25")
+
+  end subroutine Init_Derived
 
    !=========================================================================
     subroutine AddNewDeriv( name,class,subclass,txt,unit,index,f2d,&
@@ -244,6 +338,7 @@ private
        logical, intent(in), optional :: Is3D
        type(Deriv) :: inderiv
 
+if( trim(name) == "HMIX" .and. MasterProc ) print *, "ADDNEWDERIVE", iotype !NOV2011
        inderiv = Deriv(trim(name),trim(class),trim(subclass),&
                            trim(txt),trim(unit),index,f2d,dt_scale, scale,&
                             avg,iotype)
@@ -298,12 +393,13 @@ private
 
     real    :: unitscale
     logical :: volunit   ! set true for volume units, e.g. ppb
-    logical :: outmm, outdd, outhh   ! sets time-intervals
+    logical :: outmm, outdd  ! sets time-intervals
 
     character(len=30) :: dname, txt, txt2, class
     character(len=10) :: unittxt
     character(len=3)  :: subclass
     character(len=TXTLEN_SHORT) ::  outname, outunit, outtyp, outdim
+    integer :: outind
 
    integer :: ind, iadv, itot, idebug, n, n2, iLC, igrp, iout
 
@@ -371,146 +467,167 @@ call AddNewDeriv( "AOT40_Grid", "GRIDAOT","subclass","-", "ppb h", &
 
 ! NOT YET: Scale pressure by 0.01 to get hPa
 call AddNewDeriv( "PSURF ","PSURF",  "SURF","-",   "hPa", &
-               -99,  -99,  F,  1.0,  T,   IOU_DAY ) 
+               -99,  -99,  F,  1.0,  T,   IOU_DAY )
 
-call AddNewDeriv( "HMIX  ","HMIX",  "-","-",   "m", &
-               -99,  -99,  F,  1.0,  T,  IOU_DAY ) 
 
 call AddNewDeriv( "Snow_m","SNOW",  "-","-",   "m", &
-               -99,  -99,  F,  1.0,  T,  IOU_DAY ) 
+               -99,  -99,  F,  1.0,  T,  IOU_DAY )
 
-! "HMIX00","HMIX12", ....
 
 call AddNewDeriv( "USTAR_NWP","USTAR_NWP",  "-","-",   "m/s", &
-               -99,  -99, F, 1.0,  T,  IOU_DAY ) 
-call AddNewDeriv( "ws_10m","ws_10m",  "-","-",   "m/s", &
-               -99,  -99, F, 1.0,  T,  IOU_DAY ) 
-call AddNewDeriv( "u_ref","u_ref",  "-","-",   "m/s", &
-               -99,  -99, F, 1.0,  T,  IOU_DAY ) 
-
-call AddNewDeriv( "SoilWater_deep","SoilWater_deep",  "-","-",   "m", &
                -99,  -99, F, 1.0,  T,  IOU_DAY )
+!Added for TFMM scale runs
+call AddNewDeriv( "Kz_m2s","Kz_m2s",  "-","-",   "m2/s", &
+               -99,  -99, F, 1.0,  T,  IOU_DAY )
+
+!Most met params are now better specified in My_Derived.
+!MOVED call AddNewDeriv( "ws_10m","ws_10m",  "-","-",   "m/s", &
+!MOVED call AddNewDeriv( "HMIX  ","HMIX",  "-","-",   "m", &
+! "HMIX00","HMIX12", ....
+
+call AddNewDeriv( "u_ref","u_ref",  "-","-",   "m/s", &
+               -99,  -99, F, 1.0,  T,  IOU_DAY )
+
+!call AddNewDeriv( "SoilWater_deep","SoilWater_deep",  "-","-",   "m", &
+!               -99,  -99, F, 1.0,  T,  IOU_DAY )
+!call AddNewDeriv( "SoilWater_uppr","SoilWater_uppr",  "-","-",   "m", &
+!               -99,  -99, F, 1.0,  T,  IOU_DAY )
 
        !Deriv(name, class,    subc,  txt,           unit
       !Deriv index, f2d, dt_scale, scale, avg? rho Inst Yr Mn Day atw
 
 call AddNewDeriv( "T2m","T2m",  "-","-",   "deg. C", &
-               -99,  -99, F, 1.0,  T,  IOU_DAY ) 
+               -99,  -99, F, 1.0,  T,  IOU_DAY )
 call AddNewDeriv( "Idirect","Idirect",  "-","-",   "W/m2", &
                -99,  -99, F, 1.0,  T,  IOU_DAY )
 call AddNewDeriv( "Idiffuse","Idiffuse",  "-","-",   "W/m2", &
                -99,  -99, F, 1.0,  T,  IOU_DAY )
 
 
-! OutputConcs can contain both 2d and 3d specs. We automatically
+! OutputFields can contain both 2d and 3d specs. We automatically
 ! set 2d if 3d wanted
 
-do ind = 1, size( OutputConcs(:)%txt1 )
+do ind = 1, nOutputFields  !!!!size( OutputFields(:)%txt1 )
 
-   outname = trim( OutputConcs(ind)%txt1 )
-   outunit= trim( OutputConcs(ind)%txt2 )   ! eg ugN, which gives unitstxt ugN/m3
-   outdim = trim( OutputConcs(ind)%txt3 )   ! 2d or 3d
-   outtyp = trim( OutputConcs(ind)%txt5 )   ! SPEC or GROUP
+   outname = trim( OutputFields(ind)%txt1 )
+   outunit= trim( OutputFields(ind)%txt2 )   ! eg ugN, which gives unitstxt ugN/m3
+   outdim = trim( OutputFields(ind)%txt3 )   ! 2d or 3d
+   outtyp = trim( OutputFields(ind)%txt5 )   ! SPEC or GROUP
+   outind = OutputFields(ind)%ind    !  H, D, M - fequency of output
    txt2   = "-" ! not needed?
 
-   if ( outtyp == "SPEC" ) then ! Simple species
+  if ( outtyp == "MISC" ) then ! Simple species
 
-     itot = find_index( trim( outname ) , species(:)%name ) 
-     iout = itot - NSPEC_SHL   ! set to iadv
+    iout  = -99 ! find_index( wanted_deriv2d(i), def_2d(:)%name )
+    class = trim(OutputFields(ind)%txt4)
+    unitscale = 1.0
+    if(outunit=="ppb") unitscale = PPBINV
+    if(any(class==(/"PM25      ","PM25X     ",&
+                    "PM25_rh50 ","PM25X_rh50","PM10_rh50 "/)))then
+      iadv = -1 ! Units_Scale(iadv=-1) returns 1.0
+                ! uggroup_calc gets the unit conversion factor from Group_Units
+      unitscale = Units_Scale(outunit, iadv, unittxt, volunit)
+      if(MasterProc) write(*,*)"FRACTION UNITSCALE ", unitscale
+    endif
 
-     if( MasterProc .and. itot <0 ) then
-        write(*,*) "ERROR! My_Derived has asked for a species to be output",&
-&                  " that isn't in the CM_ChemSpecs list (below). FIX!"
-        do i =1, size( species(:)%name ) 
-           write(*,"(a,i4,2a12)") "CONCLIST ", i, trim(species(i)%name ), trim(outname)
-        end do
-     call CheckStop(itot<0, "OutputConcs Species not found " // trim(dname) )
-     end if
-     txt = "SURF_UG"
+    if(MasterProc ) write(*,"(i3,a,i4,a)")  me, &
+        "Deriv:D2MET " // trim(outname), outind, trim(class)
 
-   else if ( outtyp == "GROUP" ) then ! groups of species
+    call AddNewDeriv( outname,class,  "-","-",  outunit, &
+                  iout,  -99,  F, unitscale,  T, outind )
 
-    igrp = find_index( trim( outname ), GROUP_ARRAY(:)%name )
+  else ! SPEC and GROUPS of specs.
 
-    txt = "SURF_UG_GROUP"   ! ppb not implementde yet
-    itot = -1
-    iout = igrp
-   else
+    select case(outtyp)
+    case("SPEC")  ! Simple species
+      iadv = find_index(outname, species_adv(:)%name )
+      call CheckStop(iadv<0,"OutputFields Species not found "//trim(outname))
+      txt = "SURF_UG"
+      iout = iadv
+    case("GROUP") ! groups of species
+      iadv = -1     ! Units_Scale(iadv=-1) returns 1.0
+                    ! uggroup_calc gets the unit conversion factor from Group_Units
+      igrp = find_index(outname, GROUP_ARRAY(:)%name )
+!-- Emergency: Volcanic Eruption. Skipp groups if not found
+      if(outname(1:3)=="ASH")then
+        if(MasterProc.and.USE_EMERGENCY.and.DEBUG_EMERGENCY)&
+          write(*,"(A,1X,I0,':',A)")'EMERGENCY: group ',igrp,trim(outname)
+        if(igrp<1)cycle
+      endif
+      call CheckStop(igrp<0,"OutputFields Group not found "//trim(outname))
+      txt = "SURF_UG_GROUP"   ! ppb not implementde yet
+      iout = igrp
+    case default
+      call StopAll("Derived:OutputFields Error "//trim(outtyp)//":"//trim(outname))
+    endselect
 
-     call StopAll("OutputConcs Error " // trim( outtyp ) )
-   end if
+    unitscale = Units_Scale(outunit, iadv, unittxt, volunit)
 
-   call Units_Scale( outunit , itot,  unitscale, unittxt, volunit )
+    class = "SURF_MASS_" // trim(outtyp)
+    if(volunit) class = "SURF_PPB_" // trim(outtyp)
+    call CheckStop(class=="SURF_PPB_GROUP",&
+      "SURF_PPB_GROUPS not implemented yet:"// trim(dname) )
 
-   class = "SURF_MASS_" // trim(outtyp)
-   if (  volunit .and. itot > 0 ) class = "SURF_PPB_" // trim(outtyp)
-   if (  volunit .and. itot < 1 ) call StopAll(&
-           "SURF_PPB_GROUPS not implemented yet:"// trim(dname) )
-                                                
-   dname = "SURF_" // trim( outunit ) // "_" // trim( outname )
+    dname = "SURF_" // trim( outunit ) // "_" // trim( outname )
 
-   if( DEBUG.and.MasterProc ) write(*,"(a,2i4,3(1x,a),2L3,i4,es10.2)") &
-        "ADD   ", ind, iout, trim(dname),";", trim(class), outmm, outdd, &
-              OutputConcs(ind)%ind,unitscale
+    if( DEBUG.and.MasterProc ) write(*,"(a,2i4,3(1x,a),2L3,i4,es10.2)") &
+    "ADD   ", ind, iout, trim(dname),";", trim(class), outmm, outdd, &
+          OutputFields(ind)%ind,unitscale
 
-   call AddNewDeriv( dname, class, "-", "-", trim( unittxt ) , &
-             iout  , -99,  F,   unitscale,     T,  OutputConcs(ind)%ind )
+    call AddNewDeriv( dname, class, "-", "-", trim( unittxt ) , &
+          iout  , -99,  F,   unitscale,     T,  OutputFields(ind)%ind )
 
-  if ( outdim == "3d" ) then
+    if(outdim == "3d") then
 
-     class = "3D_MASS_" // trim(outtyp)
-     if (  volunit .and. itot > 0 ) class = "3D_PPB_" // trim(outtyp)
+      class = "3D_MASS_"//trim(outtyp)
+      if(volunit .and. iadv > 0) class = "3D_PPB_"//trim(outtyp)
 
-     dname = "D3_" // trim( outunit ) // "_" // trim( outname )
+      dname = "D3_"//trim(outunit)//"_"//trim(outname)
 
-     ! Always print out 3D info. Good to help avoid using 3d unless really needed!
-     if( MasterProc ) write(*,"(a,3(1x,a),a,L3,a,L3,i4,es10.2)") " ADDED 3D outputs",  &
-      trim(dname)," ; class =", trim(class), ', monthly =',outmm,', daily =',outdd
-      !, OutputConcs(ind)%ind,unitscale
+      ! Always print out 3D info. Good to help avoid using 3d unless really needed!
+      if( MasterProc ) write(*,"(a,3(1x,a),a,L3,a,L3,i4,es10.2)") " ADDED 3D outputs",  &
+        trim(dname)," ; class =", trim(class), ', monthly =',outmm,', daily =',outdd
+        !, OutputFields(ind)%ind,unitscale
 
-     call AddNewDeriv( dname, class, "-", "-", trim( unittxt ) , &
-             iout  , -99, F,   unitscale,     T,   OutputConcs(ind)%ind, & 
-             Is3D=.true. )
+      call AddNewDeriv(dname, class, "-", "-", trim( unittxt ) , &
+          iout  , -99, F,   unitscale,     T,   OutputFields(ind)%ind, &
+          Is3D=.true. )
+    endif ! 3d
 
-  end if ! 3d
-end do ! OutputConcs
+   endif
+enddo ! OutputFields
 
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-do ind = 1, size( WDEP_WANTED(:)%txt1 )
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-  if ( WDEP_WANTED(ind)%txt2 == "PREC" ) then
+do ind = 1, size(WDEP_WANTED(:)%txt1)
+  dname = "WDEP_"//trim(WDEP_WANTED(ind)%txt1)
+  select case(WDEP_WANTED(ind)%txt2)
+  case("PREC")
+    call AddNewDeriv("WDEP_PREC","PREC ","-","-", "mm",  &
+                      -1, -99,   F,    1.0,   F,    IOU_DAY )
+  case("SPEC")
+    iadv = find_index(WDEP_WANTED(ind)%txt1, species_adv(:)%name)
+    call CheckStop(iadv<1, "WDEP_WANTED Species not found " // trim(dname) )
 
-     dname = "WDEP_" // trim(WDEP_WANTED( ind )%txt1) ! just for printout below
-     call AddNewDeriv( "WDEP_PREC","PREC ","-","-", "mm",  &
-                       -1, -99,   F,    1.0,   F,    IOU_DAY )
+    unitscale = Units_Scale(WDEP_WANTED(ind)%txt3, iadv, unittxt)
+    call AddNewDeriv( dname, "WDEP", "-", "-", unittxt , &
+            iadv, -99,   F, unitscale,     F,  IOU_DAY)
+  case("GROUP")
+    igrp = find_index(dname, chemgroups(:)%name)
+    call CheckStop(igrp<1, "WDEP_WANTED Group not found " // trim(dname) )
 
-  else if ( WDEP_WANTED(ind)%txt2 == "GROUP" ) then
-
-    ! just get units text here
-     call Units_Scale(WDEP_WANTED( ind )%txt3, -1,  unitscale, unittxt, volunit)
-
-     dname = "WDEP_" // trim(WDEP_WANTED( ind )%txt1) 
-     call AddNewDeriv( dname,  "WDEP ","-","-", unittxt ,  &
-                -1, -99,   F,    1.0e6,   F,    IOU_DAY ) 
-
-  else ! SPEC
-
-     itot = find_index( trim(WDEP_WANTED(ind)%txt1) , species(:)%name ) 
-     iadv = itot - NSPEC_SHL
-
-     ! Without units for now:
-     dname = "WDEP_" // trim(WDEP_WANTED( ind )%txt1)
-     call CheckStop(itot<0, "WDEP_WANTED Species not found " // trim(dname) )
-
-     call Units_Scale(WDEP_WANTED( ind )%txt3, itot,  unitscale, unittxt, volunit)
-     call AddNewDeriv( dname, "WDEP", "-", "-", unittxt , &
-              iadv , -99,   F,   unitscale,     F,  IOU_DAY ) 
-   end if
-   if(MasterProc) write(*,*) "Wet deposition output: ", trim(dname), " ",  trim(unittxt)
-end do
-
-call AddNewDeriv( "SURF_ppbC_VOC", "VOC", "-", "-", "ppb", &
-         -1 , -99,  F, PPBINV,  T,  IOU_DAY ) 
+    ! Just get units text here.
+    ! Init_WetDep gets the unit conversion factors from Group_Scale.
+    unitscale = Units_Scale(WDEP_WANTED(ind)%txt3, -1, unittxt)
+    call AddNewDeriv( dname,  "WDEP ","-","-", unittxt ,  &
+            igrp, -99,   F,      1.0,   F,    IOU_DAY)
+  case default
+    call CheckStop("Unknown WDEP_WANTED type " // trim(WDEP_WANTED(ind)%txt2) )
+  endselect
+  if(MasterProc) write(*,*)"Wet deposition output: ",trim(dname)," ",trim(unittxt)
+enddo
 
 !Emissions:
 ! We use mg/m2 outputs for consistency with depositions
@@ -520,23 +637,22 @@ call AddNewDeriv( "SURF_ppbC_VOC", "VOC", "-", "-", "ppb", &
 ! BVOC called every dt_advec, so use dt_scale=1.0e6 to get from kg/m2/s to
 !  mg/m2 accumulated (after multiplication by dt_advec)
 
-     !Deriv(name,       class,    subc,  txt,           unit
-     !Deriv index, f2d, dt_scale, scale, avg? rho Inst Yr Mn Day atw
+    ! AddNewDeriv( name,class,subclass,txt,unit,
+    !    index,f2d, dt_scale,scale, avg,iotype,Is3D)
 
-  do  ind = 1, size(BVOC_GROUP)
-     itot = BVOC_GROUP(ind)
-     dname = "Emis_mgm2_" // trim(species(itot)%name)
+  do  ind = 1, NEMIS_BioNat
+     dname = "Emis_mgm2_BioNat" // trim(EMIS_BioNat(ind) )
      call AddNewDeriv( dname, "NatEmis", "-", "-", "mg/m2", &
-                 ind , -99, T ,    1.0e6,     F, IOU_DAY )  
+                 ind , -99, T ,    1.0e6,     F, IOU_DAY )
    end do
 
 ! SNAP emissions called every hour, given in kg/m2/s, but added to
-! d_2d every advection step, so get kg/m2. 
+! d_2d every advection step, so get kg/m2.
 ! Need 1.0e6 to get from kg/m2 to mg/m2 accumulated.
 !
 ! Future option - might make use of Emis_Molwt to get mg(N)/m2
-do  ind = 1, size(EMIS_NAME)
-  dname = "Emis_mgm2_" // trim(EMIS_NAME(ind))
+do  ind = 1, size(EMIS_FILE)
+  dname = "Emis_mgm2_" // trim(EMIS_FILE(ind))
   call AddNewDeriv( dname, "SnapEmis", "-", "-", "mg/m2", &
                      ind , -99, T,  1.0e6,  F,  IOU_DAY )
 end do ! ind
@@ -544,19 +660,21 @@ end do ! ind
 
 call AddNewDeriv("SURF_PM25water", "PM25water", "-", "-", "-", &
                       -99 , -99, F, 1.0,   T,  IOU_DAY )
+!call AddNewDeriv("SURF_PM25", "PM25", "-", "-", "-", &
+!                      -99 , -99, F, 1.0,   T,  IOU_DAY )
 
 call AddNewDeriv("AOD", "AOD", "-", "-", "-", &
-                      -99 , -99, F, 1.0,   T, IOU_DAY ) 
+                      -99 , -99, F, 1.0,   T, IOU_DAY )
+
 
 ! As for GRIDAOT, we can use index for the threshold
 call AddNewDeriv( "SOMO35","SOMO",  "SURF","-",   "ppb.day", &
-                  35, -99, F, 1.0,   F,   IOU_MON ) 
+                  35, -99, F, 1.0,   F,   IOU_MON )
 call AddNewDeriv( "SOMO0 ","SOMO",  "SURF","-",   "ppb.day", &
-                  0 , -99, F, 1.0,   F,   IOU_MON ) 
-
+                  0 , -99, F, 1.0,   F,   IOU_MON )
+if(iadv_o3>0) &
 call AddNewDeriv( "SURF_MAXO3","MAXADV", "O3","-",   "ppb", &
-           IXADV_O3, -99, F, PPBINV,   F,   IOU_DAY) 
-
+           iadv_o3, -99, F, PPBINV,   F,   IOU_DAY)
 
 !-- 3-D fields
 
@@ -594,8 +712,15 @@ end do
     ind = find_index( wanted_deriv2d(i), def_2d(:)%name )
     if (ind>0) then
       f_2d(i) = def_2d(ind)
+      if ( found_ind2d(ind) > 0 ) then
+          print *, "D2IND", me, trim( wanted_deriv2d(i) )
+          do n = 1, size(def_2d(:)%name)
+             print *, "D2IND def2d", n, trim( def_2d(n)%name )
+          end do
+
       call CheckStop ( found_ind2d(ind) > 0,  &
         "REQUESTED 2D DERIVED ALREADY DEFINED: " // trim( def_2d(ind)%name) )
+       end if
       found_ind2d(ind)  = 1
     else
       print *,"OOOPS wanted_deriv2d not found: ", wanted_deriv2d(i)
@@ -644,11 +769,13 @@ end do
   if (SOURCE_RECEPTOR.and..not.FORECAST)&  ! We assume that no daily & hourly outputs
     iou_max=IOU_MON                        ! are wanted on SOURCE_RECEPTOR mode
 
-  if (SOURCE_RECEPTOR) &                   ! We need yearly for SR always 
+  if (SOURCE_RECEPTOR) &                   ! We need yearly for SR always
     iou_min=IOU_YEAR                       !
 
   if (FORECAST) &                          ! Only dayly & hourly outputs
     iou_min=IOU_DAY                        ! are wanted on FORECAST mode
+
+  if (MasterProc) print "(a,2i4)","IOU_MAX ",  iou_max, iou_min
 
   end subroutine Define_Derived
  !=========================================================================
@@ -684,7 +811,8 @@ end do
             end if
           end do
          !====================================================================
-          if (DEBUG  .and. MasterProc )then
+          !if (DEBUG  .and. MasterProc )then
+          if ( MasterProc )then
                write(6,*) "Derived VOC setup returns ", nvoc, "vocs"
                write(6,"(a12,/,(20i3))")  "indices ", voc_index(1:nvoc)
                write(6,"(a12,/,(20i3))")  "carbons ", voc_carbon(1:nvoc)
@@ -721,9 +849,11 @@ end do
       real, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID) :: inv_air_density3D
                 ! Inverse of No. air mols/cm3 = 1/M
                 ! where M =  roa (kgair m-3) * MFAC  when ! scale in ug,  else 1
-      logical :: first_call = .true.
+      logical, save :: first_call = .true.
       integer :: ipm25, ipmc ! will save some calcs for pm10
-      integer :: igrp, ngrp  !  DS new group methods
+      integer :: igrp, ngrp  ! group methods
+      integer, save :: ind_pmfine = -999, ind_pmwater = -999, & !needed for PM25
+                       ind_pm10 = -999
 
       timefrac = dt/3600.0
       thour = current_date%hour+current_date%seconds/3600.0
@@ -732,7 +862,7 @@ end do
                              current_date%day)
 
 
-     ! Jan 2011 - just calculate once, and use where needed
+     ! Just calculate once, and use where needed
 
       forall ( i=1:limax, j=1:ljmax )
            density(i,j) = roa(i,j,KMAX_MID,1)
@@ -773,8 +903,9 @@ end do
         end if
 
         index = f_2d(n)%index
-        if ( DEBUG .and. MasterProc .and. first_call ) then
-           write(*,"(a,i4,a,i4,a)") "DEBUG Derived 2d", n, &
+        !if ( DEBUG .and. MasterProc .and. first_call ) then
+        if (  MasterProc .and. first_call ) then
+           write(*,"(a,i4,a,i4,a)") "1st call Derived 2d", n, &
               trim(f_2d(n)%name), index, trim(typ)
         end if
 
@@ -783,25 +914,38 @@ end do
             forall ( i=1:limax, j=1:ljmax )
               d_2d( n, i,j,IOU_INST) = ustar_nwp(i,j)
           end forall
+         case ( "Kz_m2s" )
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = Kz_m2s(i,j,KMAX_BND-1)
+            end forall
           case ( "ws_10m" )
             forall ( i=1:limax, j=1:ljmax )
               d_2d( n, i,j,IOU_INST) = ws_10m(i,j,1)
+          end forall
+          case ( "rh2m" )
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = rh2m(i,j,1)
           end forall
           case ( "u_ref" )
             forall ( i=1:limax, j=1:ljmax )
               d_2d( n, i,j,IOU_INST) = u_ref(i,j)
           end forall
 
-          case ( "SoilWater_deep" )
+          !case ( "SoilWater_deep" )
+          case ( "SMI_deep" )
             forall ( i=1:limax, j=1:ljmax )
               d_2d( n, i,j,IOU_INST) = SoilWater_deep(i,j,1)
           end forall
           if ( debug_flag ) call write_debug(n,index, "SoilWater_DEEP")
+          !if(debug_flag) print *, "SOILW_DEEP ", n, SoilWater_deep(2,2,1)
 
-          case ( "SoilWater" ) ! Not used so far. (=shallow)
+          !case ( "SoilWater_uppr" ) ! Not used so far. (=shallow)
+          case ( "SMI_uppr" )
             forall ( i=1:limax, j=1:ljmax )
-              d_2d( n, i,j,IOU_INST) = SoilWater_deep(i,j,1)
+              d_2d( n, i,j,IOU_INST) = SoilWater_uppr(i,j,1)
           end forall
+          if ( debug_flag ) call write_debug(n,index, "SoilWater_uppr")
+          !if(debug_flag) print *, "SOILW_UPPR ",  n,  SoilWater_uppr(2,2,1)
 
           case ( "T2m" )
             forall ( i=1:limax, j=1:ljmax )
@@ -832,7 +976,6 @@ end do
               d_2d( n, i,j,IOU_INST) = ps(i,j,1)*0.01
               !NOT YET - keep hPa in sites:d_2d( n, i,j,IOU_INST) = ps(i,j,1)
             end forall
-
 
           case ( "HMIX", "HMIX00", "HMIX12" )
 
@@ -866,23 +1009,132 @@ end do
             forall ( i=1:limax, j=1:ljmax )
               d_2d( n, i,j,IOU_INST) = PM25_water_rh50(i,j)
             end forall
+            ind_pmwater = n
+
+          case ( "PM25" )      ! Need to add PMFINE + fraction NO3_c
+            if(first_call)then
+              call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
+              call CheckStop(iadv_NO3_C<1,"Unknown specie NO3_C")
+            endif
+
+            !scale = 62.0
+            ! All this size class has the same cfac.
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = d_2d(ind_pmfine,i,j,IOU_INST) + &
+                                       fracPM25 * &
+                  ( xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
+                  ) * cfac(iadv_NO3_C,i,j) * density(i,j)
+            end forall
+
+          case ( "PM25_rh50" )      ! Need to add PMFINE + fraction NO3_c
+            if(first_call)then
+              call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
+              call CheckStop(iadv_NO3_C<1,"Unknown specie NO3_C")
+            endif
+
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = d_2d(ind_pmfine ,i,j,IOU_INST) &
+!                                    + PM25_water_rh50(i,j)*ATWAIR/PPBINV  &
+                                     + d_2d(ind_pmwater,i,j,IOU_INST) &
+                                     + fracPM25 * &
+                  ( xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
+                  ) * cfac(iadv_NO3_C,i,j) * density(i,j)
+            end forall
+
+          case ( "PM25X" )      ! Need to add PMFINE + fraction NO3_c
+            if(first_call)then
+              call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
+            endif
+            if (iadv_NO3_C      < 1 .or. & 
+                iadv_EC_C_WOOD  < 1 .or. & 
+                iadv_EC_C_FFUEL < 1 .or. & 
+                iadv_POM_C_FFUEL< 1 ) then
+                if ( first_call ) write(*,*) &
+                     "WARNING: Derived - not all PM25X species present. Skipping"
+                cycle   !! Skip this case
+            end if
+
+            !scale = 62.0
+            ! All this size class has the same cfac.
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = d_2d(ind_pmfine,i,j,IOU_INST) + &
+                                       fracPM25 * &
+                  ( xn_adv(iadv_NO3_C      ,i,j,KMAX_MID) * ug_NO3_C       &
+                  + xn_adv(iadv_EC_C_WOOD  ,i,j,KMAX_MID) * ug_EC_C_WOOD   &
+                  + xn_adv(iadv_EC_C_FFUEL ,i,j,KMAX_MID) * ug_EC_C_FFUEL  &
+                  + xn_adv(iadv_POM_C_FFUEL,i,j,KMAX_MID) * ug_POM_C_FFUEL &
+                  ) * cfac(iadv_NO3_C,i,j) * density(i,j)
+            end forall
+
+         case ( "PM25X_rh50" )      ! Need to add PMFINE + fraction NO3_c + water
+            if(first_call)then
+              call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
+            endif
+            if (iadv_NO3_C      < 1 .or. & 
+                iadv_EC_C_WOOD  < 1 .or. & 
+                iadv_EC_C_FFUEL < 1 .or. & 
+                iadv_POM_C_FFUEL< 1 ) then
+                if ( first_call ) write(*,*) &
+                     "WARNING: Derived - not all PM25X_rh50 species present. Skipping"
+                cycle   !! Skip this case
+            end if
+
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = d_2d(ind_pmfine ,i,j,IOU_INST) &
+!                                    + PM25_water_rh50(i,j)*ATWAIR/PPBINV &
+                                     + d_2d(ind_pmwater,i,j,IOU_INST) &
+                                     + fracPM25 * &
+                  ( xn_adv(iadv_NO3_C      ,i,j,KMAX_MID) * ug_NO3_C       &
+                  + xn_adv(iadv_EC_C_WOOD  ,i,j,KMAX_MID) * ug_EC_C_WOOD   &
+                  + xn_adv(iadv_EC_C_FFUEL ,i,j,KMAX_MID) * ug_EC_C_FFUEL  &
+                  + xn_adv(iadv_POM_C_FFUEL,i,j,KMAX_MID) * ug_POM_C_FFUEL &
+                  ) * cfac(iadv_NO3_C,i,j) * density(i,j)
+            end forall
+
+          case ( "PM10_rh50" )      ! Need to add PMFINE + fraction NO3_c
+            forall ( i=1:limax, j=1:ljmax )
+              d_2d( n, i,j,IOU_INST) = d_2d(ind_pm10   ,i,j,IOU_INST) &
+!                                    + PM25_water_rh50(i,j)*ATWAIR/PPBINV &
+                                     + d_2d(ind_pmwater,i,j,IOU_INST)
+            end forall
+
+            if(DEBUG.and. debug_proc )  then
+              if(first_call)then
+                call CheckStop(f_2d(n)%unit/="ug","Wrong unit for "//trim(typ))
+                call CheckStop(iadv_NO3_C      <1,"Unknown specie NO3_C")
+                call CheckStop(iadv_EC_C_WOOD  <1,"Unknown specie EC_C_WOOD")
+                call CheckStop(iadv_EC_C_FFUEL <1,"Unknown specie EC_C_FFUEL")
+                call CheckStop(iadv_POM_C_FFUEL<1,"Unknown specie POM_C_FFUEL")
+              endif
+              write(*,*) "FRACTION PM25", n, ind_pmfine, ind_pmwater
+              i= debug_li; j=debug_lj
+              write(*,"(a,2i4,4es12.3)") "Adding PM25FRACTIONS:", n, ind_pmfine,  &
+!                 PM25_water_rh50(i,j)* ATWAIR/PPBINV, &
+                  d_2d(ind_pmwater,i,j,IOU_INST), &
+                  d_2d(ind_pmfine ,i,j,IOU_INST), d_2d( n, i,j,IOU_INST), &
+                  ug_NO3_C * xn_adv(iadv_NO3_C,i,j,KMAX_MID) &
+                           * cfac(iadv_NO3_C,i,j) * density(i,j)
+              write(*,"(a,i4,f5.2,4es12.3)") "CFAC PM25FRACTIONS:", n, fracPM25,  &
+                      cfac(iadv_NO3_C    ,i,j), cfac(iadv_POM_C_FFUEL,i,j), &
+                      cfac(iadv_EC_C_WOOD,i,j), cfac(iadv_EC_C_FFUEL ,i,j)
+            endif
 
           case ( "AOD" )        !/ Aerosol Optical Depth
 
             forall ( i=1:limax, j=1:ljmax )
-              d_2d( n, i,j,IOU_INST) = AOD(i,j)   
+              d_2d( n, i,j,IOU_INST) = AOD(i,j)
             end forall
 
           case ( "MAXADV" )
 
-            if (  f_2d(n)%unit == "ppb"  ) then 
+            if (  f_2d(n)%unit == "ppb"  ) then
 
                d_2d( n, 1:limax,1:ljmax,IOU_DAY) = &
                  max( d_2d( n, 1:limax,1:ljmax,IOU_DAY),  &
                       xn_adv(index,1:limax,1:ljmax,KMAX_MID)  &
                      * cfac(index,1:limax,1:ljmax) )
                txt2 = "MAXADV ppb for " // trim( f_2d(n)%name)
-             else 
+             else
                d_2d( n, 1:limax,1:ljmax,IOU_DAY) = &
                  max( d_2d( n, 1:limax,1:ljmax,IOU_DAY),  &
                       xn_adv(index,1:limax,1:ljmax,KMAX_MID)  &
@@ -943,9 +1195,11 @@ end do
 
             call voc_2dcalc()
 
-          case( "GRIDAOT" )    !  Hardly used these days. The vegetation-specific
+          case( "GRIDAOT" )!  Hardly used these days. The vegetation-specific
                            !  AOTs are handled in the Mosaic class and as
                            !  part of the dry dep calculations.
+            if(first_call)&
+              call CheckStop(iadv_o3<1,"Unknown specie O3")
 
             d_2d(n, 1:limax, 1:ljmax, IOU_INST) = &
                  Calc_GridAOTx( f_2d(n)%index, debug_proc,"DERIVAOT")
@@ -953,13 +1207,14 @@ end do
            if( DEBUG_AOT .and. debug_proc ) then
              call datewrite("AOTDEBUG" // trim(f_2d(n)%name), n, &
                (/ zen(debug_li,debug_lj), real(f_2d(n)%index), &
-                  xn_adv(IXADV_O3,debug_li,debug_lj,KMAX_MID)*&
-                     cfac(IXADV_O3,debug_li,debug_lj)*PPBINV, &
+                  xn_adv(iadv_O3,debug_li,debug_lj,KMAX_MID)*&
+                     cfac(iadv_O3,debug_li,debug_lj)*PPBINV, &
                   d_2d(n, debug_li, debug_lj, IOU_INST )  /) )
            end if
 
            case( "SOMO" )
-
+            if(first_call)&
+              call CheckStop(iadv_o3<1,"Unknown specie O3")
 
               !dt/7200: half a dt time step in hours
               !dayfrac "points" to the middle of the integration step
@@ -969,12 +1224,12 @@ end do
 
         !last value  (not averaged):
           D2_O3_DAY( : , : , ntime) =&
-           xn_adv(IXADV_O3,:,:,KMAX_MID)*cfac(IXADV_O3,:,:)*PPBINV
+           xn_adv(iadv_o3,:,:,KMAX_MID)*cfac(iadv_o3,:,:)*PPBINV
 
               if(dayfrac<0)then !only at midnight: write on d_2d
 
 
-                 call somo_calc( n, f_2d(n)%index, DEBUG .and. debug_proc ) 
+                 call somo_calc( n, f_2d(n)%index, DEBUG .and. debug_proc )
                  d_2d(n,:,:,IOU_MON )  = d_2d(n,:,:,IOU_MON )  + d_2d(n,:,:,IOU_DAY)
 
                 ! if(current_date%month>=4.and.current_date%month<=9)then
@@ -983,7 +1238,7 @@ end do
               endif
 
 
-          case ( "PREC", "WDEP", "DDEP", "VG" ,"Rs", "Rns", "Gns", "Mosaic", "POD", "AOT" )
+          case ( "PREC", "WDEP", "DDEP", "VG" ,"Rs", "Rns", "Gns", "Mosaic", "POD", "SPOD", "AOT" )
 !            if ( debug_flag ) write(*,"(2a,i4,a,es12.3)")"PROCESS ",trim(typ),&
 !                   n, trim(f_2d(n)%name), d_2d(n,debug_li,debug_lj,IOU_INST)
 !            Nothing to do - all set in My_DryDep
@@ -1022,7 +1277,6 @@ end do
                      d_2d( n, debug_li, debug_lj, IOU_INST)
 
 
-          !case ( "ECOAREA" )
          case ( "EcoFrac" ) ! ODD TO HAVE FRAC AND AREA BELOW:"ECOAREA" )
 
             if( .not. first_call ) cycle ! Only need to do once
@@ -1047,13 +1301,13 @@ end do
           case ( "NatEmis" ) !emissions in kg/m2/s converted??
 
               forall ( i=1:limax, j=1:ljmax )
-                  d_2d(n,i,j,IOU_INST) =  EmisNat( i,j, f_2d(n)%Index)
+                  d_2d(n,i,j,IOU_INST) =  EmisNat( f_2d(n)%Index,i,j )
               end forall
               !Not done, keep mg/m2  * GridArea_m2(i,j)
               if ( debug_flag ) call write_debug(n,f_2d(n)%Index, "NatEmis")
             if( debug_flag ) &
               call datewrite("NatEmis-in-Derived, still kg/m2/s", &
-                f_2d(n)%Index, (/ EmisNat( debug_li,debug_lj, f_2d(n)%Index) /) )
+                f_2d(n)%Index, (/ EmisNat( f_2d(n)%Index, debug_li,debug_lj) /) )
 
           case ( "SnapEmis" ) !emissions in kg/m2/s converted??
 
@@ -1075,22 +1329,44 @@ end do
                    n, f_2d(n)%name, " is ", d_2d(n,debug_li,debug_lj,IOU_INST)
 
 
-          case ( "SURF_MASS_GROUP" ) ! 
-            igrp = f_2d(n)%index 
+          case ( "SURF_MASS_GROUP" ) !
+            igrp = f_2d(n)%index
             call CheckStop(igrp<1, "NEG GRP "//trim(f_2d(n)%name) )
             call CheckStop(igrp>size( GROUP_ARRAY(:)%name ), &
                  "Outside GRP "//trim(f_2d(n)%name) )
             ngrp = GROUP_ARRAY(igrp)%Ngroup
+
+            if( GROUP_ARRAY(igrp)%name == "PMFINE" .and. ind_pmfine<0 ) then
+               ind_pmfine = n
+               if( MasterProc) write(*,"(a,2i4,2a15)") "FOUND FINE FRACTION ",&
+                   n, ind_pmfine, &
+                     trim(GROUP_ARRAY(igrp)%name), trim(f_2d(n)%name)
+            end if
+            if( GROUP_ARRAY(igrp)%name == "PM10" .and. ind_pm10<0 ) then
+               ind_pm10 = n
+               if( MasterProc) write(*,"(a,2i4,2a15)") "FOUND PM10 FRACTION ",&
+                   n, ind_pm10, &
+                     trim(GROUP_ARRAY(igrp)%name), trim(f_2d(n)%name)
+            end if
             if(DEBUG.and. MasterProc ) then
                 write(*,*) "CASEGRP ", n, igrp, ngrp, trim(typ)
                 write(*,*) "CASENAM ", trim(f_2d(n)%name)
-                write(*,*) "CASEGRP:", GROUP_ARRAY(igrp)%itot(1:ngrp) 
+                write(*,*) "CASEGRP:", GROUP_ARRAY(igrp)%itot(1:ngrp)
                 write(*,*) "CASEunit", trim(f_2d(n)%unit)
             end if
-            call uggroup_calc( d_2d(n,:,:,IOU_INST), n, typ, &
-              GROUP_ARRAY(igrp)%itot(1:ngrp) ,  density, 0, &
-              GROUP_ARRAY(igrp)%name )
+            call uggroup_calc(d_2d(n,:,:,IOU_INST), density, &
+                              f_2d(n)%unit, 0, igrp)
 
+            if(DEBUG.and. debug_proc .and. n==ind_pmfine )  then
+                i= debug_li; j=debug_lj
+                write(*,"(a,2i4,3es12.3)") "PMFINE FRACTION:", n, ind_pmfine,  &
+                   d_2d(ind_pmfine,i,j,IOU_INST)
+            end if
+            if(DEBUG.and. debug_proc .and. n==ind_pm10 )  then
+                i= debug_li; j=debug_lj
+                write(*,"(a,2i4,3es12.3)") "PM10 FRACTION:", n, ind_pm10,  &
+                   d_2d(ind_pm10,i,j,IOU_INST)
+            end if
 
           case  default
 
@@ -1120,6 +1396,7 @@ end do
             af = dt_advec
         end if
 
+!print *, "D2Ding", me, n, trim(f_2d(n)%name)
         d_2d(n,:,:,IOU_DAY )  = d_2d(n,:,:,IOU_DAY )  + af*d_2d(n,:,:,IOU_INST)
         if ( f_2d(n)%avg ) nav_2d(n,IOU_DAY) = nav_2d(n,IOU_DAY) + 1
 
@@ -1130,14 +1407,17 @@ end do
                  d_2d(n,:,:,IOU_YEAR ) + af*d_2d(n,:,:,IOU_INST)
         if ( f_2d(n)%avg ) nav_2d(n,IOU_YEAR) = nav_2d(n,IOU_YEAR) + 1
 
-        if( debug_flag .and. n == 27  ) & ! C5H8 BvocEmis:
-              call datewrite("NatEmis-end-Derived", n, (/ af, & 
-                 SumSnapEmis( debug_li,debug_lj, f_2d(n)%Index), &
-                 d_2d(n,debug_li,debug_lj,IOU_INST), &
-                 d_2d(n,debug_li,debug_lj,IOU_DAY), &
-                 d_2d(n,debug_li,debug_lj,IOU_MON), &
-                 d_2d(n,debug_li,debug_lj,IOU_YEAR) &
-               /) )
+        !if( debug_flag .and. n == 27  ) then ! C5H8 BvocEmis:
+        !if(  n == 27  ) then ! C5H8 BvocEmis:
+        !   print *, " TESTING NatEmis ", n, af, f_2d(n)%Index, f_2d(n)
+        !      call datewrite("NatEmis-end-Derived", n, (/ af, &
+        !         SumSnapEmis( debug_li,debug_lj, f_2d(n)%Index), &
+        !         d_2d(n,debug_li,debug_lj,IOU_INST), &
+        !         d_2d(n,debug_li,debug_lj,IOU_DAY), &
+        !         d_2d(n,debug_li,debug_lj,IOU_MON), &
+        !         d_2d(n,debug_li,debug_lj,IOU_YEAR) &
+        !       /) )
+        !end if
 
      end do   ! num_deriv2d
 
@@ -1153,7 +1433,7 @@ end do
 
         index = f_3d(n)%index
 
-       if (  f_3d(n)%unit == "ppb"  ) then 
+       if (  f_3d(n)%unit == "ppb"  ) then
             inv_air_density3D(:,:,:) = 1.0
        else  !OLD if ( f_3d(n)%rho ) then
             forall ( i=1:limax, j=1:ljmax, k=1:KMAX_MID )
@@ -1194,17 +1474,17 @@ end do
               d_3d( n, i,j,k,IOU_INST) = th(i,j,k,1)
             end forall
 
-         case ("T   " ) ! Absolute Temperature                                                                                                 
+         case ("T   " ) ! Absolute Temperature
 
             forall ( i=1:limax, j=1:ljmax, k=1:KMAX_MID )
                d_3d( n, i,j,k,IOU_INST) = th(i,j,k,1)&
                    *exp(KAPPA*log((PT+sigma_mid(k)*(ps(i,j,1) - PT))*1.e-5))
-                 !NB: PT and PS in Pa                                               
+                 !NB: PT and PS in Pa
             end forall
 
          case ( "MAX3DSHL" ) ! Daily maxima - short-lived
 
-            if (  f_3d(n)%unit == "ppb"  ) then 
+            if (  f_3d(n)%unit == "ppb"  ) then
               call CheckStop("Asked for MAX3DSHL ppb ")
             else
               forall ( i=1:limax, j=1:ljmax, k=1:KMAX_MID )
@@ -1253,8 +1533,8 @@ end do
             end forall
            if ( debug_flag ) call write_debugadv(n,index, 1.0, "3D UG OUTS")
 
-        case ( "3D_MASS_GROUP" ) ! 
-            igrp = f_3d(n)%index 
+        case ( "3D_MASS_GROUP" ) !
+            igrp = f_3d(n)%index
             call CheckStop(igrp<1, "NEG GRP "//trim(f_3d(n)%name) )
             call CheckStop(igrp>size( GROUP_ARRAY(:)%name ), &
                  "Outside GRP "//trim(f_3d(n)%name) )
@@ -1262,15 +1542,13 @@ end do
             if(DEBUG.and. MasterProc ) then
                 write(*,*) "3DCASEGRP ", n, igrp, ngrp, trim(typ)
                 write(*,*) "3DCASENAM ", trim(f_3d(n)%name)
-                write(*,*) "3DCASEGRP:", GROUP_ARRAY(igrp)%itot(1:ngrp) 
+                write(*,*) "3DCASEGRP:", GROUP_ARRAY(igrp)%itot(1:ngrp)
                 write(*,*) "3DCASEunit", trim(f_3d(n)%unit)
-            end if
-
+            endif
             do k=1,KMAX_MID
-              call uggroup_calc( d_3d(n,:,:,k,IOU_INST), n, typ, &
-                  GROUP_ARRAY(igrp)%itot(1:ngrp) , &
-                        roa(:,:,k,1), k, GROUP_ARRAY(igrp)%name )
-            end do
+              call uggroup_calc(d_3d(n,:,:,k,IOU_INST), roa(:,:,k,1), &
+                                f_3d(n)%unit, k, igrp)
+            enddo
 
          case ( "Kz" )
 
@@ -1403,13 +1681,13 @@ end do
       integer, intent(in) :: period   ! Either IOU_DAY or IOU_MON
 
        if ( period <= LENOUT2D ) then
-           nav_2d  (:,period) = 0.0
+           nav_2d  (:,period) = 0
            d_2d(:,:,:,period) = 0.0
        end if
 
 
        if ( num_deriv3d > 0 .and.  period <= LENOUT3D ) then
-           nav_3d    (:,period) = 0.0
+           nav_3d    (:,period) = 0
            d_3d(:,:,:,:,period) = 0.0
        end if
 
@@ -1458,78 +1736,37 @@ end do
 
    end subroutine voc_3dcalc
  !=========================================================================
- subroutine uggroup_calc( ug_2d, n, class, group, density, ik, gname)
+subroutine uggroup_calc( ug_2d, density, unit, ik, igrp)
 
   !/--  calulates e.g. SIA = SO4 + pNO3_f + pNO3_c + aNH4
   ! (only SIA converted to new group system so far, rv3_5_6 )
   !/--  calulates also PM10  = SIA + PPM2.5 + PPMCOARSE
 
-  real, dimension(:,:), intent(inout) :: ug_2d  ! i,j section of d_2d arrays
-  character(len=*)    :: class   ! Type of data
-  integer, intent(in)  :: n   !
-  !character(len=*)    :: unit   !
-  integer, intent(in), dimension(:)  :: group
+  real, dimension(:,:), intent(out) :: ug_2d  ! i,j section of d_2d arrays
   real, intent(in), dimension(MAXLIMAX,MAXLJMAX)  :: density
-  integer, intent(in) :: ik
-  character(len=*),intent(in), optional    :: gname   ! group name
-  integer :: ig, iadv, itot,k
-  real :: scale
-  character(len=10) :: unit=""
+  character(len=*), intent(in) :: unit
+  integer, intent(in) :: ik,igrp
 
-  if(DEBUG .and. debug_proc) then
-    write(*,"(a,i4,L1,2i4)") "DEBUG GROUP-PM-N", size(group),debug_proc,me,ik
-    if ( present(gname ) ) write(*,*) " GNAME ", trim(gname)
-  end if
+  integer, pointer, dimension(:) :: gspec=>null()       ! group array of indexes
+  real,    pointer, dimension(:) :: gunit_conv=>null()  ! & unit conv. factors
 
-  if     (ik==0 .and. n<=num_deriv2d) then
-    k=KMAX_MID
-    unit=f_2d(n)%unit
-  elseif (ik/=0 .and. n<=num_deriv3d) then
-    k=ik
-    unit=f_3d(n)%unit
+  if(DEBUG.and.debug_proc) &
+    write(*,"(a,L1,2i4)") "DEBUG GROUP-PM-N",debug_proc,me,ik
+  call CheckStop(unit(1:2)/="ug","uggroup: Invalid deriv/level")
+  call Group_Units(igrp,unit,gspec,gunit_conv,debug=DEBUG.and.debug_proc)
+
+  if(ik==0)then
+    forall(i=1:limax,j=1:ljmax) &
+      ug_2d(i,j) = dot_product(xn_adv(gspec(:),i,j,KMAX_MID),&
+                               cfac(gspec(:),i,j)*gunit_conv(:)) &
+                 * density(i,j)
   else
-    k=-1
-    unit="not_found"
+    forall(i=1:limax,j=1:ljmax) &
+      ug_2d(i,j) = dot_product(xn_adv(gspec(:),i,j,ik),gunit_conv(:)) &
+                 * density(i,j)
   endif
-
-  ug_2d( :,:) = 0.0
-  scale = 0.0 ! safety
-  do ig = 1, size(group)
-    itot = group(ig)
-    iadv = group(ig) - NSPEC_SHL
-
-    select case (trim(unit))
-      case("ug/m3" ); scale = species(itot)%molwt
-      case("ugN/m3"); scale = species(itot)%nitrogens
-      case default 
-       if(ik==0)  print *, "uggroup Wrong Units 2d "//trim(f_2d(n)%name)
-       if(ik/=0)  print *, "uggroup Wrong Units 3d "//trim(f_3d(n)%name)
-       call StopAll("uggroup called with wrong unit='"//unit//"'!")
-    end select
-
-    if(ik==0)then
-      forall ( i=1:limax, j=1:ljmax )
-        ug_2d( i,j) = ug_2d( i,j) + xn_adv(iadv,i,j,k) *scale * cfac(iadv,i,j)
-      end forall
-    else
-      forall ( i=1:limax, j=1:ljmax )
-        ug_2d( i,j) = ug_2d( i,j) + xn_adv(iadv,i,j,k) *scale
-      end forall
-    endif
-
-   if(DEBUG .and. debug_proc) then
-      i=debug_li
-      j=debug_lj
-      write(*,"(a,i4,a,2i4,f6.1,2es12.3)") "DEBUG GROUP-PM", ig, &
-        trim(species(itot)%name), iadv, species(itot)%molwt,&
-           scale, xn_adv(iadv,i,j,k), ug_2d(i,j)
-    end if
-  end do !n
-  forall ( i=1:limax, j=1:ljmax )
-    ug_2d( i,j) = ug_2d( i,j) * density(i,j)
-  end forall
-
- end subroutine uggroup_calc
+  deallocate(gspec,gunit_conv)
+end subroutine uggroup_calc
  !=========================================================================
 
   subroutine somo_calc( n, iX, debug_flag )
@@ -1570,7 +1807,7 @@ end do
            if ( debug_flag .and. i==debug_li .and. j==debug_lj ) then
              write(*,"(a,2i4,f12.3)") "SOMO DEBUG ", n, iX, o3
            end if
-   
+
 
            o3 = max( o3 - iX , 0.0 )   ! Definition of SOMOs
 
@@ -1606,52 +1843,4 @@ end do
     end subroutine write_debug
 
  !=========================================================================
-    subroutine Units_Scale(txt,itot,unitscale,unitstxt, volunit)
-      character(len=*), intent(in) :: txt
-      integer, intent(in) :: itot  ! species index, used if > 0
-      real, intent(out) :: unitscale
-      character(len=*), intent(out) :: unitstxt
-      logical, intent(out) :: volunit
-
-    real, save    :: ugSm3 = atwS*PPBINV/ATWAIR
-    real, save    :: ugNm3 = atwN*PPBINV/ATWAIR
-    real, save    :: ugCm3 = 12*PPBINV/ATWAIR
-    real, save    :: ugXm3 = PPBINV/ATWAIR   ! will be multiplied by molwwt(X)
-!ds    real, save    :: ugPM  = PPBINV /ATWAIR  ! No multiplication needed
-
-    volunit = .false.
-
-  if ( txt .eq.  "ugS" ) then
-      unitscale = ugSm3
-      unitstxt  = "ugS/m3"
-  else if ( txt .eq.  "ugN" ) then
-      unitscale = ugNm3
-      unitstxt  = "ugN/m3"
-  else if ( txt .eq.  "ugC" ) then
-      unitscale = ugCm3
-      unitstxt  = "ugC/m3"
-  else if ( txt .eq.  "ug" ) then
-      unitscale = ugXm3  ! will be multplied by species(itot)%molwt later
-      unitstxt  = "ug/m3"
-      if( itot>0) unitscale = ugXm3 * species(itot)%molwt
-
-  else if ( txt .eq.  "ppb" ) then
-      unitscale = PPBINV
-      unitstxt  = "ppb"
-      volunit = .true.
-
-  else if ( txt .eq.  "mgS" ) then  ! For wet deposition
-      unitscale = 1.0e6
-      unitstxt  = "mgS/m2"
-  else if ( txt .eq.  "mgN" ) then
-      unitscale = 1.0e6
-      unitstxt  = "mgN/m2"
-  else if ( txt .eq.  "mgSS" ) then
-      unitscale = 1.0e6
-      unitstxt  = "mg/m2"
-  else
-      call StopAll("Units Scale Error "// txt )
-  end if
-  end subroutine Units_Scale
-
 end module Derived_ml

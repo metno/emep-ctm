@@ -38,7 +38,7 @@ use Wesely_ml,         only: NDRYDEP_CALC
 implicit none
 private
 
-real,    private, parameter ::  NOT_SET = -999.999  ! Fake value to check for
+real,    private, parameter ::  NOT_SET = -999.     ! Fake value to check for
 integer, private, parameter :: INOT_SET = -999      ! variables being set
 
 integer, public, save :: iL = INOT_SET              ! Landuse index
@@ -52,17 +52,17 @@ type, public :: GridDat
   integer :: i            ! index
   integer :: j            ! index
   logical :: is_wet       ! true if precip > 0
-  logical :: is_NWPsea    ! NWP model defines this square as sea
-  logical :: is_allNWPsea ! Only sea in grid-square
+  logical :: is_mainlysea !  Usually > 50% sea/water
+  logical :: is_allsea    ! Only sea in grid-square
   real    :: precip       ! Precip at surface
   real    :: wetarea      ! Fraction of grid which is wet
   real    :: cloud        ! Cloud-cover (fraction)
-!ACB    integer :: snow   ! 1=snow present, 0 = no snow
   logical ::  snowice     ! true is sdepth > 0 or ice>0
   real    :: sdepth       ! snowdepth (m)
   real    :: ice_nwp      ! ice_nwp (%)
   real    :: psurf        ! Surface pressure (Pa)
-  real    :: z_ref        ! Height of grid centre (m)
+  real    :: z_ref        ! Used top of SL, = min(0.1 zi, z_mid)
+  real    :: z_mid        ! Height of grid centre (m)
   real    :: DeltaZ       ! Depth of grid centre (m)
   real    :: qw_ref       ! Specific humidity
   real    :: rho_ref      ! Air density (kg/m3)
@@ -114,7 +114,7 @@ type, public :: SubDat
   ,SGS = INOT_SET         & ! Start, growing seasons (day num)
   ,EGS = INOT_SET           ! End, growing seasons (day num)
   logical :: &
-    is_forest, is_water , is_veg, is_ice
+    is_forest, is_water , is_veg, is_ice, is_crop
   real ::                 &
      t2C       = NOT_SET  & ! Surface (2m) temperature in degrees C
     ,t2        = NOT_SET  & ! Surface (2m) temperature in degrees K
@@ -148,6 +148,14 @@ type, public :: SubDat
 ! outputs from Rsurface will include:
     ,g_sto     = NOT_SET  & ! stomatal conductance (m/s)
     ,g_sun     = NOT_SET  & ! g_sto for sunlit upper-canopy (flag) leaves
+    ,f_sun     = NOT_SET  & ! f_env for SPOD?
+    ,f_shade   = NOT_SET  & ! f_env for SPOD?
+    ,f_env     = NOT_SET  & ! f_env for SPOD?
+    ,f_vpd     = NOT_SET  & ! f_env for SPOD?
+    ,f_light     = NOT_SET  & ! f_env for SPOD?
+    ,f_temp      = NOT_SET  & ! f_env for SPOD?
+    ,f_phen      = NOT_SET  & ! f_env for SPOD?
+    ,f_min       = NOT_SET  & ! f_env for SPOD?
 ! and enable concentrations at canopy height:
     ,cano3_ppb  = 0.0     & ! Use 0.0 to make d_2d behave better
     ,cano3_nmole= 0.0     & ! Use 0.0 to make d_2d behave better

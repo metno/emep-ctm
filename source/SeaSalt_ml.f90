@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,21 +44,23 @@
 ! Programmed by Svetlana Tsyro
 !-----------------------------------------------------------------------------
 
- use ChemSpecs_tot_ml,     only : SeaSalt_f, SeaSalt_c, SeaSalt_g
+ use Biogenics_ml,         only : EMIS_BioNat, EmisNat  
  use ChemChemicals_ml,     only : species
- use EmisDef_ml,           only : NSS, QSSFI, QSSCO, QSSGI
- use GridValues_ml,        only : glat, glon
- use Landuse_ml,           only : LandCover, water_cover
+ use GridValues_ml,        only : glat, glon, i_fdom, j_fdom 
+ use Io_Progs_ml,          only : PrintLog
+ use Landuse_ml,           only : LandCover, water_fraction
  use LocalVariables_ml,    only : Sub, Grid
- use MetFields_ml,         only : u_ref
- use MetFields_ml,         only : z_bnd, z_mid, sst,  &
-                                  nwp_sea, u_ref, foundSST, &
+ use MetFields_ml,         only : u_ref, z_bnd, z_mid, sst,  &
+                                  u_ref, foundSST, &
                                    foundws10_met,ws_10m
  use MicroMet_ml,          only : Wind_at_h
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, &
+                                  MasterProc, & 
                                   DEBUG_SEASALT, DEBUG_i,DEBUG_j
  use Par_ml,               only : MAXLIMAX,MAXLJMAX   ! => x, y dimensions
  use PhysicalConstants_ml, only : CHARNOCK, AVOG ,PI
+ use Setup_1dfields_ml,    only : rcemis 
+ use SmallUtils_ml,        only : find_index
  use TimeDate_ml,          only : current_date
 
  !-------------------------------------
@@ -69,17 +71,27 @@
   public ::  SeaSalt_flux   ! subroutine
 
   integer, parameter :: SS_MAAR= 7, SS_MONA= 3, &   !Number size ranges for
-                                                    !Maartinsson's and Monahan's 
-                        NFIN= 7, NCOA= 2, NGIG=1, & !Number fine&coarse&giant bins     
+                                                    !Maartinsson's and Monahan's
+                        NFIN= 7, NCOA= 3      , &   !Number fine&coarse bins 
                         SSdens = 2200.0             ! sea salt density [kg/m3]
+!TEST                      NFIN= 7, NCOA= 2, NGIG= 1, &   
 
   real, save, dimension(SS_MAAR) :: dp3, a, b
   real, save, dimension(SS_MAAR+1) :: log_dbin
   real, save, dimension(SS_MONA) :: temp_Monah, radSS, dSS3
   real, save                     :: n_to_mSS
-  real, public, dimension(NSS,MAXLIMAX,MAXLJMAX) :: SS_prod !Sea salt flux
+  real, public, allocatable,dimension(:,:,:) :: SS_prod !Sea salt flux
 
   logical, private, save :: my_first_call = .true.
+  logical, private, save :: seasalt_found
+  integer, private, save :: iseasalt   ! index of SEASALT_F
+
+ ! Indices for the species defined in this routine. Only set if found
+ ! Hard-coded for 2 specs just now. Could extend and allocate.
+  integer, private, parameter :: NSS = 2
+  integer, private, parameter :: iSSFI=1,  iSSCO=2
+  integer, private, save :: inat_SSFI,  inat_SSCO
+  integer, private, save :: itot_SSFI,  itot_SSCO
 
   contains
 
@@ -93,33 +105,64 @@
   ! Output: SS_prod - fluxes of fine and coarse sea salt aerosols [molec/cm3/s]
   !-----------------------------------------------------------------------
 
-   implicit none
-
-   integer, intent(in) :: i,j    ! coordinates of column
-   logical, intent(in) :: debug_flag
+   integer, intent(in) :: i,j         ! coordinates
+   logical, intent(in) :: debug_flag  ! set true for debug i,j
 
    real, parameter :: Z10 = 10.0  ! 10m height
    integer :: ii, jj, nlu, ilu, lu
    real    :: invdz, n2m, u10, u10_341, Tw, flux_help, total_flux
+   real, save  ::   moleccm3s_2_kgm2h 
    real    :: ss_flux(SS_MAAR+SS_MONA), d3(SS_MAAR+SS_MONA) 
+   real    :: rcss(NSS)
 !//---------------------------------------------------
  
   if ( my_first_call ) then 
 
-    call init_seasalt
+    ! We might have USE_SEASALT=.true. in ModelConstants, but the
+    ! chemical scheme might not have seasalt species. We check.
+
+    inat_SSFI = find_index( "SEASALT_F", EMIS_BioNat(:) )
+    inat_SSCO = find_index( "SEASALT_C", EMIS_BioNat(:) )
+    itot_SSFI = find_index( "SEASALT_F", species(:)%name    )
+    itot_SSCO = find_index( "SEASALT_C", species(:)%name    )
+
+    if(DEBUG_SEASALT .and. MasterProc ) &
+        write(*,*) "SSALT INIT", inat_SSFI, itot_SSFI
+
+    if ( inat_SSFI < 1 ) then
+       seasalt_found = .false.
+       call PrintLog("WARNING: SeaSalt asked for but not found",MasterProc)
+    else
+        seasalt_found = .true.
+        call init_seasalt()
+    end if
     
+    ! For EmisNat, need kg/m2/h from molec/cm3/s
+    moleccm3s_2_kgm2h =   Grid%DeltaZ * 1.0e6 * 3600.0  &! /cm3/s > /m2/hr
+                          /AVOG * 1.0e-6  ! kg  after *MW
     my_first_call = .false.
 
   end if !  my_first_call
  !....................................
 
-    SS_prod(:,i,j) = 0.0
+  if ( .not. seasalt_found  ) return 
 
-    if ( .not. Grid%is_NWPsea .or. Grid%snowice ) return ! quick check
+ !....................................
+
+
+
+    if ( .not. Grid%is_mainlysea .or. Grid%snowice ) then ! quick check
+       EmisNat( inat_SSFI,i,j) = 0.0
+       EmisNat( inat_SSCO,i,j) = 0.0
+       rcemis( itot_SSFI,KMAX_MID) = 0.0
+       rcemis( itot_SSCO,KMAX_MID) = 0.0
+       return
+    end if
 
 
 !// Loop over the land-use types present in the grid
 
+     rcss(:) = 0.0
      nlu = LandCover(i,j)%ncodes
      do ilu= 1, nlu
        lu =  LandCover(i,j)%codes(ilu)
@@ -131,9 +174,9 @@
        if ( Sub(lu)%is_water ) then
 
           if(DEBUG_SEASALT .and. debug_flag) then
-              write(6,'(a40)') ' Sea-Salt Check '
-              write(6,*)
-              write(6,'(a30,4f12.4,f8.2)') '** CHAR, ustar_nwp, d, Z0, SST ** ',&
+              write(6,'(a,2i4,f8.4,f12.4,3f8.3)') &
+                'SSALT ** Charnock, ustar_nwp, d, Z0, SST ** ',&
+                   i_fdom(i), j_fdom(j), & 
                    CHARNOCK,Grid%ustar,Sub(lu)%d,Sub(lu)%z0, sst(i,j,1)
           end if
 
@@ -146,12 +189,13 @@
                            Sub(lu)%z0,  Sub(lu)%invL)
           end if
 
-         if (u10 <= 0.0) u10 = 1.0e-5  ! make sure u10!=0 because of LOG(u10)
+         u10 =  max(0.1, u10)  ! make sure u10!=0 because of LOG(u10),
+                               ! (use plausible physical limit for ws here)
 
          u10_341=exp(log(u10) * (3.41))
 
          if(DEBUG_SEASALT .and. debug_flag) &
-             write(6,'(a,L2,4f12.4,es14.4)')'** U*, Uref, U10, Uh, invL ** ',&
+             write(6,'(a,L2,4f12.4,es14.4)')'SSALT ** U*, Uref, U10, Uh, invL ** ',&
                foundws10_met, Sub(lu)%ustar, Grid%u_ref, u10, &
                Wind_at_h (Grid%u_ref, Grid%z_ref, Z10, Sub(lu)%d,   &
                            Sub(lu)%z0,  Sub(lu)%invL), &
@@ -167,6 +211,8 @@
           else
             Tw = Grid%t2
           endif
+          Tw = max(Tw, 270.0)! prevents unrealistic sub.zero values
+          Tw = min(Tw, 300.0)! prevents unrealistic high values
 
 ! ====    Calculate sea salt fluxes in size bins  [part/m2/s] ========
          total_flux = 0.0
@@ -182,7 +228,7 @@
                total_flux =  total_flux + ss_flux(ii)
 
                if(DEBUG_SEASALT .and. debug_flag) write(6,'(a20,i5,es13.4)') &
-                  'Flux Maarten ->  ',ii, ss_flux(ii)
+                  'SSALT Flux Maarten ->  ',ii, ss_flux(ii)
           enddo
 
 !... Fluxes of larger aerosols for each size bin (Monahan etal,1986)
@@ -196,39 +242,44 @@
                total_flux =  total_flux + ss_flux(ii) 
 
                if(DEBUG_SEASALT .and. debug_flag) &
-                   write(6,'(a20,i5,es13.4)') 'Flux Monah ->  ',ii, ss_flux(jj)
+                   write(6,'(a20,i5,es13.4)') 'SSALT Flux Monah ->  ',ii, ss_flux(jj)
           enddo
 
-   if(DEBUG_SEASALT .and. debug_flag) write(6,'(a20,es13.3)') 'Total SS flux ->  ',  total_flux
+         if(DEBUG_SEASALT .and. debug_flag) &
+               write(6,'(a20,es13.3)') 'SSALT Total SS flux ->  ',  total_flux
 
-!.. conversion factor from [part/m2/s] to [molec/cm3/s]
+
+  !ESX n2m = n_to_mSS * invdz *AVOG / species(iseasalt)%molwt *1.0e-15
+  ! convert [part/m2/s] to [molec/cm3/s] required for differential equations.
+  !1).  n_to_mSS =PI*SSdens/6.0  - partfrom number to mass conversion 
+  !                                  (as M = PI/6 * diam^3 * density * N)
+  !2).  1.0e-15 = e-18 * e3 (where e-18 is to convert [um3] to [m3] in diam^3;i
+  !                                     and e3 is [kg] to [g] in density).
+  !3)    (then mass is converted to [molec] with AVOG/MotW)
 
           invdz  = 1.0e-6 / Grid%DeltaZ       ! 1/dZ [1/cm3]
-          n2m = n_to_mSS * invdz *AVOG / species(SeaSalt_f)%molwt *1.0e-15
 
-!.. Fine particles emission [molec/cm3/s]
+          n2m = n_to_mSS * invdz *AVOG / species(itot_SSFI)%molwt *1.0e-15
+
+!.. Fine particles emission [molec/cm3/s] need to be scaled to get units kg/m2/s consistent with
+! Emissions_ml (snapemis). Scaling factor is 
           do ii = 1, NFIN
-               SS_prod(QSSFI,i,j) = SS_prod(QSSFI,i,j)   &
+               rcss( iSSFI) = rcss( iSSFI) + &  
+                 !! ESX SS_prod(QSSFI,i,j) = SS_prod(QSSFI,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
-                                  * water_cover(i,j) 
+                                  * water_fraction(i,j) 
             if(DEBUG_SEASALT .and. debug_flag) &
-            write(6,'(a20,i5,2es13.4)') 'Flux fine ->  ',ii,d3(ii),SS_prod(QSSFI,i,j)
+            write(6,'(a20,i5,2es13.4)') 'SSALT Flux fine ->  ',ii,d3(ii), rcss( iSSFI ) !ESX SS_prod(QSSFI,i,j)
           enddo
 
 !..Coarse particles emission [molec/cm3/s]
           do ii = NFIN+1, NFIN+NCOA
-               SS_prod(QSSCO,i,j) = SS_prod(QSSCO,i,j)   &
+               rcss( iSSCO ) = rcss( iSSCO ) + &
+                 !!ESX SS_prod(QSSCO,i,j) = SS_prod(QSSCO,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
-                                  * water_cover(i,j)
+                                  * water_fraction(i,j)
             if(DEBUG_SEASALT .and. debug_flag) &
-            write(6,'(a20,i5,2es13.4)') 'Flux coarse ->  ',ii,d3(ii),SS_prod(QSSCO,i,j)
-          enddo
-
-!..'Giant' particles emission [molec/cm3/s]
-          do ii = NFIN+NCOA+1, NFIN+NCOA+NGIG
-               SS_prod(QSSGI,i,j) = SS_prod(QSSGI,i,j)   &
-                                  + ss_flux(ii) * d3(ii) * n2m   &
-                                  * water_cover(i,j)
+            write(6,'(a20,i5,2es13.4)') 'SSALT Flux coarse ->  ',ii,d3(ii), rcss( iSSCO ) !ESX SS_prod(QSSCO,i,j)
           enddo
 
 !... Crude fix for the effect of lower salinity in the Baltic Sea
@@ -236,15 +287,21 @@
           if ( (glat(i,j) > 52.0 .and. glat(i,j) < 67.0)     .and.   &  
                (glon(i,j) > 13.0 .and. glon(i,j) < 30.0) )   then 
           
-                 SS_prod(:,i,j) =  0.5 * SS_prod(:,i,j)
+               rcss( iSSFI ) = 0.2 * rcss( iSSFI )
+               rcss( iSSCO ) = 0.2 * rcss( iSSCO )
           endif
   
           if(DEBUG_SEASALT .and. debug_flag) write(6,'(a35,2es15.4)')  &
-             '>> SS production fine/coarse  >>', &
-                SS_prod(QSSFI,i,j), SS_prod(QSSCO,i,j)
+             '>> SSALT production fine/coarse  >>', &
+                rcss(  iSSFI ), rcss( iSSCO )
                           
        endif  ! water
      enddo  ! LU classes
+
+     EmisNat( inat_SSFI, i,j )      = rcss( iSSFI ) * moleccm3s_2_kgm2h * species( itot_SSFI )%molwt
+     EmisNat( inat_SSCO, i,j )      = rcss( iSSCO ) * moleccm3s_2_kgm2h * species( itot_SSCO )%molwt
+     rcemis ( itot_SSFI, KMAX_MID ) = rcss( iSSFI )
+     rcemis ( itot_SSCO, KMAX_MID ) = rcss( iSSCO )
 
   end subroutine SeaSalt_flux
 

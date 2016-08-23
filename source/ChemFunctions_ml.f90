@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -31,12 +31,16 @@ module ChemFunctions_ml
 ! Including Troe, sine and cosine curves, 
 ! bilinear-interpolation routines, 
 ! and Standard Atmosphere p -> H conversion
+!
+! Where possible, reference to the EMEP documentation paper, Simpson
+! et al., ACP, 2012,  are given, indicated by ACP:
+! 
 !____________________________________________________________________
 !
 !** includes
 !   troe - standrad chemical function
 !____________________________________________________________________
- use LocalVariables_ml,     only : Grid   ! => izen, is_NWPsea
+ use LocalVariables_ml,     only : Grid   ! => izen, is_mainlysea
  use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID
  use PhysicalConstants_ml,  only : AVOG, RGAS_J, DAY_ZEN
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
@@ -46,7 +50,8 @@ module ChemFunctions_ml
 
   public :: troe
   public :: troeInLog  ! When log(Fc) provided
-  public :: IUPAC_troe ! Using the approximate expression for F from Atkinson et al., 2006 (ACP6, 3625)
+  public :: IUPAC_troe ! Using the approximate expression for F from 
+                       !  Atkinson et al., 2006 (ACP6, 3625)
   public ::  kaero
   public ::  kaero2    ! for testing
   public ::  RiemerN2O5
@@ -55,14 +60,14 @@ module ChemFunctions_ml
 
 
 ! weighting factor for N2O5 hydrolysis
-! Mass of sulfate relative to sulfate+nitrate
-! according to  Riemer N, Vogel H, Vogel B, 
-! Schell B, Ackermann I, Kessler C, Hass H
-! JGR 108 (D4): FEB 27 2003 
+! Some help factors (VOLFAC)  pre-defined here. 0.068e-6 is
+! number median radius, assumed for fine aerosol
+! 1.2648 is the term 3* exp( -2.5 * (log(sig=1.8))**2 ) used below
+! We also assume generic aerosol median number radius of 0.068um
 
-  real, parameter, public :: VOLFACSO4 = 96.0/(AVOG) * 0.90236 *0.02/0.034e-6 
-  real, parameter, public :: VOLFACNO3 = 62.0/(AVOG) * 0.90236 *0.02/0.034e-6 
-  real, parameter, public :: VOLFACNH4 = 18.0/(AVOG) * 0.90236 *0.02/0.034e-6 
+  real, parameter, public :: VOLFACSO4 = 96.0/(AVOG) * 1.2648  *0.02/0.068e-6 
+  real, parameter, public :: VOLFACNO3 = 62.0/(AVOG) * 1.2648  *0.02/0.068e-6 
+  real, parameter, public :: VOLFACNH4 = 18.0/(AVOG) * 1.2648  *0.02/0.068e-6 
 
 
   !========================================
@@ -129,7 +134,7 @@ module ChemFunctions_ml
 
   !+ Calculates Troe expression
   ! -----------------------------------------------------------
-  ! ds note - this isn't checked or optimised yet. Taken from
+  ! note - this isn't optimised yet. Taken from
   ! Seinfeld+Pandis, 1998, pp 283, eqn. 5.98. 
 
   ! Input arguments are intended to represent:
@@ -170,12 +175,13 @@ module ChemFunctions_ml
 
   !+ Calculates Troe expression 
   ! -----------------------------------------------------------
-  ! rb note - this isn't checked or optimised yet. Taken from
+  ! note - this isn't optimised yet. Taken from
   ! Atkinson et al. ACP 2006, 6, 3625-4055. 
 
   ! Input arguments are intended to represent:
   !   M may be O2+N2 or just N2 or just O2.
-  ! NOTE that in the IUPAC nomenclature k0 already contains [M] so the k0(IUPAC)=k0*M here
+  ! NOTE that in the IUPAC nomenclature k0 already contains [M] so 
+  !  the k0(IUPAC)=k0*M here
   !   N=[0.75-1.27*log10(Fc)]
 
      real, intent(in)  :: k0,kinf,Fc,M,N
@@ -211,67 +217,71 @@ module ChemFunctions_ml
 !===========================================================================
 ! N2O5 -> nitrate calculation. Some constants for
 ! calculation of volume fraction of sulphate aerosol, and rate of uptake
+! Mass of sulfate relative to sulfate+nitrate according to  Riemer N, 
+! Vogel H, Vogel B, Schell B, Ackermann I, Kessler C, Hass H
+! JGR 108 (D4): FEB 27 2003 
 ! 
 !
 ! The first order reaction coefficient K (corrected for gas phase diffusion, 
 ! Schwartz, 1986) is given by
 !
-! K= A* alpha* v/4
+! K= S* alpha* v/4                               ACP:44
 !    alpha=sticking coeff. for N2O5 =0.02
 !    v=mean molecular speed for N2O5
-!    A=aerosol surfac
+!    S=aerosol surfac
 !
 ! The surface area of the aerosols can be calculated as
 ! 
-! A = V * surface/volume of aerosols
+! S = V * surface/volume of aerosols
 !     V=volume fraction of sulphate (cm3 aerosol/cm3 air)
 !     (similar for nitrate and ammonium):
 !
-!     e.g.
+!     e.g. simplest form (not used) would be:
 !     V = (so4 in moleculescm-3) x atw sulphate
 !         ---------------------------------------------------------
 !        AVOG X specific density of aerosols (assumed 2g/cm3*rh correction)
 !
-!    Or, shorter, V = S x M0/(AVOG*rho)
+!    Or, shorter, V = C x M0/(AVOG*rho)
 !
-!    where S is conc. e.g. sulphate (molecule/cm3), M0 is molwt. 
-!
-!
+!    where C is conc. e.g. sulphate (molecule/cm3), M0 is molwt. 
 !    We do not want to include  concentrations  or rho yet, so:
 !
 !     Let VOL =  M0/AVOG
 !   
+! E12:47
 ! The surface/volume ratio is calculated using Whitby particle distribution
-! with number mean radius 0.034  and standars deviation (Sigma)=2. 
+! with number mean radius rgn=0.068  and standard deviation (Sigma)=2. 
 ! Then surface/volume=3/r *  exp( -5/2 *(lnSigma)^2)=26.54 
-! 3* exp( -5/2 *(lnSigma)^2)=0.90236
+! 3* exp( -5/2 *(lnSigma)^2)=1.2648  for  sigma=1.8
 ! (monodisperse aerosols; 4*pi*r^2/(4/3 pi*r^3)= 3/r =88.2)
 !
 ! Then 
-!      A = VOL * S * 0.90236 /(0.034e-6*rho) 
+!      A = VOL * C * 1.24648 /(0.068e-6*rho) 
 ! and
-!      K = VOL * S * 0.90236 /(0.034e-6*rho)    * alpha* v/4
+!      K = VOL * C * 1.24648 /(0.068e-6*rho) * alpha* v/4
 ! Set
-!      VOLFAC= VOL*0.90236/0.034e-6 *alpha    
+!      VOLFAC= VOL*1.24648/0.068e-6 *alpha    
 ! Then
-!      K = VOLFAC *S *v/(4*rho)
+!      K = VOLFAC *C *v/(4*rho)
 !
 ! rcmisc k=v/(4*rho) 
 !
-!      K = VOLFAC *rcmisc() *S
+!      K = VOLFAC *rcmisc() *C
+!
 ! According to Riemer et al, 2003, we weight the reaction probability
 ! according to the composition of the aerosol
 !
-! alpha(N2O5)=f*alpha1 +(1-f)alpha2
+! alpha(N2O5)=f*alpha1 +(1-f)alpha2                           ACP:45
 !   alpha1=0.02
 !   alpha2=0.002
-!   f= Mso4/(Mso4+Mno3), M=aerosol mass concentration
+!   f= Mso4/(Mso4+Mno3), M=aerosol mass concentration         ACP:46
  
 ! N2O5 -> aerosol based upon  based on Riemer 2003 and
-! (May 2011) updated based upon results shown in Riemer et al., 2009.
-! We do not attempt to model OC, but simply reduce the rate by
+! In testing, we had also tried a simple acounting for 
+! results shown in Riemer et al., 2009.
+! We did not attempt to model OC, but simply reduce the rate by
 ! a factor of two to loosely account for this effect. 
-! J08 - changed from use of more accurate xnew to xn_2d, since
+! June08 - changed from use of more accurate xnew to xn_2d, since
 ! surface area won't change so much, and anyway the uncertainties
 ! are large. (and xn_2d leads to fewer dependencies)
 
@@ -288,14 +298,16 @@ module ChemFunctions_ml
        if ( rh(k)  > 0.4) then
           xNO3 = x(NO3_f,k) + x(NO3_c,k) 
 
-          rc = sqrt(3.0 * RGAS_J * itemp(k) / 0.108) & ! mean mol. speed,m/s
-             /(4*(2.5 - rh(k)*1.25)) !density, corrected for rh (moderate approx.)
+         !mean molec speed of N2O5 (MW 108), m/s
+         ! with density corrected for rh (moderate approx.)
+          rc = sqrt(3.0 * RGAS_J * itemp(k) / 0.108) & ! mol.speed (m/s)
+             /(4*(2.5 - rh(k)*1.25))                   ! density
 
           f = 96.0*x(SO4,k)/( 96.*x(SO4,k) + 62.0* xNO3  + EPSIL )
 
 
           rate(k) =  (0.9*f + 0.1) * rc *  &
-             0.5 * & ! very loosely based on OC effects from Reimer 2009 
+                !TEST   0.5 * & ! v. loosely based on Reimer 2009 
              ( VOLFACSO4 * x(SO4,k) + VOLFACNO3 * xNO3  &
               + VOLFACNH4 * x(NH4_f,k) )    !SIA aerosol surface
         else
@@ -328,7 +340,7 @@ module ChemFunctions_ml
      real, dimension(K1:K2) :: rate
      integer :: k
      
-    if ( Grid%is_NWPsea) then
+    if ( Grid%is_mainlysea) then
       rate(K1:15) = 0.0
       do k = 16, K2
         if ( rh(k)  > 0.9) then
@@ -344,16 +356,18 @@ module ChemFunctions_ml
  !---------------------------------------------------------------------
   function ec_ageing_rate() result(rate) 
  
-!.. Sets ageing rates for fresh EC based on Riemer et al.; ACP (2004). 
+   !.. Sets ageing rates for fresh EC [1/s] loosely based on Riemer etal. ACP(2004)
+   !   See also Tsyro et al, JGR, 112, D23S19, 2007
+   !   ---------------------------------  
 
      real, dimension(K1:K2) :: rate
  
     if ( Grid%izen <= DAY_ZEN ) then  ! daytime
 
-       rate (K2-2 : K2)   = 3.5e-5  ! t= 2h
-       rate (K1   : K2-3) = 1.4e-4  ! t= 8h
+       rate (K2-2 : K2)   = 3.5e-5  !  half-lifetime ~ 8h
+       rate (K1   : K2-3) = 1.4e-4  !                ~ 2h
       else
-       rate (K1 : K2 )    = 9.2e-6  ! t= 30h
+       rate (K1 : K2 )    = 9.2e-6  !                ~ 30h
     endif
 
   end function ec_ageing_rate

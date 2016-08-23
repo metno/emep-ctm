@@ -3,7 +3,7 @@
 !==============================================================================
   use PhysicalConstants_ml, only : FREEPATH, VISCO, BOLTZMANN, PI, GRAV, ROWATER
   use My_Aerosols_ml,       only : NSIZE
-  use ModelConstants_ml,    only : DEBUG_VDS
+  use ModelConstants_ml,    only : DEBUG_VDS, MasterProc
  
   ! DESCRIPTION
   ! Calculates laminar sub-layer resistance (rb) and gravitational settling 
@@ -44,6 +44,13 @@
   public  :: RuijgrokWetSO4
   public  :: Wesely1985
 
+  real, public, parameter, dimension(NSIZE) ::   &
+                 ! diam   = (/ 0.33e-6, 4.0e-6, 8.5e-6 /),  &
+                 !Mc: diam   = (/ 0.33e-6, 1.7e-6, 8.5e-6 /),  &
+                  diam   = (/ 0.33e-6, 3.0e-6, 4.0e-6, 4.5e-6 ,22e-6 /),  &
+                 ! sigma  = (/ 1.8, 2.0, 2.2 /),                    &
+                  sigma  = (/ 1.8, 2.0, 2.0, 2.2 ,2.0/),                    &
+                  PMdens = (/ 1600.0, 2200.0, 2200.0, 2600.0, 800.0/) ! kg/m3
 contains
 
    !------------------------------------------------------------------------
@@ -62,13 +69,13 @@ contains
    ! and dp=1.7 for coarse
    ! Extra 'giant' size is used for sea salt only
 
-     real, parameter, dimension(NSIZE) ::   &
-                ! diam   = (/ 0.33e-6, 4.0e-6, 8.5e-6 /),  &
-                !Mc: diam   = (/ 0.33e-6, 1.7e-6, 8.5e-6 /),  &
-                 diam   = (/ 0.33e-6, 2.5e-6, 8.5e-6 /),  &
-                ! sigma  = (/ 1.8, 2.0, 2.2 /),                    &
-                 sigma  = (/ 1.8, 1.8, 2.2 /),                    &
-                 PMdens = (/ 1600.0, 2200.0, 2200.0 /) ! kg/m3
+!     real, parameter, dimension(NSIZE) ::   &
+!                ! diam   = (/ 0.33e-6, 4.0e-6, 8.5e-6 /),  &
+!                !Mc: diam   = (/ 0.33e-6, 1.7e-6, 8.5e-6 /),  &
+!                 diam   = (/ 0.33e-6, 2.5e-6, 4.0e-6, 4.5e-6 ,22e-6 /),  &
+!                ! sigma  = (/ 1.8, 2.0, 2.2 /),                    &
+!                 sigma  = (/ 1.8, 1.8, 2.0, 2.2 ,2.0/),                    &
+!                 PMdens = (/ 1600.0, 1600.0, 2200.0, 2600.0, 800.0/) ! kg/m3
      real, parameter :: one2three = 1.0/3.0
      integer :: imod 
      real    :: lnsig2, dg, & 
@@ -95,7 +102,11 @@ contains
        !... Settling velocity for poly-disperse 
         vs(imod) = vs_help*(exp(8.0*lnsig2)+1.246*knut*exp(3.5*lnsig2)) ! A31, k=3
 
-        if (DEBUG_VDS) write(6,'(a19,i3,f8.3)') "** Settling Vd **",imod,vs(imod)*100.0
+        if (DEBUG_VDS.and.MasterProc ) &
+            write(6,'(a,i3,es12.3,f10.3,5es12.3,3f9.2,f9.3)') &
+             "** Settling Vd ** ", imod, roa, tsK, &
+             dg,knut,Di_help,vs_help,Di, lnsig2, &
+             1.0e6*diam(imod), PMdens(imod), sigma(imod), vs(imod)*100.0
 
      end do !imod
    end function SettlingVelocity

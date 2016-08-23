@@ -33,60 +33,148 @@ module ModelConstants_ml
  !
  !----------------------------------------------------------------------------
 use PhysicalConstants_ml, only : AVOG
+use Io_Nums_ml, only : IO_NML, IO_LOG
 
 implicit none
 private
 
-!=============================================================================
-! Some flags for model setup
-! will be removed when code is sufficiently tested 
-! (for convection use foundconv in permanent code)
-logical, public, parameter :: USE_CONVECTION     = .false.  ! false works best for Euro runs,
-                                                            ! essential for global
-logical, public, parameter :: USE_SOILWATER      = .false.  !needs more work for IFS!
-logical, public, parameter :: USE_FOREST_FIRES   = .false.  ! Needs global files, future
-logical, public, parameter :: USE_AIRCRAFT_EMIS  = .false.  ! Needs global file, see manual
-logical, public, parameter :: USE_LIGHTNING_EMIS = .true.   ! ok
-logical, public, parameter :: USE_SOIL_NOX       = .false.  ! Future use 
-logical, public, parameter :: USE_SEASALT        = .true.   ! ok
-logical, public, parameter :: USE_DUST           = .false.  ! Experimental
-logical, public, parameter :: DO_SAHARA          = .false.  ! Turn on/off BG Saharan Dust
-logical, public, parameter :: USE_AOD            = .false.
-logical, public, parameter :: USE_PFT_MAPS       = .false.  ! Future option
-logical, public, parameter :: EXTENDEDMASSBUDGET = .false.!extended massbudget outputs
-! Biogenics. Use 3 even if no terpene chemistry - simplifies
-! rest of code.  iso = isoprene, mtp = monoterpenes from pools, 
-! mtl = monoterpenes with light dependence
-integer, public, parameter ::   NBVOC = 3
-character(len=4),public, save, dimension(NBVOC) :: &
-  BVOC_USED = (/ "Eiso","Emt ","Emtl"/)
+public :: Config_ModelConstants
 
-!The GEA emission data, which is used for EUCAARI runs on the HIRHAM domain
+!=============================================================================
+! Experiment name:
+!  EMEPSTD      Standard run & output
+!  EMEP2010    EMEPSTD with Iceland Volcanic Eruption input
+!  TFMM        EMEPSTD, but with INERIS_SNAP & TFMM hourly output
+!  FORECAST    Forecast run, MACC-ENS hourly output & BC
+!  EVA2010     FORECAST with MACC-EVA2010 hourly output & BC
+!  EMERGENCY   FORECAST with ONLY Volcanic Eruption & Nuclear Accident.
+!
+!DS Mar 2013. We separate the concept of exp_name and the
+! variable used to set the type of output in My_outputs_ml.
+! The longer term solution puts the outputs into namelists
+! but for now we use the MY_OUTPUTS flag. EXP_NAME can
+! now be anything descriptive.
+CHARACTER(LEN=30), public, save :: EXP_NAME="EMEPSTD"
+CHARACTER(LEN=30), public, save :: MY_OUTPUTS="EMEPSTD"
+
+! FORECAST mode run:
+! * Nested IC/BC def in Nest_ml & IFSMOZ_ExternalBICs_ml
+! * Special hourly output def in My_Outputs_ml
+! * Only dayly and hourly output are required,
+!   all other output types to false in Derived_ml.
+!NML These will be reset by forecast namelist
+!NML logical, public, parameter :: FORECAST=&
+!NML (EXP_NAME=="FORECAST").or.(EXP_NAME=="EVA2010").or.(EXP_NAME=="EMERGENCY")
+
+! Namelist controlled:
+! Some flags for model setup
+! First, those which may be reset by emep_namelist.nml file
+logical, public, save ::             &
+  FORECAST              = .false.    &! reset in namelist
+ ,USE_SOILWATER         = .false.    &!
+ ,USE_DEGREEDAY_FACTORS = .false.    &!
+ ,USE_FOREST_FIRES      = .false.    &! 
+! Soil NOx. Choose EURO for better spatial and temp res, but for 
+! global runs need global monthly. Variable USE_SOILNOX set from
+! these below.
+ ,USE_EURO_SOILNOX      = .true.     & ! ok, but diff for global + Euro runs
+ ,USE_GLOBAL_SOILNOX    = .false.    & ! Need to design better switch
+ ,USE_SOILNOX           = .true.     & ! DO NOT ALTER: Set after config
+!
+ ,USE_SEASALT           = .true.     & !
+ ,USE_CONVECTION        = .false.    & ! false works best for Euro runs,
+! More experimental:
+ ,DO_SAHARA             = .false.    & ! Turn on/off BG Saharan Dust
+ ,USE_ROADDUST          = .false.    & ! TNO Road Dust routine. So far with simplified "climate-correction" factor
+ ,USE_DUST              = .false.    &! Experimental
+!TFMM
+ ,INERIS_SNAP1       = .false.       & !(EXP_NAME=="TFMM"), & ! Switches off decadal trend
+ ,INERIS_SNAP2       = .false.       & !(EXP_NAME=="TFMM"), & ! Allows near-zero summer values
+ ,USE_EMERGENCY      = .false.       & ! Emergency: Volcanic Eruption & Nuclear Accident. Under development.
+ ,USE_AOD            = .false.       &
+ ,USE_POLLEN         = .false.       &  ! EXPERIMENTAL. Only works if start Jan 1
+ ,ANALYSIS           = .false.       &  ! EXPERIMENTAL: 3DVar data assimilation
+! Output flags
+ ,SELECT_LEVELS_HOURLY  = .false.      ! for FORECAST, 3DPROFILES
+
+! Methane background. 
+  real, public, save :: BGND_CH4 = -1  ! -1 gives defaults in BoundaryConditions_ml, 
+                                       ! otherwise  set to positive value in NML
+
+! Some flags for model setup
+! will be removed when code is sufficiently tested
+! (for convection use foundconv in permanent code)
+logical, public, parameter ::         &
+  USE_AIRCRAFT_EMIS  = .false.,        & ! Needs global file, see manual
+  USE_LIGHTNING_EMIS = .true.,        & ! ok
+  NO_CROPNH3DEP      = .true.,        & ! Stop NH3 deposition for growing crops
+  USE_SOILNH3        = .false.,       & ! DUMMY VALUES, DO NOT USE!
+  USE_ZREF           = .false.,       & ! testing
+  USE_PFT_MAPS       = .false.,       & ! Future option
+  EXTENDEDMASSBUDGET = .false.,       & ! extended massbudget outputs
+  LANDIFY_MET        = .false.          ! extended massbudget outputs
+
+logical, public, parameter ::  USE_EtaCOORDINATES=.false.!temporay parameter; will be set true and removed after testing
+
+!IN-TESTING (reset in NML if wanted)
+!Boundary layer profiles
+  character(len=4), parameter, public :: FluxPROFILE = &
+     "Iter"   !
+!      "Ln95"   ! ! will use Launiainen1995  EXPERIMENTAL. Fails in some areas
+
+! Biogenics. Use 3 even if no terpene chemistry - simplifies
+! rest of code.  iso = isoprene, mtp = monoterpenes from pools,
+! mtl = monoterpenes with light dependence
+!DSA12 integer, public, parameter ::   NSOIL_EMIS = 2 ! NO + NH3
+ integer, public, parameter ::   NBVOC = 3
+ character(len=4),public, save, dimension(NBVOC) :: &
+   BVOC_USED = (/ "Eiso","Emt ","Emtl"/)
+
+!The GEA emission data, which is used for EUCAARI runs on the HIRHAM domains
 !have in several sea grid cells non-zero emissions in other sectors than SNAP8
-!and there are also NH3 emission over sea areas. The former problem makes 
-!the code crash if the sea areas are defined  as sea (sea=T), so we treat 
-!them as land in the EUCAARI/HIRHAM runs (sea=F). This is a problem with GEA 
+!and there are also NH3 emission over sea areas. The former problem makes
+!the code crash if the sea areas are defined  as sea (sea=T), so we treat
+!them as land in the EUCAARI/HIRHAM runs (sea=F). This is a problem with GEA
 !emission data only, not the HIRHAM domain! When e.g. interpolated EMEP emissions
 !are used on the HIRHAM domain, this is not a problem.
- 
-logical, public, parameter :: SEAFIX_GEA_NEEDED = .false. ! only if problems
+
+logical, public, save :: &
+   SEAFIX_GEA_NEEDED = .false. ! only if problems. Reset in nml files. NOT HERE
 
 !=============================================================================
 !+ 1) Define first dimensions that might change quite often -  for different
 !     run domains
 character(len=*), parameter, public :: &
 ! DomainName = "EMEP-50kmEurope"
- DomainName = "EMEP-50kmEECCA"
+  DomainName = "EMEP-50kmEECCA"
+! DomainName = "EMEP-1degGLOBAL"
 ! DomainName = "EMEPCWF-0.25degEurope"
 ! DomainName = "EMEPCWF-0.20degEurope"
 ! DomainName = "HIRHAM"
 
-logical, parameter, public :: IS_GLOBAL = .false.
+!IN-TESTING (reset in NML if wanted)
+!) Emissions. Standard =ascii emislist. CdfFractions possible for INERIS
+!  and new cdf emission system in testing. Reset in config_ files
+! EMIS_TEST can be merged with EMIS_SOURCE after tests
+character(len=20), save, public :: &
+   EMIS_SOURCE = "emislist"     &! "emislist" or CdfFractions
+  ,EMIS_TEST   = "None"          ! "None" or "CdfSnap" 
+Logical , save, public :: &
+   EMIS_OUT    = .false.           ! output emissions in separate files (memory demanding)
 
-integer, public, parameter ::  &
+logical, save, public :: IS_GLOBAL = .false.   !!NML .or.(EXP_NAME=="EMERGENCY")
+logical, save, public :: MONTHLY_GRIDEMIS = .false.   !! tmp
+
+integer, public :: KMAX_MID, &  ! Number of points (levels) in vertical
+                   KMAX_BND     ! Number of level boundaries (=KMAX_MID+1)
+integer, public :: IIFULLDOM,JJFULLDOM!  & SET AUTOMATICALLY BY THE CODE
 ! IIFULLDOM = 182, JJFULLDOM = 197 ! x,y-Dimensions of full HIRHAM domain
 ! IIFULLDOM = 170, JJFULLDOM = 133 ! x,y-Dimensions of full EMEP domain
- IIFULLDOM = 132, JJFULLDOM = 159 ! x,y-Dimensions of full EECA domain
+! IIFULLDOM = 132, JJFULLDOM = 159 ! x,y-Dimensions of full EECA domain
+! IIFULLDOM = 840, JJFULLDOM = 832 ! x,y-Dimensions of full TNO07 domain     
+! IIFULLDOM = 420, JJFULLDOM = 416 ! x,y-Dimensions of full TNO14 domain   
+! IIFULLDOM = 210, JJFULLDOM = 208 ! x,y-Dimensions of full TNO28 domain 
+! IIFULLDOM = 105, JJFULLDOM = 104 ! x,y-Dimensions of full TNO56 domain
 ! IIFULLDOM = 360, JJFULLDOM = 180 ! .... full GLOBAL domain
 ! IIFULLDOM = 201, JJFULLDOM = 161 ! .... full GEMS 0.25 domain
 ! IIFULLDOM = 301, JJFULLDOM = 221 ! .... full GEMS 0.25 extended domain
@@ -94,17 +182,34 @@ integer, public, parameter ::  &
 
 ! The difference between EMEP and EECCA is confusing...
 integer, public, parameter :: &
-! OFFSET_i=  0, OFFSET_j=  0    ! EMEP
- OFFSET_i=-35, OFFSET_j=-11    ! EECCA
-integer, public, parameter, dimension(4) ::  &
+! OFFSET_i=  0, OFFSET_j=  0    ! EMEP or default
+  OFFSET_i=-35, OFFSET_j=-11    ! EECCA
+
+integer, public, save, dimension(4) ::   &
 !                 x0   x1  y0   y1
+  RUNDOMAIN =(/-999,-999,-999,-999/)     ! Set values later
 ! RUNDOMAIN = (/  1, 182,  1, 197 /)     ! HIRHAM
- RUNDOMAIN = (/  1, 132,  1, 159 /)     ! EECCA = new EMEP domain
-! RUNDOMAIN = (/  1, 100,  1, 100 /)     ! Orig EMEP domain in EECCA
-! RUNDOMAIN = (/  1, 50,  1, 50 /)     ! Orig EMEP domain in EECCA
-! RUNDOMAIN = (/ 36, 167, 12, 122 /)     ! EMEP domain
-! RUNDOMAIN = (/ 56, 147, 12, 102 /)     ! EGU
-! RUNDOMAIN = (/ 75, 137, 32,  82 /)     ! EGU
+! RUNDOMAIN = (/  1, 132,  1, 159 /)     ! EECCA = new EMEP domain
+!!
+!  RUNDOMAIN = (/  1, 100,  1, 100 /)     ! Orig EMEP domain in EECCA (for benchmarks)
+! RUNDOMAIN = (/ 40, 210, 12, 184 /)     ! SR TNO28 area
+! RUNDOMAIN = (/  1, 210,  1, 208 /)     ! TNO28
+! RUNDOMAIN = (/240, 720, 48, 736 /)     ! TNO07 reduced (15W-45E;30N-73N)
+! RUNDOMAIN = (/120, 360, 24, 368 /)     ! TNO14 reduced (15W-45E;30N-73N)
+! RUNDOMAIN = (/ 60, 180, 12, 184 /)     ! TNO28 reduced (15W-45E;30N-73N)
+! RUNDOMAIN = (/ 70, 110, 72, 110 /)     ! TNO28  test
+! RUNDOMAIN = (/ 30,  90,  6,  92 /)     ! TNO56 reduced (15W-45E;30N-73N)
+! RUNDOMAIN = (/ 60, 180, 12, 184 /)     !  test TNO7 area
+!--
+! Suggestions, 6th June 2012, for TFMM_RUNS scale-dep -----------------------
+! RUNDOMAIN = (/  40, 210, 12, 184 /)     ! TNO28 SR area (25W-60E;30N-73N)
+! i.e.  - adds 20 squares west, 30 east to TNO28
+! RUNDOMAIN = (/  160, 840, 48, 736 /)    ! TNO07  - add 80, 120
+! RUNDOMAIN = (/   80, 420, 24, 368 /)    ! TNO14  - add 40, 60
+! RUNDOMAIN = (/   20, 105, 6, 92 /)      ! TNO56  - add 10, 15
+!----------------------------------------------------------------------------
+
+! RUNDOMAIN = (/ 36, 167, 12, 122 /)     ! EMEP domain in PARLAM
 ! RUNDOMAIN = (/  1, 360,  1, 180 /)     ! FULL GLOBAL
 ! RUNDOMAIN = (/  1, 132,  1, 111 /)     ! EECCA, rep09
 ! RUNDOMAIN = (/  1, 132,  1, 159 /)     ! EECCA, rep10
@@ -115,15 +220,17 @@ integer, public, parameter, dimension(4) ::  &
 ! RUNDOMAIN = (/  1, 321,  1, 221 /)     ! EMEP-CWF, MACC 0.20 domain
 ! RUNDOMAIN = (/ 70+OFFSET_i, 90+OFFSET_i, 43+OFFSET_j,  63+OFFSET_j /) ! (UK)
 ! RUNDOMAIN = (/ 60+OFFSET_i, 86+OFFSET_i, 43+OFFSET_j,  59+OFFSET_j /) ! (UK)
+! RUNDOMAIN = (/ 40+OFFSET_i, 96+OFFSET_i, 23+OFFSET_j,  69+OFFSET_j /) ! (UK)
+! RUNDOMAIN = (/ 60+OFFSET_i,116+OFFSET_i, 33+OFFSET_j,  69+OFFSET_j /) ! (UK)
 ! RUNDOMAIN = (/ 85+OFFSET_i,120+OFFSET_i, 55+OFFSET_j,  70+OFFSET_j /) ! (changeable)
+! RUNDOMAIN = (/ 85+OFFSET_i,120+OFFSET_i, 15+OFFSET_j,  50+OFFSET_j /) ! (changeable)
 ! RUNDOMAIN = (/ 75+OFFSET_i,110+OFFSET_i, 45+OFFSET_j,  60+OFFSET_j /) ! (gets Esk)
-! RUNDOMAIN = (/ 85+OFFSET_i,120+OFFSET_i, 70+OFFSET_j,  110+OFFSET_j /) ! (changeable)
-! RUNDOMAIN = (/ 85+OFFSET_i,120+OFFSET_i, 80+OFFSET_j,  110+OFFSET_j /) ! (changeable)
+! RUNDOMAIN = (/ 80+OFFSET_i, 106+OFFSET_i, 33+OFFSET_j,  55+OFFSET_j /) ! (France)
+! RUNDOMAIN = (/ 80+OFFSET_i, 106+OFFSET_i, 13+OFFSET_j,  35+OFFSET_j /) ! Southern domain
+! RUNDOMAIN = (/ 75+OFFSET_i,110+OFFSET_i, 25+OFFSET_j,  60+OFFSET_j /) ! (gets Esk)
 
-integer, public, parameter ::  &
-  NPROCX      =   8        & ! Actual number of processors in longitude
-, NPROCY      =   4        & ! .. in latitude. NPROCY must be 2 for GLOBAL,
-, NPROC       = NPROCX * NPROCY
+integer, public, save ::  & ! Actual number of processors in longitude, latitude
+  NPROCX, NPROCY, NPROC     ! and total. NPROCY must be 2 for GLOBAL runs.
 
 !=============================================================================
 !+ 2) Define  debug flags.
@@ -140,8 +247,11 @@ logical, public, save ::  DebugCell  = .false.
 
 ! The coordinates given here only apply for the standard EMEP domain
 integer, private, parameter :: &
+!  DEBUG_ii= -99, DEBUG_jj= -99 ! none
 ! DEBUG_ii= 79, DEBUG_jj= 56 ! Eskdalemuir
 ! DEBUG_ii= 73, DEBUG_jj= 48 ! Mace Head
+! DEBUG_ii= 88, DEBUG_jj= 53 ! Sibton
+! DEBUG_ii= 88, DEBUG_jj= 53 ! Sibton
 ! DEBUG_ii= 91, DEBUG_jj= 71 ! Rorvik
 ! DEBUG_ii= 82, DEBUG_jj= 72 ! Voss, has some snow
 ! DEBUG_ii=110, DEBUG_jj= 48 ! High Vg!
@@ -155,38 +265,47 @@ integer, private, parameter :: &
 ! DEBUG_ii=116, DEBUG_jj= 63 ! K-Puszta
 ! DEBUG_ii=102, DEBUG_jj= 48 ! Payerne
  DEBUG_ii= 85, DEBUG_jj= 50 ! Harwell
+! DEBUG_ii= 88, DEBUG_jj= 99 ! Harwell TNO TEST
+! DEBUG_ii= 93, DEBUG_jj= 47 !  Grignon, France
 ! DEBUG_ii= 90, DEBUG_jj= 104 !  Wetland, Tundra
-! DEBUG_ii= 85, DEBUG_jj= 15 ! biomass burnung, Aug 2003
+! DEBUG_ii= 72-OFFSET_i, DEBUG_jj= 37-OFFSET_j ! biomass burnung, Aug 2003
+! DEBUG_ii= 90-OFFSET_i, DEBUG_jj= 27-OFFSET_j ! biomass burnung, Jul 2009
+!DEBUG_ii= 58-OFFSET_i, DEBUG_jj= 72-OFFSET_j ! 99% water, SMI problems
+!DUST DEBUG_ii= 94-OFFSET_i, DEBUG_jj= 24-OFFSET_j ! 99% water, dust problems
 ! DEBUG_ii= 85, DEBUG_jj= 35 ! Sea, Bay of Biscay
 !DEBUG_ii= 76, DEBUG_jj= 65 ! Sea,  North sea
 ! DEBUG_ii= 66, DEBUG_jj= 50 ! Sea,  west UK
-! DEBUG_ii= 80, DEBUG_jj= 52 ! Irish sea    
+! DEBUG_ii= 80, DEBUG_jj= 52 ! Irish sea
 ! DEBUG_ii= 91, DEBUG_jj= 67 ! Tange
 ! DEBUG_ii=103, DEBUG_jj= 32 ! Prades, SMDge
+! DEBUG_ii=128, DEBUG_jj= 13 !  Desert?
 
 integer, public, parameter :: &
-! DEBUG_i= 62, DEBUG_j= 45  ! SEA 
+! DEBUG_i= 62, DEBUG_j= 45  ! SEA
+! DEBUG_i= 10, DEBUG_j= 140 !NEGSPOD
+! DEBUG_i= 70, DEBUG_j= 40 ! Lichtenstein, to test ncc
   DEBUG_i= DEBUG_II+OFFSET_i, DEBUG_j= DEBUG_JJ+OFFSET_j    ! EMEP/EECCA
+! DEBUG_i= 59, DEBUG_j= 79  ! JCOAST
 ! DEBUG_i= 9, DEBUG_j= 201                                  ! MACC02
-!  DEBUG_i= 0, DEBUG_j= 0    ! default
+! DEBUG_i= 0, DEBUG_j= 0    ! default
 
 !=============================================================================
 ! Some flags for model setup
 
 ! Debug flag DEBUG_XXX  applied in subroutine XXX
- logical, public, parameter ::      &
-   DEBUG_AQUEOUS        = .false. &
-  ,DEBUG_ADV            = .false. &
+ logical, public, parameter ::    &
+   DEBUG_ADV            = .false. &
   ,DEBUG_AOT            = .false. &
+  ,DEBUG_AQUEOUS        = .false. &
   ,DEBUG_BCS            = .false. &
   ,DEBUG_BIO            = .false. &
+  ,DEBUG_BLM            = .false. & ! Produces matrix of differnt Kz and Hmix
   ,DEBUG_DERIVED        = .false. &
     ,DEBUG_COLUMN       = .false. & ! Extra option in Derived
   ,DEBUG_DO3SE          = .false. &
   ,DEBUG_DRYRUN         = .false. & ! Skips fast chemistry to save some CPU
   ,DEBUG_ECOSYSTEMS     = .false. &
   ,DEBUG_FORESTFIRE     = .false. &
-  ,DEBUG_BLM            = .false. & ! Produces matrix of differnt Kz and Hmix
   ,DEBUG_Kz             = .false. &
   ,DEBUG_MY_DERIVED     = .false. &
   ,DEBUG_DRYDEP         = .false. &
@@ -195,36 +314,47 @@ integer, public, parameter :: &
     ,DEBUG_CLOVER       = .false. &
     ,DEBUG_STOFLUX      = .false. &
   ,DEBUG_EMISSIONS      = .false. &
+  ,DEBUG_EMISTIMEFACS   = .false. &
+  ,DEBUG_EQUIB          = .false. &   !MARS, EQSAM etc.
   ,DEBUG_GETEMIS        = .false. &
+  ,DEBUG_GRIDVALUES     = .false. &
   ,DEBUG_IOPROG         = .false. &
-  ,DEBUG_RUNCHEM        = .false. & ! DEBUG_RUNCHEM is SPECIAL
-    ,DEBUG_AEROSOL      = .false. & ! ...needed for intended debugs are to work
-    ,DEBUG_MY_WETDEP    = .false. &
-    ,DEBUG_SEASALT      = .false. &
-    ,DEBUG_SOA          = .false. &
-    ,DEBUG_SOLVER       = .false. &
-    ,DEBUG_WETDEP       = .false. &
   ,DEBUG_LANDDEFS       = .false. &
   ,DEBUG_LANDUSE        = .false. &
   ,DEBUG_LANDPFTS       = .false. &
+  ,DEBUG_LANDIFY        = .false. &
+  ,DEBUG_MASS           = .false. &
   ,DEBUG_MET            = .false. &
   ,DEBUG_MOSAICS        = .false. &
+  ,DEBUG_NEST           = .false. &
+  ,DEBUG_NEST_ICBC      = .false. & ! IFS-MOZART BC
   ,DEBUG_NETCDF         = .false. &
   ,DEBUG_NETCDF_RF      = .false. & ! ReadField_CDF in NetCDF_ml
   ,DEBUG_NH3            = .false. & ! NH3Emis experimental
   ,DEBUG_OUTPUTCHEM     = .false. & ! Output of netcdf results
+  ,DEBUG_OUT_HOUR       = .false. & ! Debug Output_hourly.f90
+  ,DEBUG_pH             = .false. &
   ,DEBUG_PHYCHEM        = .false. &
+  ,DEBUG_POLLEN         = .false.  &
+  ,DEBUG_RUNCHEM        = .false. & ! DEBUG_RUNCHEM is SPECIAL
+    ,DEBUG_AEROSOL      = .false. & ! ...needed for intended debugs are to work
+    ,DEBUG_DUST           = .false. & ! Skips fast chemistry to save some CPU
+    ,DEBUG_ROADDUST     = .false. &
+    ,DEBUG_MY_WETDEP    = .false. &
+    ,DEBUG_SEASALT      = .false. &
+    ,DEBUG_SOA          = .false. &
+    ,DEBUG_SOLVER       = .false. &
+    ,DEBUG_SUBMET         = .false. &
+    ,DEBUG_WETDEP       = .false. &
   ,DEBUG_RSUR           = .false. &
   ,DEBUG_RB             = .false. &
-  ,DEBUG_SOILNO         = .false. &
-  ,DEBUG_SUBMET         = .false. &
   ,DEBUG_SETUP_1DCHEM   = .false. &
   ,DEBUG_SETUP_1DBIO    = .false. &
   ,DEBUG_SITES          = .false. &
   ,DEBUG_SOILWATER      = .false. &
+  ,DEBUG_SOILNOX        = .false. &
   ,DEBUG_VOLC           = .false. & ! Volcanoes
-  ,DEBUG_NEST           = .false. &
-  ,DEBUG_NEST_ICBC      = .false.   ! IFS-MOZART BC
+  ,DEBUG_EMERGENCY      = .false.    ! Emergency: Volcanic Eruption & Nuclear Accident. Under development.
 
 !=============================================================================
 ! 3)  Source-receptor runs?
@@ -233,46 +363,43 @@ integer, public, parameter :: &
 
 logical, public, parameter :: SOURCE_RECEPTOR = .false.
 
-! Forecast run?
-! only dayly and hourly output is required on FORECAST mode, so in Derived_ml,
-! we set all other output types to false if FORECAST=.true..
-logical, public, parameter :: FORECAST = .false.
+! Compress NetCDF output? (nc4 feature)
+logical, public, save :: NETCDF_COMPRESS_OUTPUT=.true.
+
+!Hourly output in single file or monthly/daily files:
+!NB: will not work well by default on Stallo per 14th Feb 2012 because of library bugs!
+!Until this is fixed, you must compile with netcdf/4.1.3 and link and run with compiler 12.1.2
+character(len=*), public, parameter :: &! ending depeding on date:
+! HOURLYFILE_ending="_hour_YYYYMM.nc"   ! MM  -> month (01 .. 12)
+! HOURLYFILE_ending="_hour_YYYYMMDD.nc" ! DD  -> day of the month (00 .. 31)
+! HOURLYFILE_ending="_hour_YYYYJJJ.nc"  ! JJJ -> the day of the year (001 .. 366)
+! HOURLYFILE_ending="+FFF.nc"           ! a new file each forecast hour
+  HOURLYFILE_ending="_hour.nc"          ! keep the same for the whole run
 
 ! NH3 module as set up originally with U10 from met: kept for safety only.
 ! Will be replaced by sub.grid calculation of wind in future.
 ! Keep false until code re-implemented
-
 logical, public, parameter :: NH3_U10 = .false.
-
-! Nesting modes:
-! produces netcdf dump of concentrations if wanted, or initialises mode runs 
-! from such a file. Used in Nest_ml
-
-integer, public, parameter ::NEST_MODE=0  !0=donothing , 1=write , 2=read , 
-!3=read and write, 10=write at end of run, 11=read at start, 12=read at 
-!start and write at end (BIC)
-
 
 !=============================================================================
 !+ 4)  Define main model dimensions,  things that will
 !       generally only change when switching Met-driver
 integer, public, parameter ::  &
-  NLANDUSEMAX  = 23    &    ! Number of land use types in Inputs.Landuse file
+!TREEX  NLANDUSEMAX  = 19   &   ! Number of land use types in Inputs.Landuse file
+  NLANDUSEMAX  = 30    &    ! Max num land use types in Inputs.Landuse file
 , METSTEP      = 3     &    ! time-step of met. (h)
-, KMAX_MID     = 20    &    ! Number of points (levels) in vertical
-, KMAX_BND     = KMAX_MID+1 & ! Number of points (levels) in vertical + 1
 , KTOP         = 1     &    ! K-value at top of domain
 , KWINDTOP     = 5     &    ! Define extent needed for wind-speed array
 , NMET         = 2     &    ! No. met fields in memory
 , KCHEMTOP     = 2     &    ! chemistry not done for k=1
 , KCLOUDTOP    = 8     &    ! limit of clouds (for MADE dj ??)
-, KUPPER       = 6     &    ! limit of clouds (for wet dep.)
-! And for My_Derived_ml VG_SPECS & LocalVariables_ml Vg_ref etc. we need a limit
-, NVGOUT_MAX   = 10         ! Max. no species for My_Derived VG outputs
+, KUPPER       = 6          ! limit of clouds (for wet dep.)
 
 
-integer, public, parameter :: &   ! Groups for DDEP and WDEP
-  SOX_INDEX = -1, OXN_INDEX = -2, RDN_INDEX = -3
+!Namelist controlled: which veg do we want flux-outputs for
+character(len=15), public, save, dimension(20) :: FLUX_VEGS=""
+integer, public, save :: nFluxVegs = 0 ! reset in Landuse_ml
+    
 
 ! EMEP measurements end at 6am, used in  daily averages
 integer, public, parameter :: END_OF_EMEPDAY  = 6
@@ -291,15 +418,15 @@ integer, public, parameter :: NTDAY = 72
 integer, parameter, public :: CHEMTMIN=148,CHEMTMAX=333
 
 real, public, parameter :: &
-  V_RAIN     = 5.          & !approximate vertical speed of rain m/
-, CLOUDTHRES = 1.0e-5        !when cloudwater is larger than
-                             !CLOUDTHRES, there are clouds.
+  V_RAIN     = 5.           !approximate vertical speed of rain m/s
 
 real, public, parameter :: &
   CW_THRESHOLD = 1.0E-7&!Cloudwater (kg/kg); above threshold allow possibility
                         ! for precipitations. Value could be adjusted.
-, RH_THRESHOLD = 0.85   !Relative humidity (fraction); above threshold allow
+, RH_THRESHOLD = 0.85  &!Relative humidity (fraction); above threshold allow
                         !possibility for precipitations.Value could be adjusted.
+, CW2CC = 1.0E6         !Converts Cloudwater (kg/kg) into CloudCover in %
+                        !Value could be adjusted.
 !
 !  additional parameters
 !
@@ -310,6 +437,10 @@ integer, public, save , dimension(20)   :: identi   !! ????
 integer, public, parameter :: TXTLEN_NAME = 20
 character(len=120), public, save :: runlabel1&!SHORT Allows explanatory text
                                   , runlabel2 !LONG  Read in from grun.pl
+
+! Typically, we define as mainly sea when > 50% water, and
+! likely_coastal when > 20%. See Landuse_ml
+real, public, parameter, dimension(2) ::  SEA_LIMIT = (/ 0.2, 0.5 /)
 
 real, public, parameter :: &
   EPSIL  = 1.0e-30         &  ! small number
@@ -344,9 +475,55 @@ real, public, parameter :: MFAC = 0.001*AVOG/ATWAIR
 integer, public, parameter ::  &
   IOU_INST=1, IOU_YEAR=2, IOU_MON=3, IOU_DAY=4, & ! Derived output
   IOU_HOUR_PREVIOUS=5,                          & ! Aux. field
-  IOU_HOUR=6, IOU_HOUR_MEAN=7                     ! Hourly  output
+  IOU_HOUR=6, IOU_HOUR_MEAN=7                   & ! Hourly  output
+  ,IOU_MAX_MAX=7                                  ! Max values for of IOU (for array declarations)
 
 character(len=*), public, parameter :: model="EMEP_MSC-W"
+
+!----------------------------------------------------------------------------
+contains
+subroutine Config_ModelConstants(iolog)
+    character(len=120)  :: txt, errmsg
+    logical             :: file_exists
+    integer, intent(in) :: iolog ! for Log file
+
+    NAMELIST /ModelConstants_config/ &
+      EXP_NAME &  ! e.g. EMEPSTD, FORECAST, TFMM, TodayTest, ....
+     ,MY_OUTPUTS  &  ! e.g. EMEPSTD, FORECAST, TFMM
+     ,USE_SOILWATER, USE_DEGREEDAY_FACTORS, USE_FOREST_FIRES &
+     ,USE_CONVECTION &
+     ,DO_SAHARA, USE_ROADDUST, USE_DUST &
+     ,USE_EURO_SOILNOX, USE_GLOBAL_SOILNOX, USE_SEASALT ,USE_POLLEN &
+     ,INERIS_SNAP1, INERIS_SNAP2 &   ! Used for TFMM time-factors
+     ,IS_GLOBAL  &     ! Also for EMERGENCY
+     ,MONTHLY_GRIDEMIS &     ! was set in Emissions_ml
+     ,SELECT_LEVELS_HOURLY &  ! incl. FORECAST, 3DPROFILES
+     ,FORECAST, USE_EMERGENCY, ANALYSIS , USE_AOD &
+     ,SEAFIX_GEA_NEEDED & ! only if problems, see text above.
+     ,BGND_CH4  & ! Can reset background CH4 values 
+     ,EMIS_SOURCE, EMIS_TEST, EMIS_OUT & 
+     ,FLUX_VEGS  & ! TESTX
+     ,NETCDF_COMPRESS_OUTPUT,  RUNDOMAIN
+
+    txt = "ok"
+    !Can't call check_file due to circularity
+    !call check_file('emep_settings.nml', file_exists, needed=.true., errmsg=txt)
+    open(IO_NML,file='config_emep.nml',delim='APOSTROPHE')
+    read(IO_NML,NML=ModelConstants_config)
+    !close(IO_NML)
+
+    USE_SOILNOX = USE_EURO_SOILNOX .or. USE_GLOBAL_SOILNOx
+
+    if ( MasterProc )  then
+     write(*, * ) "NAMELIST IS "
+     write(*, NML=ModelConstants_config)
+     write(*,* ) "NAMELIST IOLOG IS ", iolog
+     write(iolog,*) "NAMELIST IS "
+     write(iolog, NML=ModelConstants_config)
+    end if
+
+  
+end subroutine Config_ModelConstants
 
 end module ModelConstants_ml
 !_____________________________________________________________________________

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,8 +39,7 @@ module CoDep_ml
   !---------------------------------------------------------------------------
   ! For basic reference and methods, see
   !
-  ! Fagerli et al., 2011, in preperation  for Rbs_SO2
-  ! Simpson et al. 2011, in preperation for general model documentation
+  ! Simpson et al. 2012, ACP, 12, for general model documentation
   !
   ! Also,
   ! RIS: Smith, R.I., Fowler, D., Sutton, M.A., Flechard, C: and Coyle, M.
@@ -62,8 +61,8 @@ module CoDep_ml
   !/** Some parameters for the so2nh3_24hr calculations
 
   integer, private :: nhour 
-  real, private, save ::   &             ! 24hr average ratio              
-     so2nh3_hr(24,MAXLIMAX,MAXLJMAX)=1.0 !Predefined to 1.0 to make first hours
+  real, private, save,allocatable ::   &             ! 24hr average ratio              
+     so2nh3_hr(:,:,:)  !Predefined to 1.0 to make first hours
                                          !reasonable
 
   !/** Some parameters for the Rns calculations
@@ -131,6 +130,8 @@ contains
 
      call Tabulate()
      my_first_call = .false.
+     allocate(so2nh3_hr(24,MAXLIMAX,MAXLJMAX))
+     so2nh3_hr=1.0
      if( debug_proc ) write(*,"(a,2es12.4,f7.2,f7.3,L1)") "First CoDep call, ",  &
            so2nh3ratio24hr,so2nh3ratio, Ts_C, frh, forest
 

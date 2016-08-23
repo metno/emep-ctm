@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2012 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,15 +36,16 @@ module CellMet_ml
 
 
 use CheckStop_ml, only : CheckStop
-use GridValues_ml, only :  sigma_bnd
+use GridValues_ml, only :  sigma_bnd,dA,dB
 use Landuse_ml, only : LandCover, ice_landcover    ! Provides SGS, hveg, LAI ....
+use Landuse_ml, only : mainly_sea
 use LocalVariables_ml, only: Grid, Sub, ResetSub
 use MicroMet_ml, only :  PsiH, PsiM, AerRes    !functions
 use MetFields_ml, only: ps, u_ref
-use MetFields_ml, only: cc3dmax, nwp_sea, sdepth,ice_nwp, surface_precip, &
+use MetFields_ml, only: cc3dmax, sdepth,ice_nwp, surface_precip, &
    fh,fl,z_mid, z_bnd, q, roa, rh2m, rho_surf, th, pzpbl, t2_nwp, ustar_nwp,&
     zen, coszen, Idirect, Idiffuse
-use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, PT
+use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, PT, USE_ZREF
 use PhysicalConstants_ml, only : PI, RGAS_KG, CP, GRAV, KARMAN, CHARNOCK, T0
 use SoilWater_ml, only : fSW
 use SubMet_ml, only : Get_SubMet
@@ -92,13 +93,26 @@ contains
      Grid%i        = i
      Grid%j        = j
      Grid%psurf    = ps(i,j,1)    ! Surface pressure, Pa
-     Grid%z_ref    = z_mid(i,j,KMAX_MID)   ! NB! Approx, updated every 3h
+     Grid%z_mid    = z_mid(i,j,KMAX_MID)   ! NB! Approx, updated every 3h
+
+     ! Have option to use a different reference ht:
+     if ( USE_ZREF ) then 
+        Grid%z_ref    = &
+           min( 0.1*pzpbl(i,j),  z_mid(i,j,KMAX_MID) )   ! within or top of SL
+     else
+        Grid%z_ref    = z_mid(i,j,KMAX_MID)    ! within or top of SL
+     end if
 
 ! More exact for thickness of bottom layer, since used for emissions
 ! from  dp = g. rho . dz and d sigma = dp/pstar
 ! we get dz = d sigma . pstar/(g.rho)
+!     Grid%DeltaZ  &!  = z_bnd(i,j,KMAX_BND-1) ! NB! Approx,updated every 3h
+!                = (1.0 - sigma_bnd(20) ) * (ps(i,j,1)-PT) /(GRAV*roa(i,j,20,1))
+!Eta coordinates:
+!dp = dA+dB*Ps
      Grid%DeltaZ  &!  = z_bnd(i,j,KMAX_BND-1) ! NB! Approx,updated every 3h
-                = (1.0 - sigma_bnd(20) ) * (ps(i,j,1)-PT) /(GRAV*roa(i,j,20,1))
+                = (dA(KMAX_MID)+dB(KMAX_MID)*ps(i,j,1) )/(GRAV*roa(i,j,20,1))
+
      Grid%u_ref    = u_ref(i,j)
      Grid%qw_ref    =  q(i,j,KMAX_MID,1)   ! specific humidity
      Grid%rho_ref  = roa(i,j,KMAX_MID,1)
@@ -115,14 +129,14 @@ contains
      Grid%ustar = ustar_nwp(i,j)   !  u*
      Grid%t2    = t2_nwp(i,j,1)    ! t2 , K
      Grid%t2C   = Grid%t2 - 273.15 ! deg C
+     Grid%theta_ref = th(i,j,KMAX_MID,1) 
      Grid%rh2m  = rh2m(i,j,1)      ! 
      Grid%rho_s = rho_surf(i,j)    ! Should replace Met_ml calc. in future
 
-     Grid%is_NWPsea = nwp_sea(i,j)
-     Grid%is_allNWPsea = ( nwp_sea(i,j) .and. LandCover(i,j)%ncodes == 1)
+     Grid%is_mainlysea = mainly_sea(i,j)
+     Grid%is_allsea = ( mainly_sea(i,j) .and. LandCover(i,j)%ncodes == 1)
      Grid%sdepth    = sdepth(i,j,1)
      Grid%ice_nwp   = max( ice_nwp(i,j,1), ice_landcover(i,j) ) 
-     !bug Grid%snowice   = ( Grid%sdepth  > 0.0 .or. Grid%ice_nwp > 0.0 )
      Grid%snowice   = ( Grid%sdepth  > 1.0e-10 .or. Grid%ice_nwp > 1.0e-10 )
 
      Grid%fSW       = fSW(i,j)

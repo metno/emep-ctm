@@ -45,8 +45,8 @@ module EcoSystem_ml
    logical, public, dimension(NDEF_ECOSYSTEMS,NLANDUSEMAX), &
             save :: Is_EcoSystem
 
-   real, public, dimension(NDEF_ECOSYSTEMS,MAXLIMAX,MAXLJMAX), &
-            save :: EcoSystemFrac
+   real, public, dimension(:,:,:), &
+            save,allocatable :: EcoSystemFrac
 
 contains
  !<---------------------------------------------------------------------------
@@ -56,6 +56,8 @@ contains
     character(len=TXTLEN_SHORT) :: unit
     integer :: iEco
     logical, parameter :: T = .true., F = .false. ! shorthands only
+
+    allocate(EcoSystemFrac(NDEF_ECOSYSTEMS,MAXLIMAX,MAXLJMAX))
 
       if( MasterProc ) &
            write(*,*) "Defining ecosystems: ",(trim(DEF_ECOSYSTEMS(iEco))," ",iEco = 1, NDEF_ECOSYSTEMS)

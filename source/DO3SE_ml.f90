@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2013 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,6 +28,7 @@
 module DO3SE_ml
 
   use CheckStop_ml,  only : CheckStop
+  use LandDefs_ml, only : LandDefs, LandType ! SPOD
   use LocalVariables_ml,  only : L ! &
 !         t2C  => L%t2c  &! surface temp. at height 2m (deg. C)
 !        ,vpd  => L%vpd  &! vapour pressure deficit (kPa)
@@ -38,6 +39,7 @@ module DO3SE_ml
 
   use ModelConstants_ml, only : NLANDUSEMAX, DEBUG_DO3SE, MasterProc, &
       USE_SOILWATER
+  use SmallUtils_ml,     only : find_index
   use TimeDate_ml,       only : current_date, daynumber
 
   implicit none
@@ -50,11 +52,6 @@ module DO3SE_ml
  public :: g_stomatal     ! produces g_sto and g_sun
  public :: fPhenology     !  -> f_phen
 
- ! Make public for output testing
-  real, public, save  :: f_light, f_temp, f_vpd, f_env         
-  real, public, save  :: f_swp = 1.0  ! Will only change if USE_SOILWATER set
-  real, public, save  :: f_phen = 888 ! But set elsewhere
-
 !-----------------------------------------------------------------------------
 ! Notes: Basis is Emberson et al, EMEP Report 6/2000
 ! Numbers updated to Mapping Manual, 2004 and changes recommended
@@ -66,7 +63,7 @@ module DO3SE_ml
  !/*****   Data to be read from Phenology_inputs.dat:
 
   type, public :: do3se_type
-     character(len=10) :: code
+     character(len=15) :: code
      character(len=15) :: name
      real:: g_max           ! max. value conductance g_s
      real:: f_min           ! min. value Conductance, factor
@@ -108,14 +105,16 @@ module DO3SE_ml
 contains
 !=======================================================================
   !=======================================================================
-  subroutine Init_DO3SE(io_num,fname,wanted_codes,io_msg)
+  subroutine Init_DO3SE(io_num,fname,ncodes,wanted_codes,io_msg)
   !=======================================================================
       integer, intent(in) :: io_num
       character(len=*), intent(in) :: fname 
+      integer, intent(in) ::  ncodes ! number of land-codes in mapped data
       character(len=*), dimension(:), intent(in) :: wanted_codes 
       character(len=*), intent(inout) :: io_msg 
       character(len=300)  :: inputline
-      integer :: iLC, ios
+      integer :: iLC, ios, nLC
+      type(do3se_type) :: input_do3se
       !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       ! Read data (still old-style reading, on all processors)
 
@@ -128,7 +127,8 @@ contains
       !------ Read in file. Lines beginning with "!" are taken as
       !       comments and skipped
 
-       iLC = 1    
+       !APR2013 iLC = 1    
+       nLC = 0
        nSumVPD = 0
        do
             read(unit=io_num,fmt="(a200)",iostat=ios) inputline
@@ -142,10 +142,19 @@ contains
                 cycle
             end if
 
-            read(unit=inputline,fmt=*) do3se(iLC)
+            read(unit=inputline,fmt=*) input_do3se
+            !APR2013 read(unit=inputline,fmt=*) do3se(iLC)
+            iLC = find_index( input_do3se%code, wanted_codes)
+
+            if ( iLC < 1 ) then
+                if(MasterProc) write(*,*) " DO3SE skips iLC", iLC, input_do3se%code 
+                cycle
+            end if
+
+            do3se(iLC) = input_do3se  
 
             if ( DEBUG_DO3SE .and. MasterProc ) then
-                print *, " DO3SE iLC", iLC,  do3se(iLC)%code, wanted_codes(iLC)
+                write(*,*) " DO3SE iLC", iLC,  do3se(iLC)%code, wanted_codes(iLC)
             end if
             if ( do3se(iLC)%VPDcrit > 0.0 ) then
               nSumVPD = nSumVPD + 1
@@ -155,10 +164,13 @@ contains
                 write(*,*)'VPDlimit ',do3se(iLC)%VPDcrit,' for iLC ',iLC, nSumVPD
             end if
 
-            call CheckStop( wanted_codes(iLC), do3se(iLC)%code, "DO3SE MATCHING")
-            iLC = iLC + 1
+            !APR2013 call CheckStop( wanted_codes(iLC), do3se(iLC)%code, "DO3SE MATCHING")
+            !APR2013 iLC = iLC + 1
+            nLC = nLC + 1
        end do
        close(unit=io_num)
+
+       call CheckStop( nLC /= ncodes, "Init_DO3SE didn't find all codes")
 
   end subroutine Init_DO3SE
 
@@ -183,11 +195,12 @@ contains
 
  ! environmental f factors
 
-  real :: f_sun         ! light-factor for upper-canopy sun-leaves
-  real :: f_shade       ! shade-leaf contribution to f_light
+ !FE2013 real :: f_sun         ! light-factor for upper-canopy sun-leaves
+ !FE2013 real :: f_shade       ! shade-leaf contribution to f_light
 
   real :: dg, dTs, bt   ! for temperate calculations
   real :: mmol2sm       !  Units conversion, mmole/m2/s to s/m
+  real :: tmp
 
 
         
@@ -203,10 +216,10 @@ contains
 !    al. (1998), eqns. 31-35, based upon sun/shade method of  
 !    Norman (1979,1982)
 
-    f_sun   = (1.0 - exp (-do3se(iLC)%f_light*L%PARsun  ) ) 
-    f_shade = (1.0 - exp (-do3se(iLC)%f_light*L%PARshade) ) 
+    L%f_sun   = (1.0 - exp (-do3se(iLC)%f_light*L%PARsun  ) ) 
+    L%f_shade = (1.0 - exp (-do3se(iLC)%f_light*L%PARshade) ) 
 
-    f_light = L%LAIsunfrac * f_sun + (1.0 - L%LAIsunfrac) * f_shade
+    L%f_light = L%LAIsunfrac * L%f_sun + (1.0 - L%LAIsunfrac) * L%f_shade
 
 !--------------------------------------------------------------------
   
@@ -219,36 +232,31 @@ contains
   dg  =    ( do3se(iLC)%T_opt - do3se(iLC)%T_min )
   bt  =    ( do3se(iLC)%T_max - do3se(iLC)%T_opt ) / dg
   dTs = max( do3se(iLC)%T_max - L%t2C, 0.0 )      !CHECK why max?
-  f_temp = dTs / ( do3se(iLC)%T_max - do3se(iLC)%T_opt )
-  f_temp = ( L%t2C - do3se(iLC)%T_min ) / dg *  f_temp**bt
+  tmp = dTs / ( do3se(iLC)%T_max - do3se(iLC)%T_opt )
+  L%f_temp = ( L%t2C - do3se(iLC)%T_min ) / dg *  tmp**bt
 
-  f_temp = max( f_temp, 0.01 )  ! Revised usage of min value during 2007
+  L%f_temp = max( L%f_temp, 0.01 )  ! Revised usage of min value during 2007
 
 
 !..4) Calculate f_vpd
 !---------------------------------------
 
- f_vpd = do3se(iLC)%f_min + &
+ L%f_vpd = do3se(iLC)%f_min + &
           (1.0-do3se(iLC)%f_min) * (do3se(iLC)%VPD_min - L%vpd )/ &
               (do3se(iLC)%VPD_min - do3se(iLC)%VPD_max )
- f_vpd = min(f_vpd, 1.0)
- f_vpd = max(f_vpd, do3se(iLC)%f_min)
+ L%f_vpd = min(L%f_vpd, 1.0)
+ L%f_vpd = max(L%f_vpd, do3se(iLC)%f_min)
 
 
 !..5) Calculate f_swp
 !---------------------------------------
 
-  !/  Use SWP_Mpa to get f_swp. We just need this updated
-  !   once per day, but for simplicity we do it every time-step.
-
-  !ds     f_swp = do3se(iLC)%f_min + &
-  !ds            (1-do3se(iLC)%f_min)*(do3se(iLC)%PWP-L%SWP)/ &
-  !ds                                (do3se(iLC)%PWP-do3se(iLC)%SWP_max)
-  !ds     f_swp = min(1.0,f_swp)
-  ! Aug 2010: use HIRLAM's SW, and simple "DAM" function
+  !/  Soil water effects. We now used the soil-moisture
+  !   index from ECMWF if possible, otherwise some equivalent.
+  !   Once per day, but for simplicity we do it every time-step.
 
   ! ************************************
-   if ( USE_SOILWATER ) f_swp =  L%fSW
+   !FEB2013 Set fSW in CellMet
   ! ************************************
 
 
@@ -256,21 +264,30 @@ contains
 !---------------------------------------
 !  ( with revised usage of min value for f_temp during 2007)
 
-   f_env = f_vpd * f_swp
-   f_env = max( f_env, do3se(iLC)%f_min )
-   f_env = max( f_temp, 0.01) * f_env
+   L%f_env = L%f_vpd * L%fSW
+   L%f_min  = do3se(iLC)%f_min
+   L%f_env = max( L%f_env, L%f_min )
+   L%f_env = max( L%f_temp, 0.01) * L%f_env
 
-   f_env = f_phen * f_env * f_light  ! Canopy average
+   L%f_env = L%f_phen * L%f_env * L%f_light  ! Canopy average
 
 ! From mmol O3/m2/s to s/m given in Jones, App. 3, gives 41000 for 20 deg.C )
 !   (should we just use P=100 hPa?)
 
    mmol2sm = 8.3144e-8 * L%t2       ! 0.001 * RT/P
 
-   L%g_sto = do3se(iLC)%g_max * f_env * mmol2sm 
+   L%g_sto = do3se(iLC)%g_max * L%f_env * mmol2sm 
 
-   L%g_sun = L%g_sto * f_sun/f_light       ! sunlit part
+   L%g_sun = do3se(iLC)%g_max * mmol2sm * L%f_phen * L%f_sun * &
+         max( do3se(iLC)%f_min,  L%f_temp * L%f_vpd * L%fSW )
 
+
+   if ( DEBUG_DO3SE .and. debug_flag ) then ! EXTRA
+       write(*,"(a,5i5,i3,L2,99f10.4)") "IN RSUR gstomatal ", &
+              current_date, iLC, USE_SOILWATER, L%PARsun, L%PARshade,&
+              do3se(iLC)%g_max, L%g_sto, L%f_env,  L%f_phen, L%f_vpd,&
+              L%fSW, L%g_sto * L%f_sun/L%f_light, L%g_sun 
+   end if
 
     if ( DEBUG_DO3SE ) then
         needed = (/ L%t2C,L%t2,L%vpd ,L%SWP ,&
@@ -280,11 +297,13 @@ contains
           call CheckStop("ERROR in g_stomatal, Missing data")
         end if
 
-        if ( debug_flag.and.current_date%seconds==0 .and. iLC<5  &
-             .and. current_date%hour==12.and. iLC<5 )  then
-           write(*,"(a,2i3,9f8.3)") "F-DO3SE ", daynumber, &!current_date%hour, &
-               iLC, f_phen, f_light, f_temp, f_vpd, f_swp, &
-                 f_swp*f_vpd, do3se(iLC)%f_min, f_env
+        !SPOD if ( debug_flag.and.current_date%seconds==0 .and. iLC<5  &
+         !SPOD     .and. current_date%hour==12.and. iLC<5 )  then
+        if ( debug_flag.and.current_date%seconds==0 .and. LandType(iLC)%is_forest  &
+             .and. current_date%hour==12 )  then
+           write(*,"(a,2i3,99f8.3)") "F-DO3SE ", daynumber, &!current_date%hour, &
+               iLC, L%f_phen, L%f_light,L%f_sun, L%f_temp, L%f_vpd, L%fSW, &
+                 L%fSW*L%f_vpd, L%f_min, L%f_env
 
           ! Met params, except soil water  where fSW =~ REW
 

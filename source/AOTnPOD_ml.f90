@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2011 met.no
+!*  Copyright (C) 2007-2013 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,7 +29,8 @@ module AOTx_ml
   use CheckStop_ml, only : checkStop
   use Chemfields_ml, only : xn_adv, cfac
   use ChemSpecs_adv_ml, only : IXADV_O3
-  use GridValues_ml, only : debug_li, debug_lj
+  use DO3SE_ml  ! SPOD NEG
+  use GridValues_ml, only : debug_li, debug_lj, debug_proc, i_fdom, j_fdom
   use Io_Progs_ml,   only : datewrite
   use LandDefs_ml,   only : LandType
   use Landuse_ml,    only : WheatGrowingSeason
@@ -39,7 +40,7 @@ module AOTx_ml
      ,DEBUG_AOT  & 
      ,PPBINV ! 1.0e9, for conversion from mixing ratio to ppb
   use OwnDataTypes_ml, only : TXTLEN_DERIV, TXTLEN_SHORT
-  use Par_ml, only : MAXLIMAX, MAXLJMAX, limax, ljmax
+  use Par_ml, only : MAXLIMAX, MAXLJMAX, limax, ljmax, me
   use TimeDate_ml, only : current_date, jday => effectivdaynumber
   implicit none
   private
@@ -47,6 +48,7 @@ module AOTx_ml
   public :: Calc_AOTx          ! called from AddMosaicOutput, My_DryDep
   public :: Calc_POD           ! called from AddMosaicOutput
   public :: Calc_GridAOTx      ! called from Derived_ml
+  public :: Calc_SPOD          !  Experimental, JAN2013
 
 ! Limit of daylight zenith angle for AOTs
   integer, private,  parameter :: AOT_HORIZON  = 89         
@@ -68,7 +70,7 @@ module AOTx_ml
        character(len=TXTLEN_SHORT) :: class ! POD or AOT
        real    :: Threshold     ! Threshold or CL, e.f. AOTx or AFstY
        character(len=TXTLEN_SHORT) :: defn !  MM or EU definitions
-       character(len=TXTLEN_SHORT) :: TXTLC !  CF, DF, IAM_CF etc.
+       character(len=TXTLEN_SHORT) :: txtLC !  CF, DF, IAM_CF etc.
        logical :: RelSGS      ! true if accumulation period is relative to
                               ! start of growing season (SGS)
                               ! can be false it fixed, e.g. April 1st
@@ -80,7 +82,7 @@ module AOTx_ml
     type(O3cl), public, allocatable, dimension(:) :: &
      VEGO3_OUTPUTS
 
-    type(O3cl), public, parameter, dimension(26) :: &
+    type(O3cl), public, parameter, dimension(40) :: &
      VEGO3_DEFS    =  (/ &
          ! name               class X/Y   defn   txtLC relSGS Sacc Eacc
    O3cl( "POD1_IAM_DF   ",   "POD", 1.0,  "- ", "IAM_DF",F,0,999 ), & 
@@ -89,18 +91,41 @@ module AOTx_ml
    O3cl( "POD0_IAM_MF   ",   "POD", 0.0,  "- ", "IAM_DF",F,0,999 ), &
    O3cl( "POD1_DF       ",   "POD", 1.0,  "- ", "DF    ",F,0,999 ), &
    O3cl( "POD1_CF       ",   "POD", 1.0,  "- ", "CF    ",F,0,999 ), &
-   O3cl( "POD3_TC       ",   "POD", 3.0,  "- ", "TC    ",F,0,999 ), & !
+   O3cl( "POD3_TC       ",   "POD", 3.0,  "- ", "TC    ",F,0,999 ), & !=7
+!
+!SPOD is being developed for Swedish NV
+   O3cl( "SPOD15_birch  ",   "SPOD", 15.0, "- ", "NEUR_BIRCH",F,0,999 ), & 
+   O3cl( "SPOD10_birch  ",   "SPOD", 10.0, "- ", "NEUR_BIRCH",F,0,999 ), & 
+   O3cl( "SPOD15_spruce ",   "SPOD", 15.0, "- ", "NEUR_SPRUCE",F,0,999 ), & 
+   O3cl( "SPOD10_spruce ",   "SPOD", 10.0, "- ", "NEUR_SPRUCE",F,0,999 ), & 
+   O3cl( "SPOD5_spruce  ",   "SPOD",  5.0, "- ", "NEUR_SPRUCE",F,0,999 ), & 
+   O3cl( "SPOD15_crops  ",   "SPOD", 15.0, "- ", "IAM_CR",F,0,999 ), & 
+   O3cl( "SPOD25_crops  ",   "SPOD", 25.0, "- ", "IAM_CR",F,0,999 ), & 
+   O3cl( "SPOD15_crops  ",   "SPOD", 15.0, "- ", "IAM_CR",F,0,999 ), &!
+   O3cl( "SPOD10_crops  ",   "SPOD", 10.0, "- ", "IAM_CR",F,0,999 ), & !9 => 16
+!TREE TESTS:
+   O3cl( "POD1_NEUR_SPRUCE", "POD", 1.0,  "- ", "NEUR_SPRUCE  ",F,0,999 ), &
+   O3cl( "POD1_NEUR_BIRCH ", "POD", 1.0,  "- ", "NEUR_BIRCH   ",F,0,999 ), &
+   O3cl( "POD1_ACE_PINE ",   "POD", 1.0,  "- ", "ACE_PINE   ",F,0,999 ), & !
+   O3cl( "POD1_ACE_OAK  ",   "POD", 1.0,  "- ", "ACE_OAK    ",F,0,999 ), &
+   O3cl( "POD1_ACE_BEECH",   "POD", 1.0,  "- ", "ACE_BEECH  ",F,0,999 ), &
+   O3cl( "POD1_CCE_SPRUCE", "POD", 1.0,  "- ", "CCE_SPRUCE  ",F,0,999 ), &
+   O3cl( "POD1_CCE_BEECH", "POD", 1.0,  "- ", "CCE_BEECH  ",F,0,999 ), &
+   O3cl( "POD1_MED_OAK", "POD", 1.0,  "- ", "MED_OAK  ",F,0,999 ), &
+   O3cl( "POD1_MED_PINE", "POD", 1.0,  "- ", "MED_PINE  ",F,0,999 ), &
+   O3cl( "POD1_MED_BEECH", "POD", 1.0,  "- ", "MED_BEECH  ",F,0,999 ), & !10 =>26
 ! 30days, 15 before mid, 15 after
-   O3cl( "POD3_TC30d    ",   "POD", 3.0,  "- ", "TC    ",T,30,60 ), & 
+!   O3cl( "POD3_TC30d    ",   "POD", 3.0,  "- ", "TC    ",T,30,60 ), & 
 ! 55days, 15 before mid, 40 after
-   O3cl( "POD3_TC55d    ",   "POD", 3.0,  "- ", "TC    ",T,30,85 ), & 
-   O3cl( "POD6_TC       ",   "POD", 3.0,  "- ", "TC    ",F,0,999 ), & !
-   O3cl( "POD6_TC55d    ",   "POD", 3.0,  "- ", "TC    ",T,30,85 ), & ! 55d
-   O3cl( "POD3_IAM_CR   ",   "POD", 3.0,  "- ", "IAM_CR",F,0,999 ), &
-   O3cl( "POD3_IAM_CR30d",   "POD", 3.0,  "- ", "IAM_CR",T,30,60 ), &
-   O3cl( "POD3_IAM_CR55d",   "POD", 3.0,  "- ", "IAM_CR",T,30,85 ), &
+!   O3cl( "POD3_TC55d    ",   "POD", 3.0,  "- ", "TC    ",T,30,85 ), & 
+!   O3cl( "POD6_TC55d    ",   "POD", 3.0,  "- ", "TC    ",T,30,85 ), & ! 55d
+   O3cl( "POD3_IAM_CR   ",   "POD", 3.0,  "- ", "IAM_CR",F,0,999 ), & !=>27
+!   O3cl( "POD3_IAM_CR30d",   "POD", 3.0,  "- ", "IAM_CR",T,30,60 ), &
+!   O3cl( "POD3_IAM_CR55d",   "POD", 3.0,  "- ", "IAM_CR",T,30,85 ), &
+!=24
 ! WARNING - POD6 is not recommended for European-scale IAM modelling
 ! Way too uncertain!
+   O3cl( "POD6_TC       ",   "POD", 3.0,  "- ", "TC    ",F,0,999 ), & !
    O3cl( "POD6_IAM_CR   ",   "POD", 6.0,  "- ", "IAM_CR",F,0,999 ), & ! WARN!
    O3cl( "POD6_IAM_CR30d",   "POD", 6.0,  "- ", "IAM_CR",T,30,60 ), & ! WARN!
    O3cl( "POD6_IAM_CR55d",   "POD", 6.0,  "- ", "IAM_CR",T,30,85 ), & ! WARN!
@@ -115,7 +140,7 @@ module AOTx_ml
    O3cl( "EUAOT40_Crops ", "AOT", 40.0, "EU", "IAM_CR",F,0,999 ), &  
 ! IAM_DF, we use 3m O3
    O3cl( "EUAOT40_Forests", "AOT", 40.0, "EU", "IAM_DF",F,0,999 ), &  
-   O3cl( "MMAOT40_IAM_WH ","AOT", 40.0, "MM", "IAM_WH",F,0,999 ) &
+   O3cl( "MMAOT40_IAM_WH ","AOT", 40.0, "MM", "IAM_WH",F,0,999 ) & !13 =>40
     /) !NB -last not found. Could just be skipped, but kept
        !to show behaviour of code
 
@@ -145,9 +170,13 @@ contains
              return
     end if
 
-   !If night, or outside growing season, we simply exit with aot=0
-    if ( vego3_outputs(iO3cl)%defn == "EU" .and.  (current_date%hour < 9 .or. &
-         current_date%hour > 21 )) then ! 8-20 CET, assuming summertime
+   ! If night, or outside growing season, we simply exit with aot=0
+   ! EU AOT for 8:00 -- 20:00 CET, is really 8:00 -- 19:59 CET 
+   ! Or:        7:00 -- 18:59 UTC
+   ! (nb hour is integer value)
+
+    if ( vego3_outputs(iO3cl)%defn == "EU" .and.  &
+         (current_date%hour  <  7 .or. current_date%hour  > 18 )) then
           return
 
     else if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight
@@ -257,6 +286,7 @@ contains
 
   end function Calc_GridAOTx
 
+
 !=========================================================================
   subroutine Calc_POD(iO3cl,iLC, pod, debug_flag, debug_txt )
     logical, intent(in) :: debug_flag
@@ -270,7 +300,8 @@ contains
 
     pod = 0.0
 
-    if ( Grid%izen >= 90 ) then  !UN or MM use daylight
+    !FEB2013 if ( Grid%izen >= 90 ) then  !UN or MM use daylight
+    if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight
         if ( DEBUG_AOT .and. debug_flag ) write(*,*) "PODxZen ",&
            trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, Grid%izen
         return
@@ -304,16 +335,142 @@ contains
      pod  = max(Sub(iLC)%FstO3 - Y,0.0)
 
 
-    if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
+    !SPOD if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
+    if ( DEBUG_AOT .and. debug_flag ) then
         write(6,"(a,L2,3i4)") "PODACC ", VEGO3_OUTPUTS(iO3cl)%RelSGS, &
            VEGO3_OUTPUTS(iO3cl)%SAccPeriod, VEGO3_OUTPUTS(iO3cl)%EAccPeriod, &
            jday
-       call datewrite("YYY"//trim(debug_txt) // "defn:" // &
+       !SPOD call datewrite("YYY"//trim(debug_txt) // "defn:" // &
+       call datewrite("YYY-debug_pod-defn:" // &
          trim(vego3_outputs(iO3cl)%defn), iLC, &
            (/ real(Grid%izen), Y,  o3, Sub(iLC)%FstO3, pod /) )
     end if
 
   end subroutine Calc_POD 
+
+ !=========================================================================
+  subroutine Calc_SPOD(iO3cl,iLC, spod, debug_flag, debug_txt )
+    logical, intent(in) :: debug_flag
+    character(len=*), intent(in), optional :: debug_txt
+    integer, intent(in) :: iO3cl,iLC
+    real, intent(out)    :: spod
+
+    real    :: o3, Y
+    integer :: i,j
+    real :: spod_fenv, fgmax
+ real :: dg, bt, dTs, tmp, f_temp, f_vpd !OWN CALCS
+
+    spod = 0.0
+
+    if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight
+    !FEB2013 if ( Grid%izen >= 90 ) then  !UN or MM use daylight
+        !if ( DEBUG_AOT .and. debug_flag ) write(*,*) "SPODxZen ",&
+        !   trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, Grid%izen
+        return
+    end if
+
+    ! Start and end of POD accumulation period:
+
+    !if ( DEBUG_AOT .and. debug_flag ) write(*,*) "SPODxJday ",&
+    !       trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, iLC, Sub(iLC)%SGS, Sub(iLC)%EGS
+
+   ! Outside growing season. We check agsinst f_phen also, since for jday==SGS
+   ! deciduous forests get f_phen zero
+    if ( jday < Sub(iLC)%SGS .or. jday > Sub(iLC)%EGS .or. Sub(iLC)%f_phen < 1.0e-5 ) then
+       return
+    end if
+
+    i = Grid%i
+    j = Grid%j
+    Y = vego3_outputs(iO3cl)%Threshold ! nmole/m2/s
+
+    o3 = xn_adv(IXADV_O3,i,j,KMAX_MID) * cfac(IXADV_O3,i,j) * PPBINV
+
+    fgmax = 1.0
+    if ( index( VEGO3_OUTPUTS(iO3cl)%name, "spruce" )>0 ) fgmax = 0.57
+   ! For crops, we use the simple Table 3.14 from MM, to get from 3m to 1m
+    if ( index( VEGO3_OUTPUTS(iO3cl)%name, "crops" )>0 )  fgmax = 2.5 * 0.88/0.95
+
+!if( me==33 .and. i == 10 .and. j == 13 .and.  Sub(iLC)%f_temp < 1.0e-10) then
+!if( debug_flag .and.  Sub(iLC)%f_temp < 1.0e-10) then
+!CAn be too much snow so DO3SE never called!
+!if( me==56.and. Sub(iLC)%f_temp < 1.0e-10) then
+!  write( *,"(a,3i6,L2)") "SUBTEMP NEG"//trim(VEGO3_OUTPUTS(iO3cl)%name), me, i_fdom(i), j_fdom(j), debug_proc
+!  write( *,"(a,6i5)") "SUBTEMP NEGD", current_date%hour, current_date%seconds
+!  write( *,"(a,i8,8f12.3)") "SUBTEMP NEGZ", Grid%izen, Grid%Idirect, Sub(iLC)%f_light
+!  write( *,"(a,6f12.2)") "SUBTEMP NEGF1", Sub(iLC)%f_light, Sub(iLC)%f_temp
+!  write( *,"(a,6f12.2)") "SUBTEMP NEGF2", SUb(iLC)%rh, Sub(iLC)%f_vpd, Sub(iLC)%f_phen , fgmax 
+!  write( *,"(a,6f12.2)") "SUBTEMP NEGXY", Grid%latitude, Grid%longitude 
+
+!..3) Calculate  f_temp
+!---------------------------------------
+! Asymmetric  function from Mapping Manual
+! NB _ much more efficient to tabulate this - do later!
+  
+  dg  =    ( do3se(iLC)%T_opt - do3se(iLC)%T_min )
+  bt  =    ( do3se(iLC)%T_max - do3se(iLC)%T_opt ) / dg
+  dTs = max( do3se(iLC)%T_max - L%t2C, 0.0 )      !CHECK why max?
+  tmp = dTs / ( do3se(iLC)%T_max - do3se(iLC)%T_opt )
+  f_temp = ( L%t2C - do3se(iLC)%T_min ) / dg *  tmp**bt
+
+  f_temp = max( L%f_temp, 0.01 )  ! Revised usage of min value during 2007
+
+
+!..4) Calculate f_vpd
+!---------------------------------------
+
+ f_vpd = do3se(iLC)%f_min + &
+          (1.0-do3se(iLC)%f_min) * (do3se(iLC)%VPD_min - L%vpd )/ &
+              (do3se(iLC)%VPD_min - do3se(iLC)%VPD_max )
+ f_vpd = min(f_vpd, 1.0)
+ f_vpd = max(f_vpd, do3se(iLC)%f_min)
+!  write( *,"(a,6f12.3)") "SUBTEMP RECAL", L%t2, L%rh, L%vpd, Grid%Idirect, f_temp, f_vpd
+
+!  call CheckStop(Sub(iLC)%f_temp < 1.0e-10, "SUBTEMP NEG"//trim(VEGO3_OUTPUTS(iO3cl)%name) )
+!end if
+
+
+    if (DEBUG_AOT .and.  debug_flag ) then
+      write( *,*) "spod_fenv POS"//trim(VEGO3_OUTPUTS(iO3cl)%name), me, i_fdom(i), j_fdom(j)
+      write(*,"(a,i3,i4,2i3,f7.3,i5,2es10.2,10f8.3)") "spod_fenv:", iLC,  &
+         jday, current_date%month, current_date%day, &
+         current_date%hour + current_date%seconds/3600.0,& 
+         Grid%izen, Sub(iLC)%PARsun, Grid%Idirect,  &
+ Sub(iLC)%f_light, Sub(iLC)%f_temp , Sub(iLC)%rh, Sub(iLC)%f_vpd  ,  Sub(iLC)%f_phen
+    end if
+    spod_fenv = Sub(iLC)%f_temp *  Sub(iLC)%f_vpd  *  Sub(iLC)%f_phen * fgmax
+    spod_fenv = max( spod_fenv ,  Sub(iLC)%f_min)
+
+    spod = max ( o3 * spod_fenv - Y, 0.0 )
+
+    !if ( DEBUG_AOT .and. debug_flag ) then
+    if (DEBUG_AOT .and.  debug_flag ) then
+       !write(*,*) "SPODxDATE ", iLC, current_date, SGS(iLC), EGS(iLC)
+
+       write(*,"(a,i4,2i3,f6.2,2i4,1x,3f7.2,i3,6f6.2,2x,2f7.2)") "OPOD"//trim(VEGO3_OUTPUTS(iO3cl)%name), &
+         jday, current_date%month, current_date%day, &
+         current_date%hour + current_date%seconds/3600.0,& 
+         Sub(iLC)%SGS, Sub(iLC)%EGS,&
+         o3, Sub(iLC)%cano3_ppb, o3 * spod_fenv, nint(Y), &
+              Sub(iLC)%f_env,  spod_fenv, Sub(iLC)%f_temp, Sub(iLC)%f_vpd, &
+               Sub(iLC)%f_phen, Sub(iLC)%f_light, spod, Sub(iLC)%FstO3
+       !write(*,"(2a,99f8.3)") "SPODxHFFF ", trim(VEGO3_OUTPUTS(iO3cl)%name), &
+       !  Sub(iLC)%f_env,  spod_fenv, Sub(iLC)%f_temp, Sub(iLC)%f_vpd, &
+       !        Sub(iLC)%f_phen, Sub(iLC)%f_light,  Sub(iLC)%f_min
+       !write(*,"(2a,f8.3,4i4)") "SPODxFGMAX ", trim(VEGO3_OUTPUTS(iO3cl)%name), &
+       !     fgmax, iLC, jday, Sub(iLC)%SGS, Sub(iLC)%EGS
+    end if
+
+    if ( DEBUG_AOT .and. debug_flag .and. present( debug_txt )) then
+        write(6,"(a,L2,3i4)") "SPODACC ", VEGO3_OUTPUTS(iO3cl)%RelSGS, &
+           VEGO3_OUTPUTS(iO3cl)%SAccPeriod, VEGO3_OUTPUTS(iO3cl)%EAccPeriod, &
+           jday
+       call datewrite("YYY"//trim(debug_txt) // "defn:" // &
+         trim(vego3_outputs(iO3cl)%defn), iLC, &
+           (/ real(Grid%izen), Y,  o3, spod /) )
+    end if
+
+  end subroutine Calc_SPOD 
 
  !=========================================================================
 
