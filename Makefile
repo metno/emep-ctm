@@ -6,13 +6,12 @@ PROG =	Unimod
 include Makefile.SRCS
 
 ###################################################
-LIBS = -lnetcdf -lnetcdff
-INCL = -I/global/apps/netcdf/4.2.1.1/intel/13.0/include
-LLIB = -L/global/apps/netcdf/4.2.1.1/intel/13.0/lib
 
-#LIBS = -lnetcdf
-#INCL = -I/global/apps/netcdf/3.6.2/include
-#LLIB = -L/global/apps/netcdf/3.6.2/lib
+LIBS = -lnetcdf -lnetcdff
+
+INCL = -I$(NETCDF_ROOT)/include
+LLIB = -L$(NETCDF_ROOT)/lib
+
 
 F90 = mpif90
 

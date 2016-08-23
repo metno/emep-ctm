@@ -264,7 +264,7 @@
 !.. Fine particles emission [molec/cm3/s] need to be scaled to get units kg/m2/s consistent with
 ! Emissions_ml (snapemis). Scaling factor is 
           do ii = 1, NFIN
-               rcss( iSSFI) = rcss( iSSFI) + &  
+               rcss( iSSFI) = rcss( iSSFI)  &  
                  !! ESX SS_prod(QSSFI,i,j) = SS_prod(QSSFI,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
                                   * water_fraction(i,j) 
@@ -274,7 +274,7 @@
 
 !..Coarse particles emission [molec/cm3/s]
           do ii = NFIN+1, NFIN+NCOA
-               rcss( iSSCO ) = rcss( iSSCO ) + &
+               rcss( iSSCO ) = rcss( iSSCO )  &
                  !!ESX SS_prod(QSSCO,i,j) = SS_prod(QSSCO,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
                                   * water_fraction(i,j)

@@ -55,7 +55,8 @@
                                ,debug_proc, debug_li, debug_lj &
                                ,yp_EMEP_official,fi_EMEP,GRIDWIDTH_M_EMEP&
                                ,grid_north_pole_latitude&
-                               ,grid_north_pole_longitude,GlobalPosition&
+                               ,grid_north_pole_longitude,dx_rot,dx_roti,x1_rot,y1_rot&
+                               ,GlobalPosition&
                                ,glat_fdom,glon_fdom,ref_latitude&
                                ,projection, sigma_mid,gb_stagg,gl_stagg,glon&
                                ,sigma_bnd&
@@ -282,7 +283,20 @@ endif
     call check(nf90_put_att(ncFileID, jVarID, "long_name", "latitude"))
     call check(nf90_put_att(ncFileID, jVarID, "units", "degrees_north"))
 
-  else !general projection
+  elseif(UsedProjection=='Rotated_Spherical')then
+    call check(nf90_def_dim(ncid = ncFileID, name = "i", len = GIMAXcdf, dimid = iDimID))
+    call check(nf90_def_var(ncFileID, "i", nf90_float, dimids = iDimID, varID = iVarID) )
+    call check(nf90_put_att(ncFileID, iVarID, "standard_name", "grid_longitude"))
+    call check(nf90_put_att(ncFileID, iVarID, "long_name", "Rotated longitude"))
+    call check(nf90_put_att(ncFileID, iVarID, "units", "degrees"))
+    call check(nf90_put_att(ncFileID, iVarID, "axis", "X"))
+    call check(nf90_def_dim(ncid = ncFileID, name = "j", len = GJMAXcdf, dimid = jDimID))
+    call check(nf90_def_var(ncFileID, "j", nf90_float, dimids = jDimID, varID = jVarID) )
+    call check(nf90_put_att(ncFileID, jVarID, "standard_name", "grid_latitude"))
+    call check(nf90_put_att(ncFileID, jVarID, "long_name", "Rotated latitude"))
+    call check(nf90_put_att(ncFileID, jVarID, "units", "degrees"))
+    call check(nf90_put_att(ncFileID, jVarID, "axis", "Y"))
+   else !general projection
     call check(nf90_def_dim(ncid = ncFileID, name = "i", len = GIMAXcdf, dimid = iDimID))
     call check(nf90_def_dim(ncid = ncFileID, name = "j", len = GJMAXcdf, dimid = jDimID))
     call check(nf90_def_var(ncFileID, "i", nf90_float, dimids = iDimID, varID = iVarID) )
@@ -398,7 +412,7 @@ endif
     call check(nf90_put_att(ncFileID, VarID, "latitude_of_projection_origin", 90.0))
     call check(nf90_put_att(ncFileID, VarID, "scale_factor_at_projection_origin", scale_at_projection_origin))
   elseif(UsedProjection=='lon lat')then
-
+     !no additional attributes
   elseif(UsedProjection=='Rotated_Spherical')then
     call check(nf90_def_var(ncid = ncFileID, name = "Rotated_Spherical", xtype = nf90_int, varID=varID ) )
     call check(nf90_put_att(ncFileID, VarID, "grid_mapping_name", "rotated_latitude_longitude"))
@@ -465,6 +479,16 @@ endif
       call check(nf90_put_var(ncFileID, longVarID, &
         glon_fdom(ISMBEGcdf:ISMBEGcdf+GIMAXcdf-1,JSMBEGcdf:JSMBEGcdf+GJMAXcdf-1)))
     endif
+
+  elseif(UsedProjection=='Rotated_Spherical')then
+    do i=1,GIMAXcdf
+      xcoord(i)= (i+ISMBEGcdf-1)*dx_rot+x1_rot
+    enddo
+    do j=1,GJMAXcdf
+      ycoord(j)= (j+JSMBEGcdf-1)*dx_rot+y1_rot
+    enddo
+    call check(nf90_put_var(ncFileID, iVarID, xcoord(1:GIMAXcdf)) )
+    call check(nf90_put_var(ncFileID, jVarID, ycoord(1:GJMAXcdf)) )
 
   elseif(UsedProjection=='lon lat') then
     do i=1,GIMAXcdf
@@ -601,6 +625,20 @@ character (len=*), parameter :: vert_coord='atmosphere_hybrid_sigma_pressure_coo
     call check(nf90_put_att(ncFileID, jVarID, "standard_name", "latitude"))
     call check(nf90_put_att(ncFileID, jVarID, "long_name", "latitude"))
     call check(nf90_put_att(ncFileID, jVarID, "units", "degrees_north"))
+
+  elseif(UsedProjection=='Rotated_Spherical')then
+    call check(nf90_def_dim(ncid = ncFileID, name = "i", len = GIMAXcdf, dimid = iDimID))
+    call check(nf90_def_var(ncFileID, "i", nf90_float, dimids = iDimID, varID = iVarID) )
+    call check(nf90_put_att(ncFileID, iVarID, "standard_name", "grid_longitude"))
+    call check(nf90_put_att(ncFileID, iVarID, "long_name", "Rotated longitude"))
+    call check(nf90_put_att(ncFileID, iVarID, "units", "degrees"))
+    call check(nf90_put_att(ncFileID, iVarID, "axis", "X"))
+    call check(nf90_def_dim(ncid = ncFileID, name = "j", len = GJMAXcdf, dimid = jDimID))
+    call check(nf90_def_var(ncFileID, "j", nf90_float, dimids = jDimID, varID = jVarID) )
+    call check(nf90_put_att(ncFileID, jVarID, "standard_name", "grid_latitude"))
+    call check(nf90_put_att(ncFileID, jVarID, "long_name", "Rotated latitude"))
+    call check(nf90_put_att(ncFileID, jVarID, "units", "degrees"))
+    call check(nf90_put_att(ncFileID, jVarID, "axis", "Y"))
 
   else !general projection
     call check(nf90_def_dim(ncid = ncFileID, name = "i", len = GIMAXcdf, dimid = iDimID))
@@ -808,6 +846,16 @@ character (len=*), parameter :: vert_coord='atmosphere_hybrid_sigma_pressure_coo
       call check(nf90_put_var(ncFileID, longVarID, &
         glon_fdom(ISMBEGcdf:ISMBEGcdf+GIMAXcdf-1,JSMBEGcdf:JSMBEGcdf+GJMAXcdf-1)))
     endif
+
+  elseif(UsedProjection=='Rotated_Spherical')then
+    do i=1,GIMAXcdf
+      xcoord(i)= (i+ISMBEGcdf-1)*dx_rot+x1_rot
+    enddo
+    do j=1,GJMAXcdf
+      ycoord(j)= (j+JSMBEGcdf-1)*dx_rot+y1_rot
+    enddo
+    call check(nf90_put_var(ncFileID, iVarID, xcoord(1:GIMAXcdf)) )
+    call check(nf90_put_var(ncFileID, jVarID, ycoord(1:GJMAXcdf)) )
 
   elseif(UsedProjection=='lon lat') then
     do i=1,GIMAXcdf
@@ -2252,6 +2300,7 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
 
   if( present(known_projection) ) then
      data_projection = trim(known_projection)
+     if(trim(known_projection)=="longitude latitude")data_projection = "lon lat"
      if ( debug ) write(*,*) 'data known_projection ',trim(data_projection)
   else
     call check(nf90_get_att(ncFileID, nf90_global, "projection", data_projection ),"Proj")
@@ -2259,7 +2308,8 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
   end if
   if(MasterProc)write(*,*)'Interpolating ',trim(varname),' from ',trim(filename),' to present grid'
 
-  if(trim(data_projection)=="lon lat")then ! here we have simple 1-D lat, lon
+  if(trim(data_projection)=="lon lat")then 
+     ! here we have simple 1-D lat, lon
      allocate(Rlon(dims(1)), stat=alloc_err)
      allocate(Rlat(dims(2)), stat=alloc_err)
      if ( debug ) write(*,"(a,a,i5,i5,a,i5)") 'alloc_err lon lat ',&
@@ -2273,13 +2323,19 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
   status=nf90_inq_varid(ncid = ncFileID, name = 'lon', varID = lonVarID)
   if(status /= nf90_noerr) then
      status=nf90_inq_varid(ncid = ncFileID, name = 'LON', varID = lonVarID)
-     call CheckStop(status /= nf90_noerr,'did not find longitude variable')
+     if(status /= nf90_noerr) then
+        status=nf90_inq_varid(ncid = ncFileID, name = 'longitude', varID = lonVarID)
+        call CheckStop(status /= nf90_noerr,'did not find longitude variable')
+     endif
   endif
 
   status=nf90_inq_varid(ncid = ncFileID, name = 'lat', varID = latVarID)
   if(status /= nf90_noerr) then
      status=nf90_inq_varid(ncid = ncFileID, name = 'LAT', varID = latVarID)
-     call CheckStop(status /= nf90_noerr,'did not find latitude variable')
+     if(status /= nf90_noerr) then
+        status=nf90_inq_varid(ncid = ncFileID, name = 'latitude', varID = latVarID)
+        call CheckStop(status /= nf90_noerr,'did not find latitude variable')
+     endif
   endif
   if(trim(data_projection)=="lon lat")then
      call check(nf90_get_var(ncFileID, lonVarID, Rlon), 'Getting Rlon')
@@ -2310,9 +2366,9 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
      !check that there are dimensions called lon and lat
 
      call check(nf90_inquire_dimension(ncid = ncFileID, dimID = dimids(1), name=name ),name)
-     call CheckStop(trim(name)/='lon',"longitude not found")
+     call CheckStop(trim(name)/='lon'.and.trim(name)/='longitude',"longitude not found")
      call check(nf90_inquire_dimension(ncid = ncFileID, dimID = dimids(2), name=name ),name)
-     call CheckStop(trim(name)/='lat',"latitude not found")
+     call CheckStop(trim(name)/='lat'.and.trim(name)/='latitude',"latitude not found")
 
      if(data3D)then
         call check(nf90_inquire_dimension(ncid = ncFileID, dimID = dimids(3), name=name ))
@@ -2530,7 +2586,7 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
         Ndiv=max(1,Ndiv)
         Ndiv2=Ndiv*Ndiv
         !
-        if(projection/='Stereographic'.and.projection/='lon lat')then
+        if(projection/='Stereographic'.and.projection/='lon lat'.and.projection/='Rotated_Spherical')then
            !the method should be revised or used only occasionally
            if(me==0)write(*,*)'WARNING: interpolation method may be CPU demanding'
         endif
@@ -2808,9 +2864,9 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
         yp_ext_div=(yp_ext+0.5)*Ndiv-0.5
         an_ext_div=an_ext*Ndiv
 
-        if(projection/='Stereographic'.and.projection/='lon lat'.and.projection=='Rotated_Spherical')then
+        if(projection/='Stereographic'.and.projection/='lon lat'.and.projection/='Rotated_Spherical')then
            !the method should be revised or used only occasionally
-           if(me==0)write(*,*)'WARNING: interpolation method may be CPU demanding'
+           if(me==0)write(*,*)'WARNING: interpolation method may be CPU demanding:',projection
         endif
         k2=1
         if(data3D)k2=kend-kstart+1
@@ -2923,9 +2979,9 @@ recursive subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,inte
         an_ext_div=an_ext*Ndiv
      if(MasterProc.and.debug)write(*,*)'zero_order interpolation ',an_ext_div,xp_ext_div,yp_ext_div,dims(1),dims(2)
 
-        if(projection/='Stereographic'.and.projection/='lon lat')then
+        if(projection/='Stereographic'.and.projection/='lon lat'.and.projection/='Rotated_Spherical')then
            !the method should be revised or used only occasionally
-           if(me==0)write(*,*)'WARNING: interpolation method may be CPU demanding'
+           if(me==0)write(*,*)'WARNING: interpolation method may be CPU demanding',projection
         endif
 
 

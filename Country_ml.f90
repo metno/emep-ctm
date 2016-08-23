@@ -203,6 +203,7 @@ integer, parameter, public :: IC_SRIL = 233 ! Sri_Lanka
 integer, parameter, public :: IC_TAIW = 234 ! Taiwan
 integer, parameter, public :: IC_THAI = 235 ! Thailand
 integer, parameter, public :: IC_VIET = 236 ! Vietnam
+integer, parameter, public :: IC_EGYP = 237 ! Egypt
 
   ! extra subdivisions of ship emissions into shipping categories:
   ! Baltic Sea  (30)
@@ -514,6 +515,7 @@ Country(IC_SRIL) = cc( "SRIL", 233, F,233, -100, "Sri_Lanka")
 Country(IC_TAIW) = cc( "TAIW", 234, F,234, -100, "Taiwan") 
 Country(IC_THAI) = cc( "THAI", 235, F,235, -100, "Thailand") 
 Country(IC_VIET) = cc( "VIET", 236, F,236, -100, "Vietnam") 
+Country(IC_EGYP) = cc( "EGYP", 237, F,237, -100, "Egypt")
 Country(IC_INTSHIPS ) = cc(  "INTSHIPS" ,350 ,T, 350, -100  , "International ships, RCP6" )
   end subroutine Country_Init
 

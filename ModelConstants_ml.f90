@@ -68,45 +68,60 @@ CHARACTER(LEN=30), public, save :: MY_OUTPUTS="EMEPSTD"
 
 ! Namelist controlled:
 ! Some flags for model setup
-! First, those which may be reset by emep_namelist.nml file
+!------------ NAMELIST VARIABLES - can be reset by emep_namelist.nml file
 logical, public, save ::             &
   FORECAST              = .false.    &! reset in namelist
  ,USE_SOILWATER         = .false.    &!
  ,USE_DEGREEDAY_FACTORS = .false.    &!
  ,USE_FOREST_FIRES      = .false.    &! 
-! Soil NOx. Choose EURO for better spatial and temp res, but for 
-! global runs need global monthly. Variable USE_SOILNOX set from
-! these below.
- ,USE_EURO_SOILNOX      = .true.     & ! ok, but diff for global + Euro runs
- ,USE_GLOBAL_SOILNOX    = .false.    & ! Need to design better switch
- ,USE_SOILNOX           = .true.     & ! DO NOT ALTER: Set after config
-!
  ,USE_SEASALT           = .true.     & !
  ,USE_CONVECTION        = .false.    & ! false works best for Euro runs,
+!
+! Might sometimes change for scenario runs (e.g. EnsClim):
+ ,USE_AIRCRAFT_EMIS  = .true.        & ! Needs global file, see manual
+ ,USE_LIGHTNING_EMIS = .true.        & ! 
+!
 ! More experimental:
  ,DO_SAHARA             = .false.    & ! Turn on/off BG Saharan Dust
  ,USE_ROADDUST          = .false.    & ! TNO Road Dust routine. So far with simplified "climate-correction" factor
  ,USE_DUST              = .false.    &! Experimental
-!TFMM
  ,INERIS_SNAP1       = .false.       & !(EXP_NAME=="TFMM"), & ! Switches off decadal trend
  ,INERIS_SNAP2       = .false.       & !(EXP_NAME=="TFMM"), & ! Allows near-zero summer values
  ,USE_EMERGENCY      = .false.       & ! Emergency: Volcanic Eruption & Nuclear Accident. Under development.
  ,USE_AOD            = .false.       &
  ,USE_POLLEN         = .false.       &  ! EXPERIMENTAL. Only works if start Jan 1
  ,ANALYSIS           = .false.       &  ! EXPERIMENTAL: 3DVar data assimilation
+!
 ! Output flags
  ,SELECT_LEVELS_HOURLY  = .false.      ! for FORECAST, 3DPROFILES
 
+! Soil NOx. Choose EURO for better spatial and temp res, but for 
+! global runs need global monthly. Variable USE_SOILNOX set from
+! these below.
+!
+! Also, is scaling needed for EURO_SOILNOX?
+! The Euro soil NO emissions are based upon average Nr-deposition calculated 
+!  for the 2000s, as given in the AnnualNdep.nc files. For future years a 
+!  new AnnualNdep.nc could be pre-calculated. A simpler but approximate 
+!  way is to scale with some other factor, e.g. the ratio of emissions over  
+!  some area (EMEP, or EU) in year YYYY divided by year 2005 values.  
+! Remember, soil-NO emissions are *very* uncertain.
+
+  logical, public, save ::             &
+    USE_EURO_SOILNOX      = .true.     & ! ok, but diff for global + Euro runs
+   ,USE_GLOBAL_SOILNOX    = .false.    & ! Need to design better switch
+   ,USE_SOILNOX           = .true.       ! DO NOT ALTER: Set after config
+  real, public, save :: EURO_SOILNOX_DEPSCALE = 1.0 ! 
+
 ! Methane background. 
   real, public, save :: BGND_CH4 = -1  ! -1 gives defaults in BoundaryConditions_ml, 
-                                       ! otherwise  set to positive value in NML
+!
+!------------ END OF NAMELIST VARIABLES ------------------------------------!
 
 ! Some flags for model setup
 ! will be removed when code is sufficiently tested
 ! (for convection use foundconv in permanent code)
 logical, public, parameter ::         &
-  USE_AIRCRAFT_EMIS  = .false.,        & ! Needs global file, see manual
-  USE_LIGHTNING_EMIS = .true.,        & ! ok
   NO_CROPNH3DEP      = .true.,        & ! Stop NH3 deposition for growing crops
   USE_SOILNH3        = .false.,       & ! DUMMY VALUES, DO NOT USE!
   USE_ZREF           = .false.,       & ! testing
@@ -305,7 +320,7 @@ integer, public, parameter :: &
   ,DEBUG_DO3SE          = .false. &
   ,DEBUG_DRYRUN         = .false. & ! Skips fast chemistry to save some CPU
   ,DEBUG_ECOSYSTEMS     = .false. &
-  ,DEBUG_FORESTFIRE     = .false. &
+  ,DEBUG_FORESTFIRE     = .true. &
   ,DEBUG_Kz             = .false. &
   ,DEBUG_MY_DERIVED     = .false. &
   ,DEBUG_DRYDEP         = .false. &
@@ -317,7 +332,7 @@ integer, public, parameter :: &
   ,DEBUG_EMISTIMEFACS   = .false. &
   ,DEBUG_EQUIB          = .false. &   !MARS, EQSAM etc.
   ,DEBUG_GETEMIS        = .false. &
-  ,DEBUG_GRIDVALUES     = .false. &
+  ,DEBUG_GRIDVALUES     = .true. &
   ,DEBUG_IOPROG         = .false. &
   ,DEBUG_LANDDEFS       = .false. &
   ,DEBUG_LANDUSE        = .false. &
@@ -471,10 +486,10 @@ real, public, parameter :: MFAC = 0.001*AVOG/ATWAIR
 !                         refer to output variables defined in Derived_ml.
 !   Hourly  output types: Last 2 types (hourly inst.,hourly mean),
 !                         refer to output variables defined in My_Outputs_ml.
-!   IOU_HOUR_PREVIOUS: Auxiliary field for hourly accumulated Derived output
+!   IOU_YEAR_LASTHH: Auxiliary field for hourly accumulated Derived output
 integer, public, parameter ::  &
   IOU_INST=1, IOU_YEAR=2, IOU_MON=3, IOU_DAY=4, & ! Derived output
-  IOU_HOUR_PREVIOUS=5,                          & ! Aux. field
+  IOU_YEAR_LASTHH=5,                          & ! Aux. field
   IOU_HOUR=6, IOU_HOUR_MEAN=7                   & ! Hourly  output
   ,IOU_MAX_MAX=7                                  ! Max values for of IOU (for array declarations)
 
@@ -483,8 +498,8 @@ character(len=*), public, parameter :: model="EMEP_MSC-W"
 !----------------------------------------------------------------------------
 contains
 subroutine Config_ModelConstants(iolog)
-    character(len=120)  :: txt, errmsg
-    logical             :: file_exists
+    character(len=120)  :: txt
+    !logical             :: file_exists
     integer, intent(in) :: iolog ! for Log file
 
     NAMELIST /ModelConstants_config/ &
@@ -492,8 +507,10 @@ subroutine Config_ModelConstants(iolog)
      ,MY_OUTPUTS  &  ! e.g. EMEPSTD, FORECAST, TFMM
      ,USE_SOILWATER, USE_DEGREEDAY_FACTORS, USE_FOREST_FIRES &
      ,USE_CONVECTION &
+     ,USE_AIRCRAFT_EMIS,USE_LIGHTNING_EMIS  &  
      ,DO_SAHARA, USE_ROADDUST, USE_DUST &
-     ,USE_EURO_SOILNOX, USE_GLOBAL_SOILNOX, USE_SEASALT ,USE_POLLEN &
+     ,USE_EURO_SOILNOX, USE_GLOBAL_SOILNOX, EURO_SOILNOX_DEPSCALE &
+     ,USE_SEASALT ,USE_POLLEN &
      ,INERIS_SNAP1, INERIS_SNAP2 &   ! Used for TFMM time-factors
      ,IS_GLOBAL  &     ! Also for EMERGENCY
      ,MONTHLY_GRIDEMIS &     ! was set in Emissions_ml

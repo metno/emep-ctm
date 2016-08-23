@@ -201,33 +201,37 @@
 
      !/ We can include or exclude countries:
       if ( present(excl) ) then
-           if(MasterProc) print "(a,50a4)", "INCEXCTEST-E "// &
-               trim(code)!, (trim(excl(i)),i=1,size(excl))
+           !if(MasterProc) print "(a,50a4)", "INCEXCTEST-E "// &
+           !    trim(code)!, (trim(excl(i)),i=1,size(excl))
         if ( find_index( code, excl ) >0 ) then
            !if(MasterProc) print *, "INCEXCTEST-XX ", &
            !    trim(code), find_index( code, excl )
+          !! if(MasterProc) write(*,"(a,a,i5)") "EmisGetCdf"//trim(fname)// &
+           !!    "exludes:", trim(code), find_index( code, excl )
            cycle
-        else
-           if(MasterProc) print *, "INCEXCTEST-XY ", &
-               trim(code), find_index( code, Country(:)%code  )
         end if
       end if
       if ( present(incl) ) then
         if ( find_index( code, incl ) <1 ) then
-           if(MasterProc) print "(a,i5,50a4)", "INCEXCTEST-I "//trim(code), &
-               find_index( code, incl ) !!, (trim(incl(i)),i=1,size(incl))
+          !! if(MasterProc) write(*,"(a,a,i5)") "EmisGetCdf"//trim(fname)// &
+          !!     "exludes:", trim(code), find_index( code, excl )
            cycle
         end if
       end if
 
+      !if(MasterProc) write(*,"(3a,i5)") "EmisGetCdf"//trim(fname),  &
+      !         "includes:", trim(code), find_index( code, excl )
+      !if(MasterProc) print *, "!!EmisGetCdf"//trim(fname),  &
+      !         "includes:", trim(code), find_index( code, excl )
+
      ic = find_index( code, Country(:)%code )  !from Country_ml
-     if(MasterProc) print "(a)", "INCEXCTEST-A "//trim(code)
+     if(MasterProc) print "(a)", "INCEXCTEST-A "//trim(fname)//":"//trim(code)
 
      if ( Country(ic)%code == "N/A" ) then
           if(MasterProc) print *, "CDFCYCLE ", ic, trim(Country(ic)%code)
           cycle    ! see Country_ml
      end if
-     call CheckStop( ic < 1 , "CDFEMIS NegIC"//trim(code) )
+     call CheckStop( ic < 1 , "CDFEMIS NegIC:"//trim(fname)//":"//trim(code) )
 
      !if( DEBUG .and. debug_proc ) write( *,*) 'EmisGetCdf ', trim(fname), varid,trim(varname), &
      !      " ", trim(code), ic, isec 
@@ -293,7 +297,7 @@
        sumcdfemis(:,iem) = sumcdfemis(:,iem) + sumcdfemis_iem(:)
        do ic = 1, NLAND
          if ( sumcdfemis(ic,iem) > 1.0e-10 ) & 
-            write(*,"(a,i3,f12.3)") "CDFSUM "//trim(fname), ic, sumcdfemis(ic,iem)
+            write(*,"(a,i5,f12.3)") "CDFSUM "//trim(fname), ic, sumcdfemis(ic,iem)
        end do
     end if
 

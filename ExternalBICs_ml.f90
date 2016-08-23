@@ -29,6 +29,9 @@ integer,save, public :: &
 character(len=80),public, save :: &
   filename_eta     = 'EMEP_IN_BC_eta.zaxis'
 
+
+character(len=*),public, parameter :: &
+  ICBC_FMT="(A24,'=',A24,'*',F7.2,2L2,'=',I3)"
 type, public :: icbc                ! Inital (IC) & Boundary Conditions (BC)
   character(len=24) :: spcname="none",varname="none" ! Unimod,BC_file names
   real              :: frac=1.0                      ! fraction to unimod variable

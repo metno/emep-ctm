@@ -41,6 +41,11 @@ module MARS_ml
  implicit none
  private
 
+!to test without the smoothing between different TNH4/TSO4 regimes
+!before rv4.2beta (Jan 2013), the code was (or should be) equivalent to MARS_RATIO_SMOOTH=.false.
+  logical, parameter :: MARS_RATIO_SMOOTH=.true.
+
+
   real, parameter ::    FLOOR = 1.0E-30       ! minimum concentration  
                                               ! -30 from RPM
 
@@ -515,7 +520,7 @@ module MARS_ml
          High_Factor=0.0
       endif
 
-      IF ( RATIO >RATIO_Low  .and.  RATIO < RATIO_High)then
+      IF ( RATIO >RATIO_Low  .and.  RATIO < RATIO_High .and. MARS_RATIO_SMOOTH)then
          DO_RATIO_High_2=.true.
          DO_RATIO_Low_2=.true.
          TSO4_HighA=TSO4*Ratio/RATIO_High

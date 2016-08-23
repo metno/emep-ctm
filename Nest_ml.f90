@@ -57,7 +57,7 @@ module Nest_ml
 !   ExternalBICs_ml should handle different for different external sources.
 !   Experiment specific information must be set on ExternalBICs namelists.
 !   So far coded for FORECAST and EnsClimRCA(?) work.
-use ExternalBICs_ml,     only: set_extbic, icbc, &
+use ExternalBICs_ml,     only: set_extbic, icbc, ICBC_FMT,&
        EXTERNAL_BIC_SET, EXTERNAL_BC, EXTERNAL_BIC_NAME, TOP_BC, &
        iw, ie, js, jn, kt, &! i West/East bnd; j North/South bnd; k Top
        filename_eta
@@ -108,8 +108,7 @@ public  :: readxn
 public  :: wrtxn
 
 logical, private, save :: mydebug =  .false.
-integer, public, parameter :: NHOURSAVE=3 !time between two saves. should be a fraction of 24
-integer, public, parameter :: NHOURREAD=1 !time between two reads. should be a fraction of 24
+integer, private, save :: NHOURSAVE,NHOURREAD ! write/read frequency
 !if(NHOURREAD<NHOURSAVE) the data is interpolated in time
 
 private
@@ -155,14 +154,17 @@ contains
 subroutine Config_Nest()
   integer :: ios
   logical, save :: first_call=.true.
-  NAMELIST /Nest_config/ MODE, &
+  NAMELIST /Nest_config/ MODE,NHOURSAVE,NHOURREAD, &
     template_read_3D,template_read_BC,template_write,&
     istart,jstart,iend,jend
 
   if(.not.first_call)return
   mydebug = DEBUG_NEST.and.MasterProc
 ! Default Nest mode
-  MODE=0  ! do nothing (unless FORECAST mode)
+  MODE=0        ! do nothing (unless FORECAST mode)
+! write/read frequency: Hours between consecutive saves(wrtxn)/reads(readxn)
+  NHOURSAVE=3   ! Between wrtxn calls.  Should be fraction of 24
+  NHOURREAD=1   ! Between readxn calls. Should be fraction of 24
 ! Default domain for write modes 1,3. Modes 10,12 write full RUNDOMAIN regardles
   istart=RUNDOMAIN(1)+1;iend=RUNDOMAIN(2)-1
   jstart=RUNDOMAIN(3)+1;jend=RUNDOMAIN(4)-1
@@ -173,10 +175,18 @@ subroutine Config_Nest()
     write(*,*) "NAMELIST IS "
     write(*,NML=Nest_config)
   endif
+! write/read frequency should be fraction of 24
+  if(MasterProc)then
+    call CheckStop(mod(24,NHOURSAVE),"Config_Nest: NHOURSAVE should be fraction of 24")
+    call CheckStop(mod(24,NHOURREAD),"Config_Nest: NHOURREAD should be fraction of 24")
+  endif
 ! Update filenames according to date following templates defined on Nest_config
   filename_read_3D=date2string(template_read_3D,current_date,debug=mydebug)
   filename_read_BC=date2string(template_read_BC,current_date,debug=mydebug)
   filename_write  =date2string(template_write  ,current_date,debug=mydebug)
+! Ensure sub-domain is not larger than run-domain
+  istart=max(istart,RUNDOMAIN(1));iend=min(iend,RUNDOMAIN(2))
+  jstart=max(jstart,RUNDOMAIN(3));jend=min(jend,RUNDOMAIN(4))
   first_call=.false.
 endsubroutine Config_Nest
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
@@ -491,7 +501,7 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
 
   if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
     write(*,"(a)") "Nest: DEBUG_ICBC Variables:"
-    write(*,"((1X,A,I3,'->',I3,'=',A24,'*',F7.2,2L2))") &
+    write(*,"((1X,A,I3,'->',"//ICBC_FMT//"))") &
       ('Nest: ADV_IC',n,adv_ic(n),n=1,size(adv_ic)),&
       ('Nest: ADV_BC',n,adv_bc(n),n=1,size(adv_bc))
   endif

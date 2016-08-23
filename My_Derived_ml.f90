@@ -415,43 +415,43 @@ private
 !
     character(len=TXTLEN_DERIV), public, parameter, dimension(29) :: &
      VEGO3_WANTED  =  (/ &
-         "POD1_IAM_DF    ",&
-         "POD1_IAM_MF    ",&
-         "POD1_DF        ",&
-         "POD1_CF        ",&
-         "POD3_TC        ",&
-         "SPOD15_birch   ",&
-         "SPOD10_birch   ",&
-         "SPOD15_spruce  ",&
+         "POD1_IAM_DF     ",&
+         "POD1_IAM_MF     ",&
+         "POD1_DF         ",&
+         "POD1_CF         ",&
+         "POD3_TC         ",&
+         "SPOD15_birch    ",&
+         "SPOD10_birch    ",&
+         "SPOD15_spruce   ",&
          "SPOD10_spruce   ",&
-         "SPOD15_crops   ",&
-         "SPOD25_crops   ",&
+         "SPOD15_crops    ",&
+         "SPOD25_crops    ",&
         !WIMMAX:
          "POD1_NEUR_SPRUCE",&
-         "POD1_NEUR_BIRCH",&
-         "POD1_ACE_PINE  ",&
-         "POD1_ACE_OAK   ",&
-         "POD1_ACE_BEECH ",&
+         "POD1_NEUR_BIRCH ",&
+         "POD1_ACE_PINE   ",&
+         "POD1_ACE_OAK    ",&
+         "POD1_ACE_BEECH  ",&
          "POD1_CCE_SPRUCE ",&
-         "POD1_CCE_BEECH ",&
-         "POD1_MED_OAK ",&
-         "POD1_MED_PINE ",&
-         "POD1_MED_BEECH ",&
+         "POD1_CCE_BEECH  ",&
+         "POD1_MED_OAK    ",&
+         "POD1_MED_PINE   ",&
+         "POD1_MED_BEECH  ",&
         ! "POD3_TC30d     ",&
         ! "POD3_TC55d     ",&
-         "POD3_IAM_CR    ",&
+         "POD3_IAM_CR     ",&
         ! "POD3_IAM_CR30d ",&
         ! "POD3_IAM_CR55d ",&
         ! "POD6_IAM_CR    ",& ! Not recommended - not robust
         ! "POD6_IAM_CR30d ",&  ! Not recommended - not robust
         ! "POD6_IAM_CR55d ",& ! Not recommended - not robust
-         "MMAOT40_TC     ",&
-         "MMAOT40_IAM_DF ",&
-         "MMAOT40_IAM_MF ",&
-         "MMAOT40_IAM_CR ",&
-         "EUAOT40_Crops  ", &
-         "EUAOT40_Forests", &
-         "MMAOT40_IAM_WH " &
+         "MMAOT40_TC      ",&
+         "MMAOT40_IAM_DF  ",&
+         "MMAOT40_IAM_MF  ",&
+         "MMAOT40_IAM_CR  ",&
+         "EUAOT40_Crops   ", &
+         "EUAOT40_Forests ", &
+         "MMAOT40_IAM_WH  " &
     /) !NB -last not found. Could just be skipped, but kept
        !to show behaviour
 
