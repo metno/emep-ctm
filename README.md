@@ -18,7 +18,7 @@ under [GPL license v3][GPLv3].
 You are recommended to read all chapters of the
 [EMEP/MSC-W model User Guide][guide48]
 before you start downloading data from the following link:<br/>
-[OpenSource rv4.8 (201510)][src48].  
+[OpenSource rv4.8 (201510)][rel48].  
 
 
 This contains the following set of information:
@@ -61,23 +61,23 @@ please acknowledge EMEP/MSC-W in any use of these data.
 [publ2015]: http://emep.int/publ/emep2015_publications.html
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
-[src48]:    ftp://ftp.met.no/projects/emep/OpenSource/201510/
-[guide48]:  ftp://ftp.met.no/projects/emep/OpenSource/201510/userguide_rv4_8.pdf
-[src45]:    ftp://ftp.met.no/projects/emep/OpenSource/201409/
-[src44]:    ftp://ftp.met.no/projects/emep/OpenSource/201309/
-[src43]:    ftp://ftp.met.no/projects/emep/OpenSource/201304/
-[readme43]: ftp://ftp.met.no/projects/emep/OpenSource/201304/README_rv4_3special.txt
-[src40]:    ftp://ftp.met.no/projects/emep/OpenSource/201209/
-[src201106]:ftp://ftp.met.no/projects/emep/OpenSource/201108/
-[src30]:    ftp://ftp.met.no/projects/emep/OpenSource/200802/
+[rel48]:    http://github.com/metno/emep-ctm/releases/tag/rv4_8
+[guide48]:  http://github.com/metno/emep-ctm/releases/download/rv4_8/User_Guide.pdf
+[rel45]:    http://github.com/metno/emep-ctm/releases/tag/rv4_5
+[rel44]:    http://github.com/metno/emep-ctm/releases/tag/rv4_4
+[rel43]:    http://github.com/metno/emep-ctm/releases/tag/rv4_3
+[readme43]: http://github.com/metno/emep-ctm/releases/download/rv4_3/README_rv4_3special.txt
+[rel40]:    http://github.com/metno/emep-ctm/releases/tag/rv4_0
+[rel201106]:http://github.com/metno/emep-ctm/releases/tag/v201106
+[rel30]:    http://github.com/metno/emep-ctm/releases/tag/rv3
 
 **Previous releases (YYYYMM - date of release):**
-* [OpenSource rv4.5 (201409)][src45].
-* [OpenSource rv4.4 (201309)][src44].  
-* [OpenSource rv4.3 (201304)][src43] *read the file [README_rv4_3special.txt][readme43]*.
-* [OpenSource rv4.0 (201209)][src40].
-* [OpenSource v.2011-06 (201108)][src201106].
-* [OpenSource rv3 (200802)][src30].
+* [OpenSource rv4.5 (201409)][rel45].
+* [OpenSource rv4.4 (201309)][rel44].  
+* [OpenSource rv4.3 (201304)][rel43] *read the file [README_rv4_3special.txt][readme43]*.
+* [OpenSource rv4.0 (201209)][rel40].
+* [OpenSource v.2011-06 (201108)][rel201106].
+* [OpenSource rv3 (200802)][rel30].
 
 Please read the updated EMEP MSC-W model User Guide available
 for each releaseon respective ftp site.
