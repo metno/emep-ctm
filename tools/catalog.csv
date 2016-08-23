@@ -30,7 +30,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200811.tar.bz2,,1070358563,d597352bb830184f66bddc5f2b63f1d4
 201108,meteo,2008,,{FTP}/{REL}/input_data/meteo200812.tar.bz2,,1134409502,e6bda52f8b00eee69251834e4b2ef395
 201108,input,2008,v201106,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,112183117,b6e0f2021a539793e01043ff4a2d2cb7
-201108,source,,v201106,{GIT}/archive/{MOD}.tar.gz,,741890,72bc654b9412f3e18ec5962c84522e2b
+201108,source,,v201106,{GIT}/archive/{MOD}.tar.gz,,424960,84b5825297be4ba44044ff06983f12e1
 201108,output,2008,v201106,{FTP}/{REL}/model_results_2008/model_results_Base.tar.bz2,,4988678844,02a9284ddc295948ef4300d72a24507b
 201108,output,2008,v201106,{FTP}/{REL}/model_results_2008/model_results_Jan_01_02.tar.bz2,,32745137,cd5e9f95c39c2f8ed93ea5da4e35bead
 201108,other,,,{FTP}/{REL}/model_tools/tools.tar.bz2,,2849,cf01ad5c0b866174fe6e96fc93296838
