@@ -84,10 +84,10 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201309,meteo,2011,,{FTP}/{REL}/input_data_2011/meteo/meteo201111.tar.bz2,,1235675263,8968bc3faaecaec62c116569d4fb8c4f
 201309,meteo,2011,,{FTP}/{REL}/input_data_2011/meteo/meteo201112.tar.bz2,,1307253526,b5e41560631e5f219c20f6e0ea424c28
 201309,input,2011,rv4_4,{FTP}/{REL}/input_data_2011/other_input_files.tar.bz2,,219271420,1435100b24df29e08fef85befa191295
-201309,source,2013,rv4_4,{FTP}/{REL}/model_code/EMEP_MSC-W_model.rv4_4.OpenSource.tar.gz,,604767,fc74a9b4ef93de5750bf5ccf362244d4
+201309,source,2013,rv4_4,{GIT}/archive/{MOD}.tar.gz,,520241,6be2f10f279891be91e2fe7ede067cb1
 201309,output,2011,rv4_4,{FTP}/{REL}/model_results_rv4_4_2010/Base_model_rv4_4_results.tar.bz2,,4757213120,67a1f67ad2f749c46c47ac03340452a3
 201309,output,2011,rv4_4,{FTP}/{REL}/model_results_rv4_4_2011/Base_model_rv4_4_results.tar.bz2,,4701651306,789ded8312204632f41262311db19b50
-201309,docs,,rv4_4,{FTP}/{REL}/userguide_rv4_4.pdf,,412843,87b50f26d8c5100a6b3c6bd868d22d47
+201309,docs,,rv4_4,{GIT}/releases/download/{MOD}/User_Guide.pdf,,412843,87b50f26d8c5100a6b3c6bd868d22d47
 201409,meteo,2012,,{FTP}/{REL}/input_data_2012/meteo/meteo201201.tar.bz2,,1840549524,77d79316165b208b8020df7a2a90af1a
 201409,meteo,2012,,{FTP}/{REL}/input_data_2012/meteo/meteo201202.tar.bz2,,1713122982,35f6408a7244d9154b68781d08b771b6
 201409,meteo,2012,,{FTP}/{REL}/input_data_2012/meteo/meteo201203.tar.bz2,,1814348555,d18917be84ef5758f7b713b2f1ebf0d3
