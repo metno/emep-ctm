@@ -48,10 +48,10 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201209,meteo,2010,,{FTP}/met2010/meteo201011.tar.bz2,,1077552286,f584635b85479ee4a6d5fab22b34dfc2
 201209,meteo,2010,,{FTP}/met2010/meteo201012.tar.bz2,,1136882158,a343dc09bdefbd0421f98294ce206919
 201209,input,2010,rv4_0,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,219248288,0de897c54ad8c52af89398a3c5080f92
-201209,source,2012,rv4_0,{FTP}/{REL}/model_code/Unified_EMEP_model.tar.bz2,,435998,e44bb3bb368e93c55bfd32f65dbf7baa
+201209,source,2012,rv4_0,{GIT}/archive/{MOD}.tar.gz,,490823,8fae7f5bb7ce80d5becdb8e465ff726c
 201209,output,2010,rv4_0,{FTP}/{REL}/model_results_2010/April_model_results.tar.bz2,,543964348,30f528910126f5fc4c96564d30017aac
 201209,output,2010,rv4_0,{FTP}/{REL}/model_results_2010/Base_model_results.tar.bz2,,3246376337,a231c9a61d1e417dc56b5c52ec43a0c9
-201209,docs,,rv4_0,{FTP}/{REL}/userguide092012.pdf,,396150,863ecc4833c77fae658df6d595f3adb9
+201209,docs,,rv4_0,{GIT}/releases/download/{MOD}/User_Guide.pdf,,396150,863ecc4833c77fae658df6d595f3adb9
 201304,meteo,2010,,{FTP}/met2010/meteo201001.tar.bz2,,1121901868,4228c41223e842bc3bbc019d32242ac0
 201304,meteo,2010,,{FTP}/met2010/meteo201002.tar.bz2,,1017434990,8c166a7d74627885ea9c430c66bf1fb6
 201304,meteo,2010,,{FTP}/met2010/meteo201003.tar.bz2,,1118511102,aa641c0c01f929d7d068f1dc41301898
