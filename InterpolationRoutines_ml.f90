@@ -1,9 +1,8 @@
-! <InterpolationRoutines_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2010-2011 met.no
-!* 
+! <InterpolationRoutines_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,20 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
 module InterpolationRoutines_ml
 !____________________________________________________________________
 ! Miscellaneous collection of interpolation routines
@@ -53,7 +52,7 @@ module InterpolationRoutines_ml
   private :: bilin_interp_array
 
   public :: Nearest4interp
-  public :: grid2grid_coeff
+  public :: grid2grid_coeff,point2grid_coeff
   public :: Averageconserved_interpolate
 
   real, public, dimension(0:1,0:1) :: wt    ! weighting factors, array version
@@ -204,219 +203,171 @@ module InterpolationRoutines_ml
 
   end function inside_1234
 
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+function great_circle_distance(fi1,lambda1,fi2,lambda2) result(dist)
+  ! compute the great circle distance between to points given in 
+  ! spherical coordinates. Sphere has radius 1.
+  real, intent(in) ::fi1,lambda1,fi2,lambda2 !NB: all in DEGREES here
+  real :: dist
 
-  function great_circle_distance(fi1,lambda1,fi2,lambda2) result(dist)
+  dist=2*asin(sqrt(sin(DEG2RAD*0.5*(lambda1-lambda2))**2+&
+       cos(DEG2RAD*lambda1)*cos(DEG2RAD*lambda2)*&
+         sin(DEG2RAD*0.5*(fi1-fi2))**2))
 
-    !compute the great circle distance between to points given in 
-    !spherical coordinates. Sphere has radius 1.
-    real, intent(in) ::fi1,lambda1,fi2,lambda2 !NB: all in DEGREES here
-    real :: dist
+endfunction great_circle_distance
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+subroutine Nearest4interp(glon, glat, values_grid, &
+    dlon,dlat,values_data, NXD,NYD,&
+    NXG,NYG,limax,ljmax, debug, Undef)
 
-    dist=2*asin(sqrt(sin(DEG2RAD*0.5*(lambda1-lambda2))**2+&
-         cos(DEG2RAD*lambda1)*cos(DEG2RAD*lambda2)*&
-           sin(DEG2RAD*0.5*(fi1-fi2))**2))
+! makes interpolation coefficients from one grid to the other, 
+! using only latitude and longitudes of individual gridcells
 
-  end function great_circle_distance
+  integer, intent(in) :: NXG, NYG
+  integer, intent(in) :: NXD,NYD  ! dimension of data grid
+  integer, intent(in) :: limax,ljmax  ! max dims needed (li[j]max<=NI [j]
+  real, intent(in),  dimension(NXG,NYG) :: &
+    glon,glat ! lat/long of target grid
+  real, intent(in), dimension(NXD,NYD) :: &
+    dlon,dlat ! lat/long of data to be interpolated
+  real, intent(in),  dimension(NXD,NYD) :: values_data
+  real, intent(out), dimension(NXG,NYG) :: values_grid
+  logical, intent(in) :: debug
+  real, optional, intent(in) :: Undef
 
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-  subroutine Nearest4interp(glon, glat, values_grid, &
-      dlon,dlat,values_data, NXD,NYD,&
-      NXG,NYG,limax,ljmax, debug, Undef)
-
-   !makes interpolation coefficients from one grid to the other, 
-   !using only latitude and longitudes of individual gridcells
-
-    integer, intent(in) :: NXG, NYG
-    integer, intent(in) :: NXD,NYD  ! dimension of data grid
-    integer, intent(in) :: limax,ljmax  ! max dims needed (li[j]max<=NI [j]
-    real, intent(in),  dimension(NXG,NYG) :: &
-        glon,glat ! lat/long of target grid
-    real, intent(in), dimension(NXD,NYD) :: &
-        dlon,dlat ! lat/long of data to be interpolated
-    real, intent(in),  dimension(NXD,NYD) :: values_data
-    real, intent(out), dimension(NXG,NYG) :: values_grid
-    logical, intent(in) :: debug
-    real, optional, intent(in) :: Undef
-
-  real, dimension(NXG,NYG) :: Weight1,Weight2,Weight3,Weight4
-  integer, dimension(NXG,NYG,4) :: IIij,JJij
-  real, dimension(4) :: Weight 
+  real, dimension(4,NXG,NYG), target :: Weight
+  integer, dimension(4,NXG,NYG) :: IIij,JJij
+  real, dimension(:), pointer :: ww 
   real :: Undefined  , sumWeights
   integer :: i, j, ii, jj, k
 
   Undefined = -999.0e19  ! Should improve later
-  if ( present(Undef) ) then
-          Undefined = Undef
-  end if 
+  if(present(Undef)) Undefined = Undef
 
-!Get interpolation coefficients.
-!Coefficients could be saved and reused if called several times.
+! Get interpolation coefficients.
+! Coefficients could be saved and reused if called several times.
 
-     if(debug)then
-         print "(a,i3,a,i3)", "Interpolate from data:", NXD, " x ", NYD
-         print *, " "
-         print "(9x,9f10.3)", ( dlon(i,1),i=1, NXD )  !j=1 fake
-         print "(12x,a)" , "-------------------------------------------------"
-         do j = NYD, 1, -1
-           print "(f9.1,9f10.3)", dlat(1,j), ( values_data(i,j), i = 1, NXD)
-         end do
-         print "(12x,a)" , "-------------------------------------------------"
-     end if
+  if(debug)then
+    print "(a,i3,a,i3)", "Interpolate from data:", NXD, " x ", NYD
+    print *, " "
+    print "(9x,9f10.3)", ( dlon(i,1),i=1, NXD )  !j=1 fake
+    print "(12x,a)" , "-------------------------------------------------"
+    do j = NYD, 1, -1
+     print "(f9.1,9f10.3)", dlat(1,j), ( values_data(i,j), i = 1, NXD)
+    enddo
+    print "(12x,a)" , "-------------------------------------------------"
+  endif
 
-     call grid2grid_coeff( &
-       glon,glat, & ! 
-       IIij,JJij,    & ! Gives coordinates of 4 nearest pts
-       Weight1,Weight2,Weight3,Weight4, & ! and weights
-       dlon,dlat,NXD,NYD, NXG, NYG, NXG, NYG, debug, &
-        1, 1) !1,1 is just a crude coord, while checking
+  call grid2grid_coeff( &
+    glon,glat,          &
+    IIij,JJij,Weight,   & ! Returns coordinates of 4 nearest pts and weights
+    dlon,dlat,NXD,NYD,NXG,NYG,NXG,NYG,&
+    debug, 1, 1) !1,1 is just a crude coord, while checking
 
-      do i=1,limax
-        do j=1,ljmax
-           Weight(1) = Weight1(i,j)  
-           Weight(2) = Weight2(i,j)  
-           Weight(3) = Weight3(i,j)  
-           Weight(4) = Weight4(i,j)  
+  do i=1,limax
+    do j=1,ljmax
+      ww => Weight(:,i,j)  
+      values_grid(i,j)= 0.0
+      sumWeights      = 0.0
 
-           values_grid(i,j)= 0.0
-           sumWeights      = 0.0
+      do k = 1, 4
+        ii = IIij(k,i,j)
+        jj = JJij(k,i,j)
+        if ( values_data(ii,jj) > Undefined ) then
+          values_grid(i,j)=values_grid(i,j)+ww(k)*values_data(ii,jj)
+          sumWeights      =sumWeights      +ww(k)
+        endif
+      enddo
 
-           do k = 1, 4
-              ii = IIij(i,j,k)
-              jj = JJij(i,j,k)
-              if ( values_data(ii,jj) > Undefined ) then
-                values_grid(i,j)= values_grid(i,j)+Weight(k)*values_data(ii,jj)
-                sumWeights = sumWeights + Weight(k)
-              end if
+      if(sumWeights>1.0e-9) then
+        values_grid(i,j)= values_grid(i,j)/sumWeights
+      else
+        values_grid(i,j)= Undef
+      endif
 
-           end do
-
-           if ( sumWeights > 1.0e-9 ) then
-                  values_grid(i,j)= values_grid(i,j)/sumWeights
-           else
-                  values_grid(i,j)= Undef
-           end if
-
-        enddo
-     enddo
+      enddo
+    enddo
 
     if(debug)then
-         print *, " "
-         print *, "To model grid:", NXG, " x ", NYG
-         print *, " "
-         print "(9x,9f10.3)", ( glon(i,1),i=1, NXG )  !j=1 fake
-         print "(12x,a)" , "--------------------------------------------------"
-         do j =  NYG, 1, -1
-           print "(f9.1,9f10.3)", glat(1,j), ( values_grid(i,j), i = 1, NXG)
-         end do
-         print "(12x,a)" , "--------------------------------------------------"
-    end if
+      print *, " "
+      print *, "To model grid:", NXG, " x ", NYG
+      print *, " "
+      print "(9x,9f10.3)", ( glon(i,1),i=1, NXG )  !j=1 fake
+      print "(12x,a)" , "--------------------------------------------------"
+      do j =  NYG, 1, -1
+        print "(f9.1,9f10.3)", glat(1,j), ( values_grid(i,j), i = 1, NXG)
+      enddo
+      print "(12x,a)" , "--------------------------------------------------"
+    endif
+endsubroutine Nearest4interp
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-  end subroutine Nearest4interp
-
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-  subroutine grid2grid_coeff(glon, glat &
-       ,IIij,JJij,Weight1,Weight2,Weight3,Weight4&
-       ,dlon,dlat,NXD,NYD,NX,NY,limax,ljmax &
-       , debug, debug_li, debug_lj)
+subroutine grid2grid_coeff(glon,glat,IIij,JJij,Weight,&
+     dlon,dlat,NXD,NYD,NX,NY,limax,ljmax,debug,debug_li,debug_lj)
 
 !makes interpolation coefficients from one grid to the other, 
 !using only latitude and longitudes of individual gridcells
 
-    integer, intent(in) :: NX, NY
-    integer , dimension(NX,NY,4), intent(out)::IIij, JJij
-    real ,intent(out), dimension(NX,NY) :: Weight1,Weight2,Weight3,Weight4
-    real, intent(in), dimension(NX,NY) :: &
-        glon,glat ! lat/long of target grid
-    integer,intent(in) :: NXD,NYD ! dimension of data grid
-    real, intent(in), dimension(NXD,NYD) :: &
-        dlon,dlat ! lat/long of data to be interpolated
-    integer,intent(in) :: limax,ljmax ! max dims needed (limax<=NX, ljmax<=NY)
-    logical, intent(in) :: debug
-    integer, intent(in) :: debug_li, debug_lj
+  integer, intent(in) :: NX, NY
+  integer , dimension(4,NX,NY), intent(out)::IIij, JJij
+  real ,intent(out), dimension(4,NX,NY) :: Weight
+  real, intent(in), dimension(NX,NY) :: &
+      glon,glat ! lat/long of target grid
+  integer,intent(in) :: NXD,NYD ! dimension of data grid
+  real, intent(in), dimension(NXD,NYD) :: &
+      dlon,dlat ! lat/long of data to be interpolated
+  integer,intent(in) :: limax,ljmax ! max dims needed (limax<=NX, ljmax<=NY)
+  logical, intent(in) :: debug
+  integer, intent(in) :: debug_li, debug_lj
+  
 
-    real :: dist(0:4)
-    integer :: i,j,II,JJ
+  integer :: i,j
 
-    !find interpolation constants
-    !note that i,j are local
-    !find the four closest points
-    do j=1,ljmax
-       do i=1,limax
-          dist=1.0e30
-          do JJ=1,NYD
-             do II=1,NXD
-                !distance between (i,j) and (II,JJ)
-                dist(0)=great_circle_distance(dlon(II,JJ),dlat(II,JJ),&
-                    glon(i,j),glat(i,j))
-
-                if(dist(0)<dist(1))then
-                   dist(4)=dist(3)
-                   dist(3)=dist(2)
-                   dist(2)=dist(1)
-                   dist(1)=dist(0)
-                   IIij(i,j,4)=IIij(i,j,3)
-                   JJij(i,j,4)=JJij(i,j,3)
-                   IIij(i,j,3)=IIij(i,j,2)
-                   JJij(i,j,3)=JJij(i,j,2)
-                   IIij(i,j,2)=IIij(i,j,1)
-                   JJij(i,j,2)=JJij(i,j,1)
-                   IIij(i,j,1)=II
-                   JJij(i,j,1)=JJ
-                elseif(dist(0)<dist(2))then
-                   dist(4)=dist(3)
-                   dist(3)=dist(2)
-                   dist(2)=dist(0)
-                   IIij(i,j,4)=IIij(i,j,3)
-                   JJij(i,j,4)=JJij(i,j,3)
-                   IIij(i,j,3)=IIij(i,j,2)
-                   JJij(i,j,3)=JJij(i,j,2)
-                   IIij(i,j,2)=II
-                   JJij(i,j,2)=JJ
-                elseif(dist(0)<dist(3))then
-                   dist(4)=dist(3)
-                   dist(3)=dist(0)
-                   IIij(i,j,4)=IIij(i,j,3)
-                   JJij(i,j,4)=JJij(i,j,3)
-                   IIij(i,j,3)=II
-                   JJij(i,j,3)=JJ
-                elseif(dist(0)<dist(4))then
-                   dist(4)=dist(0)
-                   IIij(i,j,4)=II
-                   JJij(i,j,4)=JJ
-                endif
-
-                !if(debug.and.i==debug_li.and.j==debug_lj) then
-                !    write(*,"(a,2i4,f10.3,2i4,4f9.3,4es12.3)") "DEBUG-g2g", II, JJ, dist(0),&
-                !      IIij(i,j,1),JJij(i,j,1),dlon(II,JJ),dlat(II,JJ),&
-                !         glon(i,j),glat(i,j), dist(1), dist(2), dist(3), dist(4)
-                !    !write(*,*) "DEBUG-star", II, JJ, dist(0),&
-                !    !  IIij(i,j,1),JJij(i,j,1),dlon(II,JJ),dlat(II,JJ)
-                !end if
-             enddo ! II
-          enddo ! JJ
-
-          dist(0)=(dist(1)+dist(2)+dist(3)+dist(4))
-          Weight1(i,j)=1.0-3.0*dist(1)/dist(0)
-          dist(0)=(dist(2)+dist(3)+dist(4))
-          Weight2(i,j)=(1.0-Weight1(i,j))*(1.0-2.0*dist(2)/dist(0))
-          dist(0)=(dist(3)+dist(4))
-          Weight3(i,j)=(1.0-Weight1(i,j)-Weight2(i,j))*(1.0-dist(3)/dist(0))
-          Weight4(i,j)=1.0-Weight1(i,j)-Weight2(i,j)-Weight3(i,j)
-          if(debug.and.i==debug_li.and.j==debug_lj) then
-             write(*,"(a,4es12.3)") "DEBUG-g2gFinal0", dist(0)
-             write(*,"(a,4es12.3)") "DEBUG-g2gFinal1", dist(1), Weight1(i,j)
-             write(*,"(a,4es12.3)") "DEBUG-g2gFinal2", dist(2), Weight2(i,j)
-             write(*,"(a,4es12.3)") "DEBUG-g2gFinal3", dist(3), Weight3(i,j)
-             write(*,"(a,4es12.3)") "DEBUG-g2gFinal4", dist(4), Weight4(i,j)
-          end if
-
-       enddo
+  !find interpolation constants
+  !note that i,j are local
+  !find the four closest points
+  do j=1,ljmax
+    do i=1,limax
+      call point2grid_coeff(glon(i,j),glat(i,j),&
+             IIij(:,i,j),JJij(:,i,j),Weight(:,i,j),&
+             dlon,dlat,NXD,NYD,all((/debug,i==debug_li,j==debug_lj/)))
     enddo
+  enddo
+endsubroutine grid2grid_coeff
+subroutine point2grid_coeff(glon,glat,IIij,JJij,Weight,dlon,dlat,NXD,NYD,debug)
+  real, intent(in)    :: glon,glat ! lat/long of target grid
+  integer, intent(in) :: NXD,NYD ! dimension of data grid
+  real, dimension(NXD,NYD), intent(in) :: &
+                         dlon,dlat ! lat/long of data to be interpolated
+  integer, dimension(4), intent(out) :: IIij, JJij
+  real,    dimension(4), intent(out) :: Weight
+  logical, intent(in) :: debug
 
-  end subroutine grid2grid_coeff
+  real :: dist(4),DD
+  integer :: II,JJ,n
+  dist=1.0e30
+  do JJ=1,NYD
+    do II=1,NXD
+      !distance between data:dlon/dlat(II,JJ) and target:glon/glat
+      DD=great_circle_distance(dlon(II,JJ),dlat(II,JJ),glon,glat)
+      if(DD>=dist(4))cycle
+      n=MINVAL([1,2,3,4],MASK=(DD<dist))
+      dist(n:4)=EOSHIFT(dist(n:4),-1,BOUNDARY=DD)
+      IIij(n:4)=EOSHIFT(IIij(n:4),-1,BOUNDARY=II)
+      JJij(n:4)=EOSHIFT(JJij(n:4),-1,BOUNDARY=JJ)
+!     if(debug) write(*,"(a,2i4,f10.3,2i4,4f9.3,4es12.3)") "DEBUG-g2g", &
+!       II,JJ,DD,IIij(1),JJij(1),dlon(II,JJ),dlat(II,JJ),glon,glat,dist(:)
+    enddo ! II
+  enddo   ! JJ
+
+  Weight(1)=1.0-3.0*dist(1)/sum(dist(1:4))
+  Weight(2)=(1.0-Weight(1))*(1.0-2.0*dist(2)/sum(dist(2:4)))
+  Weight(3)=(1.0-Weight(1)-Weight(2))*(1.0-dist(3)/sum(dist(3:4)))
+  Weight(4)=1.0-Weight(1)-Weight(2)-Weight(3)
+  if(debug) write(*,"(a,I1,2es12.3)") &
+     "DEBUG-g2gFinal",0,sum(dist),sum(Weight),&
+    ("DEBUG-g2gFinal",n,dist(n),Weight(n),n=1,4)
+endsubroutine point2grid_coeff
 
    subroutine Averageconserved_interpolate(Start,Endval,Average,Nvalues,i,x)
      !this routine interpolates a function, and evaluate it at i 

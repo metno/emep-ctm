@@ -1,8 +1,7 @@
-! <MassBudget_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <MassBudget_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,8 +24,6 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!_____________________________________________________________________________
-! ----------------------------------------------------------------------------
 module   MassBudget_ml
 ! ----------------------------------------------------------------------------
 ! DESCRIPTION
@@ -34,8 +31,6 @@ module   MassBudget_ml
 !_____________________________________________________________________________
 use CheckStop_ml,       only: CheckStop
 use ChemSpecs,          only: NSPEC_ADV, NSPEC_SHL, species_adv
-!CMR use ChemChemicals_ml,   only: species_adv   ! species identifier (advected only)
-!CMR use ChemSpecs_shl_ml,   only: NSPEC_SHL     ! No. species (shorshort-lived)
 use Chemfields_ml,      only: xn_adv        ! advected species
 use GridValues_ml,      only: carea,xmd, &  ! cell area, 1/xm2 where xm2 is
                                   ! the area factor in the middle of the cell
@@ -46,18 +41,18 @@ use ModelConstants_ml,  only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d fie
                               MasterProc,       & ! Master processor
                               dt_advec,         & ! time-step
                               PT,               & ! Pressure at top
-                              ATWAIR,           & ! Mol. weight of air(Jones,1992)
                               DEBUG_MASS,EXTENDEDMASSBUDGET
 use Par_ml,             only: &
   li0,li1,& ! First/Last local index in longitude when outer boundary is excluded
   lj0,lj1   ! First/Last local index in latitude  when outer boundary is excluded
-use PhysicalConstants_ml,only: GRAV
+use PhysicalConstants_ml,only: GRAV,ATWAIR! Mol. weight of air(Jones,1992)
 use Setup_1dfields_ml,  only: amk, rcemis ! Air concentrations , emissions
-
+!use mpi,                only: MPI_COMM_WORLD, MPI_IN_PLACE,&
+!                              MPI_DOUBLE_PRECISION, MPI_SUM, MPI_MIN, MPI_MAX
+! openMPI has no explicit interface for MPI_ALLREDUCE
 implicit none
 private
 INCLUDE 'mpif.h'
-INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
 ! Some work arrays used in Aqueous_ml and (in future) DryDry:
 ! Use ADV index, as Dry/WetDep makes no seance for SHL.

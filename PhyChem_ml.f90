@@ -1,8 +1,7 @@
-! <PhyChem_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <PhyChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,11 +37,12 @@ use Biogenics_ml,     only: Set_SoilNOx
 use Chemfields_ml,    only: xn_adv,cfac,xn_shl
 use ChemSpecs,        only: IXADV_SO2, IXADV_NH3, IXADV_O3, NSPEC_SHL, species
 use CoDep_ml,         only: make_so2nh3_24hr
-use DA_3DVar_ml,      only: main_3dvar   ! 3D-VAR Analysis
+use DA_3DVar_ml,      only: main_3dvar, T_3DVAR ! 3D-VAR Analysis
 use Derived_ml,       only: DerivedProds, Derived, num_deriv2d
 use DerivedFields_ml, only: d_2d, f_2d
 use DryDep_ml,        only: init_drydep
 use Emissions_ml,     only: EmisSet
+!use Gravset_ml,       only: gravset
 use GridValues_ml,    only: debug_proc,debug_li,debug_lj,&
                             glon,glat,projection
 use ModelConstants_ml,only: KMAX_MID, nmax, nstep &
@@ -53,7 +53,8 @@ use ModelConstants_ml,only: KMAX_MID, nmax, nstep &
                            ,FORECAST       & !use advecdiff_poles on FORECAST mode
                            ,ANALYSIS       & ! 3D-VAR Analysis
                            ,SOURCE_RECEPTOR&
-                           ,USE_POLLEN, USE_EtaCOORDINATES
+!                           ,USE_GRAVSET&
+                           ,USE_POLLEN, USE_EtaCOORDINATES,JUMPOVER29FEB
 use MetFields_ml,     only: ps,roa,z_bnd,z_mid,cc3dmax, &
                             zen,coszen,Idirect,Idiffuse
 use My_Outputs_ml ,   only: NHOURLY_OUT, FREQ_SITE, FREQ_SONDE, FREQ_HOURLY
@@ -65,6 +66,7 @@ use SoilWater_ml,     only: Set_SoilWater
 use TimeDate_ml,      only: date,daynumber,day_of_year, add_secs, &
                             current_date, timestamp,  &
                             make_timestamp, make_current_date
+use TimeDate_ExtraUtil_ml,only : date2string
 use Trajectory_ml,    only: trajectory_out     ! 'Aircraft'-type  outputs
 use Radiation_ml,     only: SolarSetup,       &! sets up radn params
                             ZenithAngle,      &! gets zenith angle
@@ -123,7 +125,7 @@ contains
     call Add_2timing(19,tim_after,tim_before,"nest: Read")
     if(ANALYSIS.and.first_call)then
        call main_3dvar()   ! 3D-VAR Analysis for "Zero hour"
-       call Add_2timing(47,tim_after,tim_before,'3DVar: Total.')
+       call Add_2timing(T_3DVAR,tim_after,tim_before)
     endif
     if(FORECAST.and.first_call)call hourly_out()!Zero hour output
     call Add_2timing(35,tim_after,tim_before,"phyche:outs")
@@ -176,6 +178,8 @@ contains
     else
        call advecdiff_poles
     endif
+
+!   if(USE_GRAVSET) call gravset
 
     call Add_2timing(17,tim_after,tim_before,"phyche:advecdiff")
     !================
@@ -240,14 +244,23 @@ contains
     ts_now = make_timestamp(current_date)
 
     call add_secs(ts_now,dt_advec)
-
     current_date = make_current_date(ts_now)
+
+    if(JUMPOVER29FEB.and.current_date%month==2.and.current_date%day==29)then
+       if(me==0)write(*,*)'Jumping over one day for current_date!'
+       if(me==0) print "(2(1X,A))",'current date and time before jump:',&
+            date2string("YYYY-MM-DD hh:mm:ss",current_date)
+       call add_secs(ts_now,24*3600.)
+       current_date = make_current_date(ts_now)       
+      if(me==0) print "(2(1X,A))",'current date and time after jump:',&
+          date2string("YYYY-MM-DD hh:mm:ss",current_date)
+   endif
 
     !====================================
     call Add_2timing(35,tim_after,tim_before,"phyche:outs")
     if(ANALYSIS)then
        call main_3dvar()   ! 3D-VAR Analysis for "non-Zero hours"
-            call Add_2timing(47,tim_after,tim_before,'3DVar: Total.')
+       call Add_2timing(T_3DVAR,tim_after,tim_before)
     endif
     call wrtxn(current_date,.false.) !Write xn_adv for future nesting
     if(FORECAST.and.USE_POLLEN) call pollen_dump()

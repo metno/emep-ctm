@@ -1,7 +1,7 @@
-! <CM_ChemSpecs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <CM_ChemSpecs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@ implicit none
 
 !   ( Output from GenChem, sub print_species ) 
 
-   integer, public, parameter ::  NSPEC_ADV = 125 
+   integer, public, parameter ::  NSPEC_ADV = 128 
  
 
 
@@ -43,152 +43,155 @@ implicit none
      IXADV_O3          =   1   &
   ,  IXADV_NO          =   2   &
   ,  IXADV_NO2         =   3   &
-  ,  IXADV_PAN         =   4   &
-  ,  IXADV_MPAN        =   5   &
-  ,  IXADV_NO3         =   6   &
-  ,  IXADV_N2O5        =   7   &
-  ,  IXADV_ISONO3      =   8   &
-  ,  IXADV_HNO3        =   9
+  ,  IXADV_SHIPNOX     =   4   &
+  ,  IXADV_PAN         =   5   &
+  ,  IXADV_MPAN        =   6   &
+  ,  IXADV_NO3         =   7   &
+  ,  IXADV_N2O5        =   8   &
+  ,  IXADV_ISONO3      =   9
 
    integer, public, parameter ::   & 
-     IXADV_HONO        =  10   &
-  ,  IXADV_CH3COO2     =  11   &
-  ,  IXADV_MACR        =  12   &
-  ,  IXADV_ISNI        =  13   &
-  ,  IXADV_ISNIR       =  14   &
-  ,  IXADV_GLYOX       =  15   &
-  ,  IXADV_MGLYOX      =  16   &
-  ,  IXADV_MAL         =  17   &
-  ,  IXADV_MEK         =  18   &
-  ,  IXADV_MVK         =  19
+     IXADV_HNO3        =  10   &
+  ,  IXADV_HONO        =  11   &
+  ,  IXADV_CH3COO2     =  12   &
+  ,  IXADV_MACR        =  13   &
+  ,  IXADV_ISNI        =  14   &
+  ,  IXADV_ISNIR       =  15   &
+  ,  IXADV_GLYOX       =  16   &
+  ,  IXADV_MGLYOX      =  17   &
+  ,  IXADV_MAL         =  18   &
+  ,  IXADV_MEK         =  19
 
    integer, public, parameter ::   & 
-     IXADV_HCHO        =  20   &
-  ,  IXADV_CH3CHO      =  21   &
-  ,  IXADV_C2H6        =  22   &
-  ,  IXADV_NC4H10      =  23   &
-  ,  IXADV_C2H4        =  24   &
-  ,  IXADV_C3H6        =  25   &
-  ,  IXADV_OXYL        =  26   &
-  ,  IXADV_C5H8        =  27   &
-  ,  IXADV_APINENE     =  28   &
-  ,  IXADV_CH3O2H      =  29
+     IXADV_MVK         =  20   &
+  ,  IXADV_HCHO        =  21   &
+  ,  IXADV_CH3CHO      =  22   &
+  ,  IXADV_C2H6        =  23   &
+  ,  IXADV_NC4H10      =  24   &
+  ,  IXADV_C2H4        =  25   &
+  ,  IXADV_C3H6        =  26   &
+  ,  IXADV_OXYL        =  27   &
+  ,  IXADV_C5H8        =  28   &
+  ,  IXADV_APINENE     =  29
 
    integer, public, parameter ::   & 
-     IXADV_C2H5OOH     =  30   &
-  ,  IXADV_BURO2H      =  31   &
-  ,  IXADV_ETRO2H      =  32   &
-  ,  IXADV_PRRO2H      =  33   &
-  ,  IXADV_OXYO2H      =  34   &
-  ,  IXADV_MEKO2H      =  35   &
-  ,  IXADV_MALO2H      =  36   &
-  ,  IXADV_MVKO2H      =  37   &
-  ,  IXADV_MACROOH     =  38   &
-  ,  IXADV_MACO3H      =  39
+     IXADV_CH3O2H      =  30   &
+  ,  IXADV_C2H5OOH     =  31   &
+  ,  IXADV_BURO2H      =  32   &
+  ,  IXADV_ETRO2H      =  33   &
+  ,  IXADV_PRRO2H      =  34   &
+  ,  IXADV_OXYO2H      =  35   &
+  ,  IXADV_MEKO2H      =  36   &
+  ,  IXADV_MALO2H      =  37   &
+  ,  IXADV_MVKO2H      =  38   &
+  ,  IXADV_MACROOH     =  39
 
    integer, public, parameter ::   & 
-     IXADV_MACO2H      =  40   &
-  ,  IXADV_ISRO2H      =  41   &
-  ,  IXADV_H2O2        =  42   &
-  ,  IXADV_CH3COO2H    =  43   &
-  ,  IXADV_ISONO3H     =  44   &
-  ,  IXADV_ISNIRH      =  45   &
-  ,  IXADV_CH3OH       =  46   &
-  ,  IXADV_C2H5OH      =  47   &
-  ,  IXADV_ACETOL      =  48   &
-  ,  IXADV_H2          =  49
+     IXADV_MACO3H      =  40   &
+  ,  IXADV_MACO2H      =  41   &
+  ,  IXADV_ISRO2H      =  42   &
+  ,  IXADV_H2O2        =  43   &
+  ,  IXADV_CH3COO2H    =  44   &
+  ,  IXADV_ISONO3H     =  45   &
+  ,  IXADV_ISNIRH      =  46   &
+  ,  IXADV_CH3OH       =  47   &
+  ,  IXADV_C2H5OH      =  48   &
+  ,  IXADV_ACETOL      =  49
 
    integer, public, parameter ::   & 
-     IXADV_CO          =  50   &
-  ,  IXADV_CH4         =  51   &
-  ,  IXADV_SO2         =  52   &
-  ,  IXADV_SO4         =  53   &
-  ,  IXADV_NH3         =  54   &
-  ,  IXADV_NO3_F       =  55   &
-  ,  IXADV_NO3_C       =  56   &
-  ,  IXADV_NH4_F       =  57   &
-  ,  IXADV_GAS_ASOA_OC =  58   &
-  ,  IXADV_PART_ASOA_OC=  59
+     IXADV_H2          =  50   &
+  ,  IXADV_CO          =  51   &
+  ,  IXADV_CH4         =  52   &
+  ,  IXADV_SO2         =  53   &
+  ,  IXADV_SO4         =  54   &
+  ,  IXADV_NH3         =  55   &
+  ,  IXADV_NO3_F       =  56   &
+  ,  IXADV_NO3_C       =  57   &
+  ,  IXADV_NH4_F       =  58   &
+  ,  IXADV_ASH_F       =  59
 
    integer, public, parameter ::   & 
-     IXADV_PART_ASOA_OM=  60   &
-  ,  IXADV_GAS_BSOA_OC =  61   &
-  ,  IXADV_PART_BSOA_OC=  62   &
-  ,  IXADV_PART_BSOA_OM=  63   &
-  ,  IXADV_PART_FFUELOA25_OC=  64   &
-  ,  IXADV_PART_FFUELOA25_OM=  65   &
-  ,  IXADV_PART_WOODOA25_OC=  66   &
-  ,  IXADV_PART_WOODOA25_OM=  67   &
-  ,  IXADV_PART_FFIREOA25_OC=  68   &
-  ,  IXADV_PART_FFIREOA25_OM=  69
+     IXADV_ASH_C       =  60   &
+  ,  IXADV_GAS_ASOA_OC =  61   &
+  ,  IXADV_PART_ASOA_OC=  62   &
+  ,  IXADV_PART_ASOA_OM=  63   &
+  ,  IXADV_GAS_BSOA_OC =  64   &
+  ,  IXADV_PART_BSOA_OC=  65   &
+  ,  IXADV_PART_BSOA_OM=  66   &
+  ,  IXADV_PART_FFUELOA25_OC=  67   &
+  ,  IXADV_PART_FFUELOA25_OM=  68   &
+  ,  IXADV_PART_WOODOA25_OC=  69
 
    integer, public, parameter ::   & 
-     IXADV_PART_OC10   =  70   &
-  ,  IXADV_PART_OC25   =  71   &
-  ,  IXADV_NONVOL_FFUELOC25=  72   &
-  ,  IXADV_NONV_FFUELOC_COARSE=  73   &
-  ,  IXADV_NONVOL_WOODOC25=  74   &
-  ,  IXADV_NONVOL_BGNDOC=  75   &
-  ,  IXADV_NONVOL_FFIREOC25=  76   &
-  ,  IXADV_PART_OM_F   =  77   &
-  ,  IXADV_POM_F_WOOD  =  78   &
-  ,  IXADV_POM_F_FFUEL =  79
+     IXADV_PART_WOODOA25_OM=  70   &
+  ,  IXADV_PART_FFIREOA25_OC=  71   &
+  ,  IXADV_PART_FFIREOA25_OM=  72   &
+  ,  IXADV_PART_OC10   =  73   &
+  ,  IXADV_PART_OC25   =  74   &
+  ,  IXADV_NONVOL_FFUELOC25=  75   &
+  ,  IXADV_NONV_FFUELOC_COARSE=  76   &
+  ,  IXADV_NONVOL_WOODOC25=  77   &
+  ,  IXADV_NONVOL_BGNDOC=  78   &
+  ,  IXADV_NONVOL_FFIREOC25=  79
 
    integer, public, parameter ::   & 
-     IXADV_POM_C_FFUEL =  80   &
-  ,  IXADV_EC_F_WOOD_NEW=  81   &
-  ,  IXADV_EC_F_WOOD_AGE=  82   &
-  ,  IXADV_EC_C_WOOD   =  83   &
-  ,  IXADV_EC_F_FFUEL_NEW=  84   &
-  ,  IXADV_EC_F_FFUEL_AGE=  85   &
-  ,  IXADV_EC_C_FFUEL  =  86   &
-  ,  IXADV_REMPPM25    =  87   &
-  ,  IXADV_REMPPM_C    =  88   &
-  ,  IXADV_FFIRE_OM    =  89
+     IXADV_PART_OM_F   =  80   &
+  ,  IXADV_POM_F_WOOD  =  81   &
+  ,  IXADV_POM_F_FFUEL =  82   &
+  ,  IXADV_POM_C_FFUEL =  83   &
+  ,  IXADV_EC_F_WOOD_NEW=  84   &
+  ,  IXADV_EC_F_WOOD_AGE=  85   &
+  ,  IXADV_EC_C_WOOD   =  86   &
+  ,  IXADV_EC_F_FFUEL_NEW=  87   &
+  ,  IXADV_EC_F_FFUEL_AGE=  88   &
+  ,  IXADV_EC_C_FFUEL  =  89
 
    integer, public, parameter ::   & 
-     IXADV_FFIRE_BC    =  90   &
-  ,  IXADV_FFIRE_REMPPM25=  91   &
-  ,  IXADV_ASOC_NG100  =  92   &
-  ,  IXADV_ASOC_UG1    =  93   &
-  ,  IXADV_ASOC_UG10   =  94   &
-  ,  IXADV_ASOC_UG1E2  =  95   &
-  ,  IXADV_ASOC_UG1E3  =  96   &
-  ,  IXADV_NON_C_ASOA_NG100=  97   &
-  ,  IXADV_NON_C_ASOA_UG1=  98   &
-  ,  IXADV_NON_C_ASOA_UG10=  99
+     IXADV_REMPPM25    =  90   &
+  ,  IXADV_REMPPM_C    =  91   &
+  ,  IXADV_FFIRE_OM    =  92   &
+  ,  IXADV_FFIRE_BC    =  93   &
+  ,  IXADV_FFIRE_REMPPM25=  94   &
+  ,  IXADV_ASOC_NG100  =  95   &
+  ,  IXADV_ASOC_UG1    =  96   &
+  ,  IXADV_ASOC_UG10   =  97   &
+  ,  IXADV_ASOC_UG1E2  =  98   &
+  ,  IXADV_ASOC_UG1E3  =  99
 
    integer, public, parameter ::   & 
-     IXADV_NON_C_ASOA_UG1E2= 100   &
-  ,  IXADV_NON_C_ASOA_UG1E3= 101   &
-  ,  IXADV_BSOC_NG100  = 102   &
-  ,  IXADV_BSOC_UG1    = 103   &
-  ,  IXADV_BSOC_UG10   = 104   &
-  ,  IXADV_BSOC_UG1E2  = 105   &
-  ,  IXADV_BSOC_UG1E3  = 106   &
-  ,  IXADV_NON_C_BSOA_NG100= 107   &
-  ,  IXADV_NON_C_BSOA_UG1= 108   &
-  ,  IXADV_NON_C_BSOA_UG10= 109
+     IXADV_NON_C_ASOA_NG100= 100   &
+  ,  IXADV_NON_C_ASOA_UG1= 101   &
+  ,  IXADV_NON_C_ASOA_UG10= 102   &
+  ,  IXADV_NON_C_ASOA_UG1E2= 103   &
+  ,  IXADV_NON_C_ASOA_UG1E3= 104   &
+  ,  IXADV_BSOC_NG100  = 105   &
+  ,  IXADV_BSOC_UG1    = 106   &
+  ,  IXADV_BSOC_UG10   = 107   &
+  ,  IXADV_BSOC_UG1E2  = 108   &
+  ,  IXADV_BSOC_UG1E3  = 109
 
    integer, public, parameter ::   & 
-     IXADV_NON_C_BSOA_UG1E2= 110   &
-  ,  IXADV_NON_C_BSOA_UG1E3= 111   &
-  ,  IXADV_FFFUEL_NG10 = 112   &
-  ,  IXADV_WOODOA_NG10 = 113   &
-  ,  IXADV_FFIREOA_NG10= 114   &
-  ,  IXADV_SEASALT_F   = 115   &
-  ,  IXADV_SEASALT_C   = 116   &
-  ,  IXADV_DUST_ROAD_F = 117   &
-  ,  IXADV_DUST_ROAD_C = 118   &
-  ,  IXADV_DUST_WB_F   = 119
+     IXADV_NON_C_BSOA_NG100= 110   &
+  ,  IXADV_NON_C_BSOA_UG1= 111   &
+  ,  IXADV_NON_C_BSOA_UG10= 112   &
+  ,  IXADV_NON_C_BSOA_UG1E2= 113   &
+  ,  IXADV_NON_C_BSOA_UG1E3= 114   &
+  ,  IXADV_FFFUEL_NG10 = 115   &
+  ,  IXADV_WOODOA_NG10 = 116   &
+  ,  IXADV_FFIREOA_NG10= 117   &
+  ,  IXADV_SEASALT_F   = 118   &
+  ,  IXADV_SEASALT_C   = 119
 
    integer, public, parameter ::   & 
-     IXADV_DUST_WB_C   = 120   &
-  ,  IXADV_DUST_SAH_F  = 121   &
-  ,  IXADV_DUST_SAH_C  = 122   &
-  ,  IXADV_RN222       = 123   &
-  ,  IXADV_RNWATER     = 124   &
-  ,  IXADV_PB210       = 125
+     IXADV_DUST_ROAD_F = 120   &
+  ,  IXADV_DUST_ROAD_C = 121   &
+  ,  IXADV_DUST_WB_F   = 122   &
+  ,  IXADV_DUST_WB_C   = 123   &
+  ,  IXADV_DUST_SAH_F  = 124   &
+  ,  IXADV_DUST_SAH_C  = 125   &
+  ,  IXADV_RN222       = 126   &
+  ,  IXADV_RNWATER     = 127   &
+  ,  IXADV_PB210       = 128
 
  !-----------------------------------------------------------
   end module ChemSpecs_adv_ml
@@ -241,13 +244,13 @@ implicit none
 
 !   ( Output from GenChem, sub print_species ) 
 
-   integer, public, parameter ::  NSPEC_TOT = 142 
+   integer, public, parameter ::  NSPEC_TOT = 145 
  
   ! Aerosols:
            integer, public, parameter :: &
                 NAEROSOL=23,   &!   Number of aerosol species
-                FIRST_SEMIVOL=109, &!   First aerosol species
-                LAST_SEMIVOL=131     !   Last  aerosol species  
+                FIRST_SEMIVOL=112, &!   First aerosol species
+                LAST_SEMIVOL=134     !   Last  aerosol species  
 
 
 
@@ -276,152 +279,155 @@ implicit none
 
    integer, public, parameter ::   & 
      NO2         =  20   &
-  ,  PAN         =  21   &
-  ,  MPAN        =  22   &
-  ,  NO3         =  23   &
-  ,  N2O5        =  24   &
-  ,  ISONO3      =  25   &
-  ,  HNO3        =  26   &
-  ,  HONO        =  27   &
-  ,  CH3COO2     =  28   &
-  ,  MACR        =  29
+  ,  SHIPNOX     =  21   &
+  ,  PAN         =  22   &
+  ,  MPAN        =  23   &
+  ,  NO3         =  24   &
+  ,  N2O5        =  25   &
+  ,  ISONO3      =  26   &
+  ,  HNO3        =  27   &
+  ,  HONO        =  28   &
+  ,  CH3COO2     =  29
 
    integer, public, parameter ::   & 
-     ISNI        =  30   &
-  ,  ISNIR       =  31   &
-  ,  GLYOX       =  32   &
-  ,  MGLYOX      =  33   &
-  ,  MAL         =  34   &
-  ,  MEK         =  35   &
-  ,  MVK         =  36   &
-  ,  HCHO        =  37   &
-  ,  CH3CHO      =  38   &
-  ,  C2H6        =  39
+     MACR        =  30   &
+  ,  ISNI        =  31   &
+  ,  ISNIR       =  32   &
+  ,  GLYOX       =  33   &
+  ,  MGLYOX      =  34   &
+  ,  MAL         =  35   &
+  ,  MEK         =  36   &
+  ,  MVK         =  37   &
+  ,  HCHO        =  38   &
+  ,  CH3CHO      =  39
 
    integer, public, parameter ::   & 
-     NC4H10      =  40   &
-  ,  C2H4        =  41   &
-  ,  C3H6        =  42   &
-  ,  OXYL        =  43   &
-  ,  C5H8        =  44   &
-  ,  APINENE     =  45   &
-  ,  CH3O2H      =  46   &
-  ,  C2H5OOH     =  47   &
-  ,  BURO2H      =  48   &
-  ,  ETRO2H      =  49
+     C2H6        =  40   &
+  ,  NC4H10      =  41   &
+  ,  C2H4        =  42   &
+  ,  C3H6        =  43   &
+  ,  OXYL        =  44   &
+  ,  C5H8        =  45   &
+  ,  APINENE     =  46   &
+  ,  CH3O2H      =  47   &
+  ,  C2H5OOH     =  48   &
+  ,  BURO2H      =  49
 
    integer, public, parameter ::   & 
-     PRRO2H      =  50   &
-  ,  OXYO2H      =  51   &
-  ,  MEKO2H      =  52   &
-  ,  MALO2H      =  53   &
-  ,  MVKO2H      =  54   &
-  ,  MACROOH     =  55   &
-  ,  MACO3H      =  56   &
-  ,  MACO2H      =  57   &
-  ,  ISRO2H      =  58   &
-  ,  H2O2        =  59
+     ETRO2H      =  50   &
+  ,  PRRO2H      =  51   &
+  ,  OXYO2H      =  52   &
+  ,  MEKO2H      =  53   &
+  ,  MALO2H      =  54   &
+  ,  MVKO2H      =  55   &
+  ,  MACROOH     =  56   &
+  ,  MACO3H      =  57   &
+  ,  MACO2H      =  58   &
+  ,  ISRO2H      =  59
 
    integer, public, parameter ::   & 
-     CH3COO2H    =  60   &
-  ,  ISONO3H     =  61   &
-  ,  ISNIRH      =  62   &
-  ,  CH3OH       =  63   &
-  ,  C2H5OH      =  64   &
-  ,  ACETOL      =  65   &
-  ,  H2          =  66   &
-  ,  CO          =  67   &
-  ,  CH4         =  68   &
-  ,  SO2         =  69
+     H2O2        =  60   &
+  ,  CH3COO2H    =  61   &
+  ,  ISONO3H     =  62   &
+  ,  ISNIRH      =  63   &
+  ,  CH3OH       =  64   &
+  ,  C2H5OH      =  65   &
+  ,  ACETOL      =  66   &
+  ,  H2          =  67   &
+  ,  CO          =  68   &
+  ,  CH4         =  69
 
    integer, public, parameter ::   & 
-     SO4         =  70   &
-  ,  NH3         =  71   &
-  ,  NO3_F       =  72   &
-  ,  NO3_C       =  73   &
-  ,  NH4_F       =  74   &
-  ,  GAS_ASOA_OC =  75   &
-  ,  PART_ASOA_OC=  76   &
-  ,  PART_ASOA_OM=  77   &
-  ,  GAS_BSOA_OC =  78   &
-  ,  PART_BSOA_OC=  79
+     SO2         =  70   &
+  ,  SO4         =  71   &
+  ,  NH3         =  72   &
+  ,  NO3_F       =  73   &
+  ,  NO3_C       =  74   &
+  ,  NH4_F       =  75   &
+  ,  ASH_F       =  76   &
+  ,  ASH_C       =  77   &
+  ,  GAS_ASOA_OC =  78   &
+  ,  PART_ASOA_OC=  79
 
    integer, public, parameter ::   & 
-     PART_BSOA_OM=  80   &
-  ,  PART_FFUELOA25_OC=  81   &
-  ,  PART_FFUELOA25_OM=  82   &
-  ,  PART_WOODOA25_OC=  83   &
-  ,  PART_WOODOA25_OM=  84   &
-  ,  PART_FFIREOA25_OC=  85   &
-  ,  PART_FFIREOA25_OM=  86   &
-  ,  PART_OC10   =  87   &
-  ,  PART_OC25   =  88   &
-  ,  NONVOL_FFUELOC25=  89
+     PART_ASOA_OM=  80   &
+  ,  GAS_BSOA_OC =  81   &
+  ,  PART_BSOA_OC=  82   &
+  ,  PART_BSOA_OM=  83   &
+  ,  PART_FFUELOA25_OC=  84   &
+  ,  PART_FFUELOA25_OM=  85   &
+  ,  PART_WOODOA25_OC=  86   &
+  ,  PART_WOODOA25_OM=  87   &
+  ,  PART_FFIREOA25_OC=  88   &
+  ,  PART_FFIREOA25_OM=  89
 
    integer, public, parameter ::   & 
-     NONV_FFUELOC_COARSE=  90   &
-  ,  NONVOL_WOODOC25=  91   &
-  ,  NONVOL_BGNDOC=  92   &
-  ,  NONVOL_FFIREOC25=  93   &
-  ,  PART_OM_F   =  94   &
-  ,  POM_F_WOOD  =  95   &
-  ,  POM_F_FFUEL =  96   &
-  ,  POM_C_FFUEL =  97   &
-  ,  EC_F_WOOD_NEW=  98   &
-  ,  EC_F_WOOD_AGE=  99
+     PART_OC10   =  90   &
+  ,  PART_OC25   =  91   &
+  ,  NONVOL_FFUELOC25=  92   &
+  ,  NONV_FFUELOC_COARSE=  93   &
+  ,  NONVOL_WOODOC25=  94   &
+  ,  NONVOL_BGNDOC=  95   &
+  ,  NONVOL_FFIREOC25=  96   &
+  ,  PART_OM_F   =  97   &
+  ,  POM_F_WOOD  =  98   &
+  ,  POM_F_FFUEL =  99
 
    integer, public, parameter ::   & 
-     EC_C_WOOD   = 100   &
-  ,  EC_F_FFUEL_NEW= 101   &
-  ,  EC_F_FFUEL_AGE= 102   &
-  ,  EC_C_FFUEL  = 103   &
-  ,  REMPPM25    = 104   &
-  ,  REMPPM_C    = 105   &
-  ,  FFIRE_OM    = 106   &
-  ,  FFIRE_BC    = 107   &
-  ,  FFIRE_REMPPM25= 108   &
-  ,  ASOC_NG100  = 109
+     POM_C_FFUEL = 100   &
+  ,  EC_F_WOOD_NEW= 101   &
+  ,  EC_F_WOOD_AGE= 102   &
+  ,  EC_C_WOOD   = 103   &
+  ,  EC_F_FFUEL_NEW= 104   &
+  ,  EC_F_FFUEL_AGE= 105   &
+  ,  EC_C_FFUEL  = 106   &
+  ,  REMPPM25    = 107   &
+  ,  REMPPM_C    = 108   &
+  ,  FFIRE_OM    = 109
 
    integer, public, parameter ::   & 
-     ASOC_UG1    = 110   &
-  ,  ASOC_UG10   = 111   &
-  ,  ASOC_UG1E2  = 112   &
-  ,  ASOC_UG1E3  = 113   &
-  ,  NON_C_ASOA_NG100= 114   &
-  ,  NON_C_ASOA_UG1= 115   &
-  ,  NON_C_ASOA_UG10= 116   &
-  ,  NON_C_ASOA_UG1E2= 117   &
-  ,  NON_C_ASOA_UG1E3= 118   &
-  ,  BSOC_NG100  = 119
+     FFIRE_BC    = 110   &
+  ,  FFIRE_REMPPM25= 111   &
+  ,  ASOC_NG100  = 112   &
+  ,  ASOC_UG1    = 113   &
+  ,  ASOC_UG10   = 114   &
+  ,  ASOC_UG1E2  = 115   &
+  ,  ASOC_UG1E3  = 116   &
+  ,  NON_C_ASOA_NG100= 117   &
+  ,  NON_C_ASOA_UG1= 118   &
+  ,  NON_C_ASOA_UG10= 119
 
    integer, public, parameter ::   & 
-     BSOC_UG1    = 120   &
-  ,  BSOC_UG10   = 121   &
-  ,  BSOC_UG1E2  = 122   &
-  ,  BSOC_UG1E3  = 123   &
-  ,  NON_C_BSOA_NG100= 124   &
-  ,  NON_C_BSOA_UG1= 125   &
-  ,  NON_C_BSOA_UG10= 126   &
-  ,  NON_C_BSOA_UG1E2= 127   &
-  ,  NON_C_BSOA_UG1E3= 128   &
-  ,  FFFUEL_NG10 = 129
+     NON_C_ASOA_UG1E2= 120   &
+  ,  NON_C_ASOA_UG1E3= 121   &
+  ,  BSOC_NG100  = 122   &
+  ,  BSOC_UG1    = 123   &
+  ,  BSOC_UG10   = 124   &
+  ,  BSOC_UG1E2  = 125   &
+  ,  BSOC_UG1E3  = 126   &
+  ,  NON_C_BSOA_NG100= 127   &
+  ,  NON_C_BSOA_UG1= 128   &
+  ,  NON_C_BSOA_UG10= 129
 
    integer, public, parameter ::   & 
-     WOODOA_NG10 = 130   &
-  ,  FFIREOA_NG10= 131   &
-  ,  SEASALT_F   = 132   &
-  ,  SEASALT_C   = 133   &
-  ,  DUST_ROAD_F = 134   &
-  ,  DUST_ROAD_C = 135   &
-  ,  DUST_WB_F   = 136   &
-  ,  DUST_WB_C   = 137   &
-  ,  DUST_SAH_F  = 138   &
-  ,  DUST_SAH_C  = 139
+     NON_C_BSOA_UG1E2= 130   &
+  ,  NON_C_BSOA_UG1E3= 131   &
+  ,  FFFUEL_NG10 = 132   &
+  ,  WOODOA_NG10 = 133   &
+  ,  FFIREOA_NG10= 134   &
+  ,  SEASALT_F   = 135   &
+  ,  SEASALT_C   = 136   &
+  ,  DUST_ROAD_F = 137   &
+  ,  DUST_ROAD_C = 138   &
+  ,  DUST_WB_F   = 139
 
    integer, public, parameter ::   & 
-     RN222       = 140   &
-  ,  RNWATER     = 141   &
-  ,  PB210       = 142
+     DUST_WB_C   = 140   &
+  ,  DUST_SAH_F  = 141   &
+  ,  DUST_SAH_C  = 142   &
+  ,  RN222       = 143   &
+  ,  RNWATER     = 144   &
+  ,  PB210       = 145
 
  !-----------------------------------------------------------
   end module ChemSpecs_tot_ml
@@ -487,6 +493,7 @@ subroutine define_chemicals()
     species(O3          ) = Chemical("O3          ",  48.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 
     species(NO          ) = Chemical("NO          ",  30.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
     species(NO2         ) = Chemical("NO2         ",  46.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
+    species(SHIPNOX     ) = Chemical("SHIPNOX     ",  46.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
     species(PAN         ) = Chemical("PAN         ", 121.0000,  0,  2,   1,  0,  0.0000,    0.0 ) 
     species(MPAN        ) = Chemical("MPAN        ", 132.0000,  0,  4,   1,  0,  0.0000,    0.0 ) 
     species(NO3         ) = Chemical("NO3         ",  62.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
@@ -541,6 +548,8 @@ subroutine define_chemicals()
     species(NO3_F       ) = Chemical("NO3_F       ",  62.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
     species(NO3_C       ) = Chemical("NO3_C       ",  62.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
     species(NH4_F       ) = Chemical("NH4_F       ",  18.0000,  0,  0,   1,  0,  0.0000,    0.0 ) 
+    species(ASH_F       ) = Chemical("ASH_F       ",  12.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 
+    species(ASH_C       ) = Chemical("ASH_C       ",  12.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 
     species(GAS_ASOA_OC ) = Chemical("GAS_ASOA_OC ",  12.0000,  0,  1,   0,  0,  0.0000,    0.0 ) 
     species(PART_ASOA_OC) = Chemical("PART_ASOA_OC",  12.0000,  0,  1,   0,  0,  0.0000,    0.0 ) 
     species(PART_ASOA_OM) = Chemical("PART_ASOA_OM",   1.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 

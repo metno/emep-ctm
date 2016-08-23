@@ -1,9 +1,8 @@
-! <CoDep_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <CoDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,20 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
 module CoDep_ml
   use CheckStop_ml,  only : CheckStop
   use Chemfields_ml, only : so2nh3_24hr
@@ -58,14 +57,14 @@ module CoDep_ml
   public   :: CoDep_factors
   private  :: Tabulate        ! pre-calculate many values to save CPU
  
-  !/** Some parameters for the so2nh3_24hr calculations
+  !*** Some parameters for the so2nh3_24hr calculations
 
   integer, private :: nhour 
   real, private, save,allocatable ::   &             ! 24hr average ratio              
      so2nh3_hr(:,:,:)  !Predefined to 1.0 to make first hours
                                          !reasonable
 
-  !/** Some parameters for the Rns calculations
+  !*** Some parameters for the Rns calculations
 
   integer, private, parameter :: TMIN = -40, TMAX = 40 ! Allowed temp. range
   integer, private, parameter :: NTAB  = 100   ! No. intervals used for tabulation
@@ -219,7 +218,7 @@ contains
   !=======================================================================
 
    subroutine Tabulate()
-    !/**  Tabulates humidity factors, 
+    !***  Tabulates humidity factors, 
 
      real :: a_SN, a_SN_24hr
      integer :: IRH, ia_SN, ia_SN_24hr

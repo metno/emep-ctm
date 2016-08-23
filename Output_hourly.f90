@@ -1,8 +1,7 @@
-! <Output_hourly.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <Output_hourly.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,7 +24,6 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!***********************************************************************
 subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 !***********************************************************************
 !**    DESCRIPTION:
@@ -57,44 +55,44 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 !   For ug/m3     output, set hr_out%unitconv=to_ug_ADV(ixadv).
 !   For ugX/m3    output, set hr_out%unitconv=to_ug_X(ixadv).
 !*************************************************************************
-  use My_Outputs_ml,    only: NHOURLY_OUT,    & ! No. outputs
-                              NLEVELS_HOURLY, & ! No. output levels
-                              hr_out,         & ! Required outputs
-                              LEVELS_HOURLY ! Output selected model levels
-            !NML SELECT_LEVELS_HOURLY, LEVELS_HOURLY ! Output selected model levels
+use My_Outputs_ml,    only: NHOURLY_OUT,    & ! No. outputs
+                            NLEVELS_HOURLY, & ! No. output levels
+                            hr_out,         & ! Required outputs
+                            LEVELS_HOURLY ! Output selected model levels
+          !NML SELECT_LEVELS_HOURLY, LEVELS_HOURLY ! Output selected model levels
 
-  use CheckStop_ml,     only: CheckStop
-  use Chemfields_ml,    only: xn_adv,xn_shl,cfac,PM25_water,PM25_water_rh50,AOD
-  use ChemGroups_ml,    only: chemgroups
-  use Derived_ml,       only: num_deriv2d,nav_2d        ! D2D houtly output type
-  use DerivedFields_ml, only: f_2d,d_2d          ! D2D houtly output type
-  use OwnDataTypes_ml,  only: Asc2D, Deriv
-  use ChemSpecs,        only: NSPEC_SHL, species
+use CheckStop_ml,     only: CheckStop
+use Chemfields_ml,    only: xn_adv,xn_shl,cfac,PM25_water,PM25_water_rh50
+use ChemGroups_ml,    only: chemgroups
+use Derived_ml,       only: num_deriv2d,nav_2d        ! D2D houtly output type
+use DerivedFields_ml, only: f_2d,d_2d          ! D2D houtly output type
+use OwnDataTypes_ml,  only: Asc2D, Deriv
+use ChemSpecs,        only: NSPEC_SHL, species
 !CMR  use ChemSpecs_shl_ml ,only: NSPEC_SHL          ! Maps indices
 !CMR  use ChemChemicals_ml ,only: species            ! Gives names
-  use GridValues_ml,    only: i_fdom, j_fdom,&   ! Gives emep coordinates
-                              debug_proc, debug_li,debug_lj
-  use Io_ml,            only: IO_HOURLY
-  use ModelConstants_ml,only: KMAX_MID, MasterProc, &
-                              IOU_INST, IOU_HOUR, IOU_YEAR, IOU_YEAR_LASTHH, &
-                              DEBUG => DEBUG_OUT_HOUR,runlabel1,HOURLYFILE_ending,&
-                              FORECAST
-  use ModelConstants_ml,only: SELECT_LEVELS_HOURLY !NML
-  use ModelConstants_ml,only: MFAC! TESTSHL
-  use MetFields_ml,     only: t2_nwp,th, roa, surface_precip, ws_10m ,rh2m,&
-                              pzpbl, ustar_nwp, Kz_m2s, &
-                              Idirect, Idiffuse, z_bnd, z_mid,ps
-  use NetCDF_ml,        only: Out_netCDF, CloseNetCDF, Init_new_netCDF, fileName_hour, &
-                              Int1, Int2, Int4, Real4, Real8  !Output data type to choose
-  use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT
-  use Par_ml,           only: MAXLIMAX, MAXLJMAX, GIMAX,GJMAX,        &
-                              me, IRUNBEG, JRUNBEG, limax, ljmax
-  use Pollen_ml,        only: heatsum, pollen_left, AreaPOLL
-  use TimeDate_ml,      only: current_date
-  use TimeDate_ExtraUtil_ml,only : date2string
-  use Units_ml,         only: Group_Units
+use GridValues_ml,    only: i_fdom, j_fdom,&   ! Gives emep coordinates
+                            debug_proc, debug_li,debug_lj
+use Io_ml,            only: IO_HOURLY
+use ModelConstants_ml,only: KMAX_MID, MasterProc, MY_OUTPUTS,&
+                            IOU_INST, IOU_HOUR, IOU_YEAR, IOU_YEAR_LASTHH, &
+                            DEBUG => DEBUG_OUT_HOUR,runlabel1,HOURLYFILE_ending,&
+                            FORECAST
+use ModelConstants_ml,only: SELECT_LEVELS_HOURLY !NML
+use MetFields_ml,     only: t2_nwp,th, roa, surface_precip, ws_10m ,rh2m,&
+                            pzpbl, ustar_nwp, Kz_m2s, &
+                            Idirect, Idiffuse, z_bnd, z_mid,ps
+use NetCDF_ml,        only: Out_netCDF, CloseNetCDF, Init_new_netCDF, fileName_hour, &
+                            Int1, Int2, Int4, Real4, Real8  !Output data type to choose
+use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT
+use Par_ml,           only: MAXLIMAX, MAXLJMAX, GIMAX,GJMAX,        &
+                            me, IRUNBEG, JRUNBEG, limax, ljmax
+use Pollen_ml,        only: heatsum, pollen_left, AreaPOLL
+use TimeDate_ml,      only: current_date
+use TimeDate_ExtraUtil_ml,only : date2string
+use Units_ml,         only: Group_Units,&
+                            to_number_cm3 ! converts roa [kg/m3] to M [molec/cm3]
 
-  implicit none
+implicit none
 
 !*.. Components of  hr_out
 !* character(len=TXTLEN_DERIV):: name   ! netCDF variable name
@@ -109,8 +107,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 !* real             :: max      ! Max allowed value for output
 
 ! local variables
-  logical, save     :: my_first_call = .true. ! Set false after file opened
-  integer msnr                        ! Message number for rsend
+  logical, save     :: first_call = .true. ! Set false after file opened
   real hourly(MAXLIMAX,MAXLJMAX)      ! Local hourly value  (e.g. ppb)
   real ghourly(GIMAX,GJMAX)           ! Global hourly value (e.g. ppb)
   real :: arrmax                      ! Maximum value from array
@@ -125,7 +122,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
   integer, save :: prev_month = -99   ! Initialise with non-possible month
   type(Deriv) :: def1           ! for NetCDF
   real :: scale                 ! for NetCDF
-  integer ::CDFtype,nk,klevel   ! for NetCDF
+  integer ::CDFtype,nk,klevel,ncfileID   ! for NetCDF
   character(len=TXTLEN_SHORT)    :: hr_out_type=""      ! hr_out%type
   integer                        :: hr_out_nk=0         ! hr_out%nk
   integer, pointer, dimension(:) :: gspec=>null()       ! group array of indexes
@@ -133,10 +130,10 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 
   integer, allocatable, dimension(:), save :: navg ! D2D average counter
 
-  character(len=len(fileName_hour)) :: filename
-  logical       :: file_exist=.false.
+  character(len=len(fileName_hour))      :: filename
+  character(len=len(fileName_hour)),save :: filename_old="no file"
   logical, save :: debug_flag      ! = ( MasterProc .and. DEBUG )
-  logical       :: surf_corrected  ! to get 3m values
+  logical       :: surf_corrected=.true.  ! to get 3m values
 
   character(len=*), parameter :: &
     SRF_TYPE(9)=(/"ADVppbv     ","ADVugXX     ","ADVugXXgroup",&
@@ -145,16 +142,25 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 
   character(len=52) :: errmsg = "ok"
 
-  if(NHOURLY_OUT<= 0) then
-    if(my_first_call.and.MasterProc.and.DEBUG) &
-       write(*,*) "DEBUG Hourly_out: nothing to output!"
-    my_first_call = .false.
+  if(NHOURLY_OUT<=0)then
+    if(first_call.and.MasterProc.and.DEBUG) &
+      write(*,*)"DEBUG Hourly_out: nothing to output!"
+    first_call=.false.
     return
   endif
 
-  if(my_first_call) then
-    debug_flag=(debug_proc.and.DEBUG)
+  ! only write at 12UTC for "TRENDS@12UTC", eg
+  ! if(MY_OUTPUTS=="TRENDS@12UTC".and.current_date%hour/=12)return
+  i=index(MY_OUTPUTS,"@")
+  if(i>0)then
+    read(MY_OUTPUTS(i+1:i+2),*)ih
+    if(current_date%hour/=ih)return
+  endif
 
+  if(first_call) then
+    first_call = .false.
+
+    debug_flag=(debug_proc.and.DEBUG)
   !/ Ensure that domain limits specified in My_Outputs lie within
   !  model domain. In emep coordinates we have:
     do ih = 1, NHOURLY_OUT
@@ -170,11 +176,16 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
     navg(:)=0.0                 ! D2D average counter
   endif  ! first_call
 
-  filename=trim(runlabel1)//date2string(HOURLYFILE_ending,current_date)
-  inquire(file=filename,exist=file_exist)
-  if(my_first_call.or..not.file_exist)then
-    if(debug_flag) write(*,*) "DEBUG ",HOURLYFILE_ending,"-Hourlyfile ", trim(filename)
+  filename=trim(runlabel1)//date2string(trim(HOURLYFILE_ending),current_date)
+  if(filename/=filename_old)then
+    filename_old=filename
+
+    if(debug_flag)&
+      write(*,*) "DEBUG ",trim(HOURLYFILE_ending),"-Hourlyfile ",trim(filename)
+  !! filename will be overwritten
     call Init_new_netCDF(trim(filename),IOU_HOUR)
+
+    ncfileID=-1 ! must be <0 as initial value
 
   !! Create variables first, without writing them (for performance purposes)   
     do ih=1,NHOURLY_OUT
@@ -192,15 +203,13 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
       select case(nk)
       case(1)       ! write as 2D
         call Out_netCDF(IOU_HOUR,def1,2,1,hourly,scale,CDFtype,ist,jst,ien,jen,&
-          create_var_only=.true.)
+          create_var_only=.true.,ncFileID_given=ncFileID)
       case(2:)      ! write as 3D
         call Out_netCDF(IOU_HOUR,def1,3,1,hourly,scale,CDFtype,ist,jst,ien,jen,1,&
-          create_var_only=.true.,chunksizes=(/ien-ist+1,jen-jst+1,1,1/))
+          create_var_only=.true.,chunksizes=(/ien-ist+1,jen-jst+1,1,1/),ncFileID_given=ncFileID)
       endselect
     enddo
   endif
-
-  my_first_call = .false.
 !......... Uses concentration/met arrays from Chem_ml or Met_ml ..................
 !
 !        real xn_adv(NSPEC_ADV,MAXLIMAX,MAXLJMAX,KMAX_MID)
@@ -219,7 +228,6 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
     if(any(hr_out(ih)%type==SRF_TYPE))hr_out_nk=1
 
     KVLOOP: do k = 1,hr_out_nk
-      msnr  = 3475 + ih
       ispec = hr_out(ih)%spec
       name  = hr_out(ih)%name
       hr_out_type=hr_out(ih)%type
@@ -259,9 +267,11 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
           case(0)
             ik=KMAX_MID              ! surface/lowermost level
             if(debug_flag) write(*,*)"DEBUG LOWEST LEVELS", ik, hr_out_type
-            select case(hr_out_type)
+            select case(hr_out_type) ! ensure surface output
             case("BCVppbv","BCVugXX","BCVugXXgroup")
-              hr_out_type(1:3)="ADV" ! ensure surface output
+              hr_out_type(1:3)="ADV"
+            case("PMwater")
+              hr_out_type=trim(hr_out_type)//"SRF"
             endselect
           endselect
         endif
@@ -289,21 +299,21 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
         unit_conv =  hr_out(ih)%unitconv
         if(itot < NSPEC_SHL .and.  debug_proc) write(*,"(a,a,4es12.3)") &
           "OUT3D MAR22 ", trim(name), unit_conv, &
-           MFAC,roa(2,2,ik,1)*MFAC, xn_shl(ispec,2,2,ik)
+           to_number_cm3,roa(2,2,ik,1)*to_number_cm3, xn_shl(ispec,2,2,ik)
 
         !MAR22 Added SHL option.
         if( itot <= NSPEC_SHL ) then !TESTSHL
          ! CRUDE units fix. Sort out later.
          !   Inverse of No. air mols/cm3 = 1/M
-         ! where M =  roa (kgair m-3) * MFAC  when ! scale in ug,  else 1
-         !inv_air_density3D(i,j,k) = 1.0/( roa(i,j,k,1) * MFAC )
+         ! where M =  roa (kgair m-3) * to_number_cm3  when ! scale in ug,  else 1
+         !inv_air_density3D(i,j,k) = 1.0/( roa(i,j,k,1) * to_number_cm3 )
 
           forall(i=1:limax,j=1:ljmax)
              hourly(i,j) = xn_shl(ispec,i,j,ik)
           end forall
           if(index(hr_out(ih)%unit,"ppt")>0) then
             forall(i=1:limax,j=1:ljmax)
-                hourly(i,j) = hourly(i,j)/( roa(i,j,ik,1) * MFAC ) * 1.0e9
+                hourly(i,j) = hourly(i,j)/( roa(i,j,ik,1) * to_number_cm3 ) * 1.0e9
             end forall
           else
             call CheckStop("SHL Out3D option not coded yet")
@@ -414,9 +424,11 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = z_mid(i,j,ik)*unit_conv
         endif
 
-      case("AOD")
-        name = "AOD 550nm"
-        forall(i=1:limax,j=1:ljmax) hourly(i,j) = AOD(i,j)
+      case("dZ","dZ_BND")  ! level thickness
+        name = "dZ_BND"
+        unit_conv =  hr_out(ih)%unitconv
+        forall(i=1:limax,j=1:ljmax) &
+          hourly(i,j)=(z_bnd(i,i,ik)-z_bnd(i,i,ik+1))*unit_conv
 
       case("COLUMN")    ! Column output in ug/m2, ugX/m2, molec/cm2
         itot = NSPEC_SHL + ispec
@@ -468,24 +480,33 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
    
       case("heatsum")
        !hr_out(ih)%unit='degree_days'
+        ik = hr_out(ih)%spec
         if(allocated(heatsum))then
-          forall(i=1:limax,j=1:ljmax) hourly(i,j) = heatsum(i,j)
+          call CheckStop(ik,[1,size(heatsum,DIM=3)],"Hourly_out: '"//&
+            trim(hr_out(ih)%type)//"' out of bounds!")
+          forall(i=1:limax,j=1:ljmax) hourly(i,j)=heatsum(i,j,ik)
         else
           hourly(:,:) = 0.0
         endif
 
       case("pollen_left")
-       !hr_out(ih)%unit=''
+       !hr_out(ih)%unit='grains/m3'
+        ik = hr_out(ih)%spec
         if(allocated(pollen_left))then
-          forall(i=1:limax,j=1:ljmax) hourly(i,j) = pollen_left(i,j)
+          call CheckStop(ik,[1,size(pollen_left,DIM=3)],"Hourly_out: '"//&
+            trim(hr_out(ih)%type)//"' out of bounds!")
+          forall(i=1:limax,j=1:ljmax) hourly(i,j) = pollen_left(i,j,ik)
         else
           hourly(:,:) = 0.0
         endif
 
       case("pollen_emiss")
        !hr_out(ih)%unit='grains/m2/h'
+        ik = hr_out(ih)%spec
         if(allocated(AreaPOLL))then
-          forall(i=1:limax,j=1:ljmax) hourly(i,j) = AreaPOLL(i,j)
+          call CheckStop(ik,[1,size(AreaPOLL,DIM=3)],"Hourly_out: '"//&
+            trim(hr_out(ih)%type)//"' out of bounds!")
+          forall(i=1:limax,j=1:ljmax) hourly(i,j) = AreaPOLL(i,j,ik)
         else
           hourly(:,:) = 0.0
         endif
@@ -626,12 +647,12 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
 
       select case(nk)
       case(1)       ! write as 2D
-        call Out_netCDF(IOU_HOUR,def1,2,1,hourly,scale,CDFtype,ist,jst,ien,jen)
+        call Out_netCDF(IOU_HOUR,def1,2,1,hourly,scale,CDFtype,ist,jst,ien,jen,ncFileID_given=ncFileID)
       case(2:)      ! write as 3D
         klevel=ik
         if(nk<KMAX_MID)  klevel=KMAX_MID-ik+1 !count from ground and up
         if(SELECT_LEVELS_HOURLY) klevel=k     !order is defined in LEVELS_HOURLY
-        call Out_netCDF(IOU_HOUR,def1,3,1,hourly,scale,CDFtype,ist,jst,ien,jen,klevel)
+        call Out_netCDF(IOU_HOUR,def1,3,1,hourly,scale,CDFtype,ist,jst,ien,jen,klevel,ncFileID_given=ncFileID)
       !case default   ! no output
       endselect
     enddo KVLOOP    
@@ -643,7 +664,7 @@ subroutine hourly_out() !!  spec,ofmt,ix1,ix2,iy1,iy2,unitfac)
     def1%class='Surface pressure'
     CDFtype=Real4 ! can be choosen as Int1,Int2,Int4,Real4 or Real8
     scale=1.
-    call Out_netCDF(IOU_HOUR,def1,2,1,ps(:,:,1)*0.01,scale,CDFtype,ist,jst,ien,jen)     
+    call Out_netCDF(IOU_HOUR,def1,2,1,ps(:,:,1)*0.01,scale,CDFtype,ist,jst,ien,jen,ncFileID_given=ncFileID)     
   endif
 
 !Not closing seems to give a segmentation fault when opening the daily file

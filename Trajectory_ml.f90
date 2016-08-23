@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -83,7 +83,7 @@ contains
     if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
 
   !  Here month and day where trajectory is expected is hardcoded. 
-    if(current_date%month == 6) then
+    if(current_date%month == 16) then
        if(current_date%day == 1 .or. current_date%day == 16 ) then
           if(me == 0)then
              write(falc,fmt='(''tra9606'',i2.2,''.pos'')') &

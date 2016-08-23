@@ -1,7 +1,7 @@
-! <AllocInit.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <AllocInit.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -64,7 +64,7 @@ contains
 
   subroutine alloc_real_1d_init_array(a, init, n1, txt)
     real, allocatable, dimension(:), intent(inout) :: a
-    real, dimension(n1), intent(in) :: init
+    real, dimension(:), intent(in) :: init
     integer, intent(in) :: n1
     character(len=*), intent(in) :: txt
 
@@ -128,7 +128,7 @@ contains
 
   subroutine alloc_integer_1d_init_array(a, init, n1, txt)
     integer, allocatable, dimension(:), intent(inout) :: a
-    integer, dimension(n1), intent(in) :: init
+    integer, dimension(:), intent(in) :: init
     integer, intent(in) :: n1
     character(len=*), intent(in) :: txt
 

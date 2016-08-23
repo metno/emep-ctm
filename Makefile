@@ -6,26 +6,23 @@ PROG =	Unimod
 include Makefile.SRCS
 
 ###################################################
-
 LIBS = -lnetcdf -lnetcdff
+
+#Libraries for ifort
 INCL = -I/global/apps/netcdf/4.2.1.1/intel/13.0/include
 LLIB = -L/global/apps/netcdf/4.2.1.1/intel/13.0/lib
 
+#Libraries for gfortran
+#INCL = -I/global/apps/netcdf/4.2.1.1/gcc/4.7.2/include
+#LLIB = -L/global/apps/netcdf/4.2.1.1/gcc/4.7.2/lib
 
 F90 = mpif90
 
 #Intel ifort compiler
 F90FLAGS =  -shared-intel -r8  -recursive -O3
 
-
-###GNU gfortran compiler (version 4.4.3 or later) 
-#LIBS = -lnetcdf -lnetcdff
-#INCL = -I$(NETCDF_ROOT)/include -I$(filter /global/apps/openmpi%,$(subst :, ,$(CPATH)))
-#LLIB = -L$(NETCDF_ROOT)/lib
-
+#GNU gfortran compiler (version 4.4.3 or later) 
 #F90FLAGS =  -ffree-line-length-none -fdefault-real-8   -O3
-
-
 ###################################################
 
 

@@ -1,9 +1,8 @@
-! <Chem_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <Chem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,36 +10,27 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
-!_____________________________________________________________________________
+!*****************************************************************************!
+module Chemfields_ml
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-
-                         module Chemfields_ml
-
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!_____________________________________________________________________________
-use AllocInits,        only: AllocInit
-use ChemSpecs,         only: NSPEC_ADV, NSPEC_SHL, NSPEC_TOT ! => No. species 
-!CMR use ChemSpecs_adv_ml,  only: NSPEC_ADV         ! => No. species 
-!CMR use ChemSpecs_shl_ml,  only: NSPEC_SHL         ! => No. species 
-!CMR use ChemSpecs_tot_ml,      only :  NSPEC_TOT
-use ModelConstants_ml    , only: KMAX_MID, KCHEMTOP     ! =>  z dimension
-use Par_ml               , only: MAXLIMAX,MAXLJMAX   ! => x, y dimensions
+use AllocInits,           only: AllocInit
+use ChemSpecs,            only: NSPEC_ADV, NSPEC_SHL, NSPEC_TOT ! => No. species 
+use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, AERO        ! =>  z dimension
+use NumberConstants,      only: UNDEF_R
+use Par_ml,               only: MAXLIMAX,MAXLJMAX   ! => x, y dimensions
 use Setup_1dfields_ml
 implicit none
 private
@@ -71,12 +61,15 @@ private
     ,xn_shl(:,:,:,:)  &
     ,xn_bgn(:,:,:,:) &
     ,PM25_water(:,:,:) &  !3D PM water
-    ,PM25_water_rh50(:,:)    !gravimetric PM water
+    ,PM25_water_rh50(:,:) &   !gravimetric PM water
+    ,Gerber_water(:,:,:)   !3D PM water from GERBER
+
+  real, save, allocatable, public :: &
+    SurfArea_um2cm3(:,:,:)  !2D  aerosol surface area, um2/cm3  (n,i,j)
 
   real, public, save, allocatable:: Fgas3d (:,:,:,:)  ! for SOA
 
-  real, public, save, allocatable, dimension(:,:) :: AOD
-  real, public, save, allocatable, dimension(:,:,:) :: Extin_coeff
+  real, public, save, allocatable :: AOD(:,:,:,:),Extin_coeff(:,:,:,:,:)
 
   real, save, allocatable, public :: &
      cfac   (:,:,:)   
@@ -106,10 +99,10 @@ contains
     PM25_water=0.0
     allocate(PM25_water_rh50(MAXLIMAX,MAXLJMAX))
     PM25_water_rh50=0.0
-    allocate(AOD(MAXLIMAX,MAXLJMAX))
-    AOD=0.0
-    allocate(Extin_coeff(MAXLIMAX,MAXLJMAX,KMAX_MID))
-    Extin_coeff=0.0
+!   allocate(AOD(MAXLIMAX,MAXLJMAX))
+!   AOD=0.0
+!   allocate(Extin_coeff(MAXLIMAX,MAXLJMAX,KMAX_MID))
+!   Extin_coeff=0.0
     allocate(cfac(NSPEC_ADV,MAXLIMAX,MAXLJMAX))
     cfac=1.0
     allocate(so2nh3_24hr(MAXLIMAX,MAXLJMAX))
@@ -126,20 +119,46 @@ contains
     Fgas  = 1.0! Fraction as gas-phase
     Fpart = 0.0
     allocate(rcemis(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID))
-rcemis = 0.0
+    allocate(deltaZcm(KCHEMTOP:KMAX_MID))
+    rcemis = 0.0
     allocate(rh(KCHEMTOP:KMAX_MID),amk(KCHEMTOP:KMAX_MID),o2(KCHEMTOP:KMAX_MID))
     allocate(n2(KCHEMTOP:KMAX_MID),h2o(KCHEMTOP:KMAX_MID),temp(KCHEMTOP:KMAX_MID))
     allocate(tinv(KCHEMTOP:KMAX_MID),pp(KCHEMTOP:KMAX_MID))
     allocate(itemp(KCHEMTOP:KMAX_MID))
     CHEMSIZE = KMAX_MID-KCHEMTOP+1
 
+   ! Surface area and water
+!if( USES%SURF_AREA) then
+    allocate(surfarea_um2cm3(AERO%NSAREA,MAXLIMAX,MAXLJMAX))
+    SurfArea_um2cm3=0.0
+    allocate(Gerber_water(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    Gerber_water=0.0
+
+   ! wet DpgN and defaults from dry values
+    allocate(DpgNw(AERO%NSAREA, KCHEMTOP:KMAX_MID))
+
+    allocate(S_m2m3(AERO%NSAREA, KCHEMTOP:KMAX_MID)) ! GERBER
+    S_m2m3=0.0
+
+    ! Mol speeds
+    allocate(cn2o5(KCHEMTOP:KMAX_MID),chno3(KCHEMTOP:KMAX_MID),&
+              cho2(KCHEMTOP:KMAX_MID),co3(KCHEMTOP:KMAX_MID))
+    cn2o5=UNDEF_R
+    chno3=UNDEF_R
+    cho2= UNDEF_R
+    co3=  UNDEF_R
+    allocate(aero_fom(KCHEMTOP:KMAX_MID),aero_fdust(KCHEMTOP:KMAX_MID),&
+              aero_fss(KCHEMTOP:KMAX_MID))
+    aero_fom    = UNDEF_R
+    aero_fss    = UNDEF_R
+    aero_fdust  = UNDEF_R
+  
+!end if
+
+
   end subroutine alloc_ChemFields
 
 
 !_____________________________________________________________________________
+endmodule Chemfields_ml
 ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-                     end module Chemfields_ml
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-!_____________________________________________________________________________

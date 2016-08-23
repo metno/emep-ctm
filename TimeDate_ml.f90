@@ -1,11 +1,8 @@
-!>TimeDate_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!!         Chemical transport Model>
-!! MODULE to calculate date-related items, such as day-of-week, Julian
-!! date, etc.
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <TimeDate_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -13,21 +10,24 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
+!>TimeDate_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
+!! MODULE to calculate date-related items, such as day-of-week, Julian
+!! date, etc.
 !*****************************************************************************! 
-!_____________________________________________________________________________
 MODULE TimeDate_ml
 
 ! Originally timedate.f90 from Paul Curtis, found on web, 31/8/04: 
@@ -40,6 +40,8 @@ MODULE TimeDate_ml
 IMPLICIT NONE
 
 !/ Functions ...............
+public :: print_date            ! Simple print, YYYY-MM-DD-HH-SSSS
+public :: same_date             ! True if dates identical
 public :: make_current_date     ! convert timestamp to current_date
 public :: add2current_date      ! Increment current_date
 public :: make_timestamp        ! convert current_date(yyyy,mon,day,hour,secs)
@@ -81,6 +83,7 @@ type, public :: date
 end type date
 
 type(date), public, save :: current_date
+logical, save :: new_hour = .true.  ! eg to control print-out frequency
 
 !==============================================================================
 
@@ -110,6 +113,43 @@ CHARACTER(LEN=3),DIMENSION(0:6), public :: short_day =  &
   (/"Sun","Mon","Tue","Wed","Thu","Fri","Sat" /)
 
 CONTAINS
+
+!> FUNCTION print_date: produces  YYYY-MM-DD-HH-SSSS
+
+function print_date(cd) result(str)
+  type(date), optional :: cd
+  type(date) :: pd
+  character(len=18) :: str
+  if( present(cd) ) then
+     pd = cd
+  else
+     pd = current_date
+  end if
+!print *, "PD IN ", pd
+
+  write(str,"(i4,3(a,i2.2),a,i4.4)") &
+    pd%year, "-",  &
+    pd%month, "-",  &
+    pd%day, "-",  &
+    pd%hour, "-",  &
+    pd%seconds
+!print *, "PD OUT ", pd
+end function print_date
+   
+!> FUNCTION same_date
+!! DS Returns true if dates equal
+
+function same_date(cd1,cd2) result(tf)
+  type(date) :: cd1, cd2
+  logical :: tf
+  tf = ( & 
+    cd1%year     == cd2%year  .and. &
+    cd1%month    == cd2%month  .and. &
+    cd1%day      == cd2%day  .and. &
+    cd1%hour     == cd2%hour  .and. &
+    cd1%seconds  == cd2%seconds )
+end function same_date
+   
 
 FUNCTION make_timestamp (cd) RESULT (ts)
   TYPE(timestamp)              :: ts
@@ -353,3 +393,7 @@ SUBROUTINE Init_nmdays (indate)
 END SUBROUTINE Init_nmdays
 
 END MODULE TimeDate_ml
+!TSTESX program testr
+!TSTESX use TimeDate_ml, only : date, print_date
+!TSTESX print *, "DATE is ", print_date( date( 1999, 3, 2,21, 0 ))
+!TSTESX end program testr

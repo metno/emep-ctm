@@ -1,7 +1,7 @@
-! <Unimod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <Unimod.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,7 +39,7 @@ program myeul
   use My_Timing_ml,     only: lastptim, mytimm, Output_timing, &
        Init_timing, Add_2timing, Code_timer, &
        tim_before, tim_before0, tim_before1, &
-       tim_after, tim_after0
+       tim_after, tim_after0, NTIMING_UNIMOD,NTIMING
   use Advection_ml,     only: vgrid, assign_nmax, assign_dtadvec
   use Aqueous_ml,       only: init_aqueous, Init_WetDep   !  Initialises & tabulates
   use AirEmis_ml,       only: lightning
@@ -47,16 +47,17 @@ program myeul
   use BoundaryConditions_ml, only: BoundaryConditions
   use CheckStop_ml,     only: CheckStop
   use Chemfields_ml,    only: alloc_ChemFields
-!CMR  use ChemChemicals_ml, only: define_chemicals
   use ChemSpecs,        only: define_chemicals
   use ChemGroups_ml,    only: Init_ChemGroups
+  use Country_ml,       only: Country_Init
   use DefPhotolysis_ml, only: readdiss
   use Derived_ml,       only: Init_Derived, iou_min, iou_max
   use DerivedFields_ml, only: f_2d, f_3d
   use EcoSystem_ml,     only: Init_EcoSystems
   use Emissions_ml,     only: Emissions, newmonth
   use ForestFire_ml,    only: Fire_Emis
-  use GridValues_ml,    only: MIN_ADVGRIDS, GRIDWIDTH_M, Poles, DefDebugProc, GridRead
+  use GridValues_ml,    only: MIN_ADVGRIDS, GRIDWIDTH_M, Poles,&
+                              DefDebugProc, GridRead
   use Io_ml,            only: IO_MYTIM,IO_RES,IO_LOG,IO_NML,IO_DO3SE
   use Io_Progs_ml,      only: read_line, PrintLog
   use Landuse_ml,       only: InitLandUse, SetLanduse, Land_codes
@@ -68,7 +69,7 @@ program myeul
        METSTEP,    &   ! Hours between met input
        runlabel1,  &   ! explanatory text
        runlabel2,  &   ! explanatory text
-       nprint,nterm,iyr_trend,    nmax,nstep ,                  &
+       nterm,iyr_trend,    nmax,nstep ,                  &
        IOU_INST,IOU_HOUR, IOU_YEAR,IOU_MON, IOU_DAY, &
        USES, USE_LIGHTNING_EMIS, &
        FORECAST       ! FORECAST mode
@@ -84,6 +85,7 @@ program myeul
   use TimeDate_ExtraUtil_ml,only : date2string, assign_NTERM
   use Trajectory_ml,    only: trajectory_init,trajectory_in
   use Nest_ml,          only: wrtxn     ! write nested output (IC/BC)
+  use DA_3DVar_ml,      only: NTIMING_3DVAR
   !--------------------------------------------------------------------
   !
   !  Variables. There are too many to list here. Still, here are a
@@ -162,7 +164,7 @@ program myeul
   endif
 
   !*** Timing ********
-  call Init_timing()
+  call Init_timing(NTIMING_UNIMOD+NTIMING_3DVAR)
   call Code_Timer(tim_before0)
   tim_before = tim_before0
 
@@ -183,12 +185,6 @@ program myeul
   ! daynumber needed  for BCs, so call here to get initial
   daynumber=day_of_year(yyyy,mm,dd)
 
-  !     Decide the frequency of print-out
-  !
-  nprint = nterm
-
-  if (MasterProc) print *,'nterm, nprint:',nterm, nprint
-
   !-------------------------------------------------------------------
   !
   !++  parameters and initial fields.
@@ -204,6 +200,8 @@ program myeul
   call trajectory_init()
 
   call Add_2timing(2,tim_after,tim_before,"After define_Chems, readpar")
+
+  call Country_Init() ! In Country_ml, => NLAND, country codes and names, timezone
 
   call SetLandUse(daynumber, mm) !  Reads Inputs.Landuse, Inputs.LandPhen
 
@@ -370,6 +368,8 @@ program myeul
      ts2=make_timestamp(date(enddate(1),enddate(2),enddate(3),enddate(4),0))
      End_of_Run =  (nint(tdif_secs(ts1,ts2))<=0)
 
+     if( DEBUG%STOP_HH >= 0 .and. DEBUG%STOP_HH == current_date%hour ) End_of_Run = .true.
+
   enddo ! time-loop
 
   call Code_timer(tim_after0)
@@ -379,20 +379,20 @@ program myeul
   !
   !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  call wrtxn(current_date,.true.)
+  if(.not.FORECAST) call wrtxn(current_date,.true.)
   call massbudget()
 
   if(MasterProc)then
      print *,'programme is finished'
      ! Gather timing info:
      if(NPROC-1> 0)then
-        CALL MPI_RECV(lastptim,8*39,MPI_BYTE,NPROC-1,765,MPI_COMM_WORLD,STATUS,INFO)
+        CALL MPI_RECV(lastptim,NTIMING*8,MPI_BYTE,NPROC-1,765,MPI_COMM_WORLD,STATUS,INFO)
      else
         lastptim(:) = mytimm(:)
      endif
      call Output_timing(IO_MYTIM,me,NPROC,nterm,GIMAX,GJMAX)
   elseif(me==NPROC-1) then
-     CALL MPI_SEND(mytimm,8*39,MPI_BYTE,0,765,MPI_COMM_WORLD,INFO)
+     CALL MPI_SEND(mytimm,NTIMING*8,MPI_BYTE,0,765,MPI_COMM_WORLD,INFO)
   endif
 
   ! write 'modelrun.finished' file to flag the end of the FORECAST

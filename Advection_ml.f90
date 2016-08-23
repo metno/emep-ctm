@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -119,6 +119,7 @@
 !  public :: adv_int
 
   private :: advvk
+  private :: adv_vert_zero
   private :: advx
   private :: advy
   private :: preadvx
@@ -151,7 +152,7 @@
     implicit none
     real, intent(in) ::GRIDWIDTH_M
 
-    if(GRIDWIDTH_M>76000.0) dt_advec=1800.0
+    dt_advec=1800.0
     if(GRIDWIDTH_M<61000.0) dt_advec=1200.0
     if(GRIDWIDTH_M<21000.0) dt_advec= 900.0
     if(GRIDWIDTH_M<11000.0) dt_advec= 600.0
@@ -1544,7 +1545,10 @@
              ! perform only vertical advection
              do j = lj0,lj1
                 do i = li0,li1
+!                   call adv_vert_zero(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
+!                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
                    call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
+
                 enddo
              enddo
              if(iters<niters .or. iterxys < niterxys)then
@@ -1652,6 +1656,8 @@
              ! perform only vertical advection
              do j = lj0,lj1
                 do i = li0,li1
+!                   call adv_vert_zero(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
+!                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
                    call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
                 enddo
              enddo
@@ -3277,6 +3283,7 @@
 !     integrated flux form
 
       ijn = ij+nint(0.5*(1.-ijn1))
+
       flux(:,ij) = max(0.,xn_adv(:,(ijn+2)*MAXLIMAX)*zzfc(5,ij)        &
                         + xn_adv(:,(ijn+1)*MAXLIMAX)*zzfc(4,ij)        &
                         + xn_adv(:, ijn   *MAXLIMAX)*zzfc(3,ij)        &
@@ -4184,5 +4191,473 @@
     allocate(alfnew(9,2:KMAX_MID,0:1))
 
   end subroutine alloc_adv_arrays
+
+
+
+  subroutine adv_vert_zero(xn_adv,ps3d,sdot,dt_s)
+ !"zero order Bott" advection for vertical
+    implicit none
+
+!    input
+    real,intent(in)::  sdot(0:MAXLIMAX*MAXLJMAX*KMAX_BND-1),dt_s
+
+!    input+output
+    real ,intent(inout):: xn_adv(NSPEC_ADV,0:MAXLIMAX*MAXLJMAX*KMAX_MID-1)
+    real ,intent(inout):: ps3d(0:MAXLIMAX*MAXLJMAX*KMAX_MID-1)
+   
+    real :: fluxk(NSPEC_ADV,KMAX_MID),fluxps(KMAX_MID),fc(KMAX_MID)
+    integer :: k
+
+    do k = 1,KMAX_MID-1
+      fc(k) = sdot(k*MAXLIMAX*MAXLJMAX)*dt_s
+    enddo
+
+!dhs1(k+1) is thickness of layer k
+!concentrations and thickness from upwind cell
+    do k = 1,KMAX_MID-1
+       if(fc(k).lt.0.)then
+          fluxk(:,k) = xn_adv(:,k*MAXLIMAX*MAXLJMAX) * fc(k)
+          fluxps(k) = ps3d(k*MAXLIMAX*MAXLJMAX) * fc(k)
+       else
+          fluxk(:,k) = xn_adv(:,(k-1)*MAXLIMAX*MAXLJMAX) * fc(k)  
+          fluxps(k) = ps3d((k-1)*MAXLIMAX*MAXLJMAX) * fc(k)  
+       endif
+    enddo
+
+    k=0
+    xn_adv(:,k*MAXLIMAX*MAXLJMAX)=max(0.0,xn_adv(:,k*MAXLIMAX*MAXLJMAX)+(-fluxk(:,k+1))*dhs1i(k+2))
+    ps3d(k*MAXLIMAX*MAXLJMAX)=max(0.0,ps3d(k*MAXLIMAX*MAXLJMAX)+(-fluxps(k+1))*dhs1i(k+2))
+    do k = 1,KMAX_MID-2
+       if(xn_adv(1,k*MAXLIMAX*MAXLJMAX)+(fluxk(1,k)-fluxk(1,k+1))*dhs1i(k+2)<0.0)then
+       write(*,*)'PWPW a',me,k,xn_adv(1,k*MAXLIMAX*MAXLJMAX)+(fluxk(1,k)-fluxk(1,k+1))*dhs1i(k+2),xn_adv(1,k*MAXLIMAX*MAXLJMAX),fluxk(1,k),-fluxk(1,k+1),dhs1i(k+2)
+       stop
+       endif
+       xn_adv(:,k*MAXLIMAX*MAXLJMAX)=max(0.0,xn_adv(:,k*MAXLIMAX*MAXLJMAX)+(fluxk(:,k)-fluxk(:,k+1))*dhs1i(k+2))
+       if(ps3d(k*MAXLIMAX*MAXLJMAX)+(fluxps(k)-fluxps(k+1))*dhs1i(k+2)<0.0001)then
+          write(*,*)'PWPW ',me,ps3d(k*MAXLIMAX*MAXLJMAX)+(fluxps(k)-fluxps(k+1))*dhs1i(k+2),ps3d(k*MAXLIMAX*MAXLJMAX),(fluxps(k)),-fluxps(k+1),dhs1i(k+2)
+          stop
+       endif
+       ps3d(k*MAXLIMAX*MAXLJMAX)=max(0.0,ps3d(k*MAXLIMAX*MAXLJMAX)+(fluxps(k)-fluxps(k+1))*dhs1i(k+2))
+    enddo
+    k=KMAX_MID-1
+    xn_adv(:,k*MAXLIMAX*MAXLJMAX)=max(0.0,xn_adv(:,k*MAXLIMAX*MAXLJMAX)+(fluxk(:,k))*dhs1i(k+2))
+    ps3d(k*MAXLIMAX*MAXLJMAX)=max(0.0,ps3d(k*MAXLIMAX*MAXLJMAX)+(fluxps(k))*dhs1i(k+2))
+
+
+  end subroutine adv_vert_zero
+
+
+  subroutine adv_vert_fourth(xn_adv,ps3d,sdot,dt_s)
+ !"4th order Bott" advection for vertical
+    implicit none
+
+!    input
+    integer :: STRIDE
+    real,intent(in)::  sdot(0:MAXLIMAX*MAXLJMAX*KMAX_BND-1),dt_s
+
+!    input+output
+    real ,intent(inout):: xn_adv(NSPEC_ADV,MAXLIMAX*MAXLJMAX:MAXLIMAX*MAXLJMAX*KMAX_MID)
+    real ,intent(inout):: ps3d(MAXLIMAX*MAXLJMAX:MAXLIMAX*MAXLJMAX*KMAX_MID)
+   
+    integer :: k
+
+    integer ij, ijn,ijll
+    integer limtlow,limthig
+    integer lijb,lije
+    real ijn1,dth
+    real x1, x2, hh3,hh4
+    real y0,y1,y2,y3
+    real zzfc(5,-1:KMAX_MID+1)
+    real fc(-1:KMAX_MID+1)
+    real flux(NSPEC_ADV,-1:KMAX_MID+1)
+    real fluxps(-1:KMAX_MID+1)
+    real hel1(NSPEC_ADV),hel2(NSPEC_ADV)
+    real hel1ps,hel2ps
+    integer ijpasses
+    integer ijb1(KMAX_MID),ije1(KMAX_MID)
+    integer ijb2(KMAX_MID),ije2(KMAX_MID),ijb3(KMAX_MID)
+    logical ijdoend
+    integer kstart,kend
+    real,dimension(NSPEC_ADV,3) :: xnbeg,xnend  
+    real,dimension(3)           :: psbeg,psend  
+    real ::xm(0:KMAX_MID),xmi(0:KMAX_MID)
+
+!-----------------------------------------------------------------------
+    STRIDE=MAXLIMAX*MAXLJMAX
+!    xnbeg(:,1)= 2*xn_adv(:,STRIDE)-xn_adv(:,2*STRIDE)
+!    xnbeg(:,2)= 3*xn_adv(:,STRIDE)-2*xn_adv(:,2*STRIDE)
+!    xnbeg(:,3)= 4*xn_adv(:,STRIDE)-3*xn_adv(:,2*STRIDE)
+!    psbeg(1)=2*ps3d(STRIDE)-ps3d(2*STRIDE)
+!    psbeg(2)=3*ps3d(STRIDE)-2*ps3d(2*STRIDE)
+!    psbeg(3)=4*ps3d(STRIDE)-3*ps3d(2*STRIDE)
+    xnbeg(:,1)= xn_adv(:,STRIDE)
+    xnbeg(:,2)= xnbeg(:,1)
+    xnbeg(:,3)= xnbeg(:,1)
+    psbeg(:)=ps3d(STRIDE)
+
+    xnend(:,1)=xn_adv(:,STRIDE*KMAX_MID)
+    xnend(:,2)=xnend(:,1)
+    xnend(:,3)=xnend(:,1)
+    psend(:)=ps3d(STRIDE*KMAX_MID)
+
+    do k=0,KMAX_MID
+       xm(k)=dhs1i(k+1)/KMAX_MID
+       xmi(k)=1.0/xm(k)
+    enddo
+
+!    xm=1.0
+!    xmi=1.0
+
+    kstart=1
+    kend=KMAX_MID
+    limtlow = kstart-1
+    limthig = kend
+    dth=dt_s*KMAX_MID ! 1/KMAX_MID = vertical resolution in eta coordinates (average)
+
+    do 10 ij = kstart-1,kend
+!      fc(ij) = vel(ij*STRIDE)*dth
+      fc(ij) = sdot(ij*STRIDE)*dth
+
+      fc(ij) = min( 1.0, fc(ij))
+      fc(ij) = max(-1.0, fc(ij))
+
+      ijn1 = sign(1.,fc(ij))
+      ijn = ij + nint(0.5*(1-ijn1))
+
+      y0 = ijn1*fc(ij)
+      x1 = 1.-2.*y0*xm(ijn)
+      x2 = x1*x1
+      y3 = xmi(ijn)*(1.-x2)/3840.
+      y1 = 5.*ijn1*y3
+      y2 = x1*y3
+      hh3 = (116.-4.*x2)*y2
+      hh4 = (66.-2.*x2)*y1
+      zzfc(3,ij) = y0 - (214.-6.*x2)*y2
+      zzfc(5,ij) = (y2+y1)*(x2-9.)
+      zzfc(1,ij) = (y2-y1)*(x2-9.)
+      zzfc(4,ij) = hh3+hh4
+      zzfc(2,ij) = hh3-hh4
+
+10    continue
+
+
+
+!------- boundary treatment -----------------------------------------
+
+!        helping values at the boundaries are found by linear
+!        extrapolation in cases of outflow, and by assuming constant
+!        values in inflow cases.
+
+!        calculate the coefficients in the polynomial, the
+!        normalized fluxes, and limit them for positivness
+        flux(:,0) = 0.0
+        fluxps(0) = 0.0
+
+!     integrated flux form
+
+    if(fc(kstart).ge.0.)then
+      flux(:,kstart) = max(0.,xn_adv(:,(kstart+2)*STRIDE)*zzfc(5,kstart)       &
+                         + xn_adv(:,(kstart+1)*STRIDE)*zzfc(4,kstart)       &
+                         + xn_adv(:, kstart   *STRIDE)*zzfc(3,kstart)       &
+                         + xnbeg(:,3)                *zzfc(2,kstart)       &
+                         + xnbeg(:,2)                *zzfc(1,kstart))
+      fluxps(kstart) = max(0.,ps3d((kstart+2)*STRIDE)*zzfc(5,kstart)           &
+                         + ps3d((kstart+1)*STRIDE)*zzfc(4,kstart)           &
+                         + ps3d( kstart   *STRIDE)*zzfc(3,kstart)           &
+                         + psbeg(3)              *zzfc(2,kstart)           &
+                         + psbeg(2)              *zzfc(1,kstart))
+    else
+      flux(:,kstart) = max(0.,xn_adv(:,(kstart+3)*STRIDE)*zzfc(5,kstart)       &
+                         + xn_adv(:,(kstart+2)*STRIDE)*zzfc(4,kstart)       &
+                         + xn_adv(:,(kstart+1)*STRIDE)*zzfc(3,kstart)       &
+                         + xn_adv(:, kstart   *STRIDE)*zzfc(2,kstart)       &
+                         + xnbeg(:,3)                *zzfc(1,kstart))
+      fluxps(kstart) = max(0.,ps3d((kstart+3)*STRIDE)*zzfc(5,kstart)           &
+                         + ps3d((kstart+2)*STRIDE)*zzfc(4,kstart)           &
+                         + ps3d((kstart+1)*STRIDE)*zzfc(3,kstart)           &
+                         + ps3d( kstart   *STRIDE)*zzfc(2,kstart)           &
+                         + psbeg(3)              *zzfc(1,kstart))
+    endif
+
+    if(fc(kstart+1).ge.0.)then
+
+!     integrated flux form
+
+      flux(:,kstart+1) = max(0.,xn_adv(:,(kstart+3)*STRIDE)*zzfc(5,kstart+1)   &
+                           + xn_adv(:,(kstart+2)*STRIDE)*zzfc(4,kstart+1)   &
+                           + xn_adv(:,(kstart+1)*STRIDE)*zzfc(3,kstart+1)   &
+                           + xn_adv(:, kstart   *STRIDE)*zzfc(2,kstart+1)   &
+                           + xnbeg(:,3)                *zzfc(1,kstart+1))
+      fluxps(kstart+1) = max(0.,ps3d((kstart+3)*STRIDE)*zzfc(5,kstart+1)      &
+                           + ps3d((kstart+2)*STRIDE)*zzfc(4,kstart+1)      &
+                           + ps3d((kstart+1)*STRIDE)*zzfc(3,kstart+1)      &
+                           + ps3d( kstart   *STRIDE)*zzfc(2,kstart+1)      &
+                           + psbeg(3)              *zzfc(1,kstart+1))
+    endif
+
+
+    lijb = kstart+2
+    if(fc(kstart+1).lt.0.)lijb = kstart+1
+    lije = kend-3
+    if(fc(kend-2).ge.0.)lije = kend-2
+
+    do ij = lijb,lije
+
+      ijn1 = sign(1.,fc(ij))
+
+!     integrated flux form
+
+      ijn = ij+nint(0.5*(1.-ijn1))
+
+      flux(:,ij) = max(0.,xn_adv(:,(ijn+2)*STRIDE)*zzfc(5,ij)        &
+                        + xn_adv(:,(ijn+1)*STRIDE)*zzfc(4,ij)        &
+                        + xn_adv(:, ijn   *STRIDE)*zzfc(3,ij)        &
+                        + xn_adv(:,(ijn-1)*STRIDE)*zzfc(2,ij)        &
+                        + xn_adv(:,(ijn-2)*STRIDE)*zzfc(1,ij))
+      fluxps(ij) = max(0.,ps3d((ijn+2)*STRIDE)*zzfc(5,ij)            &
+                        + ps3d((ijn+1)*STRIDE)*zzfc(4,ij)            &
+                        + ps3d( ijn   *STRIDE)*zzfc(3,ij)            &
+                        + ps3d((ijn-1)*STRIDE)*zzfc(2,ij)            &
+                        + ps3d((ijn-2)*STRIDE)*zzfc(1,ij))
+
+    enddo
+
+    if(fc(kend-2).lt.0.)then
+
+!     integrated flux form
+
+
+      flux(:,kend-2) = max(0.,xnend(:,1)                *zzfc(5,kend-2)   &
+                           + xn_adv(:, kend   *STRIDE)*zzfc(4,kend-2)   &
+                           + xn_adv(:,(kend-1)*STRIDE)*zzfc(3,kend-2)   &
+                           + xn_adv(:,(kend-2)*STRIDE)*zzfc(2,kend-2)   &
+                           + xn_adv(:,(kend-3)*STRIDE)*zzfc(1,kend-2))
+      fluxps(kend-2) = max(0.,psend(1)*zzfc(5,kend-2)                     &
+                           + ps3d( kend   *STRIDE)*zzfc(4,kend-2)       &
+                           + ps3d((kend-1)*STRIDE)*zzfc(3,kend-2)       &
+                           + ps3d((kend-2)*STRIDE)*zzfc(2,kend-2)       &
+                           + ps3d((kend-3)*STRIDE)*zzfc(1,kend-2))
+
+    endif
+
+!     integrated flux form
+
+    if(fc(kend-1).ge.0.)then
+
+      flux(:,kend-1) = max(0.,xnend(:,1)                *zzfc(5,kend-1)   &
+                           + xn_adv(:, kend   *STRIDE)*zzfc(4,kend-1)   &
+                           + xn_adv(:,(kend-1)*STRIDE)*zzfc(3,kend-1)   &
+                           + xn_adv(:,(kend-2)*STRIDE)*zzfc(2,kend-1)   &
+                           + xn_adv(:,(kend-3)*STRIDE)*zzfc(1,kend-1))
+      fluxps(kend-1) = max(0.,psend(1)    *zzfc(5,kend-1)                 &
+                           + ps3d( kend   *STRIDE)*zzfc(4,kend-1)       &
+                           + ps3d((kend-1)*STRIDE)*zzfc(3,kend-1)       &
+                           + ps3d((kend-2)*STRIDE)*zzfc(2,kend-1)       &
+                           + ps3d((kend-3)*STRIDE)*zzfc(1,kend-1))
+
+    else
+
+      flux(:,kend-1) = max(0.,xnend(:,2)      *zzfc(5,kend-1)             &
+                           + xnend(:,1)      *zzfc(4,kend-1)             &
+                           + xn_adv(:, kend   *STRIDE)*zzfc(3,kend-1)   &
+                           + xn_adv(:,(kend-1)*STRIDE)*zzfc(2,kend-1)   &
+                           + xn_adv(:,(kend-2)*STRIDE)*zzfc(1,kend-1))
+      fluxps(kend-1) = max(0.,psend(2)*zzfc(5,kend-1)                     &
+                           + psend(1)*zzfc(4,kend-1)                     &
+                           + ps3d(kend*STRIDE)*zzfc(3,kend-1)           &
+                           + ps3d((kend-1)*STRIDE)*zzfc(2,kend-1)       &
+                           + ps3d((kend-2)*STRIDE)*zzfc(1,kend-1))
+
+    endif
+
+!     integrated flux form
+
+    if(limthig.eq.kend)then
+      if(fc(kend).ge.0.)then
+
+        flux(:,kend) = max(0.,xnend(:,2)                *zzfc(5,kend)   &
+                           + xnend(:,1)                *zzfc(4,kend)   &
+                           + xn_adv(:, kend   *STRIDE)*zzfc(3,kend)   &
+                           + xn_adv(:,(kend-1)*STRIDE)*zzfc(2,kend)   &
+                           + xn_adv(:,(kend-2)*STRIDE)*zzfc(1,kend))
+        fluxps(kend) = max(0.,psend(2)*zzfc(5,kend)                     &
+                           + psend(1)              *zzfc(4,kend)       &
+                           + ps3d( kend   *STRIDE)*zzfc(3,kend)       &
+                           + ps3d((kend-1)*STRIDE)*zzfc(2,kend)       &
+                           + ps3d((kend-2)*STRIDE)*zzfc(1,kend))
+
+      else
+
+        flux(:,kend) = max(0.,xnend(:,3)                *zzfc(5,kend)   &
+                           + xnend(:,2)                *zzfc(4,kend)   &
+                           + xnend(:,1)                *zzfc(3,kend)   &
+                           + xn_adv(:, kend   *STRIDE)*zzfc(2,kend)   &
+                           + xn_adv(:,(kend-1)*STRIDE)*zzfc(1,kend))
+        fluxps(kend) = max(0.,psend(3)              *zzfc(5,kend)       &
+                           + psend(2)              *zzfc(4,kend)       &
+                           + psend(1)              *zzfc(3,kend)       &
+                           + ps3d( kend   *STRIDE)*zzfc(2,kend)       &
+                           + ps3d((kend-1)*STRIDE)*zzfc(1,kend))
+
+      endif
+
+
+    endif
+
+    if(limtlow.eq.-1)then
+    else
+      if(fc(kstart-1).ge.0.) then
+        flux(:,kstart-1) = min(xnbeg(:,3)*xmi(kstart-1),flux(:,kstart-1))
+        fluxps(kstart-1) = min(psbeg(3)*xmi(kstart-1),fluxps(kstart-1))
+        ij = kstart
+      else
+        if(fc(kstart).lt.0.) then
+          flux(:,kstart-1)=-min(xn_adv(:,kstart*STRIDE)*xmi(kstart),flux(:,kstart-1))
+          fluxps(kstart-1)=-min(ps3d(kstart*STRIDE)*xmi(kstart),fluxps(kstart-1))
+          ij = kstart
+        else
+          hel1(:) = xn_adv(:,kstart*STRIDE)*xmi(kstart)
+          hel2(:) = flux(:,kstart) +  flux(:,kstart-1)
+          where(hel1(:).lt.hel2(:))
+            flux(:,kstart-1) =-flux(:,kstart-1)*hel1(:)/(hel2(:)+1.0E-100)
+            flux(:,kstart)   = flux(:,kstart)  *hel1(:)/(hel2(:)+1.0E-100)
+            xn_adv(:,kstart*STRIDE) = 0.
+          elsewhere
+            flux(:,kstart-1) =-flux(:,kstart-1)
+            xn_adv(:,kstart*STRIDE) =xm(kstart)*(hel1(:)-hel2(:))
+          end where
+          hel1ps = ps3d(kstart*STRIDE)*xmi(kstart)
+          hel2ps = fluxps(kstart) + fluxps(kstart-1)
+          if(hel1ps.lt.hel2ps)then
+            fluxps(kstart-1) =-fluxps(kstart-1)*hel1ps/hel2ps
+            fluxps(kstart)   = fluxps(kstart)  *hel1ps/hel2ps
+            ps3d(kstart*STRIDE) = 0.
+          else
+            fluxps(kstart-1) =-fluxps(kstart-1)
+            ps3d(kstart*STRIDE) =xm(kstart)*(hel1ps-hel2ps)
+          endif
+          ij = kstart+1
+        endif
+      endif
+    endif
+
+    ijpasses = 0
+    do while(.true.)
+
+      ijpasses = ijpasses+1
+      ijb1(ijpasses) = ij
+      ije1(ijpasses) = -5
+      do while(fc(ij).ge.0.)
+        ije1(ijpasses) = ij
+        ij = ij+1
+        if(ij.gt.kend-1)then
+          ijb2(ijpasses) = ij
+          ije2(ijpasses) = -5
+          ijb3(ijpasses) = -5
+          goto 257
+        endif
+      enddo
+      ijb2(ijpasses) = ij
+      ije2(ijpasses) = -5
+      do while(fc(ij+1).lt.0.)
+        ije2(ijpasses) = ij
+        ij = ij+1
+        if(ij.gt.kend-1)then
+          ijb3(ijpasses) = -5
+          goto 257
+        endif
+      enddo
+      ijb3(ijpasses) = ij
+      ij = ij+2
+      if(ij.gt.kend-1)goto 257
+    enddo
+
+257 continue
+    ijdoend = .false.
+    if(ij.eq.kend)ijdoend=.true.
+
+    do ijll = 1,ijpasses
+
+      do ij = ijb1(ijll),ije1(ijll)
+        flux(:,ij)= min(xn_adv(:,ij*STRIDE)*xmi(ij),flux(:,ij))
+        xn_adv(:,ij*STRIDE) =                                         &
+                    max(0.,xn_adv(:,ij*STRIDE)                        &
+                          -xm(ij)*(flux(:,ij)-flux(:,ij-1)))
+        fluxps(ij)= min(ps3d(ij*STRIDE)*xmi(ij),fluxps(ij))
+        ps3d(ij*STRIDE) =                                             &
+                    max(0.,ps3d(ij*STRIDE)                            &
+                          -xm(ij)*(fluxps(ij)-fluxps(ij-1)))
+      enddo
+      do ij = ijb2(ijll),ije2(ijll)
+        flux(:,ij)=-min(xn_adv(:,(ij+1)*STRIDE)*xmi(ij+1),flux(:,ij))
+        xn_adv(:,ij*STRIDE) =                                         &
+                    max(0.,xn_adv(:,ij*STRIDE)                        &
+                          -xm(ij)*(flux(:,ij)-flux(:,ij-1)))
+        fluxps(ij)=-min(ps3d((ij+1)*STRIDE)*xmi(ij+1),fluxps(ij))
+        ps3d(ij*STRIDE) =                                             &
+                    max(0.,ps3d(ij*STRIDE)                            &
+                          -xm(ij)*(fluxps(ij)-fluxps(ij-1)))
+      enddo
+      ij = ijb3(ijll)
+      if(ij.lt.-3) goto 357
+      hel1(:) = xn_adv(:,(ij+1)*STRIDE)*xmi(ij+1)
+      hel2(:) = flux(:,ij+1) +  flux(:,ij)
+      where(hel1(:).lt.hel2(:))
+!On IBM machine the division can give overflow if hel2 is too small
+        flux(:,ij)   =-flux(:,ij)  *hel1(:)/(hel2(:)+1.0E-100)
+        flux(:,ij+1) = flux(:,ij+1)*hel1(:)/(hel2(:)+1.0E-100)
+        xn_adv(:,(ij+1)*STRIDE) = 0.
+      elsewhere
+        flux(:,ij)   =-flux(:,ij)
+        xn_adv(:,(ij+1)*STRIDE) = xm(ij+1)*(hel1(:)-hel2(:))
+      end where
+      xn_adv(:,ij*STRIDE) =                                           &
+                    max(0.,xn_adv(:,ij*STRIDE)                        &
+                          -xm(ij)*(flux(:,ij)-flux(:,ij-1)))
+      hel1ps = ps3d((ij+1)*STRIDE)*xmi(ij+1)
+      hel2ps = fluxps(ij+1) +  fluxps(ij)
+      if(hel1ps.lt.hel2ps)then
+        fluxps(ij)   =-fluxps(ij)  *hel1ps/hel2ps
+        fluxps(ij+1) = fluxps(ij+1)*hel1ps/hel2ps
+        ps3d((ij+1)*STRIDE) = 0.
+      else
+        fluxps(ij) = -fluxps(ij)
+        ps3d((ij+1)*STRIDE) = xm(ij+1)*(hel1ps-hel2ps)
+      endif
+    ps3d(ij*STRIDE) =                                                 &
+                    max(0.,ps3d(ij*STRIDE)                            &
+                          -xm(ij)*(fluxps(ij)-fluxps(ij-1)))
+    enddo
+
+357 continue
+
+    if(ijdoend)then
+
+        if(fc(kend).ge.0.) then
+          flux(:,kend) =                                                 &
+                    min(xn_adv(:,kend*STRIDE)*xmi(kend),flux(:,kend))
+          xn_adv(:,kend*STRIDE) =                                      &
+                    max(0.,xn_adv(:,kend*STRIDE)                       &
+                          -xm(kend)*(flux(:,kend)-flux(:,kend-1)))
+          fluxps(kend) =                                                 &
+                    min(ps3d(kend*STRIDE)*xmi(kend),fluxps(kend))
+          ps3d(kend*STRIDE) =                                          &
+                    max(0.,ps3d(kend*STRIDE)                           &
+                          -xm(kend)*(fluxps(kend)-fluxps(kend-1)))
+        else
+          flux(:,kend)=                                                  &
+                   -min(xnend(:,1)*xmi(kend+1),flux(:,kend))
+          xn_adv(:,kend*STRIDE) =                                      &
+                    max(0.,xn_adv(:,kend*STRIDE)                       &
+                          -xm(kend)*(flux(:,kend)-flux(:,kend-1)))
+          fluxps(kend)=                                                  &
+                   -min(psend(1)*xmi(kend+1),fluxps(kend))
+          ps3d(kend*STRIDE) =                                          &
+                    max(0.,ps3d(kend*STRIDE)                           &
+                          -xm(kend)*(fluxps(kend)-fluxps(kend-1)))
+        endif
+    endif
+
+  end subroutine adv_vert_fourth
 
 end module Advection_ml

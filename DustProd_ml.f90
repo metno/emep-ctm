@@ -1,9 +1,8 @@
-! <DustProd_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <DustProd_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,21 +10,22 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
+! <DustProd_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
-
 
  module DustProd_ml
 
@@ -49,13 +49,12 @@
  use Biogenics_ml,         only : EmisNat, EMIS_BioNat
  use CheckStop_ml,         only : CheckStop
  use Functions_ml,         only : ERFfunc
-!CMR use ChemChemicals_ml,     only : species
  use ChemSpecs,            only : species
  use GridValues_ml,        only : glat, glon, glat_fdom, glon_fdom, i_fdom, j_fdom 
  use GridValues_ml,        only : debug_proc, debug_li, debug_lj
  use Io_ml,                only : PrintLog, datewrite
  use Landuse_ml,           only : LandCover, NLUMAX 
- use Landuse_ml,           only : water_fraction ! DSA12
+ use Landuse_ml,           only : water_fraction
  use LandDefs_ml,          only:  LandType
  use LocalVariables_ml,    only : Grid
  use MetFields_ml,         only : z_bnd, z_mid, u_ref, ustar_nwp, roa,    &
@@ -207,15 +206,12 @@
 !/.. No dust production when soil is frozen, or covered by snow,
 !/.. or wet (crude approximation by surface Rh)
 
-!DSA12 QUERY: Why "FROST" term?
-  !RV4TEST FROST: if ( Grid%t2C > 0.0 .and.  Grid%sdepth == 0.0 .and.  & 
   FROST: if ( Grid%t2C > SMALL    .and.  Grid%sdepth <  SMALL   .and.  & 
                                     rh(KMAX_MID) < 0.85)  then
 
     if(debug) write(6,'(a25,2f10.2,i4)')   &
           '>> FAVOURABLE for DUST>>', Grid%t2C, rh(KMAX_MID), Grid%sdepth 
 
-!DSA12
    if ( water_fraction(i,j)  > 0.99) then ! skip dust calcs
       if(DEBUG_DUST) call datewrite("DUST: Skip SEA! ", &
         (/ i_fdom(i), j_fdom(j) /), (/ fc(i,j), water_fraction(i,j) /) )
@@ -367,11 +363,12 @@
   if (lu == LU_DESERT)       then      ! ---------  desert -----
         soil_type = 'Saharan desert'
         z0 = 0.5e-4        !TEST
-        dust_lim = 0.5     ! 1.0
+        dust_lim = 0.3 ! rep15   ! 0.5 !- with my versions
         alfa = 2.0e-5 
  !//  European deserts: lat(gb), long (gl)
-     if ( (glat(i,j) > 36.0 .and. glon(i,j) < 0.0) .or.   &  
-          (glat(i,j) > 37.0 .and. glon(i,j) < 45.0) )    then 
+     if ( (glat(i,j) > 36.0 .and. glon(i,j) < 0.0) .or.   & 
+          (glat(i,j) > 34.0 .and. glon(i,j) < 45.0) )    then 
+!rep15          (glat(i,j) > 37.0 .and. glon(i,j) < 45.0) )    then 
         soil_type = 'European Arid'
         z0 = 0.5e-4        !TEST
         dust_lim = 0.05

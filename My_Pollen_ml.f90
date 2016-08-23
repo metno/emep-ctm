@@ -1,7 +1,7 @@
-! <My_Pollen_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <My_Pollen_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,32 +34,31 @@
 ! Pollen particles are assumed of 22 um diameter and 800 kg/m3 density. 
 !-----------------------------------------------------------------------!
 module Pollen_const_ml
-  use PhysicalConstants_ml, only: PI
-  use ModelConstants_ml,    only: USE_POLLEN,DEBUG=>DEBUG_POLLEN
-!CRM  use ChemChemicals_ml,     only: species_adv
-  use ChemSpecs,            only: species_adv
-  use CheckStop_ml,         only: CheckStop
-  implicit none
-  public
+use PhysicalConstants_ml, only: PI
+use ModelConstants_ml,    only: USE_POLLEN,DEBUG=>DEBUG_POLLEN
+use ChemSpecs,            only: species_adv
+use CheckStop_ml,         only: CheckStop
+implicit none
+public
 
-  real, parameter :: &
-    D_POLL   = 22e-6,     & ! Pollen grain diameter [m]
-    POLL_DENS= 800e3        ! Pollen density [g/m3]
+real, parameter :: &
+  D_POLL   = 22e-6,     & ! Pollen grain diameter [m]
+  POLL_DENS= 800e3        ! Pollen density [g/m3]
 
-  real, parameter :: &
-    grain_wt = POLL_DENS*PI*D_POLL**3/6.0, &  ! 1 grain weight [g]
-    ug2grains= 1e-6/grain_wt                  ! # grains in 1 ug
+real, parameter :: &
+  grain_wt = POLL_DENS*PI*D_POLL**3/6.0, &  ! 1 grain weight [g]
+  ug2grains= 1e-6/grain_wt                  ! # grains in 1 ug
 
 contains
 
-subroutine pollen_check()
-  logical,save :: fist_call=.true.
-  if(.not.fist_call)return
-  fist_call=.false.
-  call CheckStop(USE_POLLEN.and.all(species_adv(:)%name/="POLLEN_B"),&
-    "USE_POLLEN on model compiled without pollen")
-  call CheckStop(DEBUG.and..not.USE_POLLEN,&
-    "DEBUG_POLLEN on run without USE_POLLEN")
+subroutine pollen_check(igrp)
+  integer, intent(out), optional :: igrp
+  logical,save :: first_call=.true.
+  if(present(igrp))igrp=-1
+  if(.not.first_call)return
+  first_call=.false.
+  call CheckStop(USE_POLLEN.or.DEBUG,&
+    "USE_POLLEN/DEBUG_POLLEN on model compiled without pollen modules")
 endsubroutine pollen_check
 endmodule Pollen_const_ml
 !-----------------------------------------------------------------------!
@@ -76,7 +75,7 @@ module Pollen_ml
   implicit none
   public:: pollen_flux,pollen_dump,pollen_read,pollen_check
 
-  real,public,save, allocatable,dimension(:,:) :: &
+  real,public,save, allocatable,dimension(:,:,:) :: &
     AreaPOLL,     & ! emission of pollen 
     heatsum,      & ! heatsum, needs to be remembered for forecast
     pollen_left     ! amount of pollen left in catkins, relative amount... 0:sr 1:end 

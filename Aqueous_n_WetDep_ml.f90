@@ -1,8 +1,7 @@
-! <Aqueous_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <Aqueous_n_WetDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +25,6 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
 module Aqueous_ml
-
 !-----------------------------------------------------------------------
 ! Aqueous scavenging and cloud-processing routines.
 !
@@ -57,71 +55,67 @@ module Aqueous_ml
 !    model. Atm.  Env. Vol. 33, pp.2853-2879.
 !-----------------------------------------------------------------------
 
-  use My_Derived_ml,    only: WDEP_WANTED ! Which outputs wanted!
-  use My_Derived_ml,    only: nWDEP => nOutputWdep ! number WDEP used
-  use CheckStop_ml,     only: CheckStop
-  use ChemSpecs                 
-!CMR  use ChemSpecs_tot_ml
-!CMR  use ChemSpecs_adv_ml          ! IXADV_SO2, IXADV_SO4, etc.
-!CMR  use ChemSpecs_shl_ml, only: NSPEC_SHL
-!CMR  use ChemChemicals_ml, only: species_adv
-  use ChemGroups_ml,    only: ChemGroups
-  use DerivedFields_ml, only: f_2d, d_2d     ! Contains Wet deposition fields
-  use GridValues_ml,    only: gridwidth_m,xm2,dA,dB
-  use Io_ml,            only: IO_DEBUG, datewrite
-  use MassBudget_ml,    only : wdeploss,totwdep
-  use ModelConstants_ml,only: &
-      CHEMTMIN, CHEMTMAX      &       ! -> range of temperature
-     ,MasterProc              &
-     ,DEBUG   &  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH &
-     ,KMAX_MID                &       ! -> ground, k=20
-     ,KUPPER                  &       ! -> top of cloud-chemistry, k=6
-     ,KCHEMTOP                &       ! -> top of chemistry, now k=2
-     ,dt => dt_advec          &       ! -> model timestep
-     ,IOU_INST                &       ! Index: instantaneous values
-     ,ATWAIR                           ! -> atw. air
-  use MetFields_ml,       only: pr, roa, z_bnd, cc3d, lwc
-  use MetFields_ml,       only: ps
-  use OrganicAerosol_ml,  only: ORGANIC_AEROSOLS
-  use OwnDataTypes_ml,    only: depmap  ! has adv, calc, vg
-  use Par_ml,             only: limax,ljmax, me,li0,li1,lj0,lj1
-  use PhysicalConstants_ml,only: GRAV,AVOG,  &     ! "g" & Avogadro's No.
-                                 RGAS_ATML,RGAS_J  ! Gas-constant
-  use Setup_1dfields_ml,  only: xn_2d, amk, Fpart, Fgas, &
-                                temp, itemp        ! temperature (K)
-  use SmallUtils_ml,      only: find_index
-  use Units_ml,           only: Group_Scale,group_umap
+use My_Derived_ml,    only: WDEP_WANTED ! Which outputs wanted!
+use My_Derived_ml,    only: nWDEP => nOutputWdep ! number WDEP used
+use CheckStop_ml,     only: CheckStop
+use ChemSpecs                 
+use ChemGroups_ml,    only: ChemGroups
+use DerivedFields_ml, only: f_2d, d_2d     ! Contains Wet deposition fields
+use GridValues_ml,    only: gridwidth_m,xm2,dA,dB
+use Io_ml,            only: IO_DEBUG, datewrite
+use MassBudget_ml,    only : wdeploss,totwdep
+use ModelConstants_ml,only: &
+    CHEMTMIN, CHEMTMAX      &       ! -> range of temperature
+   ,MasterProc              &
+   ,DEBUG   &  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH &
+   ,KMAX_MID                &       ! -> ground, k=20
+   ,KUPPER                  &       ! -> top of cloud-chemistry, k=6
+   ,KCHEMTOP                &       ! -> top of chemistry, now k=2
+   ,dt => dt_advec          &       ! -> model timestep
+   ,IOU_INST                        ! Index: instantaneous values
+use MetFields_ml,       only: pr, roa, z_bnd, cc3d, lwc
+use MetFields_ml,       only: ps
+use OrganicAerosol_ml,  only: ORGANIC_AEROSOLS
+use OwnDataTypes_ml,    only: depmap  ! has adv, calc, vg
+use Par_ml,             only: limax,ljmax, me,li0,li1,lj0,lj1
+use PhysicalConstants_ml,only: GRAV,AVOG,  &    ! "g" & Avogadro's No.
+                               ATWAIR,&         ! Mol. weight of air(Jones,1992)
+                               RGAS_ATML,RGAS_J ! Gas-constant
+use Setup_1dfields_ml,  only: xn_2d, amk, Fpart, Fgas, &
+                              temp, itemp        ! temperature (K)
+use SmallUtils_ml,      only: find_index
+use Units_ml,           only: Group_Scale,group_umap
 
-  implicit none
-  private
+implicit none
+private
 
 ! Subroutines:
-  public :: Init_WetDep       ! Call from Unimod
-  public :: WetDep_Budget     ! called here
-  public :: init_aqueous
-  public :: Setup_Clouds      ! characterises clouds and calls WetDeposition if rain
-  public :: WetDeposition     ! simplified setup_wetdep
-  private:: tabulate_aqueous
-  private:: get_frac
-  private:: setup_aqurates
+public :: Init_WetDep       ! Call from Unimod
+public :: WetDep_Budget     ! called here
+public :: init_aqueous
+public :: Setup_Clouds      ! characterises clouds and calls WetDeposition if rain
+public :: WetDeposition     ! simplified setup_wetdep
+private:: tabulate_aqueous
+private:: get_frac
+private:: setup_aqurates
 
 ! Outputs:
-  logical, public, save,allocatable, dimension(:) :: &
-    incloud              ! True for in-cloud k values
+logical, public, save,allocatable, dimension(:) :: &
+  incloud              ! True for in-cloud k values
 ! Variables used in module:
-  real, private, save,allocatable, dimension(:) :: &
-    pr_acc                  ! Accumulated precipitation
+real, private, save,allocatable, dimension(:) :: &
+  pr_acc                  ! Accumulated precipitation
 !hf NEW (here for debugging)
-  real, private, save,allocatable, dimension(:) :: &
-    pH,so4_aq,no3_aq,nh4_aq,nh3_aq,hso3_aq,so2_aq,so32_aq,co2_aq,hco3_aq   ! pH in cloud
+real, private, save,allocatable, dimension(:) :: &
+  pH,so4_aq,no3_aq,nh4_aq,nh3_aq,hso3_aq,so2_aq,so32_aq,co2_aq,hco3_aq   ! pH in cloud
 
-  integer, private, save  :: kcloudtop   ! k-level of highest-cloud
-  integer, private, save  :: ksubcloud   ! k-level just below cloud
+integer, private, save  :: kcloudtop   ! k-level of highest-cloud
+integer, private, save  :: ksubcloud   ! k-level just below cloud
 
-  real, private, parameter :: & ! Define limits for "cloud"
-    PR_LIMIT = 1.0e-7,  &      ! for accumulated precipitation
-    CW_LIMIT = 1.0e-10, &      ! for cloud water, kg(H2O)/kg(air)
-    B_LIMIT  = 1.0e-3         ! for cloud cover (fraction)
+real, private, parameter :: & ! Define limits for "cloud"
+  PR_LIMIT = 1.0e-7,  &      ! for accumulated precipitation
+  CW_LIMIT = 1.0e-10, &      ! for cloud water, kg(H2O)/kg(air)
+  B_LIMIT  = 1.0e-3         ! for cloud cover (fraction)
 
 !hf  real, private, save :: &      ! Set in init below
 !hf      INV_Hplus          &      ! = 1.0/Hplus       (1/H+)
@@ -131,42 +125,42 @@ module Aqueous_ml
 ! are calculated as effective. A factor K1fac = 1+K1/H+ is defined
 ! here also.
 
-  integer, public, parameter :: &
+integer, public, parameter :: &
 !hf pH
-    NHENRY  = 5, &  ! No. of species with Henry's law applied
-    NK1     = 1, &  ! No. of species needing effective Henry's calc.
-    IH_SO2  = 1, &
-    IH_H2O2 = 2, &
-    IH_O3   = 3, &
-    IH_NH3  = 4, &     !hf pH
-    IH_CO2  = 5
+  NHENRY  = 5, &  ! No. of species with Henry's law applied
+  NK1     = 1, &  ! No. of species needing effective Henry's calc.
+  IH_SO2  = 1, &
+  IH_H2O2 = 2, &
+  IH_O3   = 3, &
+  IH_NH3  = 4, &     !hf pH
+  IH_CO2  = 5
 ! Aqueous fractions:
-  real, save,allocatable, public,  dimension(:,:) :: frac_aq
-  real, private, dimension(NHENRY,CHEMTMIN:CHEMTMAX), save :: H
-  real, private, dimension(NK1,CHEMTMIN:CHEMTMAX),    save :: K1fac
+real, save,allocatable, public,  dimension(:,:) :: frac_aq
+real, private, dimension(NHENRY,CHEMTMIN:CHEMTMAX), save :: H
+real, private, dimension(NK1,CHEMTMIN:CHEMTMAX),    save :: K1fac
 !hf NEW
-  real, private, dimension(CHEMTMIN:CHEMTMAX), save :: &
-    K1,           & ! K for SO2->HSO3-
-    K2,           & ! HSO3->SO32-
-    Knh3,         & ! NH3+H20-> NH4+
-    Kw,           & ! K for water
-    Kco2
+real, private, dimension(CHEMTMIN:CHEMTMAX), save :: &
+  K1,           & ! K for SO2->HSO3-
+  K2,           & ! HSO3->SO32-
+  Knh3,         & ! NH3+H20-> NH4+
+  Kw,           & ! K for water
+  Kco2
 ! Aqueous reaction rates for usage in gas-phase chemistry:
-  integer, private, parameter :: &
-    NAQUEOUS = 4, & ! No. aqueous rates
-    NAQRC    = 3    ! No. constant rates
+integer, private, parameter :: &
+  NAQUEOUS = 4, & ! No. aqueous rates
+  NAQRC    = 3    ! No. constant rates
 
-  real, public, save,allocatable, dimension(:,:) :: aqrck
-  real, private, dimension(NAQRC), save :: aqrc ! constant rates for
-                                                ! so2 oxidn.
-  real, private, dimension(2), save :: vw       ! constant rates for
-  logical, public,save :: prclouds_present      ! true if precipitating clouds
+real, public, save,allocatable, dimension(:,:) :: aqrck
+real, private, dimension(NAQRC), save :: aqrc ! constant rates for
+                                              ! so2 oxidn.
+real, private, dimension(2), save :: vw       ! constant rates for
+logical, public,save :: prclouds_present      ! true if precipitating clouds
 
-  integer, public, parameter :: &
-    ICLOHSO2  = 1, & ! for [oh] + [so2]
-    ICLRC1    = 2, & ! for [h2o2] + [so2]
-    ICLRC2    = 3, & ! for [o3] + [so2]
-    ICLRC3    = 4    ! for [o3] + [o2] (Fe catalytic)
+integer, public, parameter :: &
+  ICLOHSO2  = 1, & ! for [oh] + [so2]
+  ICLRC1    = 2, & ! for [h2o2] + [so2]
+  ICLRC2    = 3, & ! for [o3] + [so2]
+  ICLRC3    = 4    ! for [o3] + [o2] (Fe catalytic)
 
 ! Incloud scavenging: (only dependant on precipitation (not cloud water)
 !-----------------------------------------------------------------------
@@ -204,26 +198,26 @@ module Aqueous_ml
 
 
 ! ------------ WetDep initialisation (old My_WetDep --------------
-  type, public :: WScav
-    real :: W_sca       ! Scavenging ratio/z_Sca/rho = W_sca/1.0e6
-    real :: W_sub       ! same for subcloud
-  endtype WScav
+type, public :: WScav
+  real :: W_sca       ! Scavenging ratio/z_Sca/rho = W_sca/1.0e6
+  real :: W_sub       ! same for subcloud
+endtype WScav
 
-  integer, public, parameter :: NWETDEP_CALC =  14 ! No. of solublity classes
+integer, public, parameter :: NWETDEP_CALC =  14 ! No. of solublity classes
 !  Note - these are for "master" or model species - they do not
 !  need to be present in the chemical scheme. However, the chemical
 !  scheme needs to define wet scavenging after these. If you would
 !  like other characteristics, add them here.
-  integer, parameter, public :: &
-    CWDEP_SO2  =  1, CWDEP_SO4  =  2, CWDEP_NH3  =  3, CWDEP_HNO3 =  4, &
-    CWDEP_H2O2 =  5, CWDEP_HCHO =  6, CWDEP_PMf  =  7, CWDEP_PMc  =  8, &
-    CWDEP_ECfn =  9, CWDEP_SSf  = 10, CWDEP_SSc  = 11, CWDEP_SSg  = 12, &
-    CWDEP_POLLw= 13, &
-    CWDEP_ROOH = 14   ! TEST!!
-  integer, parameter, public :: &
-    CWDEP_ASH1=CWDEP_PMf,CWDEP_ASH2=CWDEP_PMf,CWDEP_ASH3=CWDEP_PMf,&
-    CWDEP_ASH4=CWDEP_PMf,CWDEP_ASH5=CWDEP_PMc,CWDEP_ASH6=CWDEP_PMc,&
-    CWDEP_ASH7=CWDEP_PMc
+integer, parameter, public :: &
+  CWDEP_SO2  =  1, CWDEP_SO4  =  2, CWDEP_NH3  =  3, CWDEP_HNO3 =  4, &
+  CWDEP_H2O2 =  5, CWDEP_HCHO =  6, CWDEP_PMf  =  7, CWDEP_PMc  =  8, &
+  CWDEP_ECfn =  9, CWDEP_SSf  = 10, CWDEP_SSc  = 11, CWDEP_SSg  = 12, &
+  CWDEP_POLLw= 13, &
+  CWDEP_ROOH = 14   ! TEST!!
+integer, parameter, public :: &
+  CWDEP_ASH1=CWDEP_PMf,CWDEP_ASH2=CWDEP_PMf,CWDEP_ASH3=CWDEP_PMf,&
+  CWDEP_ASH4=CWDEP_PMf,CWDEP_ASH5=CWDEP_PMc,CWDEP_ASH6=CWDEP_PMc,&
+  CWDEP_ASH7=CWDEP_PMc
 
 !===========================================!
 ! Chemistry-dependent mapping:
@@ -232,23 +226,21 @@ module Aqueous_ml
 ! .... produced from GenChem, also with e.g.
 !integer, public, parameter ::  NWETDEP_ADV  = 14
 !===========================================!
-  include 'CM_WetDep.inc'
-!===========================================!
-!===========================================!
+include 'CM_WetDep.inc'
 !===========================================!
 
 ! And create an array to map from the "calc" to the advected species
 ! Use zeroth column to store number of species in that row
-  integer, public, dimension(NWETDEP_CALC,0:NWETDEP_ADV) :: Calc2adv
+integer, public, dimension(NWETDEP_CALC,0:NWETDEP_ADV) :: Calc2adv
 
 ! arrays for species and groups, e.g. SOX, OXN
-  integer, private, save :: nwgrp = 0, nwspec = 0  ! no. groups & specs
-  integer, private, allocatable, dimension(:), save :: wetGroup, wetSpec
-  type(group_umap), private, allocatable, dimension(:), target, save :: wetGroupUnits
+integer, private, save :: nwgrp = 0, nwspec = 0  ! no. groups & specs
+integer, private, allocatable, dimension(:), save :: wetGroup, wetSpec
+type(group_umap), private, allocatable, dimension(:), target, save :: wetGroupUnits
 
-  type(WScav), public, dimension(NWETDEP_CALC), save  :: WetDep
+type(WScav), public, dimension(NWETDEP_CALC), save  :: WetDep
 
-  integer, public, save  :: WDEP_PREC   ! Used in Aqueous_ml
+integer, public, save  :: WDEP_PREC   ! Used in Aqueous_ml
 contains
 
 subroutine Init_WetDep()

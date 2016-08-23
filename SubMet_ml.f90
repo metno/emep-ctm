@@ -1,9 +1,8 @@
-! <SubMet_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <SubMet_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,19 +10,21 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
+! <SubMet_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 module SubMet_ml
 !=============================================================================
@@ -40,7 +41,7 @@ use MetFields_ml, only : ps        !needed if FluxPROFILE == Ln95
 
 use BLPhysics_ml, only : MIN_USTAR_LAND
 use CheckStop_ml, only : CheckStop
-use LandDefs_ml,   only: LandType
+use LandDefs_ml,   only: LandType, LandDefs
 use Landuse_ml,    only: LandCover
 use LocalVariables_ml, only: Grid, SubDat
 use MicroMet_ml, only :  PsiM, AerRes    !functions
@@ -141,6 +142,11 @@ real :: theta2
 
         !if( USE_SOILWATER )
           Sub(iL)%fSW    = Grid%fSW ! MAR2013 - not needed, but for safety
+!GMO3
+  if( index( LandDefs(iL)%name , 'Irrigated' ) > 0 ) then
+    Sub(iL)%fSW = 1.0
+  end if
+!GMO3
 
      ! If NWP thinks this is a sea-square, but we anyway have land,
      ! the surface temps will be wrong and so will stability gradients.

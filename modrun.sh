@@ -1,20 +1,16 @@
-#!/bin/bash 
+#!/bin/bash
 
-# Minimalistic script to run the Unified EMEP model
-#-----------------------------------------------------
-# All input variables needed to run the model is now 
-# moved into config_emep.nml.   Edit this file for
-# iyr_trend, runlabel1, runlabel2, startdate, startdate
-# and the link to Meteorology data
-
+# Minimalistic script for run the Unified EMEP model
 
 # Link the input data
 inputdir=.
-ln -s $inputdir/input/* .   # Other input files
+met=$inputdir/meteo2013
+ln -s $inputdir/input/* .   # input files excpet metdata
+ln -s $met/DegreeDayFactors.nc .
 
 # Run the model
-mpiexec $inputdir/code/Unimod
+mpirun $inputdir/code/Unimod
 
-# Clean the links to the input data. 
-ls $inputdir/met  |xargs rm
-ls $inputdir/input|xargs rm
+# Clean the links to the input data and remove INPUT.PARA
+find . -type l -print0 | xargs -0 rm 
+

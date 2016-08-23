@@ -1,7 +1,7 @@
-! <MetFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <MetFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +26,7 @@
 !*****************************************************************************!
 module MetFields_ml
 
-  use ModelConstants_ml,    only : USE_CONVECTION,USE_SOILWATER
+  use ModelConstants_ml,    only : USE_CONVECTION,USE_SOILWATER,USE_WRF_MET_NAMES
 
   implicit none
   private
@@ -139,6 +139,8 @@ module MetFields_ml
        ,sdot     &! vertical velocity, sigma coords, 1/s
        ,Kz_met    ! vertical diffusivity in sigma coordinates from meteorology
 
+  real,target,public, save,allocatable, dimension(:,:,:,:) :: rain! used only by wrf met
+
 
   ! since pr,cc3d,cc3dmax,cnvuf,cnvdf used only for 1 time layer - define without NMET
   real,target,public, save,allocatable, dimension(:,:,:) :: &
@@ -186,6 +188,7 @@ module MetFields_ml
      u_ref             & ! wind speed m/s at 45m (real, not projected)
     ,rho_surf          & ! Surface density
     ,surface_precip    & ! Surface precip mm/hr
+    ,convective_precip & ! Convective precip mm/hr
     ,Tpot2m            & ! Potential temp at 2m
     ,ustar_nwp         & ! friction velocity m/s ustar^2 = tau/roa
     ,invL_nwp          & ! friction velocity m/s ustar^2 = tau/roa
@@ -206,6 +209,8 @@ module MetFields_ml
   real,target,public, save,allocatable, dimension(:,:) :: &   !st-dust
        clay_frac  &  ! clay fraction (%) in the soil
       ,sand_frac     ! sand fraction (%) in the soil
+  real,target,public, save,allocatable, dimension(:,:) :: &
+       surface_precip_old !precip from previous step for making differences (wrf)
 
   ! Different NWP outputs for soil water are possible. We can currently
   ! cope with two:
@@ -244,14 +249,15 @@ module MetFields_ml
     ,foundprecip= .false.    & ! false if no precipitationfrom meteorology
     ,foundcloudwater= .false.& !false if no cloudwater found
     ,foundSMI1= .true.& ! false if no Soil Moisture Index level 1 (shallow)
-    ,foundSMI3= .true. ! false if no Soil Moisture Index level 3 (deep)
+    ,foundSMI3= .true.& ! false if no Soil Moisture Index level 3 (deep)
+    ,foundrain= .false. ! false if no rain found or used
 
 ! specific indices of met
   integer, public, save   :: ix_u_xmj,ix_v_xmi, ix_q, ix_th, ix_sdot, ix_cc3d, ix_pr, ix_cw_met, ix_cnvuf, &
        ix_cnvdf, ix_Kz_met, ix_roa, ix_SigmaKz, ix_EtaKz, ix_Etadot, ix_cc3dmax, ix_lwc, ix_Kz_m2s, &
        ix_u_mid, ix_v_mid, ix_ps, ix_t2_nwp, ix_rh2m, ix_fh, ix_fl, ix_tau, ix_ustar_nwp, ix_sst, &
        ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_ice_nwp, ix_ws_10m, ix_surface_precip, &
-       ix_uw, ix_ue, ix_vs, ix_vn  
+       ix_uw, ix_ue, ix_vs, ix_vn, ix_convective_precip, ix_rain
 
   type,  public :: metfield
      character(len = 100) :: name = 'empty' !name as defined in external meteo file
@@ -271,13 +277,17 @@ module MetFields_ml
 
   integer, public, parameter   :: NmetfieldsMax=100 !maxnumber of metfields
   type(metfield),  public :: met(NmetfieldsMax)  !To put the metfirelds that need systematic treatment
+  type(metfield),  public :: derivmet(20)  !DSA15 To put the metfields derived from NWP, eg for output
   logical, target :: metfieldfound(NmetfieldsMax)=.false. !default for met(ix)%found 
   integer, public, save   :: Nmetfields! number of fields defined in met
   integer, public, save   :: N3Dmetfields! number of 3D fields defined in met
   real,target, public,save,allocatable, dimension(:,:,:) :: uw,ue
   real,target, public,save,allocatable, dimension(:,:,:) :: vs,vn
 
-
+  logical, public :: WRF_MET_CORRECTIONS = .false.
+  logical, public :: MET_SHORT = .true.!metfields are stored as "short" (integer*2 and scaling)
+  logical, public :: MET_C_GRID = .false.!true if u and v wind fields are in a C-staggered, larger grid.
+  logical, public :: MET_REVERSE_K = .false.!set true if met fields are stored with lowest k at surface
   public :: Alloc_MetFields !allocate arrays
 
 contains
@@ -809,6 +819,21 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   ix_surface_precip=ix
 
   ix=ix+1
+  met(ix)%name             = 'convective_precipitations'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .false.
+  met(ix)%read_meteo       = .false.
+  met(ix)%needed           = .true.
+  met(ix)%found            = .false.
+  allocate(convective_precip(MAXLIMAX,MAXLJMAX))
+  convective_precip=0.0
+  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:1)  => convective_precip
+  met(ix)%zsize = 1
+  met(ix)%msize = 1
+  ix_convective_precip=ix
+
+  ix=ix+1
   met(ix)%name             = 'neigbors_wind-uw'
   met(ix)%dim              = 2
   met(ix)%frequency        = 3
@@ -868,6 +893,54 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%msize = NMET
   ix_vn=ix
 
+
+if(USE_WRF_MET_NAMES)then
+   WRF_MET_CORRECTIONS = .true.
+   MET_C_GRID = .true.
+   MET_SHORT = .false. !metfields are stored as "float"
+   MET_REVERSE_K = .true.!reverse k coordinates when reading
+!names used in WRF metfiles
+!3D
+   met(ix_u_xmj)%name             = 'U' 
+   met(ix_v_xmi)%name             = 'V'
+   met(ix_q)%name                 = 'QVAPOR'
+   met(ix_th)%name                = 'T'
+   met(ix_cc3d)%name              = 'CLDFRA'
+   met(ix_cw_met)%name            = 'QCLOUD'
+
+!Use QRAIN to make 3D precip profiles from 2D. NB not accumulated, so cannot be used directly
+  ix=ix+1
+  met(ix)%name             = 'QRAIN'
+  met(ix)%dim              = 3
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .true.!to get new and old value stored
+  met(ix)%read_meteo       = .true.
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundrain
+  allocate(rain(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+  rain=0.0
+  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => rain
+  met(ix)%zsize = KMAX_MID
+  met(ix)%msize = 1
+  ix_rain=ix
+
+!2D
+   met(ix_surface_precip)%name    = 'RAINNC'
+   met(ix_convective_precip)%name = 'RAINC'
+   met(ix_ps)%name                = 'PSFC'
+   met(ix_t2_nwp)%name            = 'T2'
+   met(ix_fh)%name                = 'HFX'
+   met(ix_fl)%name                = 'LH'
+   met(ix_ustar_nwp)%name         = 'UST'
+   met(ix_sst)%name               = 'SST'
+   met(ix_ws_10m)%name            = 'U10'
+   met(ix_SoilWater_uppr)%name    = 'SMI1'!take first level. Do not change name! (name set in Getmeteofield)
+   met(ix_SoilWater_deep)%name    = 'SMI3'!take third level. Do not change name! (name set in Getmeteofield)
+   met(ix_sdepth)%name            = 'SNOWNC'!snow and ice in mm
+   met(ix_ice_nwp)%name           = 'SEAICE'!flag 0 or 1
+!... addmore
+endif
+
   Nmetfields=ix
   if(Nmetfields>NmetfieldsMax)then
      write(*,*)"Increase NmetfieldsMax! "
@@ -891,7 +964,8 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
     allocate(Idirect(MAXLIMAX, MAXLJMAX))
     allocate(clay_frac(MAXLIMAX, MAXLJMAX))
     allocate(sand_frac(MAXLIMAX, MAXLJMAX))
-
+    allocate(surface_precip_old(MAXLIMAX,MAXLJMAX))
+    surface_precip_old=0.0
 
   end subroutine Alloc_MetFields
 

@@ -1,7 +1,7 @@
-! <OutputChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <OutputChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@ use GridValues_ml,     only: debug_proc ,debug_li, debug_lj
 use My_Outputs_ml,     only: NBDATES, wanted_dates_inst,            &
                              Ascii3D_WANTED
 use Io_ml,             only: IO_WRTCHEM, datewrite
-use ModelConstants_ml, only: nprint, END_OF_EMEPDAY, KMAX_MID, MasterProc&
+use ModelConstants_ml, only: END_OF_EMEPDAY, KMAX_MID, MasterProc&
                             ,DEBUG => DEBUG_OUTPUTCHEM, METSTEP &
                             ,IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_MAX_MAX
 use NetCDF_ml,         only: CloseNetCDF, Out_netCDF
@@ -48,7 +48,7 @@ use TimeDate_ExtraUtil_ml,only: date2string
 
 implicit none
 
-!/* subroutines:
+!** subroutines:
 public :: Wrtchem
 public :: Output_fields   ! (iotyp)
 public :: wanted_iou      ! (iotyp, def%iotyp)
@@ -86,7 +86,6 @@ subroutine Wrtchem()
 
 !---------------------------------------------------------------------
 
-  if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
 
   nyear  = current_date%year
   nmonth = current_date%month
@@ -96,13 +95,14 @@ subroutine Wrtchem()
   dd_out = nday
   mm_out = nmonth
   Jan_1st    = all((/nyear,nmonth,nday/)==startdate(1:3))
-!  End_of_Run = ( mod(numt,nprint) == 0       )
 
 !this is a bit complicated because it must account for the fact that for instance 3feb24:00 = 4feb00:00 
   ts1=make_timestamp(current_date)
   ts2=make_timestamp(date(enddate(1),enddate(2),enddate(3),enddate(4),0))
   End_of_Run =  (nint(tdif_secs(ts1,ts2))<=0)
 
+  if((current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0)).and. &
+       .not. End_of_Run)return
   if(MasterProc .and. DEBUG) write(6,"(a12,i5,5i4)") "DAILY DD_OUT ",   &
        nmonth, mm_out, nday, dd_out, nhour
 

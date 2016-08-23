@@ -1,9 +1,8 @@
-! <Timing_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <Timing_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,20 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
 module My_Timing_ml
 !----------------------------------------------------------------------------
 !+
@@ -46,13 +45,14 @@ public :: Init_timing
 public :: Add_2timing   ! Calls Code_timer, adds times and descriptions to arrays
 public :: Output_timing ! Outputs
 
-integer, public, parameter                :: NTIMING=39+8
-real, public, dimension(NTIMING), save    :: mytimm       ! stores CPU-s
-real, public, dimension(NTIMING), save    :: lastptim     ! for final CPU-s
-character(len=30), public, &
-                 dimension(NTIMING), save :: timing = ""  ! description
-real, private, save                       :: rclksec      ! rate-of-clock
-
+integer, public, parameter  :: NTIMING_UNIMOD=39
+integer, public, save       :: NTIMING=NTIMING_UNIMOD
+real, public, dimension(:), allocatable, save :: &
+  mytimm,   &           ! stores CPU-s
+  lastptim              ! for final CPU-s
+character(len=30), dimension(:), allocatable, public, save :: &
+  timing                ! description
+real, private, save  :: rclksec      ! rate-of-clock
 
 !/--- MAKE CHANGE HERE TO SWAP FROM SYSTEM_CLOCK TO SYSTEM_TIME
 
@@ -64,12 +64,21 @@ real,    public, save :: &   !CPU
 
 contains
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-subroutine Init_timing()
+subroutine Init_timing(ntim)
+  integer, intent(in), optional :: ntim    ! set NTIMING
 !SYS      integer :: iclktck,iclksec,ierr
 !SYS  call system_clock(iclktck,iclksec)   ! SYS
 !SYS  rclksec = 1./float(iclksec)          ! SYS
 
+  if(present(ntim))NTIMING=ntim
+  if(allocated(mytimm))   deallocate(mytimm)
+  if(allocated(lastptim)) deallocate(lastptim)
+  if(allocated(timing))   deallocate(timing)
+  allocate(mytimm(NTIMING),lastptim(NTIMING),timing(NTIMING))
+
   mytimm(:) = 0.0    !CPU and SYS
+  lastptim(:)=0.0    !CPU and SYS
+  timing(:)  = ""
 endsubroutine Init_timing
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine Add_2timing(n,after,before,txt)
@@ -81,6 +90,7 @@ subroutine Add_2timing(n,after,before,txt)
   real,    intent(out)   :: after    ! CPU
   character(len=*), intent(in), optional :: txt
 
+  if((n>NTIMING).or.(n<1)) return
   call Code_Timer(after)
 !SYS  mytimm(n) = mytimm(n) + (after-before)*rclksec  ! SYS
   mytimm(n) = mytimm(n) +  after-before           ! CPU

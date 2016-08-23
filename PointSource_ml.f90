@@ -1,7 +1,7 @@
-! <PointSource_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <PointSource_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -51,7 +51,6 @@ module PointSource_ml
   ! --- prelim module to introduce point sources.
   !
   use CheckStop_ml,      only : CheckStop
-!CMR  use ChemChemicals_ml,  only : species
   use ChemSpecs,         only : species
   use Functions_ml,      only : StandardAtmos_kPa_2_km, Tpot_2_T
   use GridValues_ml,     only : sigma_bnd, debug_proc &
