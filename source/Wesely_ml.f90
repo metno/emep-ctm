@@ -1,8 +1,7 @@
-! <Wesely_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <Wesely_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -96,7 +95,7 @@ integer, public, parameter :: &
   WES_H2O2=  6, WES_ALD=  7, WES_HCHO=  8, WES_OP =  9, WES_PAA = 10, &
   WES_ORA = 11, WES_NH3= 12, WES_PAN = 13, WES_HNO2=14
 
-!/** Variables used in deposition calculations
+!*** Variables used in deposition calculations
 
 ! DDEP_xx gives the index that will be used in the EMEP model
 ! WES_xx gives the index of the Wesely gas to which this corresponds
@@ -106,12 +105,10 @@ integer, public, parameter :: &
 ! can use the rates for other similar species. (e.g. AMSU can use
 ! the Vg for SO4.  Must set NDRYDEP_CALC species
 
-!/** IMPORTANT: the variables below must match up in the sense that, for
+!*** IMPORTANT: the variables below must match up in the sense that, for
 ! example, if DDEP_NH3=4 then the 4th element of DRYDEP must be WES_NH3.
 
 integer, public, parameter :: NDRYDEP_GASES = 11  ! gases
-integer, public, parameter :: NDRYDEP_AER = 6   ! aerosols
-integer, public, parameter :: NDRYDEP_CALC = NDRYDEP_GASES + NDRYDEP_AER
 
 integer, public, parameter :: &
   CDDEP_HNO3 =  1, CDDEP_O3  =  2, CDDEP_SO2 = 3, &
@@ -124,13 +121,19 @@ integer, public, parameter :: CDDEP_RCHO = CDDEP_ALD ! Convenience
 integer, public, parameter :: &
   CDDEP_PMfS= 12, CDDEP_PMfN= 13, CDDEP_PMc  = 14, &
   CDDEP_SSc = 15, CDDEP_DUc = 16, CDDEP_POLLd= 17
+integer, public, parameter :: CDDEP_PMfNH4 = 18  ! TEST_2014
+integer, public, parameter :: CDDEP_LASTPM = 18  ! Safety. Catches changes
+
+integer, dimension(CDDEP_PMfS:CDDEP_LASTPM), public, parameter :: &
+  AERO_SIZE = (/ 1, 1, 2, 3, 4, 5, 1 /) !1=fine,2=coarse,3=coarse sea salt, 4=dust, 5 = pollen
+
+integer, public, parameter :: NDRYDEP_AER = 7   ! aerosols with CDDEP_PMfNH4 
+integer, public, parameter :: NDRYDEP_CALC = NDRYDEP_GASES + NDRYDEP_AER
+
 integer, public, parameter :: &
   CDDEP_ASH1=CDDEP_PMfS,CDDEP_ASH2=CDDEP_PMfS,CDDEP_ASH3=CDDEP_PMfS,&
   CDDEP_ASH4=CDDEP_PMfS,CDDEP_ASH5=CDDEP_PMc ,CDDEP_ASH6=CDDEP_PMc, &
   CDDEP_ASH7=CDDEP_PMc
-
-integer, dimension(CDDEP_PMfS:CDDEP_POLLd), public, parameter :: &
-  AERO_SIZE = (/ 1, 1, 2, 3, 4, 5/) !1=fine,2=coarse,3=coarse sea salt, 4=dust, 5 = pollen
 
 integer, public, parameter :: CDDEP_SET = -99
 

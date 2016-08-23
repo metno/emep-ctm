@@ -1,7 +1,7 @@
-! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

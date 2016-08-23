@@ -1,8 +1,7 @@
-! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,8 +24,9 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
+! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
+!*****************************************************************************!
 
-!==============================================================================
 module DerivedFields_ml
   use OwnDataTypes_ml, only: Deriv,TXTLEN_DERIV
   implicit none

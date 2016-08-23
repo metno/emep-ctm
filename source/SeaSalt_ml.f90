@@ -1,9 +1,8 @@
-! <SeaSalt_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <SeaSalt_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,30 +10,26 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
+! <SeaSalt_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
-!_____________________________________________________________________________
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
 
                           module SeaSalt_ml
 
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-!-----------------------------------------------------------------------------
+!*****************************************************************************! 
 ! Calculates production of sea salt based on: 
 ! Maartinsson et al.(2003) JGR,100,D8      for particles with Ddry<1.25um  
 ! Monahan et al.(1986) J.Phys.Oceanogr,10  for particles with Ddry=~1.25-5um  
@@ -44,8 +39,8 @@
 ! Programmed by Svetlana Tsyro
 !-----------------------------------------------------------------------------
 
+ use AeroFunctions,        only : WetRad, umWetRad, GbSeaSalt
  use Biogenics_ml,         only : EMIS_BioNat, EmisNat  
-!CMR  use ChemChemicals_ml,     only : species
  use ChemSpecs,            only : species
  use GridValues_ml,        only : glat, glon, i_fdom, j_fdom 
  use Io_Progs_ml,          only : PrintLog
@@ -57,7 +52,7 @@
  use MicroMet_ml,          only : Wind_at_h
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, &
                                   MasterProc, & 
-                                  DEBUG_SEASALT
+                                  DEBUG   ! -> SEASALT
  use Par_ml,               only : MAXLIMAX,MAXLJMAX   ! => x, y dimensions
  use PhysicalConstants_ml, only : CHARNOCK, AVOG ,PI
  use Setup_1dfields_ml,    only : rcemis 
@@ -128,7 +123,7 @@
     itot_SSFI = find_index( "SEASALT_F", species(:)%name    )
     itot_SSCO = find_index( "SEASALT_C", species(:)%name    )
 
-    if(DEBUG_SEASALT .and. MasterProc ) &
+    if(DEBUG%SEASALT .and. MasterProc ) &
         write(*,*) "SSALT INIT", inat_SSFI, itot_SSFI
 
     if ( inat_SSFI < 1 ) then
@@ -175,7 +170,7 @@
 
        if ( Sub(lu)%is_water ) then
 
-          if(DEBUG_SEASALT .and. debug_flag) then
+          if(DEBUG%SEASALT .and. debug_flag) then
               write(6,'(a,2i4,f8.4,f12.4,3f8.3)') &
                 'SSALT ** Charnock, ustar_nwp, d, Z0, SST ** ',&
                    i_fdom(i), j_fdom(j), & 
@@ -196,7 +191,7 @@
 
          u10_341=exp(log(u10) * (3.41))
 
-         if(DEBUG_SEASALT .and. debug_flag) &
+         if(DEBUG%SEASALT .and. debug_flag) &
              write(6,'(a,L2,4f12.4,es14.4)')'SSALT ** U*, Uref, U10, Uh, invL ** ',&
                foundws10_met, Sub(lu)%ustar, Grid%u_ref, u10, &
                Wind_at_h (Grid%u_ref, Grid%z_ref, Z10, Sub(lu)%d,   &
@@ -229,7 +224,7 @@
 
                total_flux =  total_flux + ss_flux(ii)
 
-               if(DEBUG_SEASALT .and. debug_flag) write(6,'(a20,i5,es13.4)') &
+               if(DEBUG%SEASALT .and. debug_flag) write(6,'(a20,i5,es13.4)') &
                   'SSALT Flux Maarten ->  ',ii, ss_flux(ii)
           enddo
 
@@ -243,11 +238,11 @@
 
                total_flux =  total_flux + ss_flux(ii) 
 
-               if(DEBUG_SEASALT .and. debug_flag) &
+               if(DEBUG%SEASALT .and. debug_flag) &
                    write(6,'(a20,i5,es13.4)') 'SSALT Flux Monah ->  ',ii, ss_flux(jj)
           enddo
 
-         if(DEBUG_SEASALT .and. debug_flag) &
+         if(DEBUG%SEASALT .and. debug_flag) &
                write(6,'(a20,es13.3)') 'SSALT Total SS flux ->  ',  total_flux
 
 
@@ -270,7 +265,7 @@
                  !! ESX SS_prod(QSSFI,i,j) = SS_prod(QSSFI,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
                                   * water_fraction(i,j) 
-            if(DEBUG_SEASALT .and. debug_flag) &
+            if(DEBUG%SEASALT .and. debug_flag) &
             write(6,'(a20,i5,2es13.4)') 'SSALT Flux fine ->  ',ii,d3(ii), rcss( iSSFI ) !ESX SS_prod(QSSFI,i,j)
           enddo
 
@@ -280,7 +275,7 @@
                  !!ESX SS_prod(QSSCO,i,j) = SS_prod(QSSCO,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
                                   * water_fraction(i,j)
-            if(DEBUG_SEASALT .and. debug_flag) &
+            if(DEBUG%SEASALT .and. debug_flag) &
             write(6,'(a20,i5,2es13.4)') 'SSALT Flux coarse ->  ',ii,d3(ii), rcss( iSSCO ) !ESX SS_prod(QSSCO,i,j)
           enddo
 
@@ -293,7 +288,7 @@
                rcss( iSSCO ) = 0.2 * rcss( iSSCO )
           endif
   
-          if(DEBUG_SEASALT .and. debug_flag) write(6,'(a35,2es15.4)')  &
+          if(DEBUG%SEASALT .and. debug_flag) write(6,'(a35,2es15.4)')  &
              '>> SSALT production fine/coarse  >>', &
                 rcss(  iSSFI ), rcss( iSSCO )
                           
@@ -391,13 +386,29 @@
 !.. Equilibrium wet radius from Gerber(1985) (Gong&Barrie [1997], JGR)
 
      do i = 1, SS_MONA
-        radSS(i) = ( K1*rdry(i)**K2 /(K3 *rdry(i)**K4 -     &
-                     log10(0.8))+rdry(i)**3) ** third
-        lim1 = ( K1*RLIM(i+1)**K2 /(K3 *RLIM(i+1)**K4 -     &
-                 log10(0.8))+RLIM(i+1)**3) ** third
-        lim2 = ( K1*RLIM(i)**K2 /(K3 *RLIM(i)**K4 -         &
-                 log10(0.8))+RLIM(i)**3) ** third
+        !Gb radSS(i) = ( K1*rdry(i)**K2 /(K3 *rdry(i)**K4 -     &
+        !Gb              log10(0.8))+rdry(i)**3) ** third
+        !Gb lim1 = ( K1*RLIM(i+1)**K2 /(K3 *RLIM(i+1)**K4 -     &
+        !Gb          log10(0.8))+RLIM(i+1)**3) ** third
+        !Gb lim2 = ( K1*RLIM(i)**K2 /(K3 *RLIM(i)**K4 -         &
+        !Gb          log10(0.8))+RLIM(i)**3) ** third
+
+        !ds now use Gerber functions
+        radSS(i) = umWetRad(rdry(i), 0.8, GbSeaSalt)
+        lim1     = umWetRad(rlim(i+1), 0.8, GbSeaSalt)
+        lim2     = umWetRad(rlim(i), 0.8, GbSeaSalt)
         Rrange(i) = lim1 - lim2       ! bin size intervals 
+
+       if( DEBUG%SEASALT ) then
+         ! WetRad takes radius in m
+        write(*,"(a,i4,9g10.3)") "SSALT WETRAD ", i, radSS(i), lim1, lim2 !,  &
+!          WetRad(rdry(i)*MKM, 0.8, GbSeaSalt)/MKM,&
+!          WetRad(RLIM(i+1)*MKM, 0.8, GbSeaSalt)/MKM,&
+!          WetRad(RLIM(i)*MKM, 0.8, GbSeaSalt)/MKM, &
+!          umWetRad(rdry(i), 0.8, GbSeaSalt),&
+!          umWetRad(RLIM(i+1), 0.8, GbSeaSalt),&
+!          umWetRad(RLIM(i), 0.8, GbSeaSalt)
+       end if
      enddo
 
 !.. Help parameter

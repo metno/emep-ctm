@@ -1,8 +1,7 @@
-! <Setup_1dfields_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <Setup_1dfields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,6 +24,7 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
+! <Setup_1dfields_ml.f90 - part of the EMEP MSC-W Chemical transport Model>
 !_____________________________________________________________________________!
  module Setup_1dfields_ml
 
@@ -35,6 +35,7 @@
   !
   ! - new aray added to keep o2, m, and for MADE oh, etc
 
+  use ModelConstants_ml, only : AERO ! for %NSAREA = No types surface area
   implicit none
   private
 
@@ -75,9 +76,20 @@
          ,h2o                 & ! water
          ,temp                & ! temperature
          ,tinv                & ! inverse temp
+         ,cN2O5               & ! mol speed, N2O5
+         ,cHNO3               & ! mol speed, HNO3 
+         ,cHO2                & ! mol speed, HO2  
+         ,cO3                 & ! mol speed, O3   
+        ,aero_fom, aero_fss, aero_fdust & ! fractions
+!         ,ugdryPM             & ! for wet radius from Gerber, etc.
+         ,deltaZcm             & ! layer thickness, cm
          ,pp                     !pressure
 
    integer, public, allocatable, dimension(:), save :: &
           itemp                  ! int of temperature
+
+   real, public, allocatable, dimension(:,:), save :: &
+         DpgNw  & ! wet diameter,           dim:NSAREA,k
+        ,S_m2m3   ! surface area, m2/m3     dim:NSAREA,k
 
  end module Setup_1dfields_ml

@@ -1,9 +1,8 @@
-! <OwnDataTypes_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2010-2011 met.no
-!* 
+! <OwnDataTypes_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,22 +10,27 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
+!> OwnDataTypes_ml.f90 - A component of the EMEP MSC-W Chemical transport Model
+!! ***************************************************************************! 
+
 module OwnDataTypes_ml
+use NumberConstants, only : UNDEF_R, UNDEF_I
 implicit none
+private
 
   ! depmap
   ! gtype for species groups, used in CM_ChemSpecs and Derived
@@ -103,29 +107,29 @@ implicit none
   !==================
   !+ Derived output type
   type, public:: Deriv
-    character(len=TXTLEN_DERIV) :: name     ! e.g. DDEP_SO2_m2Conif
-    character(len=TXTLEN_SHORT) :: class    ! Type of data, e.g. ADV or Mosaic
-    character(len=TXTLEN_SHORT) :: subclass !  e.g. "VG", "Rns"
-    character(len=TXTLEN_SHORT) :: txt      ! text where needed, e.g. "Conif"
-    character(len=TXTLEN_SHORT) :: unit     ! writen in netCDF output
-    integer :: index          ! index in concentation array, or other
-    integer :: f2d            ! index in f_2d arrays
-    logical :: dt_scale       ! used only if we need a factor on dt_advec,
-    real    :: scale          !  e.g. use 100.0 to get cm/s
-    logical :: avg            ! True => average data (divide by nav at end),
+    character(len=TXTLEN_DERIV) :: name      = '-'  ! e.g. DDEP_SO2_m2Conif
+    character(len=TXTLEN_SHORT) :: class     = '-' ! Type of data, e.g. ADV or Mosaic
+    character(len=TXTLEN_SHORT) :: subclass  = '-'!  e.g. "VG", "Rns"
+    character(len=TXTLEN_SHORT) :: txt       = '-'! text where needed, e.g. "Conif"
+    character(len=TXTLEN_SHORT) :: unit      = '-'! writen in netCDF output
+    integer :: index         =UNDEF_I ! index in concentation array, or other
+    integer :: f2d           =UNDEF_I ! index in f_2d arrays
+    logical :: dt_scale      =.false. ! used only if we need a factor on dt_advec,
+    real    :: scale         =UNDEF_R !  e.g. use 100.0 to get cm/s
+    logical :: avg           =.true.  ! True => average data (divide by nav at end),
                               !  else accumulate over run period
-    integer :: iotype         ! sets output timing
+    integer :: iotype        =UNDEF_I ! sets output timing
   endtype
 
- ! Sentinel values
-  real,    private, parameter :: UNDEF_R = -huge(0.0)
-  integer, private, parameter :: UNDEF_I = -huge(0)
+ ! Sentinel values (moved to NumberConstants)
+ ! real,    private, parameter :: UNDEF_R = -huge(0.0)
+ ! integer, private, parameter :: UNDEF_I = -huge(0)
 
   !==================
   !+ Hourly ASCII/NetCDF output type
   type, public:: Asc2D
-    character(len=TXTLEN_DERIV):: name = "NOTSET"   ! Name (no spaces!)
-    character(len=TXTLEN_SHORT):: type = "NOTSET"  ! "ADVppbv" or "ADVugm3" or "SHLmcm3"
+    character(len=TXTLEN_DERIV):: name = "-"   ! Name (no spaces!)
+    character(len=TXTLEN_SHORT):: type = "-"  ! "ADVppbv" or "ADVugm3" or "SHLmcm3"
 !   character(len=9) :: ofmt      ! Output format (e.g. es12.4)
     integer          :: spec = UNDEF_I   ! Species number in xn_adv or xn_shl array
                                   ! or other arrays
@@ -145,6 +149,9 @@ implicit none
    !real        :: Tref     ! Assumed 300
     real        :: DeltaH   ! kJ/mole
   endtype VBST
+  !==================
+
+
 
 contains
 !=========================================================================
@@ -169,9 +176,18 @@ subroutine print_Deriv_type(w)
   write(*,"(a,a)")    "subclass :", trim(w%subclass)
   write(*,"(a,a)")      "txt    :", trim(w%txt)
   write(*,"(a,a)")      "units  :", trim(w%unit)
-  write(*,"(a,i3)")     "index  :", w%index
-  write(*,"(a,i3)")     "f2d    :", w%f2d
-  write(*,"(a,a10)")    "txt    :", w%txt
+  if( w%index == UNDEF_I) then 
+    write(*,"(a)")     "index  : UNDEF"
+  else
+    write(*,"(a,i5)")  "index  :", w%index
+  end if
+  if( w%f2d == UNDEF_I) then 
+    write(*,"(a,i3)")     "f2d    :", w%f2d
+  else
+    write(*,"(a)")     "f2d  : UNDEF"
+  end if
+  !write(*,"(a,a10)")    "txt    :", w%txt
+  write(*,*)    "txt    :", trim(w%txt)
   write(*,"(a,es10.3)") "scale  :", w%scale
   write(*,*)          "dt_scale :", w%dt_scale
   write(*,*)               "avg :", w%avg

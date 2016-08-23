@@ -1,8 +1,8 @@
-! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -10,58 +10,53 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
-!_____________________________________________________________________________
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
+!*****************************************************************************!
+!> Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model
+!!---------------------------------------------------------------------
+!! Calls for routines calculating chemical and physical processes: 
+!! irreversible and equilibrium chemistry, dry and wet deposition,
+!! sea salt production, particle water etc.
+!!---------------------------------------------------------------------
 
 module RunChem_ml
 
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!----------------------------------------------------------------------
-! Calls for routines calculating chemical and physical processes: 
-! irreversible and equilibrium chemistry, dry and wet deposition,
-! sea salt production, particle water etc.
-!    
-!----------------------------------------------------------------------
-
-  use My_Aerosols_ml,   only: My_MARS, My_EQSAM, AERO_DYNAMICS,      &
-                              EQUILIB_EMEP, EQUILIB_MARS, EQUILIB_EQSAM,  &
-                              Aero_water, Aero_water_MARS   !DUST -> USE_DUST
+  use AerosolCalls,     only: AerosolEquilib & !DEC2014 My_MARS, My_EQSAM, &
+                             ,Aero_water, Aero_water_MARS   !DUST -> USE_DUST
   use My_Timing_ml,     only: Code_timer, Add_2timing,  &
                               tim_before, tim_after
-  use Ammonium_ml,      only: Ammonium
   use AOD_PM_ml,        only: AOD_Ext
   use Aqueous_ml,       only: Setup_Clouds, prclouds_present, WetDeposition
   use Biogenics_ml,     only: setup_bio
   use CellMet_ml,       only: Get_CellMet
-  use CheckStop_ml,     only: CheckStop
+  use CheckStop_ml,     only: CheckStop, StopAll
   use Chemfields_ml,    only: xn_adv    ! For DEBUG 
   use Chemsolver_ml,    only: chemistry
   use ChemSpecs                         ! DEBUG ONLY
   use DefPhotolysis_ml, only: setup_phot
   use DryDep_ml,        only: drydep
   use DustProd_ml,      only: WindDust
-  use GridValues_ml,    only: debug_proc, debug_li, debug_lj
+  use FastJ_ml,         only: setup_phot_fastj,phot_fastj_interpolate
+  use GridValues_ml,    only: debug_proc, debug_li, debug_lj, i_fdom, j_fdom
   use Io_Progs_ml,      only: datewrite
   use MassBudget_ml,    only: emis_massbudget_1d
   use ModelConstants_ml,only: USE_DUST, USE_SEASALT, USE_AOD, USE_POLLEN, & 
-                              KMAX_MID, nprint, END_OF_EMEPDAY, nstep,  &
-                              USES, & ! need USES%EMISSTACKS 
+                              MasterProc, & 
+                              KMAX_MID, END_OF_EMEPDAY, nstep,  &
+                              AERO,  USES, & ! need USES%EMISSTACKS 
+                              USE_FASTJ, &
                               DEBUG_EMISSTACKS, & ! MKPS
                               DebugCell, DEBUG    ! RUNCHEM
   use OrganicAerosol_ml,only: ORGANIC_AEROSOLS, OrganicAerosol, &
@@ -82,23 +77,29 @@ module RunChem_ml
   private
 
   public :: runchem
+  private :: check_negs
+
 contains
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine runchem()
 
 !  local
-  integer :: i, j
+  integer :: i, j, n
   integer :: errcode
   integer :: nmonth, nday, nhour     
   logical ::  Jan_1st, End_of_Run
-! logical :: ambient
   logical ::  debug_flag    ! =>   Set true for selected i,j
+  logical :: dbg
+  character(len=*), parameter :: sub='RunChem:'
+  character(len=10) :: dbgtxt
 ! =============================
   nmonth = current_date%month
   nday   = current_date%day
   nhour  = current_date%hour
 
+
   Jan_1st    = ( nmonth == 1 .and. nday == 1 )
+
 
   if(ORGANIC_AEROSOLS.and.first_call) &
     call CheckStop(SOA_MODULE_FLAG == "NotUsed", & ! Just safety
@@ -153,19 +154,29 @@ subroutine runchem()
       call emis_massbudget_1d(i,j)   ! Adds bio/nat to rcemis
       call Add_2timing(28,tim_after,tim_before,"Runchem:setup_cl/bio")
 
-      call setup_phot(i,j,errcode)
+      if(USE_FASTJ)then
+!         call setup_phot_fastj(i,j,errcode,0)! recalculate the column
+         call  phot_fastj_interpolate(i,j,errcode)!interpolate (intelligently) from 3-hourly values
+      else
+         call setup_phot(i,j,errcode)
+      endif
+
       call CheckStop(errcode,"setup_photerror in Runchem") 
       call Add_2timing(29,tim_after,tim_before,"Runchem:1st setups")
 
       ! Called every adv step, only updated every third hour
 !FUTURE call setup_nh3(i,j)    ! NH3emis, experimental (NMR-NH3)
 
+
       if(DEBUG%RUNCHEM.and.debug_flag) &
         call datewrite("Runchem Pre-Chem", (/ rcemis(NO,20), &
+!          rcemis(SHIPNOX,KMAX_MID), &!hardcoded chemical indice are not defined for all chem schemes, and should be avoided
           rcemis(C5H8,KMAX_MID), xn_2d(NO,20),xn_2d(C5H8,20) /) )
+      if(DEBUG%RUNCHEM) call check_negs(i,j,'A')
 
       if(ORGANIC_AEROSOLS) &
         call OrganicAerosol(i,j,debug_flag)
+      if(DEBUG%RUNCHEM) call check_negs(i,j,'B')
 
       call Add_2timing(30,tim_after,tim_before,"Runchem:2nd setups")
       call Add_2timing(27,tim_after,tim_before,"Runchem:setup_1d+rcemis")
@@ -176,6 +187,7 @@ subroutine runchem()
 !     !-------------------------------------------------
 !     !-------------------------------------------------
       call chemistry(i,j,DEBUG%RUNCHEM.and.debug_flag)
+      if(DEBUG%RUNCHEM) call check_negs(i,j,'C')
 !     !-------------------------------------------------
 !     !-------------------------------------------------
 !     !-------------------------------------------------
@@ -188,33 +200,30 @@ subroutine runchem()
       !  Alternating Dry Deposition and Equilibrium chemistry
       !  Check that one and only one eq is chosen
       if(mod(nstep,2)/=0) then 
-        if(EQUILIB_EMEP ) call ammonium() 
-        if(EQUILIB_MARS ) call My_MARS(debug_flag)
-        if(EQUILIB_EQSAM) call My_EQSAM(debug_flag) 
+        call AerosolEquilib(debug_flag)
+        if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
+        !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
+        !if(AERO%EQUILIB=='MARS' ) call My_MARS(debug_flag)
+        !if(AERO%EQUILIB=='EQSAM') call My_EQSAM(debug_flag) 
         call DryDep(i,j)
+        if(DEBUG%RUNCHEM) call check_negs(i,j,'E')
       else !do drydep first, then eq
         call DryDep(i,j)
-        if(EQUILIB_EMEP ) call ammonium() 
-        if(EQUILIB_MARS ) call My_MARS(debug_flag)
-        if(EQUILIB_EQSAM) call My_EQSAM(debug_flag) 
+        if(DEBUG%RUNCHEM) call check_negs(i,j,'F')
+        call AerosolEquilib(debug_flag)
+        if(DEBUG%RUNCHEM) call check_negs(i,j,'G')
+        !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
+        !if(AERO%EQUILIB=='MARS' ) call My_MARS(debug_flag)
+        !if(AERO%EQUILIB=='EQSAM') call My_EQSAM(debug_flag) 
       endif
       !????????????????????????????????????????????????????
 
       call Add_2timing(32,tim_after,tim_before,"Runchem:ammonium+Drydep")
 
-!     if ( DEBUG%RUNCHEM .and. debug_flag  ) then
-!       write(6,"(a,10es12.3)") "DEBUG_RUNCHEM me RIEMER, aero", &
-!         xn_2d(SO4,20), xn_2d(aNO3,20), xn_2d(aNH4,20),tmpOut1, tmpOut2
-!      !write(6,*) "DEBUG_RUNCHEM me pre WetDep", me, prclouds_present
-!       write(6,"(a20,2i3,i5,3es12.3)") "DEBUG_RUNCHEM me OH", &
-!             current_date%day, current_date%hour,&
-!             current_date%seconds, &
-!             xn_2d(OH,20), xn_2d(O3,20), xn_2d(HNO3,20)
-!
-!     endif
-
-      if(prclouds_present)  &
+      if(prclouds_present) then
         call WetDeposition(i,j,debug_flag)
+        call check_negs(i,j,'H')
+      end if
 
       !// Calculate Aerosol Optical Depth
       if(USE_AOD)  &
@@ -231,8 +240,12 @@ subroutine runchem()
 !     ambient = .true.  !  For real conditions (3D) 
 !     call Aero_water(i,j, ambient, debug_flag)
                    
-      if(i>=li0.and.i<=li1.and.j>=lj0.and.j<=lj1) &
+      call check_negs(i,j,'END')
+      if(i>=li0.and.i<=li1.and.j>=lj0.and.j<=lj1) then
+
         call reset_3d(i,j)  ! DO NOT UPDATE BC. BC are frozen
+
+      end if 
 
       call Add_2timing(33,tim_after,tim_before,"Runchem:post stuff")
       first_call = .false.   ! end of first call 
@@ -241,4 +254,16 @@ subroutine runchem()
 
 endsubroutine runchem
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+subroutine check_negs(i,j,txt)
+  integer, intent(in) :: i,j
+  character(len=*), intent(in) :: txt
+  integer :: n
+  if ( any( xn_2d(:,KMAX_MID) < 0.0 ) ) then
+         print *, txt, me,i_fdom(i),j_fdom(j)
+         do n = 1, NSPEC_TOT
+           if( xn_2d(n,KMAX_MID) < 0.0 ) print *, txt, xn_2d(n,KMAX_MID) 
+         end do
+         call StopAll( txt // 'STOPPED by check_negs in RunChem_ml')
+  end if
+end subroutine check_negs
 endmodule RunChem_ml

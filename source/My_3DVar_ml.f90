@@ -1,7 +1,7 @@
-! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,6 +28,7 @@ module DA_3DVar_ml
 use CheckStop_ml,     only: CheckStop
 use ModelConstants_ml,only: ANALYSIS
 implicit none
+integer, public, parameter :: NTIMING_3DVAR=0, T_3DVAR=0
 contains
 subroutine main_3dvar()
 !-----------------------------------------------------------------------

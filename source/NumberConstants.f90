@@ -1,4 +1,4 @@
-! <My_ESX_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <NumberConstants.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2015 met.no
@@ -24,22 +24,33 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!> Dummy implementation of ESX_ml for models that don't use ESX.
-module ESX_ml
-
+module NumberConstants
   implicit none
   private
 
-  public :: Init_ESX
-  public :: Run_ESX
+! from KPP system
+! Definition of different levels of accuracy
+! for REAL variables using KIND parameterization
+!
+! KPP SP - Single precision kind
+  integer, public, parameter :: sp = selected_real_kind(6,30)
+! KPP DP - Double precision kind
+  integer, public, parameter :: dp = selected_real_kind(14,300)
+! CYGWIN can't handle quad precision, so we re-define
+! KPP QP - Quadruple precision kind
+  integer, public, parameter :: qp = dp ! selected_real_kind(18,400)
 
-contains
+!DEWS working precision can be changed here
+! Typically should be dp, but qp for testing
 
-  subroutine Init_ESX()
-  end subroutine Init_ESX
+  integer, public, parameter :: wp = qp
 
-  subroutine Run_ESX()
-  end subroutine Run_ESX
+!integer, public, parameter :: dp = kind(0.0d0)  ! Double precision real(qp) kind
 
-end module ESX_ml
+! Sentinel values
+!real(qp), public, parameter :: UNDEF_D = -huge(0.0_dp)
+    real,     public, parameter :: UNDEF_R = -huge(0.0)
+    real(wp), public, parameter :: UNDEF_WP = -huge(0.0_wp)
+    integer,  public, parameter :: UNDEF_I = -huge(0)
 
+end module NumberConstants

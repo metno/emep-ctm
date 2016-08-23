@@ -1,8 +1,7 @@
-! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Eulerian
-!          Chemical transport Model>
+! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,7 +24,8 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-
+! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Euleria Chemical transport Model>
+!*****************************************************************************!
 module LocalVariables_ml
 ! -----------------------------------------------------------------------
 ! Near-surface meteorology and other variables for local area,
@@ -84,8 +84,8 @@ type, public :: GridDat
   real    :: Ra_2m        !
   real    :: Ra_3m        !
   real    :: so2nh3ratio  !  for CEH deposition scheme
-  real    :: surf_o3_ppb  !  for  EU AOTs
-  real    :: O3factor     !  ratio of O3out/O3in for DryDep module
+  real    :: surf_o3_ppb  !  for  EU AOTs, 3m O3
+  real    :: surf_o3_ppb1 !   .... after deploss
 ! CoDep
   real    :: so2nh3ratio24hr  !  for CEH SO2 deposition scheme
   real    ::              & ! some on this set might not be need
@@ -97,9 +97,10 @@ type, public :: GridDat
     ,coszen    = NOT_SET    ! = cos(zen)(= sinB, where B is elevation angle)
   integer :: izen = INOT_SET  ! int(zen)
   real, dimension(NDRYDEP_CALC) :: &  ! for species subject to dry depostion
-     Vg_ref   & ! Grid average of Vg at ref ht. (effective Vg for cell)
+     Vg_ref = 0.0   & ! Grid average of Vg at ref ht. (effective Vg for cell)
+    ,StoFrac = 0.0  & ! Fraction of flux (Vg) going through stomata.
     ,Vg_3m    & ! and at 3m
-    ,Gsur,Gns
+    ,Gsur,Gsto, Gns
 end type GridDat
 
 type(GridDat), public, save :: Grid
@@ -162,7 +163,8 @@ type, public :: SubDat
   real, dimension(NDRYDEP_CALC) :: & ! for species subject to dry depostion
      Vg_ref   &  ! Grid average of Vg at ref ht. (effective Vg for cell)
     ,Vg_3m    &  ! and at 3m
-    ,Gsur,Gns
+    ,StoFrac = 0.0  & ! Fraction of flux (Vg) going through stomata.
+    ,Gsur, Gsto, Gns
 end type SubDat
 
 ! MOVED TO Mosaic type(SubDat), public, dimension(0:NLANDUSEMAX), save :: Sub

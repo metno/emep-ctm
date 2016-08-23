@@ -1,7 +1,7 @@
-! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,7 +25,6 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
 module Convection_ml
-
 !If subsidence is included, ps3d could actually be any constant (in k), and 
 ! will recover the same value after the subsidience.
 !
@@ -39,33 +38,31 @@ module Convection_ml
 !between convection and subsidience, which is not corrrect either
 !-----------------------------------------------------------------------------------
 
-
- use Chemfields_ml,        only  : xn_adv
- use ChemSpecs,            only  : NSPEC_ADV
+use Chemfields_ml,        only  : xn_adv
+use ChemSpecs,            only  : NSPEC_ADV
 !CRM  use ChemSpecs_adv_ml ,    only  : NSPEC_ADV
- use ModelConstants_ml,    only  : KMAX_BND,KMAX_MID,PT,Pref
- use MetFields_ml ,        only  : ps,sdot,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
- use GridValues_ml,        only  : dA, dB, sigma_bnd
- use Par_ml,               only  : MAXLIMAX,MAXLJMAX,limax,ljmax,li0,li1,lj0,lj1
- use PhysicalConstants_ml, only  : GRAV
+use ModelConstants_ml,    only  : KMAX_BND,KMAX_MID,PT,Pref
+use MetFields_ml ,        only  : ps,sdot,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
+use GridValues_ml,        only  : dA, dB, sigma_bnd
+use Par_ml,               only  : MAXLIMAX,MAXLJMAX,limax,ljmax,li0,li1,lj0,lj1
+use PhysicalConstants_ml, only  : GRAV
 
- public :: convection_pstar!in sigma coordinates
- public :: convection_Eta!in more general hybrid coordinates (Eta)
+public :: convection_pstar!in sigma coordinates
+public :: convection_Eta!in more general hybrid coordinates (Eta)
 
- contains
+contains
 
- subroutine convection_pstar(ps3d,dt_conv)
+subroutine convection_pstar(ps3d,dt_conv)
 
-    implicit none
-    real ,intent(inout):: ps3d(MAXLIMAX,MAXLJMAX,KMAX_MID),dt_conv
-   
-    real ::xn_in_core(NSPEC_ADV,KMAX_MID+1)
-    real ::mass_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), mass_air_core(KMAX_MID)
-    real ::mass_exchanged,mass
-    real :: mass_air_grid_k_temp,xn_buff(NSPEC_ADV,KMAX_MID)
-    real :: dk(KMAX_MID),dp(KMAX_MID),totdk
-    integer ::k,i,j,k_fill,k1
-   INCLUDE 'mpif.h'
+  implicit none
+  real ,intent(inout):: ps3d(MAXLIMAX,MAXLJMAX,KMAX_MID),dt_conv
+ 
+  real ::xn_in_core(NSPEC_ADV,KMAX_MID+1)
+  real ::mass_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), mass_air_core(KMAX_MID)
+  real ::mass_exchanged,mass
+  real :: mass_air_grid_k_temp,xn_buff(NSPEC_ADV,KMAX_MID)
+  real :: dk(KMAX_MID),dp(KMAX_MID),totdk
+  integer ::k,i,j,k_fill,k1
   
 
 

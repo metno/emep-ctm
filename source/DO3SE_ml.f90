@@ -1,9 +1,8 @@
-! <DO3SE_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <DO3SE_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,20 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
 module DO3SE_ml
 
   use CheckStop_ml,  only : CheckStop
@@ -40,7 +39,7 @@ module DO3SE_ml
   use ModelConstants_ml, only : NLANDUSEMAX, DEBUG, MasterProc, &
       USE_SOILWATER
   use SmallUtils_ml,     only : find_index
-  use TimeDate_ml,       only : current_date, daynumber
+  use TimeDate_ml,       only : current_date, daynumber, print_date
 
   implicit none
   private
@@ -60,7 +59,7 @@ module DO3SE_ml
 
  ! 2 ) Phenology part
 
- !/*****   Data to be read from Phenology_inputs.dat:
+ !******   Data to be read from Phenology_inputs.dat:
 
   type, public :: do3se_type
      character(len=15) :: code
@@ -95,7 +94,7 @@ module DO3SE_ml
 
   ! For some veg we have a SumVPD limitation. Usually just for a few,
   ! so we assume max 3 for now
-  integer, private, parameter :: MAXnSumVPD=3
+  integer, private, parameter :: MAXnSumVPD=10
   integer, public, save       :: nSumVPD
   integer, public, dimension(MAXnSumVPD), save :: SumVPD_LC
 
@@ -153,14 +152,14 @@ contains
 
             do3se(iLC) = input_do3se  
 
-            if ( DEBUG%DO3SE .and. MasterProc ) then
+            if ( DEBUG%DO3SE>0 .and. MasterProc ) then
                 write(*,*) " DO3SE iLC", iLC,  do3se(iLC)%code, wanted_codes(iLC)
             end if
             if ( do3se(iLC)%VPDcrit > 0.0 ) then
               nSumVPD = nSumVPD + 1
               call CheckStop( nSumVPD > MAXnSumVPD, "DO3SE nSumVPD")
               SumVPD_LC(nSumVPD) = iLC
-              if(DEBUG%DO3SE .and. MasterProc) &
+              if(DEBUG%DO3SE>0 .and. MasterProc) &
                 write(*,*)'VPDlimit ',do3se(iLC)%VPDcrit,' for iLC ',iLC, nSumVPD
             end if
 
@@ -189,6 +188,7 @@ contains
 
      integer, intent(in) :: iLC
      logical, intent(in) :: debug_flag
+     character(len=20) :: txtdate
 
 ! Outputs:
 !    L%g_sto, L%g_sun       ! stomatal conductance for canopy and sun-leaves
@@ -282,14 +282,17 @@ contains
          max( do3se(iLC)%f_min,  L%f_temp * L%f_vpd * L%fSW )
 
 
-   if ( DEBUG%DO3SE .and. debug_flag ) then ! EXTRA
-       write(*,"(a,5i5,i3,L2,99f10.4)") "IN RSUR gstomatal ", &
-              current_date, iLC, USE_SOILWATER, L%PARsun, L%PARshade,&
+   if ( DEBUG%DO3SE>0 .and. debug_flag ) then ! EXTRA
+      txtdate =  print_date(current_date)
+      !txtdate =  print_date()
+      !print *, "TXT PD CD2", trim(txtdate)
+      if(iLC>=20)  write(*,"(2a,i5,L2,99g10.3)") "IN RSUR gstomatal ", &
+              print_date(), iLC, USE_SOILWATER, L%PARsun, L%PARshade,&
               do3se(iLC)%g_max, L%g_sto, L%f_env,  L%f_phen, L%f_vpd,&
               L%fSW, L%g_sto * L%f_sun/L%f_light, L%g_sun 
    end if
 
-    if ( DEBUG%DO3SE ) then
+    if ( DEBUG%DO3SE>0 ) then
         needed = (/ L%t2C,L%t2,L%vpd ,L%SWP ,&
                     L%PARsun ,L%PARshade ,L%LAIsunfrac /)
         if ( any( needed(:) < -998.0 )) then
@@ -317,7 +320,8 @@ contains
 
 !===========================================================================
 
- elemental function fPhenology(iLC,jday,SGS,EGS,debug_flag) result (fphen)
+ !elemental function fPhenology(iLC,jday,SGS,EGS,debug_flag) result (fphen)
+ function fPhenology(iLC,jday,SGS,EGS,debug_flag) result (fphen)
   real :: fphen
 
 ! Input
@@ -326,16 +330,25 @@ contains
   integer, intent(in):: SGS, EGS
   logical, intent(in) :: debug_flag
   real  :: a,b,c,d,Slen,Elen,Astart, Aend
+  real  :: gsf  ! factor to scale for short growing-seasons
+
+ !CEH 2014 GAEZ
+  gsf =  1.0
+  if( EGS - SGS  < 90 ) then
+     gsf = (EGS - SGS)/90.0
+     if( debug_flag ) write(*,"(a,2i5,f8.4)") "DO3SE gsf ", SGS, EGS, gsf
+  end if
+    
 
         a =  do3se(iLC)%f_phen_a
         b =  do3se(iLC)%f_phen_b
         c =  do3se(iLC)%f_phen_c
         d =  do3se(iLC)%f_phen_d
-        Slen =  do3se(iLC)%f_phen_Slen  ! e
-        Elen =  do3se(iLC)%f_phen_Elen  ! f
+        Slen =  gsf * do3se(iLC)%f_phen_Slen  ! e
+        Elen =  gsf * do3se(iLC)%f_phen_Elen  ! f
 
-        Astart   = SGS  + do3se(iLC)%Astart_rel
-        Aend   = EGS  - do3se(iLC)%Aend_rel
+        Astart   = SGS  + gsf * do3se(iLC)%Astart_rel
+        Aend   = EGS  - gsf * do3se(iLC)%Aend_rel
 
 
         if ( jday <  SGS ) then

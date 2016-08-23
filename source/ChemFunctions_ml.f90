@@ -1,9 +1,8 @@
-! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,19 +10,21 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
+! <ChemFunctions_ml.f90 - the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 module ChemFunctions_ml
 !____________________________________________________________________
@@ -40,11 +41,15 @@ module ChemFunctions_ml
 !** includes
 !   troe - standrad chemical function
 !____________________________________________________________________
+ use AeroFunctions,         only : UptakeRate, GammaN2O5_EJSS, GammaN2O5
+ use CheckStop_ml,          only : StopAll
+ use ChemSpecs,             only : SO4, NO3_f, NH4_f, NO3_c
  use LocalVariables_ml,     only : Grid   ! => izen, is_mainlysea
- use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID
+ use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID, USES, AERO
  use PhysicalConstants_ml,  only : AVOG, RGAS_J, DAY_ZEN
- use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk
-!CRM  use ChemSpecs_tot_ml,        only : SO4, NO3_f, NH4_f, NO3_c
+ use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk, &
+     aero_fom,aero_fss,aero_fdust, &
+     cN2O5, temp, DpgNw, S_m2m3 ! for surface area
  use ChemSpecs,             only : SO4, NO3_f, NH4_f, NO3_c
   implicit none
   private
@@ -53,9 +58,12 @@ module ChemFunctions_ml
   public :: troeInLog  ! When log(Fc) provided
   public :: IUPAC_troe ! Using the approximate expression for F from 
                        !  Atkinson et al., 2006 (ACP6, 3625)
-  public ::  kaero
+  !April2015 to AeroFunctions
+  public ::  xkaero 
   public ::  kaero2    ! for testing
   public ::  RiemerN2O5
+  public ::  S_RiemerN2O5 !TES
+  public ::  HydrolysisN2O5
   public ::  ec_ageing_rate
   public ::  kmt3      ! For 3-body reactions, from Robert OCt 2009
 
@@ -318,7 +326,186 @@ module ChemFunctions_ml
 
   end function RiemerN2O5
   !---------------------------------------------------------------------
-  function kaero() result(rate) 
+
+  ! crude, but rate = xxxx . S , dvs S = rate / xxxx
+  function S_RiemerN2O5(k) result(S) 
+     integer, intent(in) :: k
+     real :: S
+     real    :: c, rate, gam, rho
+     real    :: f   ! Was f_Riemer
+     real, parameter :: EPSIL = 1.0  ! One mol/cm3 to stop div by zero
+     real :: xNO3  ! As the partitioning between fine and coarse is so difficult
+                   ! we include both in the nitrate used here.
+
+          xNO3 = x(NO3_f,k) + x(NO3_c,k) 
+
+         !mean molec speed of N2O5 (MW 108), m/s
+         ! with density corrected for rh (moderate approx.)
+          c = sqrt(3.0 * RGAS_J * itemp(k) / 0.108) ! mol.speed (m/s)
+          rho= (2.5 - rh(k)*1.25)                   ! density, g/cm3
+
+          f = 96.0*x(SO4,k)/( 96.*x(SO4,k) + 62.0* xNO3  + EPSIL )
+
+
+          rate=  (0.9*f + 0.1) * c /(4.0*rho) *  &
+                !TEST   0.5 * & ! v. loosely based on Reimer 2009 
+             ( VOLFACSO4 * x(SO4,k) + VOLFACNO3 * xNO3  &
+              + VOLFACNH4 * x(NH4_f,k) )    !SIA aerosol surface
+          !rate = 1/4 . gamma. c . S
+          !rate in s-1
+          gam = ( 0.9*f + 0.1 )*0.02
+          S = 4.0 * rate/(gam * c ) ! will give S in m2
+
+  end function S_RiemerN2O5
+  !---------------------------------------------------------------------
+
+  function HydrolysisN2O5(ormethod) result(rate) 
+   character(len=*), intent(in) , optional:: ormethod ! overrides default method if wanted
+   character(len=30) :: method
+   real, dimension(K1:K2) :: rate
+   real    :: rc
+   real    :: f   ! Was f_Riemer
+   real    :: gam, S, Rwet  ! for newer methods
+   real, save :: g1 = 0.02, g2=0.002 ! gammas for 100% SO4, 100% NO3, default
+   real, parameter :: EPSIL = 1.0  ! One mol/cm3 to stop div by zero
+   integer :: k
+   real :: xNO3  ! As the partitioning between fine and coarse is so difficult
+                 ! we include both in the nitrate used here.
+   logical, save :: first_call = .true.
+
+
+   method = USES%n2o5HydrolysisMethod
+   if ( present(ormethod) )then
+     method = ormethod
+   end if
+
+   select case ( method )
+    case ( "ORIGRIEMER","OrigRiemer") 
+
+     do k = K1, K2
+       if ( rh(k)  > 0.4) then
+          xNO3 = x(NO3_f,k) + x(NO3_c,k) 
+
+         !mean molec speed of N2O5 (MW 108), m/s
+         ! with density corrected for rh (moderate approx.)
+          rc = sqrt(3.0 * RGAS_J * itemp(k) / 0.108) & ! mol.speed (m/s)
+             /(4*(2.5 - rh(k)*1.25))                   ! density
+
+          f = 96.0*x(SO4,k)/( 96.*x(SO4,k) + 62.0* xNO3  + EPSIL )
+
+
+          rate(k) =  (0.9*f + 0.1) * rc *  &
+                !TEST   0.5 * & ! v. loosely based on Reimer 2009 
+             ( VOLFACSO4 * x(SO4,k) + VOLFACNO3 * xNO3  &
+              + VOLFACNH4 * x(NH4_f,k) )    !SIA aerosol surface
+        else
+          rate(k) = 0.0
+        endif
+      end do ! k
+  !---------------------------------------
+   case ( "Smix", "SmixTen" )
+
+     do k = K1, K2
+
+       if ( rh(k)  > 0.4) then ! QUERY???
+
+            xNO3 = x(NO3_f,k) + 0.27 * x(NO3_c,k)  ! fracPM25, crude...
+            f = 96*x(SO4,k)/( 96*x(SO4,k) + 62* xNO3  + EPSIL )
+
+            S = S_m2m3(AERO%PM_F,k) !NOW all fine PM
+            gam = GammaN2O5(temp(k),rh(k),&
+                   f,aero_fom(k),aero_fss(k),aero_fdust(k))
+
+            if( method == "SmixTen") gam = 0.1 * gam ! cf Brown et al, 2009!
+
+            rate(k) = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
+       else
+            rate(k) = 0.0
+       end if
+    end do
+
+      
+  !---------------------------------------
+   case ( "RiemerSIA", "RiemerSIAc3", "RiemerPMF", "mixedPMF" )
+
+     do k = K1, K2
+
+       if ( rh(k)  > 0.4) then ! QUERY???
+
+         !Unfortunate hard-coding. Will fix in later stages
+         if( method == "RiemerSIA" ) then
+            S = S_m2m3(AERO%SIA_F,k)
+            Rwet = 0.5*DpgNw(AERO%SIA_F,k)
+         else if( method == "RiemerSIAc3" ) then
+            S = S_m2m3(AERO%SIA_F,k)
+            Rwet = 0.5*DpgNw(AERO%SIA_F,k)
+            if( first_call ) g2=g1/3.0   ! Chang notes that the factor  of ten reduction was too high
+
+         ! use whole aerosol area, but Riemer nitrate (factor 3 though):
+         else ! if( USES%n2o5HydrolysisMethod == "RiemerPMF" ) then
+              !.or.  USES%n2o5HydrolysisMethod == "mixedPMF" ) then
+
+            S = S_m2m3(AERO%PM_F,k)
+            !Rwet = 0.5*DpgNw(AERO%PM_F,k)
+! Chang notes that the factor  of ten reduction was too high, and in PMF we also
+! have EC, OM, etc.
+            if( first_call ) g2=g1/3.0   
+         end if
+
+          xNO3 = x(NO3_f,k) + x(NO3_c,k) 
+
+         !mean molec speed of N2O5 (MW 108), m/s
+          !c=cMolSpeed(temp(k),108.0)
+
+          f = 96.0*x(SO4,k)/( 96.*x(SO4,k) + 62.0* xNO3  + EPSIL )
+          gam = g1 * f + g2 * (1-f)
+
+          !rate(k) = UptakeRate(c,gam,S,Rwet) !1=fine SIA ! +OM
+          rate(k) = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
+
+          if( method == "mixedPMF" ) then
+
+            ! 2) Add  fine sea-salt
+            S = S_m2m3(AERO%SS_F,k)
+            !Rwet = 0.5*DpgNw(AERO%SS_F,k)
+            gam = GammaN2O5_EJSS(rh(k))
+            rate(k) = rate(k) + UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
+
+            ! 3) Add  fine dust
+            S = S_m2m3(AERO%DU_F,k)
+            !Rwet = 0.5*DpgNw(AERO%DU_F,k)
+            gam = 0.01 ! Evans & Jacob, 2005
+            rate(k) = rate(k) + UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
+
+          end if
+
+
+      else
+         rate(k) = 0.0
+      endif
+    end do ! k
+    case ( "Gamma:0.002")  ! Inspired by Brown et al. 2009
+     do k = K1, K2
+
+       if ( rh(k)  > 0.4) then ! QUERY???
+
+          gam = 0.002
+          S = S_m2m3(AERO%PM_F,k) !fine SIA +OM + ...
+          rate(k) = UptakeRate(cN2O5(k),gam,S) 
+      else
+         rate(k) = 0.0
+       end if
+
+    end do ! k
+
+     case default
+       call StopAll("Unknown N2O5 hydrolysis"//method )
+       
+   end select
+   first_call = .false.
+  end function HydrolysisN2O5
+  !---------------------------------------------------------------------
+  function xkaero() result(rate) 
     ! Former rate for HNO3 -> NO3_c, not now used
      real, dimension(K1:K2) :: rate
      integer :: k
@@ -332,7 +519,7 @@ module ChemFunctions_ml
     end do !k
 
 
-  end function kaero
+  end function xkaero
   !---------------------------------------------------------------------
   function kaero2() result(rate) 
     ! New rate for HNO3 -> NO3_c, used only over sea squares

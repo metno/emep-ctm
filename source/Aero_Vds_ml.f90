@@ -1,7 +1,7 @@
-! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,7 +28,6 @@
   module Aero_Vds_ml
 !==============================================================================
   use PhysicalConstants_ml, only : FREEPATH, VISCO, BOLTZMANN, PI, GRAV, ROWATER
-  use My_Aerosols_ml,       only : NSIZE
   use ModelConstants_ml,    only : DEBUG_VDS, MasterProc
  
   ! DESCRIPTION
@@ -70,72 +69,56 @@
   public  :: RuijgrokWetSO4
   public  :: Wesely1985
 
-  real, public, parameter, dimension(NSIZE) ::   &
-!st May 2014          diam   = (/ 0.33e-6, 3.0e-6, 4.0e-6, 4.5e-6 ,22e-6 /),  &
-!st MMD_SS=0.6*MMD_NO3c (Savoie&Prospero, GRL, 9, 1982)
-!st test1                  diam   = (/ 0.33e-6, 3.0e-6, 4.8e-6, 5.0e-6 ,22e-6 /),  &
-!st test2                  diam   = (/ 0.33e-6, 3.0e-6, 4.5e-6, 5.0e-6 ,22e-6 /),  &
-                  diam   = (/ 0.33e-6, 3.0e-6, 4.8e-6, 5.0e-6 ,22e-6 /),  &
-                  sigma  = (/ 1.8, 2.0, 2.0, 2.2 ,2.0/),                  &
-                  PMdens = (/ 1600.0, 2200.0, 2200.0, 2600.0, 800.0/) ! kg/m3
 contains
 
    !------------------------------------------------------------------------
-   function SettlingVelocity(tsK,roa) result(Vs)
-    ! gravitational settling for 2 modes
+   elemental function SettlingVelocity(tsK,roa,sigma,diam,PMdens) result(Vs)
+    ! gravitational settling velocity
     ! Equations Axx referred to here are from Appendix A,
     !  Binkowski+Shankar, JGR, 1995
     !  Note confusing notation in B+S, dp was used for diff. coeff.
     !  here we use Di
 
      real, intent(in) :: tsK, roa ! temp, air density, Rel.hum
-     real  :: Vs(NSIZE)
+     real, intent(in) :: sigma,diam,PMdens
 
-   ! here we use dp=0.33 equivalent to McDonald et al.2007, Table 3 
-   ! data for accumulation mode, background.
-   ! and dp=1.7 for coarse
-   ! Extra 'giant' size is used for sea salt only
+     real             :: Vs ! (NSIZE)
 
-!     real, parameter, dimension(NSIZE) ::   &
-!                ! diam   = (/ 0.33e-6, 4.0e-6, 8.5e-6 /),  &
-!                !Mc: diam   = (/ 0.33e-6, 1.7e-6, 8.5e-6 /),  &
-!                 diam   = (/ 0.33e-6, 2.5e-6, 4.0e-6, 4.5e-6 ,22e-6 /),  &
-!                ! sigma  = (/ 1.8, 2.0, 2.2 /),                    &
-!                 sigma  = (/ 1.8, 1.8, 2.0, 2.2 ,2.0/),                    &
-!                 PMdens = (/ 1600.0, 1600.0, 2200.0, 2600.0, 800.0/) ! kg/m3
      real, parameter :: one2three = 1.0/3.0
-     integer :: imod 
      real    :: lnsig2, dg, & 
                 knut, Di,   & ! Knudsen number, Diffusion coefficient
                 Di_help, vs_help
-     !vind, vsmo, slip, stoke, schmidt ! slip correction, Stokes and Schmidt numbers
  !-----------------------------------------------------------------------------------
 
-    do imod = 1, NSIZE
 
-        lnsig2 = log(sigma(imod))**2
+        lnsig2 = log(sigma)**2
 
        !... mass median diameter -> geometric diameter 
 
-        dg = exp (log(diam(imod)) - 3.* lnsig2 )
+        dg = exp (log(diam) - 3.* lnsig2 )
 
         knut = 2.0*FREEPATH/dg   ! Knut's number
 
-        Di_help =BOLTZMANN*tsK/(3*PI*dg *VISCO *roa)                    ! A30, dpg
-        vs_help= dg*dg * PMdens(imod) * GRAV / (18.0* VISCO*roa)        ! A32
+        Di_help =BOLTZMANN*tsK/(3*PI*dg *VISCO *roa)              ! A30, dpg
+        vs_help= dg*dg * PMdens * GRAV / (18.0* VISCO*roa)        ! A32
 
        !... Diffusion coefficient for poly-disperse 
-        Di = Di_help*(exp(-2.5*lnsig2)+1.246*knut*exp(-4.*lnsig2))      ! A29, dpk 
+        Di = Di_help*(exp(-2.5*lnsig2)+1.246*knut*exp(-4.*lnsig2)) ! A29, dpk 
        !... Settling velocity for poly-disperse 
-        vs(imod) = vs_help*(exp(8.0*lnsig2)+1.246*knut*exp(3.5*lnsig2)) ! A31, k=3
+        Vs = vs_help*(exp(8.0*lnsig2)+1.246*knut*exp(3.5*lnsig2))  ! A31, k=3
 
-        if (DEBUG_VDS.and.MasterProc ) &
-            write(6,'(a,i3,es12.3,f10.3,5es12.3,3f9.2,f9.3)') &
-             "** Settling Vd ** ", imod, roa, tsK, &
-             dg,knut,Di_help,vs_help,Di, lnsig2, &
-             1.0e6*diam(imod), PMdens(imod), sigma(imod), vs(imod)*100.0
+! Can't have output from elemental
+!        if (DEBUG_VDS.and.MasterProc ) &
+!            write(6,'(a,i3,es12.3,f10.3,5es12.3,3f9.2,f9.3)') &
+!             "** Settling Vd ** ", roa, tsK, &
+!             dg,knut,Di_help,vs_help,Di, lnsig2, &
+!             1.0e6*diam, PMdens, sigma, Vs*100.0
+!OLDER TEXT/QUERY
+  ! Restrict settling velocity to 2cm/s. Seems
+  ! very high otherwise,  e.g. see Fig. 4, Petroff et al., 2008 (Part I), where
+  ! observed Vg for forests is usually < 2cm/s.
 
-     end do !imod
+
    end function SettlingVelocity
 
 ! -------------------------------------------------------------------

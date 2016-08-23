@@ -1,7 +1,7 @@
-! <My_Derived_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <My_Derived_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,41 +26,44 @@
 !*****************************************************************************!
 !==============================================================================
 module My_Derived_ml
+!---------------------------------------------------------------------------
+! DESCRIPTION
+! This module specifies the "derived" fields, such as accumulated
+! precipitation
+! or sulphate, daily, monthly or yearly averages, depositions. These fields
+! are all typically output as netCDF fields.
+!
+! This module provides the user-defined setups which are used in Derived_ml.
+! Derived fields are identified by a "class", such as "ADV" of "VOC", and
+! the Derived_ml should perform any integrations for this.
+!
+! Several often-used routines (e.g. for AOTs, acc. sulphate, are defined
+! in the Derived_ml.f90, but users can define their own here, since
+! we do not use "use only" in Derived_ml.
+!
+!   Only text strings used here to define wanted data
+!   All data field characteristics should be defined in Derived_ml, e.g.
+!   in f_2d arrays.
+!   Derived fields such as d_2d only exist in Derived_ml, so are
+!   accessed here through subroutine calls - using just the (i,j) part
+!   of the bigger d_2d arrays
+!
+! NOTE (14/9/2015) - this routine will likely be deleted in future, as we are
+!  moving most definitions to the config namelist system.
+!---------------------------------------------------------------------------
 
-  !---------------------------------------------------------------------------
-  ! DESCRIPTION
-  ! This module specifies the "derived" fields, such as accumulated
-  ! precipitation
-  ! or sulphate, daily, monthly or yearly averages, depositions. These fields
-  ! are all typically output as netCDF fields.
-  !
-  ! This module provides the user-defined setups which are used in Derived_ml.
-  ! Derived fields are identified by a "class", such as "ADV" of "VOC", and
-  ! the Derived_ml should perform any integrations for this.
-  !
-  ! Several often-used routines (e.g. for AOTs, acc. sulphate, are defined
-  ! in the Derived_ml.f90, but users can define their own here, since
-  ! we do not use "use only" in Derived_ml.
-  !
-  !   Only text strings used here to define wanted data
-  !   All data field characteristics should be defined in Derived_ml, e.g.
-  !   in f_2d arrays.
-  !   Derived fields such as d_2d only exist in Derived_ml, so are
-  !   accessed here through subroutine calls - using just the (i,j) part
-  !   of the bigger d_2d arrays
-  !---------------------------------------------------------------------------
-
-use AOTx_ml, only : O3cl, VEGO3_OUTPUTS, VEGO3_DEFS
+use AOTx_ml, only : VEGO3_OUTPUTS, nOutputVegO3,OutputVegO3
 use CheckStop_ml,  only: CheckStop, StopAll
 use Chemfields_ml, only : xn_adv, xn_shl, cfac
 use ChemSpecs      ! Use IXADV_ indices...
 use ChemGroups_ml  ! Allow all groups to ease compilation
                    !  eg. OXN_GROUP, DDEP_OXNGROUP, BVOC_GROUP
-use EmisDef_ml,     only :  EMIS_FILE
-use GridValues_ml, only : debug_li, debug_lj, debug_proc
-use Io_Nums_ml,   only: IO_NML
-use Io_Progs_ml,   only: PrintLog
-use LandDefs_ml,  only : LandDefs, LandType, Check_LandCoverPresent ! e.g. "CF"
+use EmisDef_ml,     only : EMIS_FILE
+use EmisGet_ml,      only: nrcemis, iqrc2itot
+use GridValues_ml,  only : debug_li, debug_lj, debug_proc
+use Io_Nums_ml,      only: IO_NML
+use Io_Progs_ml,     only: PrintLog
+use LandDefs_ml,    only : LandDefs, LandType, Check_LandCoverPresent ! e.g. "CF"
 use MetFields_ml,        only : z_bnd, roa
 use ModelConstants_ml, only : MasterProc, SOURCE_RECEPTOR  &
                         , USE_AOD &
@@ -69,8 +72,8 @@ use ModelConstants_ml, only : MasterProc, SOURCE_RECEPTOR  &
                         , KMAX_MID   ! =>  z dimension
 use MosaicOutputs_ml, only : nMosaic, MAX_MOSAIC_OUTPUTS, MosaicOutput, & !
   Init_MosaicMMC,  Add_MosaicMetConcs, &
-  Add_NewMosaics, Add_MosaicVEGO3, Add_MosaicDDEP, &
-  MMC_USTAR, MMC_INVL, MMC_RH, MMC_CANO3, MMC_VPD, MMC_FST, MMC_GSTO, MMC_EVAP
+  Add_NewMosaics, Add_MosaicVEGO3, Add_MosaicDDEP!, &
+!  MMC_USTAR, MMC_INVL, MMC_RH, MMC_CANO3, MMC_VPD, MMC_FST, MMC_GSTO, MMC_EVAP
 
 use OwnDataTypes_ml, only : Deriv, print_deriv_type, TXTLEN_DERIV, &
            TXTLEN_SHORT, typ_ss, typ_s3, typ_s4, typ_s5i, typ_si
@@ -86,11 +89,10 @@ private
  public  :: My_DerivFunc ! Miscelleaneous functions of xn_adv for output
                          ! (not currently used)
 
-
-   !/** Depositions are stored in separate arrays for now - to keep size of
-   !    derived arrays smaller and to allow possible move to a Deposition
-   !    module at a later stage.
-   !  Factor 1.0e6 converts from kg/m2/a to mg/m2/a
+  !    Depositions are stored in separate arrays for now - to keep size of
+  !    derived arrays smaller and to allow possible move to a Deposition
+  !    module at a later stage.
+  !    Factor 1.0e6 converts from kg/m2/a to mg/m2/a
 
   !        We normally distinguish source-receptor (SR) stuff from model
   !        evaluation.  The SR runs should use as few as possible outputs
@@ -123,34 +125,33 @@ private
 
   ! some shorthands for this table
    character(len=TXTLEN_SHORT), private, parameter ::&
-        D2    = "2d", D3 = "3d", SPEC  = "SPEC", GROUP ="GROUP"
+        D2    = "2d", D3 = "3d", SPEC  = "SPEC", GROUP ="GROUP", SHL ="SHL"
 
    !REMEMBER - KEEP UPPER CASE FOR ALL GASES
    type(typ_s5i), public, save, dimension(MAX_NUM_DERIV2D) :: OutputFields
    integer, public, save :: nOutputFields = 0
    integer, public, save :: nOutputWdep   = 0
 
+  ! Direct setting of derived fields:
+   type(Deriv), public, save, dimension(MAX_NUM_DERIV2D) :: OutputMisc= Deriv()
+   integer, save, public :: nOutputMisc = 0
+
    type(typ_s5i), public, save, dimension(MAX_NUM_DERIV2D) :: OutputConcs = &
-          typ_s5i("NOTSET","-","-","-","-",-999)
+          typ_s5i("-","-","-","-","-",-999)
 
    ! Depositions
   type(typ_si), public, save, dimension(MAX_NUM_DDEP_ECOS) :: DDEP_ECOS = &
-     typ_si("NOTSET", -999 )  ! e.g. "Grid     ", D), 
+     typ_si("-", -999 )  ! e.g. "Grid     ", D), 
 
   type(typ_s3), public, save, dimension(MAX_NUM_DDEP_WANTED) :: &
-    DDEP_WANTED = typ_s3('NOTSET', '-', ' -' )
+    DDEP_WANTED = typ_s3('-', '-', ' -' )
 ! e.g.     typ_s3("SO2      ", SPEC, "mgS"), &
+! Stomatal depositin (for HTAP)
+  type(typ_s3), public, save, dimension(MAX_NUM_DDEP_WANTED) :: &
+    SDEP_WANTED = typ_s3('-', '-', ' -' )
 
   type(typ_s3), public, save, dimension(MAX_NUM_WDEP_WANTED) :: &
-    WDEP_WANTED = typ_s3('NOTSET', '-', ' -' )
-
-! Tropospheric columns
-!   integer, public, save, dimension(MAX_COLUMNDAT_WANTED) :: &
-!      COLUMNDAT_WANTED = typ_ss( 'NOTSET', 'k20' )
-   !NMLinteger, public, parameter, dimension(1) :: COLUMN_MOLEC_CM2 = &
-   !NML       (/ NO2 /) ! , CO, CH4, C2H6, HCHO, NO2 /)
-   !NML character(len=3), public, save, dimension(MAX_COL_WANTED) :: &
-   !NML    COLUMN_LEVELS = (  'k20' ) ! , "k16", "k12", "k08" /)
+    WDEP_WANTED = typ_s3('-', '-', ' -' )
 
    character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
   D2_SR = (/ &
@@ -159,10 +160,6 @@ private
       ,"SOMO35        " &
       ,"PSURF         " &  ! Surface  pressure (for cross section):
   /)
-
-
-    character(len=TXTLEN_DERIV), public, parameter, dimension(1) :: &
-  COL_ADD = (/ "AOD" /)
 
 
   !============ Extra parameters for model evaluation: ===================!
@@ -197,84 +194,17 @@ private
    ! dep. velocities for in netcdf files. Set in My_DryDep_ml.
 
     type(typ_s5i), public, parameter, dimension(1) :: &
-         NewMosaic = (/ &
-             typ_s5i( "Mosaic", "VG", "O3       ", "Grid","cms",D ) &
-         /)
-
-!TFMM            ,typ_s5i( "Mosaic", "VG", "O3       ", "CF  ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "O3       ", "SNL ","cms",D ) &
-!           ,typ_s5i( "Mosaic", "VG", "HNO3     ", "Grid","cms",D ) &
-!           ,typ_s5i( "Mosaic", "VG", "NO2      ", "Grid","cms",D ) &
-!           ,typ_s5i( "Mosaic", "VG", "NO3_F    ", "Grid","cms",D ) &
-!           ,typ_s5i( "Mosaic", "VG", "NO3_C    ", "Grid","cms",D ) &
-!           ,typ_s5i( "Mosaic", "VG", "PAN      ", "Grid","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "HNO3     ", "W   ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "HNO3     ", "CF  ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "HNO3     ", "SNL ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "NO3_F    ", "SNL ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "NO3_C    ", "SNL ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "NO3_F    ", "Grid","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "NO3_C    ", "Grid","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "SEASALT_F", "W   ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "SEASALT_C", "W   ","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "SEASALT_F", "Grid","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "VG", "SEASALT_C", "Grid","cms",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "Rs", "SO2      ", "Grid","sm",D ) &
-!TFMM            ,typ_s5i( "Mosaic", "Rs", "NH3      ", "Grid","sm",D ) &
-
-! VEGO3 outputs for PODY and AOTX - see AOTnPOD_ml for definitions,
-! Any string used here must have been defined in AOTnPOD_ml.
-!
-    character(len=TXTLEN_DERIV), public, parameter, dimension(25) :: &
-     VEGO3_WANTED  =  (/ &
-         "POD1_IAM_DF     ",&
-         "POD1_IAM_MF     ",&
-         "POD1_DF         ",&
-         "POD1_CF         ",&
-         "POD3_TC         ",&
-         "POD6_TC         ",&
-!         "SPOD15_birch    ",&
-!         "SPOD10_birch    ",&
-!         "SPOD15_spruce   ",&
-!         "SPOD10_spruce   ",&
-!         "SPOD15_crops    ",&
-!         "SPOD25_crops    ",&
-        !WIMMAX:
-         "POD1_NEUR_SPRUCE",&
-         "POD1_NEUR_BIRCH ",&
-         "POD1_ACE_PINE   ",&
-         "POD1_ACE_OAK    ",&
-         "POD1_ACE_BEECH  ",&
-         "POD1_CCE_SPRUCE ",&
-         "POD1_CCE_BEECH  ",&
-         "POD1_MED_OAK    ",&
-         "POD1_MED_PINE   ",&
-         "POD1_MED_BEECH  ",&
-        ! "POD3_TC30d     ",&
-        ! "POD3_TC55d     ",&
-         "POD3_IAM_CR     ",&
-         "POD6_IAM_CR     ",&
-        ! "POD3_IAM_CR30d ",&
-        ! "POD3_IAM_CR55d ",&
-        ! "POD6_IAM_CR    ",& ! Not recommended - not robust
-        ! "POD6_IAM_CR30d ",&  ! Not recommended - not robust
-        ! "POD6_IAM_CR55d ",& ! Not recommended - not robust
-         "MMAOT40_TC      ",&
-         "MMAOT40_IAM_DF  ",&
-         "MMAOT40_IAM_MF  ",&
-         "MMAOT40_IAM_CR  ",&
-         "EUAOT40_Crops   ", &
-         "EUAOT40_Forests ", &
-         "MMAOT40_IAM_WH  " &
-    /) !NB -last not found. Could just be skipped, but kept
-       !to show behaviour
+      NewMosaic = (/typ_s5i( "Mosaic", "VG", "O3       ", "Grid","cms",D ) /)
 
 
 ! For met-data and canopy concs/fluxes ...
 
-!TFMM    character(len=TXTLEN_DERIV), public, parameter, dimension(3) :: &
-    character(len=TXTLEN_DERIV), public, parameter, dimension(1) :: &
-      MOSAIC_METCONCS = (/ "USTAR" /) ! TFMM "VPD     "  &
+    character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
+      MOSAIC_METCONCS = (/ "USTAR   ",  "LAI     "  & ! /) 
+                          ,"CanopyO3" & !SKIP
+                          ,"FstO3   "  /)
+   ! character(len=TXTLEN_DERIV), public, parameter, dimension(2) :: &
+   !   MOSAIC_METCONCS = (/ "USTAR", "LAI  " /) ! TFMM "VPD     "  &
                          ! ,"CanopyO3" & !SKIP
          !,"VPD     ", "FstO3   " "EVAP    ", "Gsto    " &
                         !SKIP
@@ -282,9 +212,10 @@ private
    !TFMM                    /)
                           ! "g_sto" needs more work - only set as L%g_sto
 
-    character(len=TXTLEN_DERIV), public, save, dimension(2) :: &
-      MET_LCS  = (/ "DF    ", "GR    " /) !, "CF    ", "BF    ", "NF    " /) !,
-                                !"IAM_DF", "IAM_MF"/)
+    character(len=TXTLEN_DERIV), public, save, dimension(6) :: &
+      MET_LCS  = (/ "DF    ", "GR    " , & !! /) !, "CF    ", "BF    ", "NF    " /) !,
+                    "BF    ", "TC    ", &  
+                    "IAM_DF", "IAM_CR"/)
 
       !MET_LCS  = (/ "GR    " , "IAM_CR", "IAM_DF", "IAM_MF"/)
     !character(len=TXTLEN_DERIV), public, parameter, dimension(5) :: &
@@ -306,6 +237,8 @@ private
        D3_OTHER  != (/ "D3_PM25water" /) !**** Under construction *******
      != (/ "D3_m_TH", "D3_m2s_Kz" /)
 
+    logical, parameter, public :: EmisSplit_OUT = .false.
+
     integer, private :: i,j,k,n, ivoc, index    ! Local loop variables
 
    contains
@@ -325,37 +258,52 @@ private
           tag_name    ! Needed to concatanate some text in AddArray calls
                       ! - older (gcc 4.1?) gfortran's had bug
     character(len=TXTLEN_SHORT) :: outname, outunit, outdim, outtyp, outclass
-    logical :: debug0   !  if(DEBUG%MY_DERIVED.and.MasterProc )
+    logical :: Is3D,debug0   !  if(DEBUG%MY_DERIVED.and.MasterProc )
+    character(len=12), save :: sub='InitMyDeriv:'
 
-    NAMELIST /OutputConcs_config/OutputConcs
-    NAMELIST /OutputDep_config/DDEP_ECOS, DDEP_WANTED, WDEP_WANTED
+    NAMELIST /OutputConcs_config/OutputMisc,OutputConcs,OutputVegO3
+    NAMELIST /OutputDep_config/DDEP_ECOS, DDEP_WANTED, WDEP_WANTED, SDEP_WANTED
 
     debug0 = DEBUG%MY_DERIVED.and.MasterProc
 
-!NML   typ_s5i("HMIX      ", "m",   D2,"HMIX     ","MISC", D)&
-   rewind(IO_NML)
-   read(IO_NML,NML=OutputConcs_config)
-   read(IO_NML,NML=OutputDep_config)
+    rewind(IO_NML)
+    read(IO_NML,NML=OutputConcs_config)
+    read(IO_NML,NML=OutputDep_config)
    
 
     !! Find number of wanted OutoutConcs
-    nOutputConcs = find_index("NOTSET", OutputConcs(:)%txt1, &
-                       first_only=.true. ) -1
-    nOutputWdep  = find_index("NOTSET", WDEP_WANTED(:)%txt1, &
-                       first_only=.true. ) -1
-!    nOutputMisc  = find_index("NOTSET", COLUMNDATA_WANTED(:)%txt1, &
+    nOutputMisc  = find_index("-", OutputMisc(:)%name, first_only=.true. ) -1
+    nOutputConcs = find_index("-", OutputConcs(:)%txt1, first_only=.true. ) -1
+    nOutputVegO3 = find_index("-", OutputVegO3(:)%name, first_only=.true. ) -1
+    nOutputWdep  = find_index("-", WDEP_WANTED(:)%txt1, first_only=.true. ) -1
+!    nOutputMisc  = find_index("-", COLUMNDATA_WANTED(:)%txt1, &
 !                       first_only=.true. ) -1
        
+    if(MasterProc) write(*,"(a,i3)") "NMLOUT nOUTMISC ", nOutputMisc
+    do i = 1,nOutputMisc  
+       if(MasterProc) write(*,"(3a,2i3)")"NMLOUT OUTMISC ",OutputMisc(i)%name,&
+              OutputMisc(i)%class, OutputMisc(i)%index
+       tag_name(1) = trim(OutputMisc(i)%name)
+       call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
+    end do
+   ! OutputVegO3 will be added to derived fields from within the Mosaics_ml
+   ! after adding 
+    do i = 1,nOutputVegO3  
+       if(MasterProc) write(*,"(3a,f7.1)")"NMLOUT OUTVegO3 ",OutputVegO3(i)%name,&
+              OutputVegO3(i)%class, OutputVegO3(i)%Threshold
+    end do
     if(MasterProc) then
+      write(*,"(a,i3)") "NMLOUT nOUTCONC ", nOutputConcs
       do i = 1,nOutputConcs  
-        write(*,"(3a,2i3)") "NMLOUT ", OutputConcs(i)%txt1, OutputConcs(i)%txt4, OutputConcs(i)%ind
+        write(*,"(3a,2i3)") "NMLOUT CONC ", OutputConcs(i)%txt1, &
+             OutputConcs(i)%txt4, OutputConcs(i)%ind
       end do
       do i = 1,size(DDEP_ECOS)  
         if( DDEP_ECOS(i)%ind < 1 ) exit
-        write(*,"(2a,2i3)") "NMLOUT CONC ", DDEP_ECOS(i)%name, DDEP_ECOS(i)%ind
+        write(*,"(2a,2i3)") "NMLOUT DEP ", DDEP_ECOS(i)%name, DDEP_ECOS(i)%ind
       end do
       do i = 1,size(DDEP_WANTED)  
-        if( DDEP_WANTED(i)%txt1 == 'NOTSET' ) exit
+        if( DDEP_WANTED(i)%txt1 == '-' ) exit
         write(*,"(2a)") "NMLOUT DDEP ", DDEP_WANTED(i)%txt1
       end do
       do i = 1,nOutputWdep  
@@ -376,10 +324,6 @@ private
      call CheckStop( errmsg, errmsg // "WDEP_WANTED too long" )
 !TEST     call AddArray( D2_SR,  wanted_deriv2d, NOT_SET_STRING, errmsg)
 !TEST     call CheckStop( errmsg, errmsg // "D2_SR too long" )
-     !if( USE_AOD ) then
-       call AddArray( COL_ADD,  wanted_deriv2d, NOT_SET_STRING, errmsg)
-       call CheckStop( errmsg, errmsg // "COL_ADD too long" )
-     !end if
 
   ! Emission sums - we always add these (good policy!)
    do  i = 1, size(EMIS_FILE)
@@ -396,7 +340,12 @@ private
      call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
    end if
 
-
+   if(EmisSplit_OUT)then
+      do i=1,max(18,nrcemis)
+         tag_name(1) = "EmisSplit_mgm2_"//trim(species(iqrc2itot(i))%name)
+         call AddArray(tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
+      enddo
+   endif
 
 ! Do SR last, so we get PM25 after groups have been done
      call AddArray( D2_SR,  wanted_deriv2d, NOT_SET_STRING, errmsg)
@@ -408,23 +357,6 @@ private
      end if
 
 
-     ! Column data:
-!     n = 0
-!     do n1 = 1, size(COLUMN_MOLEC_CM2)
-!     do n2 = 1, size(COLUMN_LEVELS)
-!       n = n + 1
-!       tmpname(n) = "COLUMN_" // trim( species(COLUMN_MOLEC_CM2(n1))%name ) &
-!          // "_" // COLUMN_LEVELS(n2)
-!     end do
-!     end do
-!     call AddArray(tmpname, wanted_deriv2d, NOT_SET_STRING, errmsg)
-!     call CheckStop( errmsg, errmsg // "COLUMN too long" )
-
-     ! Didn't work:
-     !call AddArray( "COLUMN_" // trim( species(COLUMN_MOLEC_CM2(:))%name ), &
-     !  wanted_deriv2d, NOT_SET_STRING)
-
-
       !------------- Depositions to ecosystems --------------------------------
 
       call Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
@@ -434,20 +366,17 @@ private
       ! For fluxes or AOTs we start with a formatted name, eg. POD_3.0_CF and
       !untangle it to get threshold Y (=3.0) and landcover type
 
-      allocate(VEGO3_OUTPUTS( size(VEGO3_WANTED) ), stat=istat)
+      allocate(VEGO3_OUTPUTS( nOutputVegO3 ), stat=istat)
       if(DEBUG%MY_DERIVED.and.istat/=0) &
          write(*,*) "My_Derived ISTAT ERR VEGO3"
 
-      do n = 1, size(VEGO3_WANTED)
-         n1 = find_index(VEGO3_WANTED(n),VEGO3_DEFS(:)%name)
-         call CheckStop(  n1>size(VEGO3_DEFS(:)%name) .or. n1<1 , &
-                   "VEGO3 not found"//trim(VEGO3_WANTED(n)) )
-         VEGO3_OUTPUTS(n) = VEGO3_DEFS(n1)
-       if( debug0 )  write(*,*) "VEGO3 NUMS ", n, n1, trim( VEGO3_WANTED(n) )
+      do n = 1, nOutputVegO3
+          VEGO3_OUTPUTS(n) = OutputVegO3(n)
+          if( debug0 )  write(*,*) "VEGO3 NUMS ", n, n1, &
+           trim(OutputVegO3(n)%name) 
       end do
-      if(MasterProc)call WriteArray(VEGO3_OUTPUTS(:)%name,size(VEGO3_WANTED)," VEGO3 OUTPUTS:")
-      call Add_MosaicVEGO3(M, nVEGO3)  ! M=monthly
-      nOutVEGO3 = nVEGO3
+      if(MasterProc)call WriteArray(VEGO3_OUTPUTS(:)%name,nOutputVegO3," VEGO3 OUTPUTS:")
+      call Add_MosaicVEGO3(nOutVEGO3) ! nVEGO3 is output, excluding missing LC types
 
       !----- some "luxury outputs" -------------------------------------------
 
@@ -455,7 +384,6 @@ private
 
       !------------- Deposition velocities -----------------------------------
 
-!print *, "NMOSAIC MC  ", NMosaic, nVEGO3
       call Add_NewMosaics(NewMosaic, nMc)
 
       if( debug0 ) then
@@ -469,7 +397,6 @@ private
       ! adding them to the derived-type array LCC_Met (e.g. => Met_CF)
       !FEB2011  Daiyl output asked for just now. Change larer
 
-!print *, "NMOSAIC VEG ", NMosaic, nVEGO3
       call Add_MosaicMetConcs(MOSAIC_METCONCS,MET_LCS, D, nMET)
       nOutMET = nMET !not needed?
   end if ! SOURCE_RECEPTOR
@@ -477,13 +404,10 @@ private
 
       !------------- end LCC data for d_2d -------------------------
 
-!print *, "NMOSAIC PRE ", NMosaic, nVEGO3
-     call CheckStop( NMosaic >= MAX_MOSAIC_OUTPUTS, &
-                       "too many nMosaics" )
-!print *, "NMOSAIC END ", NMosaic, nVEGO3
+     call CheckStop( NMosaic >= MAX_MOSAIC_OUTPUTS, sub//"too many nMosaics" )
      call AddArray( MosaicOutput(1:nMosaic)%name, &
                         wanted_deriv2d, NOT_SET_STRING, errmsg)
-     call CheckStop( errmsg, errmsg // "MosaicOutput too long" )
+     call CheckStop( errmsg, sub//errmsg // "MosaicOutput too long" )
 
      mynum_deriv2d  = LenArray( wanted_deriv2d, NOT_SET_STRING )
 
@@ -495,69 +419,83 @@ private
    !   OutputConcs = (/  typ_s5i("SO2", "ugS", D2,"AIR_CONCS", SPEC, M),&
    !                     typ_s5i("SO4", "ugS", D2,"AIR_CONCS", SPEC, M),&
 
-      do n = 1, nOutputConcs ! size( OutputConcs(:)%txt1 )
+      do n = 1, nOutputConcs
+        outname= trim(OutputConcs(n)%txt1)
+        outunit= trim(OutputConcs(n)%txt2)
+        outdim = trim(OutputConcs(n)%txt3)
+        outtyp = trim(OutputConcs(n)%txt4)
+        outclass=trim(OutputConcs(n)%txt5) ! MISC or SPEC or GROUP
+        Is3D    =.false.
+        if(outclass=="MISC") then
+          select case(outtyp)
+          case('COLUMN','COLUMN:SPEC','COLUMN:GROUP')
+            tag_name(1)= "COLUMN_"//trim(outname)//"_"//trim(outdim)
+          case('AOD','AOD:TOTAL','AOD:SPEC','AOD:SHL','AOD:GROUP',&
+               'EXT','EXT:TOTAL','EXT:SPEC','EXT:SHL','EXT:GROUP')
+            if(.not.USE_AOD)cycle
+            if(outname(1:3)/=outtyp(1:3))&
+              outname  = outtyp(1:3)//"_"//trim(outname)
+            tag_name(1)=            trim(outname)//"_"//trim(outdim)
+            Is3D       =(outtyp(1:3)=="EXT")
+          case default
+            tag_name(1)= trim(outname) ! Just use raw name here
+          endselect
+           
+          if(Is3D)then
+            call AddArray(tag_name(1:1),wanted_deriv3d,NOT_SET_STRING,errmsg)
+          else
+            call AddArray(tag_name(1:1),wanted_deriv2d,NOT_SET_STRING,errmsg)
+          endif
+          call CheckStop(errmsg,errmsg//trim(outname)//" too long")
+          nOutputFields = nOutputFields + 1
+          OutputFields(nOutputFields) = OutputConcs(n)
 
-         outname= trim(OutputConcs(n)%txt1)
-         outunit= trim(OutputConcs(n)%txt2)
-         outdim = trim(OutputConcs(n)%txt3)
-         outtyp = trim(OutputConcs(n)%txt4)
-         outclass = trim(OutputConcs(n)%txt5) ! MISC or SPEC or GROUP
+         elseif(outtyp=="AIR_CONCS") then
+            select case(outclass)
+              case(SPEC ) ;n1=find_index(outname,species(:)%name)
+              case(SHL  ) ;n1=find_index(outname,species(:)%name)
+              case(GROUP) ;n1=find_index(outname,chemgroups(:)%name)
+              case default;n1=-1
+            endselect
 
-!NOTUSED?         if( outdim == "3d" ) txt = "D3"  ! Will simplify later
-!NOTUSED?         if( outdim == "2d" ) txt = "SURF"  ! Will simplify later
+            if(n1<1) then
+              if( debug0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
+              call PrintLog("WARNING: Requested My_Derived OutputField not found: "&
+                  //trim(outclass)//":"//trim(outname), MasterProc)
+              cycle
+            endif
 
-         if( outclass == "MISC" ) then
-
-              tag_name(1)= trim(outname) ! Just use raw name here
-
-              if( outtyp == "COLUMN" ) then
-                 tag_name(1)= "COLUMN_" // trim(outname) //"_"//trim(outdim)
-              end if
-
-              call AddArray( tag_name(1:1) , wanted_deriv2d, &
-                     NOT_SET_STRING, errmsg)
-              nOutputFields = nOutputFields + 1
-              OutputFields(nOutputFields) = OutputConcs(n)
-
-         elseif( outtyp == "AIR_CONCS" ) then
-              select case(outclass)
-                case(SPEC ) ;n1=find_index(outname,species(:)%name)
-                case(GROUP) ;n1=find_index(outname,chemgroups(:)%name)
-                case default;n1=-1
-              endselect
-
-              if(n1<1) then
-                if( debug0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
-                call PrintLog("WARNING: Requested My_Derived OutputField not found: "&
-                   // " " //trim(outclass) // ":"   //trim(outname), MasterProc)
-                cycle
-              endif
-
+            select case(outdim)
+            case("2d","2D","SURF")   
               tag_name(1) = "SURF_" // trim(outunit) // "_" //  trim(outname)
               call AddArray(  tag_name(1:1) , wanted_deriv2d, &
-                     NOT_SET_STRING, errmsg)
+                        NOT_SET_STRING, errmsg)
               call CheckStop( errmsg, errmsg // trim(outname) // " too long" )
               nOutputFields = nOutputFields + 1
               OutputFields(nOutputFields) = OutputConcs(n)
 
-              if( outdim == "3d" ) then
-                  tag_name(1) = "D3_" // trim(outunit) // "_" //  trim(outname)
-                  call AddArray(  tag_name(1:1) , wanted_deriv3d, &
-                     NOT_SET_STRING, errmsg)
-                  call CheckStop( errmsg, errmsg // trim(outname) // " too long" )
-                  nOutputFields = nOutputFields + 1
-                  OutputFields(nOutputFields) = OutputConcs(n)
-              end if
+            case("3d","3D","MLEV")
+              tag_name(1) = "D3_" // trim(outunit) // "_" //  trim(outname)
+              call AddArray(  tag_name(1:1) , wanted_deriv3d, &
+                   NOT_SET_STRING, errmsg)
+              call CheckStop( errmsg, errmsg // trim(outname) // " too long" )
+              nOutputFields = nOutputFields + 1
+                OutputFields(nOutputFields) = OutputConcs(n)
 
-
+            case default
+              if( debug0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
+              call PrintLog("WARNING: Unsupported My_Derived OutputField%outdim: "&
+                  //trim(outclass)//":"//trim(outname)//":"//trim(outdim), MasterProc)
+              cycle
+            endselect
          else
-            call StopAll("My_Deriv: Not coded yet" // &
-              trim(outname) //":"//trim(outtyp) )
-         end if
+            call StopAll("My_Deriv: Unsupported OutputConcs" // &
+              trim(outname)//":"//trim(outtyp)//":"//trim(outdim))
+         endif
          if( debug0 ) write(*,*) "OutputFields-tags ", n, trim(outname)&
                      // "->"//tag_name(1)
 
-      end do
+      enddo
 
    ! ditto wanted_deriv3d....
 

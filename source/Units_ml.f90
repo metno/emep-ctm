@@ -1,7 +1,7 @@
-! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_5(2809)>
+! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,15 +25,13 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
 module Units_ml
-use CheckStop_ml,     only: CheckStop
-use ChemGroups_ml,    only: chemgroups
-!CMR use ChemSpecs_adv_ml, only: NSPEC_ADV
-!CMR use ChemSpecs_shl_ml, only: NSPEC_SHL
-!CMR use ChemChemicals_ml, only: species_adv
-use ChemSpecs,        only : NSPEC_ADV, NSPEC_SHL, species_adv
-use ModelConstants_ml,only: PPBINV,ATWAIR,atwS,atwN,MFAC
-use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT,Asc2D
-use SmallUtils_ml,    only: find_index
+use CheckStop_ml,         only: CheckStop
+use ChemGroups_ml,        only: chemgroups
+use ChemSpecs,            only: NSPEC_ADV, NSPEC_SHL, species_adv
+use ModelConstants_ml,    only: PPBINV
+use PhysicalConstants_ml, only: AVOG,ATWAIR
+use OwnDataTypes_ml,      only: TXTLEN_DERIV,TXTLEN_SHORT,Asc2D
+use SmallUtils_ml,        only: find_index
 
 implicit none
 private
@@ -49,9 +47,10 @@ interface Group_Units
   module procedure Group_Units_Asc2D,Group_Units_detail
 end interface Group_Units
 
-!    real, save    :: ugPM  = PPBINV /ATWAIR  ! No multiplication needed
 real, private, parameter :: &
-  atwC  = 12.0,             &
+  atwS  = 32.0,             & ! Atomic weight of Sulphur
+  atwN  = 14.0,             & ! Atomic weight of Nitrogen
+  atwC  = 12.0,             & ! Atomic weight of Carbon
   ugXm3 = PPBINV/ATWAIR,    & ! will be multiplied by species(?)%molwt
   ugSm3 = ugXm3*atwS,       &                       ! species(?)%sulphurs
   ugNm3 = ugXm3*atwN,       &                       ! species(?)%nitrogens
@@ -67,7 +66,8 @@ real, private, parameter :: &
 real, public, parameter ::  &
   to_ugSIA=ugXm3,           & ! conversion to ug
   to_mgSIA=to_ugSIA*1e3,    & ! conversion to mg
-  to_molec_cm3=MFAC,        &
+  to_number_cm3=0.001*AVOG/ATWAIR,& ! from density (roa, kg/m3) to molecules/cm3
+  to_molec_cm3=to_number_cm3,&    ! kg/m3=1000 g/m3=0.001*Avog/Atw molecules/cm3
   to_molec_cm2=to_molec_cm3*1e2
 
 ! Conversion to ug/m3
@@ -83,9 +83,12 @@ real, public, dimension(NSPEC_ADV), save  :: &
   to_ug_N,    & ! conversion to ug of N
   to_ug_S       ! conversion to ug of S
 
+logical, parameter :: T=.true., F=.false.
 type, public :: umap
-  character(len=TXTLEN_SHORT)  :: utxt,units    ! short,NetCDF units
-  real, dimension(0:NSPEC_ADV) :: uconv         ! conversion factor
+  character(len=TXTLEN_SHORT)  :: utxt,units ! short,NetCDF units,output class
+  logical :: volunit  ! volume unit (PPB output class)?
+  logical :: needroa  ! need to be multiplied by air density (roa)?,
+  real, dimension(0:NSPEC_ADV) :: uconv           ! conversion factor
 endtype umap
 
 type, public :: group_umap
@@ -94,32 +97,35 @@ type, public :: group_umap
   real,   pointer,dimension(:) :: uconv=>null() ! conversion factor
 endtype group_umap
 
-type(umap), public, save :: unit_map(20-1)=(/&
+type(umap), public, save :: unit_map(23-1)=(/&
 ! Air concentration
-  umap("mix_ratio","mol/mol",1.0),&  ! Internal model unit
-  umap("mass_ratio","kg/kg",1.0/ATWAIR), &  ! mass mixing ratio
-  umap("ppb" ,"ppb" ,PPBINV),&
-  umap("ppbh","ppb h",s2h  ),&  ! PPBINV already included in AOT calculations
-  umap("ug" ,"ug/m3" ,ugXm3),&  ! ug* units need to be further multiplied
-  umap("ugC","ugC/m3",ugCm3),&  !   by the air density (roa) as part of the
-  umap("ugN","ugN/m3",ugNm3),&  !   unit covnersion
-  umap("ugS","ugS/m3",ugSm3),&
+  umap("mix_ratio","mol/mol",T,F,1.0),&  ! Internal model unit
+  umap("mass_ratio","kg/kg" ,T,F,1.0/ATWAIR), &  ! mass mixing ratio
+  umap("ppb" ,"ppb"  ,T,F,PPBINV),&
+  umap("ppbC","ppbC" ,T,F,PPBINV),&
+  umap("ppbN","ppbN" ,T,F,PPBINV),&
+  umap("ppbS","ppbS" ,T,F,PPBINV),&
+  umap("ppbh","ppb h",T,F,s2h   ),&  ! PPBINV already included in AOT calculations
+  umap("ug" ,"ug/m3" ,F,T,ugXm3),&  ! ug* units need to be further multiplied
+  umap("ugC","ugC/m3",F,T,ugCm3),&  !   by the air density (roa) as part of the
+  umap("ugN","ugN/m3",F,T,ugNm3),&  !   unit covnersion
+  umap("ugS","ugS/m3",F,T,ugSm3),&
 ! Dry/Wet deposition
-  umap("mm" ,"mm"    ,1.0  ),&
-  umap("mg" ,"mg/m2" ,mgXm2),&
-  umap("mgC","mgC/m2",mgCm2),&
-  umap("mgN","mgN/m2",mgNm2),&
-  umap("mgS","mgS/m2",mgSm2),&
+  umap("mm" ,"mm"    ,F,F,1.0  ),&
+  umap("mg" ,"mg/m2" ,F,F,mgXm2),&
+  umap("mgC","mgC/m2",F,F,mgCm2),&
+  umap("mgN","mgN/m2",F,F,mgNm2),&
+  umap("mgS","mgS/m2",F,F,mgSm2),&
 ! Exposure to radioactive material
-  umap("uBq" ,"uBq/m3"  ,ugXm3),& ! inst/mean   exposure
-  umap("uBqh","uBq h/m3",ugXm3),& ! accumulated exposure over 1 hour
-  umap("mBq" ,"mBq/m2"  ,mgXm2),& ! deposition
+  umap("uBq" ,"uBq/m3"  ,F,T,ugXm3),& ! inst/mean   exposure
+  umap("uBqh","uBq h/m3",F,T,ugXm3),& ! accumulated exposure over 1 hour
+  umap("mBq" ,"mBq/m2"  ,F,F,mgXm2),& ! deposition
 ! Aerosol optical properties
-! umap("ext" ,"ext550nm",extX),&! ext* units need to be further multiplied...
+! umap("ext" ,"ext550nm",F,T,extX),&! ext* units need to be further multiplied...
 ! Coulumn output
-  umap("ugm2"   ,"ug/m2",ugXm3),&  ! ug* units need to be further multiplied
-  umap("mcm2"   ,"molec/cm2"    ,to_molec_cm2),&
-  umap("e15mcm2","1e15molec/cm2",to_molec_cm2*1e-15)/)
+  umap("ugm2"   ,"ug/m2"        ,F,T,ugXm3),&  ! ug* units need to be further multiplied
+  umap("mcm2"   ,"molec/cm2"    ,F,T,to_molec_cm2),&
+  umap("e15mcm2","1e15molec/cm2",F,T,to_molec_cm2*1e-15)/)
 
 logical, private, save :: Initialize_Units = .true.
 
@@ -143,11 +149,11 @@ subroutine Init_Units()
    select case (unit_map(i)%utxt)
     case("ug","mg","uBq","uBqh","mBq","ugm2","mass_ratio")
       uconv_spec = species_adv%molwt
-    case("ugC","mgC")
+    case("ugC","mgC","ppbC")
       uconv_spec = species_adv%carbons
-    case("ugN","mgN")
+    case("ugN","mgN","ppbN")
       uconv_spec = species_adv%nitrogens
-    case("ugS","mgS")
+    case("ugS","mgS","ppbS")
       uconv_spec = species_adv%sulphurs
 !   case("ext")
 !     uconv_spec = species_adv%molwt*species_adv%ExtC
@@ -157,14 +163,15 @@ subroutine Init_Units()
    endselect
    unit_map(i)%uconv(1:)=unit_map(i)%uconv(0)*uconv_spec
  enddo
-end subroutine Init_Units
+endsubroutine Init_Units
 
-subroutine Group_Units_Asc2D(hr_out,gspec,gunit_conv,debug,name)
+subroutine Group_Units_Asc2D(hr_out,gspec,gunit_conv,debug,name,volunit,needroa)
   type(Asc2D), intent(in)                     :: hr_out
   integer, pointer, dimension(:), intent(out) :: gspec      ! group array of indexes
   real,    pointer, dimension(:), intent(out) :: gunit_conv ! group array of unit conv. factors
   logical, intent(in)                         :: debug
-  character(len=TXTLEN_DERIV), intent(out),optional :: name       ! For output file, species names
+  character(len=TXTLEN_DERIV), intent(out),optional :: name  ! For output file, species names
+  logical,intent(out),optional :: volunit,needroa
   character(len=TXTLEN_DERIV)  :: dname
   integer :: i
 
@@ -186,36 +193,42 @@ subroutine Group_Units_Asc2D(hr_out,gspec,gunit_conv,debug,name)
 !!if(i>0)hr_out%unit=unit_map(i)%units
   if(i<1)i=find_index(hr_out%unit,unit_map(:)%units)
   call CheckStop(i<1,"Group_Units Error: Unknown unit "//trim(hr_out%unit))
+  if(present(volunit)) volunit = unit_map(i)%volunit
+  if(present(needroa)) needroa = unit_map(i)%needroa
 
   if(associated(gunit_conv)) deallocate(gunit_conv)
   allocate(gunit_conv(size(gspec)))
   gunit_conv(:)=unit_map(i)%uconv(gspec)
-end subroutine Group_Units_Asc2D
+endsubroutine Group_Units_Asc2D
 
-subroutine Group_Units_detail(igrp,unit,gspec,gunit_conv,debug)
+subroutine Group_Units_detail(igrp,unit,gspec,gunit_conv,debug,volunit,needroa)
   integer, intent(in)                         :: igrp
   character(len=*), intent(in)                :: unit
   integer, pointer, dimension(:), intent(out) :: gspec      ! group array of indexes
   real,    pointer, dimension(:), intent(out) :: gunit_conv ! group array of unit conv. factors
   logical, intent(in)                         :: debug
+  logical,intent(out),optional :: volunit,needroa
   type(Asc2D)                                 :: hr_out
   hr_out%spec=igrp
   hr_out%unit=unit//""
   hr_out%type="Group_Units_detail"
-  call Group_Units_Asc2D(hr_out,gspec,gunit_conv,debug)
-end subroutine Group_Units_detail
+  call Group_Units_Asc2D(hr_out,gspec,gunit_conv,debug,&
+                         volunit=volunit,needroa=needroa)
+endsubroutine Group_Units_detail
 
-function Group_Scale(igrp,unit,debug) result(gmap)
+function Group_Scale(igrp,unit,debug,volunit,needroa) result(gmap)
   integer, intent(in)          :: igrp
   character(len=*), intent(in) :: unit
   logical, intent(in)          :: debug
   type(group_umap)             :: gmap
+  logical,intent(out),optional :: volunit,needroa
   type(Asc2D)                  :: hr_out
   hr_out%spec=igrp
   hr_out%unit=unit//""
   hr_out%type="Group_Scale"
-  call Group_Units_Asc2D(hr_out,gmap%iadv,gmap%uconv,debug,name=gmap%name)
-end function Group_Scale
+  call Group_Units_Asc2D(hr_out,gmap%iadv,gmap%uconv,debug,&
+                         name=gmap%name,volunit=volunit,needroa=needroa)
+endfunction Group_Scale
 
 function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(unitscale)
   character(len=*), intent(in) :: txtin
@@ -240,7 +253,7 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
     txt="ug"
   case("mol/mol","mole mole-1","mixratio","vmr")
     txt="mix_ratio"
-  case("kg/kg","kg kg-1","massratio","mmr")
+  case("kg/kg","kg kg-1","kg kg**-1","massratio","mmr")
     txt="mass_ratio"
   case("ppbv","ppbV")
     txt="ppb"
@@ -249,9 +262,9 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
   if(i<1)i=find_index(txt,unit_map(:)%units)
   call CheckStop(i<1,"Units_Scale Error: Unknown unit "// trim(txtin) )
 
-  if(present(unitstxt))unitstxt = unit_map(i)%units
-  if(present(volunit )) volunit = txt(1:3)=="ppb"
-  if(present(needroa )) needroa = any(txt(1:2)==(/"ug","uB","ex"/))
+  if(present(unitstxt))unitstxt = trim(unit_map(i)%units)
+  if(present(volunit )) volunit = unit_map(i)%volunit
+  if(present(needroa )) needroa = unit_map(i)%needroa
   select case (iadv)
   case (-1)
 ! groups (called iadv==-1) do not get a scaling factor at this stage.

@@ -1,9 +1,8 @@
-! <LandPFT_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2010-2012 met.no
-!* 
+! <LandPFT_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,28 +10,34 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
+!> <LandPFT_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
+!! *************************************************************************! 
+!! Reads LAI maps from Global LPJ-GUESS model
+!! Data provided by Guy Schurgers & Almut Arneth (Lund University) 
+!! and normalised to LAI factors for EMEP usage (DS)
+
 module LandPFT_ml
 
-use CheckStop_ml,   only: CheckStop
-use GridValues_ml,  only: debug_proc, debug_li, debug_lj
-use ModelConstants_ml,  only : DEBUG_LANDPFTS, MasterProc, BVOC_USED
+use CheckStop_ml,   only: CheckStop, StopAll
+use GridValues_ml,  only: debug_proc, debug_li, debug_lj, glon, glat
+use ModelConstants_ml,  only : DEBUG, MasterProc, BVOC_USED, PFT_MAPPINGS
 use NetCDF_ml, only: ReadField_CDF
 use Par_ml,         only: MAXLIMAX, MAXLJMAX, me
-use SmallUtils_ml,  only: find_index, NOT_FOUND, WriteArray
+use SmallUtils_ml,  only: find_index, NOT_FOUND, WriteArray, trims
 
 implicit none
 private
@@ -60,7 +65,8 @@ private
 
    ! Variables available:
 
-    character(len=5),public, parameter :: LAI_VAR =  "LAIv_"
+    !NORMED character(len=5),public, parameter :: LAI_VAR =  "LAIv_"
+    character(len=5),public, parameter :: LAI_VAR =  "LAIv"
     character(len=5),public, parameter, dimension(2) :: BVOC_VAR = &
         (/ "Eiso_" , "Emt_ " /)
 
@@ -87,7 +93,7 @@ contains
     integer :: pft
     character(len=20) :: varname
 
-return ! JAN31TEST. This code needs to be  completed still *****
+!PFT return ! JAN31TEST. This code needs to be  completed still *****
      if ( my_first_call ) then
          allocate ( pft_lai(MAXLIMAX,MAXLJMAX,N_PFTS) )
          my_first_call = .false.
@@ -99,14 +105,17 @@ return ! JAN31TEST. This code needs to be  completed still *****
     ! Get LAI data:
 
      do pft =1, N_PFTS
-           varname = trim(LAI_VAR) // trim(PFT_CODES(pft)) 
+           varname = trims( "Normed_" // LAI_VAR // PFT_CODES(pft) ) 
 
            call ReadField_CDF('GLOBAL_LAInBVOC.nc',varname,&
-              lpj,month,interpol='zero_order',needed=.true.,debug_flag=.true.)
+              lpj,month,interpol='zero_order',needed=.true.,debug_flag=.false.)
 
            pft_lai(:,:,pft ) = lpj(:,:)
-           if( DEBUG_LANDPFTS .and. debug_proc ) then
-             write(*,*) "PFT_DEBUG ", pft, lpj(debug_li, debug_lj)
+           if( DEBUG%PFT_MAPS.gt.0 .and. debug_proc ) then
+             write(*,"(a20,2i3,3f8.3)") "PFT_DEBUG "//trim(varname), &
+                 month, pft, &
+                 glon(debug_li, debug_lj), glat(debug_li, debug_lj), &
+                 lpj(debug_li, debug_lj)
            end if
 
      end do ! pft

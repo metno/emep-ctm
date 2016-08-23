@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -115,6 +115,7 @@ module AirEmis_ml
       
       if(.not.allocated(airlig))then
          allocate(airlig(KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX))
+         airlig=0.0
       endif
 
 ! --- Read Emission data received from DLR 
@@ -319,9 +320,14 @@ module AirEmis_ml
             do k = KCHEMTOP,KMAX_MID
                  frac = 1. - fraca(k) - fracb(k)
                  kg = ilevel(k)
-                 airem(k,i,j) = flux(lon,lat,kg)*fraca(k)             &
-                              + flux(lon,lat,kg-1)*frac              &
-                              + flux(lon,lat,kg-2)*fracb(k)
+                 if(kg<=ILEV)then
+                    airem(k,i,j) = flux(lon,lat,kg)*fraca(k)             &
+                         + flux(lon,lat,kg-1)*frac              &
+                         + flux(lon,lat,kg-2)*fracb(k)
+                 else
+                    !zero emissions
+                    airem(k,i,j) = 0.0
+                 endif
             end do
 
            ! surface emissions

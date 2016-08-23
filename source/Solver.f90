@@ -1,9 +1,7 @@
-
-! <Solver.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +24,8 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!_____________________________________________________________________________
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model>
+!*****************************************************************************!
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
 
@@ -50,12 +49,9 @@
     use Aqueous_ml,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3
     use CheckStop_ml,      only: CheckStop
     use DefPhotolysis_ml         ! => IDHNO3, etc.
-    !ESX use EmisDef_ml,        only: QSSFI, QSSCO, QDUFI, QDUCO, QPOL, &
-    !ESX                              QROADDUST_FI, QROADDUST_CO
-    use Emissions_ml,      only: KEMISTOP
+    use EmisDef_ml,      only: KEMISTOP
     use ChemFunctions_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
     use ChemGroups_ml,     only: RO2_POOL, RO2_GROUP
-!CMR    use ChemSpecs_tot_ml           ! => NSPEC_TOT, O3, NO2, etc.
     use ChemSpecs                  ! => NSPEC_TOT, O3, NO2, etc.
     use Chemfields_ml, only : NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
     use ChemRates_rct_ml,   only: rct

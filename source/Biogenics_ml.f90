@@ -1,9 +1,8 @@
-! <Biogenics_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <Biogenics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,23 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
+!> <Biogenics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
+!  **************************************************************************! 
+
 module Biogenics_ml
 
   !/-- Reads in BVOC emisions factors 
@@ -55,8 +57,7 @@ module Biogenics_ml
   !    Dave Simpson, 2010-2012
   !---------------------------------------------------------------------------
 
-  use CheckStop_ml,      only: CheckStop
-!CMR   use ChemChemicals_ml,  only : species
+  use CheckStop_ml,      only: CheckStop, StopAll !BIO
   use ChemSpecs,         only : species
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
   use Io_ml            , only : IO_FORES, open_file, ios, PrintLog, datewrite
@@ -66,12 +67,13 @@ module Biogenics_ml
   use Landuse_ml,        only : LandCover
   use LocalVariables_ml, only : Grid  ! -> izen, DeltaZ
   use MetFields_ml,      only : t2_nwp
-  use ModelConstants_ml, only : USE_EURO_SOILNOX, USE_GLOBAL_SOILNOx, DEBUG_SOILNOX, USE_SOILNH3
   use ModelConstants_ml, only : NPROC, MasterProc, TINY, &
-                           USE_PFT_MAPS, NLANDUSEMAX, IOU_INST, & 
+                           USES, NLANDUSEMAX, IOU_INST, & 
                            KT => KCHEMTOP, KG => KMAX_MID, & 
                            EURO_SOILNOX_DEPSCALE, & 
-                           DEBUG_BIO, BVOC_USED, MasterProc
+                           DEBUG, BVOC_USED, MasterProc, &
+                           USE_EURO_SOILNOX, USE_GLOBAL_SOILNOx, &
+                           DEBUG_SOILNOX, USE_SOILNH3
   use NetCDF_ml,        only : ReadField_CDF, printCDF
   use OwnDataTypes_ml,  only : Deriv, TXTLEN_SHORT
   use Par_ml   , only :  MAXLIMAX,MAXLJMAX,MSG_READ1,me, limax, ljmax
@@ -168,7 +170,9 @@ module Biogenics_ml
 
     integer :: alloc_err
     
-    allocate(AnnualNdep(MAXLIMAX,MAXLJMAX),SoilNOx(MAXLIMAX,MAXLJMAX), SoilNH3(MAXLIMAX,MAXLJMAX))
+    allocate(AnnualNdep(MAXLIMAX,MAXLJMAX), &
+                SoilNOx(MAXLIMAX,MAXLJMAX), &
+                SoilNH3(MAXLIMAX,MAXLJMAX))
     allocate(EmisNat(NEMIS_BioNat,MAXLIMAX,MAXLJMAX))
     EmisNat=0.0
     allocate(day_embvoc(MAXLIMAX,MAXLJMAX,size(BVOC_USED)))
@@ -243,9 +247,12 @@ module Biogenics_ml
 
    end subroutine Init_BVOC
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-   subroutine Get_LCinfo() ! Gets landcover info, last_bvoc_LC
-      ! Checks for default bvoc emissions from each landcover category
-      ! (read from Inputs_LandDefs.csv file)
+  !> SUBROUTINE Get_LCinfo
+  !! Checks for default bvoc emissions from each landcover category
+  !! (read from Inputs_LandDefs.csv file)
+  !! and establishes number of LC with BVOC emissions
+
+   subroutine Get_LCinfo()
       integer :: iL
 
         do iL= 1, size(LandType(:)%pft )
@@ -253,10 +260,13 @@ module Biogenics_ml
             if( LandDefs(iL)%Eiso > 0 ) last_bvoc_LC = iL
             if( LandDefs(iL)%Emtp > 0 ) last_bvoc_LC = iL
             if( LandDefs(iL)%Emtl > 0 ) last_bvoc_LC = iL
+            if(MasterProc.and.DEBUG%BIO ) &
+              write(*,"(a,2i4,3es12.3)") "LandDefs: BVOC LC:", &
+               iL, last_bvoc_LC, LandDefs(iL)%Eiso,LandDefs(iL)%Emtp,LandDefs(iL)%Emtl
 
          end do
-         if( MasterProc.and.DEBUG_BIO)&
-              write(*,*) " LAST BVOC LC from LandDefs:",last_bvoc_LC
+         if( MasterProc.and. DEBUG%BIO ) write(*,*) "LandDefs: LAST BVOC LC:",&
+           last_bvoc_LC,size(LandType(:)%pft)
 
        ! We need at least 4 for CF, DF, NF, BF in Euro file
          last_bvoc_LC =  max(last_bvoc_LC, 4 ) 
@@ -271,18 +281,10 @@ module Biogenics_ml
 
 !    Reads the processed BVOC emission potentials.
 
-!    real    :: loc(MAXLIMAX,MAXLJMAX)  ! Emissions read from file
     integer :: iVeg, iEmis, ibvoc, i,j
     character(len=1000) :: varname
     character(len=2), dimension(4) :: VegName = (/ "CF", "DF", "NF", "BF" /)
 
-
-       !varname = "Fake"
-       !HaveLocalEF(:) = .false.
-       !call ReadField_CDF('EMEP_EuroBVOC.nc',varname,&
-       !    loc,1,interpol='zero_order',needed=.true.,debug_flag=.true.)
-       !if( debug_proc ) write(*,*)  "EMEP_EuroBVOC i,j fake ", &
-       !   loc(debug_li, debug_lj)
      do iVeg = 1, size(VegName)
        ibvoc = find_index( VegName(iveg), LandDefs(:)%code )
        HaveLocalEF(ibvoc) = .true.
@@ -333,7 +335,7 @@ module Biogenics_ml
       real :: biso, bmt    !  Just for printout
       logical :: use_local, debug_flag
 
-      if( MasterProc .and.DEBUG_BIO) write(*,*) "Into MergedBVOC"
+      if( MasterProc .and. DEBUG%BIO ) write(*,*) "Into MergedBVOC"
 
       do i = 1, limax !PPP MAXLIMAX
       do j = 1, ljmax !PPP MAXLJMAX
@@ -399,17 +401,17 @@ module Biogenics_ml
       integer :: i, j, nlu, iL, iiL, ibvoc
       real :: LAIfac  ! Multiplies by land-fraction
       real :: b       !  Just for printout
-      logical :: debug
+      logical :: mydebug
       logical, save :: my_first_call = .true.
       real, allocatable, dimension(:,:) ::  workarray
 
-      if( MasterProc .and.DEBUG_BIO ) write(*,"(a,3i5)") "Into SetDailyBVOC", &
+      if( MasterProc .and. DEBUG%BIO ) write(*,"(a,3i5)") "Into SetDailyBVOC", &
             daynumber, last_daynumber, last_bvoc_LC
 
       if ( daynumber == last_daynumber ) return
       last_daynumber = daynumber
 
-      if ( DEBUG_BIO .and.  my_first_call  ) then
+      if ( DEBUG%BIO .and.  my_first_call  ) then
            allocate(  workarray(MAXLIMAX,MAXLJMAX), stat=alloc_err )
            call CheckStop( alloc_err , "workarray alloc failed"  )
            workarray = 0.0
@@ -421,7 +423,7 @@ module Biogenics_ml
         nlu = LandCover(i,j)%ncodes
 
         day_embvoc(i,j,:) = 0.0
-        debug = ( DEBUG_BIO .and. debug_proc .and.  &
+        mydebug = ( DEBUG%BIO .and. debug_proc .and.  &
                    debug_li == i .and. debug_lj == j )
 
         LULOOP: do iiL= 1, nlu
@@ -435,7 +437,7 @@ module Biogenics_ml
              
               if( LandCover(i,j)%LAI(iiL)< 1.0e-5 ) then ! likely wetlands, tundra
                  LAIfac = 1.0
-                 if( debug ) write(*,*)"BVOC TUNDRA/WETLANDS",iL,LandCover(i,j)%LAI(iiL)
+                 if( mydebug ) write(*,*)"BVOC TUNDRA/WETLANDS",iL,LandCover(i,j)%LAI(iiL)
               else
                 LAIfac = LandCover(i,j)%LAI(iiL)/LandDefs(IL)%LAImax
                 LAIfac= min(LAIfac, 1.0)
@@ -449,7 +451,7 @@ module Biogenics_ml
                    !done above LandCover(i,j)%fraction(iiL) *  &
               end do
 
-              if ( debug ) then
+              if ( mydebug ) then
                  b = 0.0
                  if ( iL <= last_bvoc_LC ) b = bvocEF(i, j,iL, BIO_ISOP)
                  write(*,"(a,a10,2i5,f9.5,2f7.3,8f10.3)") "SetBVOC", &
@@ -460,14 +462,14 @@ module Biogenics_ml
                   
               end if
               ! When debugging it helps with an LAI map
-              if( DEBUG_BIO .and. my_first_call ) &
+              if( DEBUG%BIO .and. my_first_call ) &
                  workarray(i,j) = workarray(i,j) + &
                     LandCover(i,j)%LAI(iiL)*LandCover(i,j)%fraction(iiL)
         end do LULOOP
       end do
       end do
 
-      if ( DEBUG_BIO ) then
+      if ( DEBUG%BIO ) then
 !         if ( my_first_call  ) then ! print out 1st day
 !              call printCDF("BIO-LAI", workarray, "m2/m2" )
 !              workarray(:,:) = day_embvoc(:,:,1)
@@ -508,7 +510,7 @@ module Biogenics_ml
 
       !?? for terpene fac = 0.5*fac(iso): as mass terpene = 2xmass isoprene
 
-      if(DEBUG_BIO  .and.  MasterProc ) &
+      if(DEBUG%BIO  .and.  MasterProc ) &
              write(6,"(A12,i4,5g12.3)") 'Biogenic ecfs: ', &
                   it, ( canopy_ecf(i,it), i=1, N_ECF )
     end do
@@ -586,6 +588,8 @@ module Biogenics_ml
      EmisNat(ispec_C5H8,i,j) = 0.0
      E_MTL = 0.0
      E_ISOP = 0.0
+     par = 0.0   ! just for printout
+     cL  = 0.0   ! just for printout
   endif ! daytime
 
     if ( ispec_APIN > 0 ) then
@@ -613,7 +617,7 @@ module Biogenics_ml
     end if
      
  
-    if ( DEBUG_BIO .and. debug_proc .and. i==debug_li .and. j==debug_lj .and. &
+    if ( DEBUG%BIO .and. debug_proc .and. i==debug_li .and. j==debug_lj .and. &
          current_date%seconds == 0 ) then
 
       call datewrite("DBIO env ", it2m, (/ max(par,0.0), max(cL,0.0), &

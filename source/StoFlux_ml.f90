@@ -1,9 +1,8 @@
-! <StoFlux_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,22 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
+!> StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model
+
 module StoFlux_ml
   use CheckStop_ml
   use DO3SE_ml, only : do3se, nSumVPD, SumVPD_LC
@@ -32,7 +33,7 @@ module StoFlux_ml
   use LandDefs_ml, only : LandType, STUBBLE, iLC_grass
   use LocalVariables_ml, only : L, Grid
   use MicroMet_ml, only : AerRes, Wind_at_h
-  use ModelConstants_ml, only : NLANDUSEMAX, dt_advec, DEBUG_STOFLUX
+  use ModelConstants_ml, only : NLANDUSEMAX, dt_advec, DEBUG
   use Par_ml, only : MAXLIMAX, MAXLJMAX
   use PhysicalConstants_ml, only : AVOG, KARMAN
   use SmallUtils_ml, only : find_index
@@ -119,7 +120,7 @@ contains
           Sub(iL)%FstO3 = 0.0
           Sub(iL)%cano3_ppb   = 0.0  !! Can't do better?
           Sub(iL)%EvapTransp = 0.0   ! No evapo-transpiration ?
-          if ( DEBUG_STOFLUX .and. debug_flag ) &
+          if ( DEBUG%STOFLUX .and. debug_flag ) &
             call datewrite("FST - hveg < z0 ", iL, (/ L%hveg, L%z0 /) )
 
         else 
@@ -153,7 +154,7 @@ contains
               if( L%g_sun > 0.0 ) SumVPD(i,j,ivpd) = SumVPD(i,j,ivpd) + L%vpd*dt_advec/3600.0
               tmp_gsun = L%g_sun
               if ( SumVPD(i,j,ivpd) > 8.0 ) L%g_sun = min( L%g_sun, old_gsun(i,j,ivpd) )
-              if( DEBUG_STOFLUX .and. debug_flag ) then
+              if( DEBUG%STOFLUX .and. debug_flag ) then
                  call datewrite("StoFlux SUMVPD ", iL, &
                     (/ real(ivpd), L%rh, L%t2C,  L%vpd, SumVPD(i,j,ivpd) /) ) 
               !       old_gsun(i,j), tmp_gsun, L%g_sun , L%g_sto
@@ -166,7 +167,7 @@ contains
 
           Sub(iL)%FstO3 = L%cano3_nmole * rc_leaf/(rb_leaf+rc_leaf) * L%g_sun 
 
-          if( DEBUG_STOFLUX .and. debug_flag ) then
+          if( DEBUG%STOFLUX .and. debug_flag ) then
             !write(*,*) "StoFlux SXXS", iL, nLC, iL, L%hveg, L%cano3_nmole, L%g_sun
             call datewrite("StoFlux O3 ", (/ iiL, nLC, iL /),&
                 (/ L%hveg, L%g_sun, L%cano3_nmole, L%cano3_ppb /) )
@@ -181,7 +182,7 @@ contains
 
              Sub(iL)%FstO3 = Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb * Sub(iL)%FstO3
 
-             if ( DEBUG_STOFLUX  .and. debug_flag ) then
+             if ( DEBUG%STOFLUX  .and. debug_flag ) then
                 call datewrite("CLOVER ", iL, &
                    (/ Sub(iL)%FstO3, Sub(iLC_grass)%cano3_ppb, &
                        Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb /) )
@@ -228,7 +229,7 @@ contains
          !                 (rb_leaf/1.6 + 0.0224*(L%t2/273.0) 
 
 
-          if ( DEBUG_STOFLUX .and. debug_flag.and. current_date%seconds==0 ) then 
+          if ( DEBUG%STOFLUX .and. debug_flag.and. current_date%seconds==0 ) then 
             call datewrite("StoFlux VALS ", iL, (/ L%LAI, L%g_sto, L%g_sun, u_hveg,&
                              Sub(iL)%cano3_ppb, Sub(iL)%FstO3, gvcms /) )
           end if

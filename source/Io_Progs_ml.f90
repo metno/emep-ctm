@@ -1,9 +1,8 @@
-! <Io_Progs_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
-!          Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-201409 met.no
-!* 
+! <Io_Progs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2015 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -11,20 +10,20 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-!*****************************************************************************! 
+!*****************************************************************************!
  module Io_Progs_ml  
 !_____________________________________________________________________________
 ! -- routines to check and open files. Also, the routine Read_Headers
@@ -356,8 +355,8 @@ subroutine Read2D(fname,data2d,idata2d)
   Nlines = 0
   Nused = 0
 
-  if (present(idata2d) ) idata2d(:,:) = 0    !/**  initialise  **/
-  if (present(data2d)  ) data2d (:,:) = 0.0  !/**  initialise  **/
+  if (present(idata2d) ) idata2d(:,:) = 0    !***  initialise  ***
+  if (present(data2d)  ) data2d (:,:) = 0.0  !***  initialise  ***
 
   if ( MasterProc ) then
     call open_file(IO_TMP,"r",fname,needed=.true.)
@@ -442,7 +441,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
 
   Nlines = 0
 
-  data2d  (:,:,:) = 0.0     !/**  initialise  **/
+  data2d  (:,:,:) = 0.0     !***  initialise  ***
 
   Start_Needed = .true.
   if ( present(HeadersRead) ) then   ! Headers have already been read

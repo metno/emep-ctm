@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-201409 met.no
+!*  Copyright (C) 2007-2015 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -280,9 +280,11 @@
 
          if (aw >= 0.40) then
            mfs15 = poly4(C15,aw)
-           mfs2  = poly4(C2,aw)
+           !mfs2  = poly4(C2,aw)
+           !y2    = (1.0 - mfs2) / mfs2
+           MFSSO4 = POLY6( KSO4, AW )             ! PW-18/12/2014 after Changed 05/30/2000 by FSB
+           Y2     = ( 1.0d0 - MFSSO4 ) / MFSSO4
            y15   = (1.0 - mfs15) / mfs15
-           y2    = (1.0 - mfs2) / mfs2
            y     = 2.0 * (y15 * (2.0 - x) + y2 * (x - 1.5) )
          end if ! end of check for crystallization
 

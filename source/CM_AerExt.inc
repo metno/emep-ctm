@@ -1,15 +1,17 @@
-integer, public, parameter :: NUM_EXT = 22
+integer, public, parameter :: NUM_EXT = 24
 type(ExtEffMap), public, dimension(NUM_EXT), parameter :: ExtMap=(/&
+  ExtEffMap(ASH_C           ,CEXT_DDc ,WET_MODE),&
+  ExtEffMap(ASH_F           ,CEXT_DDf ,WET_MODE),&
   ExtEffMap(DUST_ROAD_C     ,CEXT_DDc ,DRY_MODE),&
   ExtEffMap(DUST_ROAD_F     ,CEXT_DDf ,DRY_MODE),&
-  ExtEffMap(DUST_SAH_C      ,CEXT_DDc ,WET_MODE),&
-  ExtEffMap(DUST_SAH_F      ,CEXT_DDf ,WET_MODE),&
-  ExtEffMap(DUST_WB_C       ,CEXT_DDc ,WET_MODE),&
-  ExtEffMap(DUST_WB_F       ,CEXT_DDf ,WET_MODE),&
+  ExtEffMap(DUST_SAH_C      ,CEXT_DDc ,DRY_MODE),&
+  ExtEffMap(DUST_SAH_F      ,CEXT_DDf ,DRY_MODE),&
+  ExtEffMap(DUST_WB_C       ,CEXT_DDc ,DRY_MODE),&
+  ExtEffMap(DUST_WB_F       ,CEXT_DDf ,DRY_MODE),&
   ExtEffMap(EC_F_FFUEL_AGE  ,CEXT_ECa ,WET_MODE),&
-  ExtEffMap(EC_F_FFUEL_NEW  ,CEXT_ECn ,WET_MODE),&
+  ExtEffMap(EC_F_FFUEL_NEW  ,CEXT_ECn ,DRY_MODE),&
   ExtEffMap(EC_F_WOOD_AGE   ,CEXT_ECa ,WET_MODE),&
-  ExtEffMap(EC_F_WOOD_NEW   ,CEXT_ECn ,WET_MODE),&
+  ExtEffMap(EC_F_WOOD_NEW   ,CEXT_ECn ,DRY_MODE),&
   ExtEffMap(FFIRE_BC        ,CEXT_EC  ,WET_MODE),&
   ExtEffMap(FFIRE_OM        ,CEXT_OC  ,WET_MODE),&
   ExtEffMap(FFIRE_REMPPM25  ,CEXT_DDf ,WET_MODE),&
