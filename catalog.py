@@ -53,15 +53,15 @@ Examples:
     "Select a release dataset")
   group.add_option("-R","--revision",
     type="string", metavar="REV",
-    action="store", dest="tag",
+    action="append", dest="tag",
     help="revision REV")
   group.add_option("-S","--status",
     type="int", metavar="YEAR",
-    action="store", dest="status",
+    action="append", dest="status",
     help=SUPPRESS_HELP) # help="YEAR's status report")
   group.add_option("-Y","--year",
     type="int", metavar="YEAR",
-    action="store", dest="year",
+    action="append", dest="year",
     help="Meteorological/run YEAR")
   parser.add_option_group(group)
 
@@ -101,7 +101,7 @@ Examples:
  
   opts,args = parser.parse_args(args[1:])
   if(all(getattr(opts,attr) is None for attr in ['tag','status','year'])):
-    opts.tag=_CONST['LASTREL']
+    opts.tag=[_CONST['LASTREL']]
   if opts.data==None :
     opts.data=["meteo","input","output","source","docs"]
   if opts.outpath:
@@ -449,9 +449,9 @@ if __name__ == "__main__":
       continue
 
     if opts.verbose>1:
-      print("Searching %s:%s"%(attr,target))
+      print("Searching %s(s):%s"%(attr,target))
     try:
-      dataSet=[v for _,v in catalog.items() if getattr(v,attr)==target]
+      dataSet=[v for _,v in catalog.items() if getattr(v,attr) in target]
       if len(dataSet)==0:
         raise
     except:
