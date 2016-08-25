@@ -267,7 +267,7 @@ class dataPoint(object):
     if(verbose):
       print("%-8s %s"%('Check',self))
 
-    with open(self.dst) as f:
+    with open(self.dst,'rb') as f:
       if self.md5sum!=md5(f.read()).hexdigest():
         if(cleanup):    # remove broken file
           self.cleanup(verbose)
