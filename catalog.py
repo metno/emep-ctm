@@ -166,7 +166,7 @@ def printProgress(iteration,total,prefix='',suffix='',decimals=2,barLength=100):
 class fileSize(int):
   """Human readable file size"""
   def __new__(cls, value):
-    return int.__new__(cls,max(value,0))  # only positive values make sence
+    return int.__new__(cls,max(int(value),0))  # only positive values make sence
   def __repr__(self):
     return "%d%s"%(self*4,'b')            # show in bites
   def __str__(self):                      # show K/M/G/T bytes
@@ -280,7 +280,11 @@ class dataPoint(object):
     """derived from http://stackoverflow.com/a/22776/2576368"""
     from os.path import dirname,isdir
     from os import makedirs
-    from urllib2 import urlopen
+    from sys import version_info as version
+    if version[0]>2:    # Python3.x
+      from urllib.request import urlopen
+    else:               # Python2.x
+      from urllib2 import urlopen
     # check if file exists/md5sum, remove file if fail md5sum
     if self.check(verbose>2,cleanup=True):
       return
@@ -325,7 +329,7 @@ class dataPoint(object):
       print("%-8s %s"%('Untar',self))
       with open(self.dst,'r') as f:      
         if userConsent('See the contents first?',inspect,'no'):
-          print f.list(verbose=(verbose>1))
+          print(f.list(verbose=(verbose>1)))
           if not userConsent('Do you wish to proceed?',inspect):
             print("OK, skipping file")
             return
@@ -383,7 +387,7 @@ def readCatalog(filename,verbose=1):
   try:
     f=open(filename)
   except IOError as e:
-    print "Failed to open '%s'.\n%s."%(filename,e.strerror)
+    print("Failed to open '%s'.\n%s."%(filename,e.strerror))
     sys.exit(-1)
 
   reader = csvreader(f,delimiter=',')
