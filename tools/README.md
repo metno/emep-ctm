@@ -4,8 +4,8 @@ Simplified access to the source code, input data and benchmark results
 ## Get the latest release dataset
 ```bash
 # download the catalog tool/files
-wget https://github.com/metno/emep-ctm/blob/master/tools/catalog.py
-wget https://github.com/metno/emep-ctm/blob/master/tools/catalog.csv
+wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.py
+wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.csv
 
 # make it executable and run it
 chmod +x catalog.py
