@@ -19,7 +19,7 @@ _CONST={
 def parse_arguments():
   from optparse import OptionParser,OptionGroup,SUPPRESS_HELP
   from os.path import dirname
-  from sys      import argv as args
+  from sys import argv as args
 
   usage = """usage: %prog [options]
 
@@ -143,25 +143,25 @@ def userConsent(question,ask=True,default='yes'):
 # Print iterations progress
 # http://stackoverflow.com/a/34325723/2576368
 def printProgress(iteration,total,prefix='',suffix='',decimals=2,barLength=100):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : number of decimals in percent complete (Int)
-        barLength   - Optional  : character length of bar (Int)
-    """
-    from sys import stdout
-    filledLength    = int(round(barLength * iteration / float(total)))
-    percents        = round(100.00 * (iteration / float(total)), decimals)
-    bar             = '█' * filledLength + '-' * (barLength - filledLength)
-    stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+  """
+  Call in a loop to create terminal progress bar
+  @params:
+      iteration   - Required  : current iteration (Int)
+      total       - Required  : total iterations (Int)
+      prefix      - Optional  : prefix string (Str)
+      suffix      - Optional  : suffix string (Str)
+      decimals    - Optional  : number of decimals in percent complete (Int)
+      barLength   - Optional  : character length of bar (Int)
+  """
+  from sys import stdout
+  filledLength    = int(round(barLength * iteration / float(total)))
+  percents        = round(100.00 * (iteration / float(total)), decimals)
+  bar             = '█' * filledLength + '-' * (barLength - filledLength)
+  stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+  stdout.flush()
+  if iteration == total:
+    stdout.write('\n')
     stdout.flush()
-    if iteration == total:
-      stdout.write('\n')
-      stdout.flush()
 
 class fileSize(int):
   """Human readable file size"""
@@ -322,21 +322,28 @@ class dataPoint(object):
     from os.path import isdir,basename
     from os import makedirs
     from shutil import copyfile
+    import sys
     if not self.check(verbose>2):
       return
       
     if is_tarfile(self.dst):
       print("%-8s %s"%('Untar',self))
       with open(self.dst,'r') as f:      
-        if userConsent('See the contents first?',inspect,'no'):
+        if userConsent('  See the contents first?',inspect,'no'):
           print(f.list(verbose=(verbose>1)))
-          if not userConsent('Do you wish to proceed?',inspect):
+          if not userConsent('  Do you wish to proceed?',inspect):
             print("OK, skipping file")
             return
         d="%s/"%(_CONST['DATADIR'])
         if (not isdir(d))and(d!=''):
           makedirs(d)
-        f.extractall(d)
+        try:
+          f.extractall(d)
+        except EOFError as e:
+          print("  Failed unpack '%s':\n    %s."%(self.dst,e))
+          if not userConsent('    Do you wish to continue?',inspect,'yes'):
+            sys.exit(-1)
+
     else:
       d="%s/%s/"%(_CONST['DATADIR'],self.key)
       f=d+basename(self.dst)
