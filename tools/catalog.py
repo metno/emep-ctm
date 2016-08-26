@@ -163,20 +163,17 @@ def printProgress(iteration,total,prefix='',suffix='',decimals=2,barLength=100):
     stdout.write('\n')
     stdout.flush()
 
-class fileSize(int):
-  """Human readable file size"""
-  def __new__(cls, value):
-    return int.__new__(cls,max(int(value),0))  # only positive values make sence
-  def __repr__(self):
-    return "%d%s"%(self*4,'b')            # show in bites
-  def __str__(self):                      # show K/M/G/T bytes
-    """ derived from http://stackoverflow.com/a/1094933/2576368"""
-    num=float(self)
-    for unit in ['B','K','M','G']:
-      if num < 1024.0:
-        return "%3.1f%s"%(num, unit)
-      num /= 1024.0
-    return "%.1f%s"%(num, 'T')
+def fileSize(value):
+  """
+  Human readable file size (K/M/G/T bytes)
+    derived from http://stackoverflow.com/a/1094933/2576368
+  """
+  num=max(float(value),0)
+  for unit in ['B','K','M','G']:
+    if num < 1024.0:
+      return "%3.1f%s"%(num,unit)
+    num /= 1024.0
+  return "%.1f%s"%(num,'T')
 
 class dataPoint(object):
   '''Info and retrieval/check methods'''
@@ -204,8 +201,8 @@ class dataPoint(object):
     self.dst    = str(dst)            # path for uncompressed self.dst
     if self.dst=='':
       self.dst= '{TMPDIR}/{TAG}/'
-    self.size   = fileSize(byteSize)  # self.src file size [bytes]
-    self.md5sum  = md5sum             # self.src checksum
+    self.size   = float(byteSize)     # self.src file size [bytes]
+    self.md5sum = md5sum              # self.src checksum
     if self.md5sum:
       self.md5sum= str(self.md5sum)
 
@@ -217,14 +214,10 @@ class dataPoint(object):
       self.dst+=basename(self.src)
 
   def __str__(self):
-    return "%-14s %6s %s"%(self.tag,self.size,self.dst)
-#   return "%s (%s) --> %s"%(self.tag,self.size,self.dst)
-#   return "%s %s --> %s"%(self,self.src,self.dst)
+    return "%-14s %6s %s"%(self.tag,fileSize(self.size),self.dst)
   def __repr__(self):
     from os.path import basename
-    return "%6s %s"%(self.size,basename(self.dst))
-#   return "%6s %s"%(self.size,self.tag)
-#   return "%s (%s)"%(self.tag,self.size)
+    return "%6s %s"%(fileSize(self.size),basename(self.dst))
 
   def __hash__(self):
     '''find unique self.src occurences'''
@@ -366,10 +359,9 @@ class dataSet(object):
     self.dataset= dataset             # {'input':input,'meteo':meteo,..}
     self.size   = 0
     if byteSize:
-      self.size = byteSize or 0
+      self.size = float(byteSize) or 0
     else:
       self.size = sum([x.size for _,x in self.dataset.items() if hasattr(x,"size")])
-    self.size = fileSize(self.size)
 
   def __str__(self):
     return "%-8s (meteo:%s, status:%s)"%(self.tag,self.year,self.status)
@@ -487,13 +479,13 @@ if __name__ == "__main__":
       for key in ds:
         down+=ds[key]
         if opts.verbose:
-          print("Queue download: %6s %s"%(
-            fileSize(sum([x.size for x in ds[key]])),ds[key][0].tag))
+          total=sum([x.size for x in ds[key]])
+          print("Queue download: %6s %s"%(fileSize(total),ds[key][0].tag))
 
   down=list(set(down))  # unique files, for single download and total size
 
-  print("Queue download: %6s %s"%(
-    fileSize(sum([x.size for x in down])),'Total'))
+  total=sum([x.size for x in down])
+  print("Queue download: %6s %s"%(fileSize(total),'Total'))
   if not userConsent('Do you wish to proceed?',opts.ask):
     print("OK, bye")
     sys.exit(0)
