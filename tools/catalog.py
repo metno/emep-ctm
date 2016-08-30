@@ -82,6 +82,9 @@ Examples:
   group.add_option("-d", "--docs",const="docs",
     action="append_const", dest="data",
     help="get corresponding user guide")
+  group.add_option("--extras",
+    action="store_true", dest="extras",
+    help="also get the extras, if any")
   parser.add_option_group(group)
 
   group = OptionGroup(parser, "Download options","")
@@ -104,6 +107,8 @@ Examples:
     opts.tag=[_CONST['LASTREL']]
   if opts.data==None :
     opts.data=["meteo","input","output","source","docs"]
+  if opts.extras :
+    opts.data+=["extra"]
   if opts.outpath:
     _CONST['DATADIR']=opts.outpath
   if opts.tmppath:
@@ -478,7 +483,7 @@ if __name__ == "__main__":
 
       for key in ds:
         down+=ds[key]
-        if opts.verbose:
+        if opts.verbose and ds[key]:
           total=sum([x.size for x in ds[key]])
           print("Queue download: %6s %s"%(fileSize(total),ds[key][0].tag))
 

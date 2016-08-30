@@ -1,5 +1,5 @@
 release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,md5sum
-200802,other,,,{FTP}/{REL}/Exercises_13Oct2008.pdf,,36184,e6ac9beda2c9dd403faaeb306216ef2a
+200802,extra,,,{FTP}/{REL}/Exercises_13Oct2008.pdf,,36184,e6ac9beda2c9dd403faaeb306216ef2a
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo200501.tar.bz2,,895050986,ea37b0ab3697e796971c9c020ff5c035
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo200502.tar.bz2,,815062094,e0a57cd3f0e379fb260ca03835bd1374
 200802,meteo,2005,,{FTP}/{REL}/input_data/meteo/meteo200503.tar.bz2,,905158650,ed5d28120638219e8416fba54e684391
@@ -33,7 +33,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201108,source,,v201106,{GIT}/archive/{MOD}.tar.gz,,424960,84b5825297be4ba44044ff06983f12e1
 201108,output,2008,v201106,{FTP}/{REL}/model_results_2008/model_results_Base.tar.bz2,,4988678844,02a9284ddc295948ef4300d72a24507b
 201108,output,2008,v201106,{FTP}/{REL}/model_results_2008/model_results_Jan_01_02.tar.bz2,,32745137,cd5e9f95c39c2f8ed93ea5da4e35bead
-201108,other,,,{FTP}/{REL}/model_tools/tools.tar.bz2,,2849,cf01ad5c0b866174fe6e96fc93296838
+201108,extra,,,{FTP}/{REL}/model_tools/tools.tar.bz2,,2849,cf01ad5c0b866174fe6e96fc93296838
 201108,docs,,v201106,{GIT}/releases/download/{MOD}/User_Guide.pdf,,360271,745f35eb41e26b30b327d66fb28dac2c
 201209,meteo,2010,,{FTP}/met2010/meteo201001.tar.bz2,,1121901868,4228c41223e842bc3bbc019d32242ac0
 201209,meteo,2010,,{FTP}/met2010/meteo201002.tar.bz2,,1017434990,8c166a7d74627885ea9c430c66bf1fb6
@@ -67,7 +67,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201304,input,2010,rv4_3,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,262083439,eb42df889afdbfc4ac8590e090710028
 201304,source,,rv4_3,{GIT}/archive/{MOD}.tar.gz,,525582,70b0af3be8616deda99234117253fa71
 201304,output,2010,rv4_3,{FTP}/{REL}/model_results_rv4_3_2010/Base_model_rv4_3_results.tar.bz2,,3929661092,4bbcf7ea1e0dc9c07ae378867eaac32e
-201304,other,,,{FTP}/{REL}/mscw-osrc_ncl.tar.gz,,303521340,56b102916af6f3209c52742737372e4f
+201304,extra,,,{FTP}/{REL}/mscw-osrc_ncl.tar.gz,,303521340,56b102916af6f3209c52742737372e4f
 201304,source,,rv4_3,{GIT}/releases/download/{MOD}/README_rv4_3special.txt,,1394,7169a884114727c0ca5b37555381c8ce
 201304,output,2010,rv4_3,{FTP}/{REL}/README_rv4_3special.txt,,1394,7169a884114727c0ca5b37555381c8ce
 201304,docs,,rv4_3,{GIT}/releases/download/{MOD}/User_Guide.pdf,,412260,0a500dec4b4e8e00233a2d0d8c38109c
