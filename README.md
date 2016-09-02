@@ -52,17 +52,22 @@ The codes have a number of things in common:
 * they produce ascii files for the desired sites and pollutants. 
 
 The python scripts also produce plots, e.g. of daily or monthly mean
-concenrations - as time-series for sites data, and as 2-D plots for
-sonde data (see [Fig.1](#fig1)).  
+concenrations - as time-series for sites data (see [Fig. 1](#fig1)),
+and as 2-D plots for sonde data (see [Fig. 1](#fig1)).  
+
 
 ## Rd_ncsites.py and Rd_ncsondes.py
 
-These python tools make use of the matplotlib and netCDF4 modules - these are
+These python (2.7) tools make use of the matplotlib and netCDF4 modules - these are
 usually readily available, e.g. in standard Ubuntu repositories.
 
 <a name="fig1"></a>
-![](monmeans.png)
-*Figure 1: Example of Rd_ncsondes.py output, monthly mean PAN values*
+![Figure 1](dsitesNO2.png)
+*Figure 1: Example of Rd_ncsites.py output, daily NO2 values for 2 sites*
+
+<a name="fig2"></a>
+![Figure 2](monmeans.png)
+*Figure 2: Example of Rd_ncsondes.py output, monthly mean OH values*
 
 ### Examples
 
@@ -78,15 +83,16 @@ Rd_ncsondes.py -i sondes_2012.nc
 Rd_ncsondes.py -i sondes_2012.nc -s Bremen -v O3 -pt monmeans -pr entire
 ```
 
+Usage of Rd_ncsites.py is very similar, but if wanted more than one site can be plotted (as in Fig.1):
+
+```bash
+Rd_ncsites.py -i sites_2012.nc -s Bremen,Kiruna -v NO2 -pt daymeans -pr entire
+```
+
 The ascii output files are prefixed with SITES or SONDES, for example:
 
-* `SITES_Birkenes_O3.vals`:
-  Hourly values as 24 column matrix
-* `SITES_Birkenes_O3.dates`:
-  Just lists dates (yyyy mm dd jday), same number of records as dmean, dmax below
-* `SITES_Birkenes_O3.hrly`:
-  Hourly values (with date info)
-* `SITES_Birkenes_O3.dmean`:
-  Daily means  (no dates)
-* `SITES_Birkenes_O3.dmax`:
-  Daily max  (no dates)
+* `SITES_Birkenes_O3.vals`:  Hourly values as 24 column matrix
+* `SITES_Birkenes_O3.1hrly`: Hourly values
+* `SITES_Birkenes_O3.dmean`: Daily means
+* `SITES_Birkenes_O3.dmax`:  Daily max
+* `SITES_Birkenes_O3.mmean`: Monthly mean
