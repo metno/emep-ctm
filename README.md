@@ -52,6 +52,7 @@ Options:
     -o, --output        get model benckmark
     -s, --source        get source code for benckmark
     -d, --docs          get corresponding user guide
+    --extras            also get the extras, if any
 
   Download options:
     --yes               Don't ask before start downloading/unpacking
