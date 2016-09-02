@@ -60,3 +60,67 @@ Options:
     --tmppath=TMPPATH   Override temporary (download) directory
     --cleanup           Remove ALL temporary (download) files
 ```
+
+# Tools to read sites and sondes output
+
+The EMEP model currently provides detailed outputs for slected locations.
+The 'sites' outputs provide surface concentrations (at ca. 3m),
+and typically many (or all) chemical compounds are provided for each site and hour.
+The 'sondes' type of outputs provide vertical profiles,
+typically for a selection of compounds (to prevent huge files)
+and possibly with time-resolution of e.g. 3 or 6 hours.
+The model has historically provided ascii outputs,
+but recently a parallel system with netcdf outouts has been introduced.
+In future the ascii outputs will be removed.
+
+We provide two programmes:
+
+* Rd_ncsites.py:  python script to read and plot netcdf site files
+* Rd_ncsondes.py: python script to read and plot netcdf sonde files
+
+The codes have a number of things in common:
+
+* they can be called either directly with site names and  pollutant, or
+* they can be used in a simple menu-like approach in which case the user is
+  presented with a list of stations, pollutants and other choices as appopriate.
+* they produce ascii files for the desired sites and pollutants. 
+
+The python scripts also produce plots, e.g. of daily or monthly mean
+concenrations - as time-series for sites data, and as 2-D plots for
+sonde data (see [Fig.1](#fig1)).  
+
+## Rd_ncsites.py and Rd_ncsondes.py
+
+These python tools make use of the matplotlib and netCDF4 modules - these are
+usually readily available, e.g. in standard Ubuntu repositories.
+
+<a name="fig1"></a>
+![](monmeans.png)
+*Figure 1: Example of Rd_ncsondes.py output, monthly mean PAN values*
+
+### Examples
+
+```bash
+# produces help with usage information
+Rd_ncsondes.py -h
+
+# suggest list of sites and then pollutants
+# generate outputs after selection
+Rd_ncsondes.py -i sondes_2012.nc
+
+# produce ascii outputs and plot    
+Rd_ncsondes.py -i sondes_2012.nc -s Bremen -v O3 -pt monmeans -pr entire
+```
+
+The ascii output files are prefixed with SITES or SONDES, for example:
+
+* `SITES_Birkenes_O3.vals`:
+  Hourly values as 24 column matrix
+* `SITES_Birkenes_O3.dates`:
+  Just lists dates (yyyy mm dd jday), same number of records as dmean, dmax below
+* `SITES_Birkenes_O3.hrly`:
+  Hourly values (with date info)
+* `SITES_Birkenes_O3.dmean`:
+  Daily means  (no dates)
+* `SITES_Birkenes_O3.dmax`:
+  Daily max  (no dates)
