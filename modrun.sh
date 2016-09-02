@@ -4,13 +4,10 @@
 
 # Link the input data
 inputdir=.
-met=$inputdir/meteo2013
-ln -s $inputdir/input/* .   # input files excpet metdata
-ln -s $met/DegreeDayFactors.nc .
+ln -s $inputdir/input/* .   # input files except meteorology
 
 # Run the model
-mpirun $inputdir/code/Unimod
+mpiexec $inputdir/code/Unimod
 
-# Clean the links to the input data and remove INPUT.PARA
+# Clean the links to the input data
 find . -type l -print0 | xargs -0 rm 
-
