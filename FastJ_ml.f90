@@ -1,3 +1,29 @@
+! <FastJ_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2016 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 ! ---------- JX71_notes.f90
 
 !  same as JX70b except that test for solar flux = 0 so that can run 200 nm data set
@@ -3293,7 +3319,7 @@
         use MetFields_ml, only : ps ,foundcloudwater,q,th,lwc,cc3dmax
         use ModelConstants_ml,    only : KMAX_BND,KMAX_MID,KCHEMTOP, METSTEP 
         use NetCDF_ml, only :ReadField_CDF
-        use Par_ml,           only: me,MAXLIMAX, MAXLJMAX
+        use Par_ml,           only: me,LIMAX, LJMAX
         use PhysicalConstants_ml, only :KAPPA, RGAS_KG, GRAV  
         use Radiation_ml, only : ZenithAngleS,ZenithAngle
         use TimeDate_ml, only : daynumber,current_date
@@ -3506,11 +3532,11 @@ use netcdf
      if(me==0)write(*,*)'Clim number of levels ',Nlevel_CLIM
  
      allocate(etaa_CLIM(Nlevel_CLIM+1),etab_CLIM(Nlevel_CLIM+1))
-     allocate(temperature_clim(Nlevel_CLIM,MAXLIMAX,MAXLJMAX))
-     allocate(cloudliquidwater_clim(Nlevel_CLIM,MAXLIMAX,MAXLJMAX))
-     allocate(humidity_clim(Nlevel_CLIM,MAXLIMAX,MAXLJMAX))
-     allocate(o3_clim(Nlevel_CLIM,MAXLIMAX,MAXLJMAX))
-     allocate(rcphot_3D(NRCPHOT,KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX,2))
+     allocate(temperature_clim(Nlevel_CLIM,LIMAX,LJMAX))
+     allocate(cloudliquidwater_clim(Nlevel_CLIM,LIMAX,LJMAX))
+     allocate(humidity_clim(Nlevel_CLIM,LIMAX,LJMAX))
+     allocate(o3_clim(Nlevel_CLIM,LIMAX,LJMAX))
+     allocate(rcphot_3D(NRCPHOT,KCHEMTOP:KMAX_MID,LIMAX,LJMAX,2))
       
      call check(nf90_inq_varid(ncid = ncFileID, name = "P0", varID = varID))                 
      call check(nf90_get_var(ncFileID, varID, P0 ))

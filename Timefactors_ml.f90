@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -56,16 +56,16 @@
 
   use CheckStop_ml, only : CheckStop
   use Country_ml,   only : NLAND,Country
-  use EmisDef_ml,   only : NSECTORS, NEMIS_FILE, EMIS_FILE, ISNAP_DOM
+  use EmisDef_ml,   only : NEMIS_FILE, EMIS_FILE, ISNAP_DOM, NSECTORS_SNAP,N_TFAC
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
   use InterpolationRoutines_ml, only : Averageconserved_interpolate
   use Met_ml,       only : Getmeteofield
   use ModelConstants_ml, only : MasterProc, DEBUG => DEBUG_EMISTIMEFACS
   use ModelConstants_ml, only : IIFULLDOM, JJFULLDOM
   use ModelConstants_ml, only : iyr_trend ,USES  ! for GRIDDED_EMIS_MONTHLY_FACTOR 
-  use ModelConstants_ml, only : INERIS_SNAP1, INERIS_SNAP2
+  use ModelConstants_ml, only : INERIS_SNAP1, INERIS_SNAP2, DegreeDayFactorsFile
   use NetCDF_ml,    only : GetCDF , ReadField_CDF
-  use Par_ml,       only : MAXLIMAX,MAXLJMAX, me, li0, lj0, li1, lj1
+  use Par_ml,       only : MAXLIMAX,MAXLJMAX, limax,ljmax, me, li0, lj0, li1, lj1
   use Par_ml,       only : IRUNBEG, JRUNBEG, MSG_READ8
   use PhysicalConstants_ml, only : PI
   use SmallUtils_ml,    only: find_index
@@ -100,8 +100,8 @@
      dimension(:,:,:,:) :: fac_emm  ! Monthly factors
 
  ! Hourly for each day ! From EURODELTA/INERIS
-  real, public, save,  &
-     dimension(NSECTORS,24,7) :: fac_ehh24x7  !  Hour factors for 7 days
+  real, public, save, allocatable,  &
+     dimension(:,:,:) :: fac_ehh24x7  !  Hour factors for 7 days
 
  ! We keep track of min value for degree-day work
  !
@@ -117,7 +117,7 @@
   ! Heating-degree day factor for SNAP-2. Independent of country:
   logical, public, save :: Gridded_SNAP2_Factors = .false.
   real, public, allocatable,dimension (:,:), save :: gridfac_HDD
-  !real, private, dimension (MAXLIMAX,MAXLJMAX), save :: tmpt2
+  !real, private, dimension (LIMAX,LJMAX), save :: tmpt2
 
   ! Used for general file calls and mpi routines below
 
@@ -157,7 +157,6 @@ contains
   character(len=100) :: errmsg
   character(len=200) :: inputline
   real :: fracchange
-  real, dimension(NLAND,NEMIS_FILE):: sumfacc !factor to normalize monthly changes                                                         
   real :: Start, Endval, Average, x, buff(12)
 
   if (DEBUG) write(unit=6,fmt=*) "into timefactors "
@@ -165,7 +164,7 @@ contains
    call CheckStop( nydays < 365, &
       "Timefactors: ERR:Call set_nmdays before timefactors?")
 
-   call CheckStop(  NSECTORS /= 11 , &
+   call CheckStop(  N_TFAC /= 11 , &
       "Timefactors: ERR:Day-Night dimension wrong!")
 
 
@@ -231,17 +230,15 @@ contains
        close(IO_TIMEFACS)
 
       ! Apply change in monthly factors for SNAP 1
-       sumfacc(:,:)=0.0
        do ic = 1, NLAND
+          sumfac=0.0
           do mm=1,12
                fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*fac_cemm(mm)
-               sumfacc(ic,iemis)=sumfacc(ic,iemis)+fac_emm(ic,mm,1,iemis)
+               sumfac=sumfac+fac_emm(ic,mm,1,iemis)
           enddo
-       enddo
-      ! normalize
-       do ic = 1, NLAND
+          ! normalize
           do mm=1,12
-             fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*12./sumfacc(ic,iemis)
+             fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*12./sumfac
           enddo
        enddo
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2 
@@ -368,7 +365,7 @@ contains
       !note that the subsequent interpolation does not change this integral
       do iemis = 1, NEMIS_FILE
          n = 0
-         do isec = 1, NSECTORS
+         do isec = 1, N_TFAC
             do ic = 1, NLAND
                iday = 0
                do mm = 1, 12     ! Jan - Dec
@@ -396,7 +393,7 @@ contains
 ! normalize the factors over the year 
    do iemis = 1, NEMIS_FILE
        n = 0
-       do isec = 1, NSECTORS
+       do isec = 1, N_TFAC
            do ic = 1, NLAND
              iday = 0
              sumfac = 0.0
@@ -488,11 +485,11 @@ contains
   ! for each country, emission, and sector.  Called at midnight every day.
   !
   ! Uses arays: 
-  !     fac_emm(NLAND,NM,NSECTORS,NEMIS_FILES)    ! Jan - Dec.
-  !     fac_edd(NLAND,7,NSECTORS,NEMIS_FILES)     ! Monday=1, Sunday=7
+  !     fac_emm(NLAND,NM,N_TFAC,NEMIS_FILES)    ! Jan - Dec.
+  !     fac_edd(NLAND,7,N_TFAC,NEMIS_FILES)     ! Monday=1, Sunday=7
   !
   ! Outputs:
-  !    real timefac(NLAND,NSECTORS,NEMIS_FILES)
+  !    real timefac(NLAND,N_TFAC,NEMIS_FILES)
   !
   !...........................................................................
   ! nyear(1) - year of simulation 
@@ -529,7 +526,7 @@ contains
 !   Calculate monthly and daily factors for emissions 
 
     do iemis = 1, NEMIS_FILE
-      do isec = 1, NSECTORS 
+      do isec = 1, N_TFAC
          do iland = 1, NLAND
             
             Start= 0.5*(fac_emm(iland ,nmnd0,isec,iemis)+fac_emm(iland ,nmnd,isec,iemis))
@@ -572,12 +569,12 @@ contains
 
    !/ See if we have a file to work with....
     if ( daynumber == 0 ) then
-      call check_file("DegreeDayFactors.nc", Gridded_SNAP2_Factors,&
+      call check_file(trim(DegreeDayFactorsFile), Gridded_SNAP2_Factors,&
         needed=.true., errmsg=errmsg )
       if ( Gridded_SNAP2_Factors ) then
-         call PrintLog("Found DegreeDayFactors.nc", MasterProc)
+         call PrintLog("Found "//trim(DegreeDayFactorsFile), MasterProc)
       else
-         call PrintLog("Not-found: DegreeDayFactors.nc"//trim(errmsg), MasterProc)
+         call PrintLog("Not-found: "//trim(DegreeDayFactorsFile)//' '//trim(errmsg), MasterProc)
       end if
       return
     end if
@@ -594,7 +591,7 @@ contains
 !     write(*,*) "HDD inputs", me, " Day ", daynumber
 
    ! DegreeDays have the same domain/grid as the met data, so we can use:
-    if(MasterProc) call GetCDF('HDD_Facs','DegreeDayFactors.nc', &
+    if(MasterProc) call GetCDF('HDD_Facs',trim(DegreeDayFactorsFile), &
           var2d_global,IIFULLDOM,JJFULLDOM,1,daynumber,nfetch)
 
     if(.not.allocated(gridfac_HDD))then
@@ -636,7 +633,7 @@ contains
      implicit none
      integer, intent(in) ::month
      integer ::iemis,isec,i
-     character(len=20) ::sector_map(NSECTORS,NEMIS_FILE),name
+     character(len=20) ::sector_map(NSECTORS_SNAP,NEMIS_FILE),name
      real :: x(12)
 ! sector_map(sector,emis) = name_in_netcdf_file
      sector_map(:,:)='default'
@@ -651,12 +648,12 @@ contains
      sector_map(7,:)='tra'
 
      if(.not.allocated(GridTfac))then
-        allocate(GridTfac(MAXLIMAX,MAXLJMAX,NSECTORS,NEMIS_FILE))
+        allocate(GridTfac(LIMAX,LJMAX,NSECTORS_SNAP,NEMIS_FILE))! only snap sectors defined for GridTfac!
         GridTfac=dble(nmdays(month))/nydays !default, multiplied by inverse later!!
      endif
 
      name='none'
-     do isec=1,NSECTORS
+     do isec=1,NSECTORS_SNAP! only snap sectors defined for GridTfac!
         do iemis=1,NEMIS_FILE
 
            if(sector_map(isec,iemis)=='default')then

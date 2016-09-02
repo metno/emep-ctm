@@ -1,7 +1,7 @@
-! <Par_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Par_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,20 +41,24 @@ module Par_ml
 !RESTRI
 !  we try to run on a smaller domain with the same input
 !  for this reason we now define additional parameters:
-!  numbers of points in the 'larger' array iilardom,jjlardom
-!  and coordinates of the origin of the smaller domain with
-!  respect to the larger domain ismbeg,jsmbeg
+!  numbers of points in the larger (=fulldomain) array iilardom,jjlardom
+!  and coordinates of the origin of the smaller domain (=rundomain) with
+!  respect to the larger domain irunbeg,jrunbeg
 !  one can run the large domain by setting  
 !  gimax, gjmax to iilardom,jjlardom
-!  and  ismbeg,jsmbeg   to 1
-!  also we have now to distinguish mfsize for input and output: 
-!  mfsizeinp,mfsizeout!!!
+!  and  irunbeg,jrunbeg   to 1
 
 use CheckStop_ml,      only : CheckStop
 use Io_Nums_ml,        only:  IO_LOG
 use ModelConstants_ml, only : RUNDOMAIN, IIFULLDOM, JJFULLDOM, &
                               MasterProc, &  ! Set true for me=0 processor
                               NPROCX, NPROCY, NPROC, DOMAIN_DECOM_MODE
+use MPI_Groups_ml, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
+                          MPI_MIN, MPI_MAX, MPI_SUM, &
+                          MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, &
+                          ME_MPI, ME_IO, ME_SUB, NPROC_MPI, NPROC_IO, NPROCX_IO, NPROCY_IO,&
+                          NPROCX_SUB, NPROCY_SUB, NPROC_SUB, largeLIMAX,largeLJMAX   
+
 implicit none
 private
 
@@ -99,7 +103,7 @@ integer, public, save, dimension(4) ::  neighbor
 
 ! Tables of actual number of points and start and end points for all processors
 integer, public, save, allocatable, dimension(:) ::  &
-  tlimax, tgi0, tgi1, tljmax, tgj0, tgj1
+  tlimax, tgi0, tgi1, tljmax, tgj0, tgj1, tlargeimax,tlargejmax, tlargegi0, tlargegi1, tlargegj0, tlargegj1
 
 logical, private, parameter :: DEBUG_PAR = .false.
 
@@ -155,7 +159,8 @@ integer, public, parameter :: &
   MSG_PARI = 107
 
 public :: parinit
-public :: Topology
+public :: parinit_groups
+public :: Topology, Topology_io
 
 contains
 
@@ -213,7 +218,7 @@ integer :: ime, imex, imey, rest,i
   case default
     call CheckStop('parinit: Unknown DOMAIN_DECOM_MODE')
   endselect
- call CheckStop(NPROCX*NPROCY,NPROC,'parinit: X*Y/=NPROC')
+ call CheckStop(NPROCX*NPROCY,NPROC,'parinit: X*Y /= NPROC')
  
 ! Check if the subdomain is large enough
   if(GJMAX/NPROCY<min_grids.or.GIMAX/NPROCX<min_grids)then
@@ -225,7 +230,7 @@ integer :: ime, imex, imey, rest,i
 56  format(A,I3,A,I3,A)
 66  format(A,I3,A,I5,A)
   if(MasterProc)then
-    write(*,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC !may be different in future versions
+    write(*,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC,' available for calculations' !may be different in future versions
     write(IO_LOG,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC !may be different in future versions
     write(*,66)' Divided rundomain into ',NPROCX ,' X',NPROCY ,' subdomains'
     write(IO_LOG,66)' Divided rundomain into ',NPROCX ,' X',NPROCY ,' subdomains'
@@ -334,6 +339,293 @@ integer :: ime, imex, imey, rest,i
                                    & Ljmax must be at least min_grids")
 endsubroutine parinit
 
+subroutine parinit_groups(min_grids,Pole_singular)  
+!decompose first in "largesubdomains", then decompose
+!each  largesubdomain into subdomains
+
+! defines size and position of subdomains
+implicit none
+integer, intent(in) :: min_grids ,Pole_singular 
+integer :: ime, imex, imey, rest,i
+
+  !Set size of grid actually used    
+  IRUNBEG = RUNDOMAIN(1)  
+  JRUNBEG = RUNDOMAIN(3)  
+  GIMAX = RUNDOMAIN(2)-RUNDOMAIN(1)+1 ! Number of global points in longitude
+  GJMAX = RUNDOMAIN(4)-RUNDOMAIN(3)+1 ! Number of global points in longitude
+
+  if(me_MPI==0)write(*,*)'Dividing into large subdomains '
+!define largesubdomains
+
+  if(DOMAIN_DECOM_MODE=="")then !Determine NPROCX, NPROCY from Pole_singular
+    select case(Pole_singular)  ! For max efficiency (load balance):
+    case(0)
+      DOMAIN_DECOM_MODE="X*Y"   !   try X,Y values until X*Y=NPROC
+    case(1)                       
+      DOMAIN_DECOM_MODE="Y=1"   !   divide only in X direction
+    case(2)
+      if(mod(NPROC,2)==0)then     
+        DOMAIN_DECOM_MODE="Y=2" !   even NPROC --> divide Y into 2
+      else                    
+        DOMAIN_DECOM_MODE="Y=1" !   odd  NPROC --> divide only in X direction  
+      endif          
+    case default
+      call CheckStop('parinit: Wrong Pole_singular value')
+    endselect
+  endif
+
+!decompose into largesubdomains
+ ! select case(DOMAIN_DECOM_MODE)
+ ! case("X*Y","XY")            ! try X,Y values until X*Y==NPROC
+ !   NPROCY_IO=nint(sqrt(1.0*NPROC_IO))
+ !   NPROCX_IO=1!default (for instance when NPROC_IO=1)
+ !   do i=1,NPROC_IO-NPROCY_IO
+ !     NPROCX_IO=NPROC_IO/NPROCX_IO
+ !     if(NPROCX_IO*NPROCY_IO==NPROC_IO)exit ! we found some values that divide NPROC
+ !     NPROCY_IO=NPROCY_IO+1
+ !     call CheckStop(NPROCX_IO>NPROC_IO,'parinit: bug in NPROCX_IO algorithm')             
+ !   enddo
+ ! case("X*1","Y=1","X")       ! divide only in X direction
+ !   NPROCX_IO=NPROC_IO
+ !   NPROCY_IO=1
+ ! case("1*Y","X=1","Y")       ! divide only in Y direction
+ !MUST choose NPROCX_IO=1, to ensure that CPUs on the same largesubdomain have consecutive 
+ !ranks and thereby NORMALLY share the same memory 
+    NPROCX_IO=1
+    NPROCY_IO=NPROC_IO
+ ! case("2*Y","X=2")           ! divide X into 2
+ !   NPROCX_IO=NPROC_IO/2
+ !   NPROCY_IO=2
+ ! case("X*2","Y=2")           ! divide Y into 2
+ !   NPROCX_IO=NPROC_IO/2
+ !   NPROCY_IO=2
+ ! case default
+ !   call CheckStop('parinit: Unknown DOMAIN_DECOM_MODE')
+ ! endselect
+ call CheckStop(NPROCX_IO*NPROCY_IO,NPROC_IO,'parinit: X*Y/=NPROC_IO')
+ 
+ if(me_MPI==0)write(*,*)'large subdomain decomposition ',NPROCX_IO,'X',NPROCY_IO
+
+!now each largesubdomain is decomposed
+  select case(DOMAIN_DECOM_MODE)
+  case("X*Y","XY")            ! try X,Y values until X*Y==NPROC
+    NPROCX_SUB=nint(sqrt(1.0*NPROC_SUB))
+    NPROCY_SUB=1!default (for instance when NPROC=1)
+    do i=1,NPROC_SUB-NPROCX_SUB
+      NPROCY_SUB=NPROC_SUB/NPROCX_SUB
+      if(NPROCX_SUB*NPROCY_SUB==NPROC_SUB)exit ! we found some values that divide NPROC
+      NPROCX_SUB=NPROCX_SUB+1
+      call CheckStop(NPROCX_SUB>NPROC_SUB,'parinit: bug in NPROCX_SUB algorithm')             
+    enddo
+  case("X*1","Y=1","X")       ! divide only in X direction
+    NPROCX_SUB=NPROC_SUB
+    NPROCY_SUB=1
+  case("1*Y","X=1","Y")       ! divide only in Y direction
+    NPROCX_SUB=1
+    NPROCY_SUB=NPROC_SUB
+  case("2*Y","X=2")           ! divide X into 2
+     if(NPROCX_IO==2)then
+        !X already divided!
+        NPROCX_SUB=1
+        NPROCY_SUB=NPROC_SUB       
+     else
+        NPROCX_SUB=NPROC_SUB/2
+        NPROCY_SUB=2
+     endif
+  case("X*2","Y=2")           ! divide Y into 2
+     if(NPROCY_IO==2)then
+        !Y already divided!
+        NPROCX_SUB=NPROC_SUB
+        NPROCY_SUB=1
+     else
+        NPROCX_SUB=NPROC_SUB/2
+        NPROCY_SUB=2
+     endif
+  case default
+    call CheckStop('parinit: Unknown DOMAIN_DECOM_MODE')
+  endselect
+  if(me_MPI==0)write(*,*)'each large subdomain divided into',NPROCX_SUB,'X',NPROCY_SUB,' subdomains'
+  call CheckStop(NPROCX_SUB*NPROCY_SUB,NPROC_SUB,'parinit: X*Y/=NPROC_SUB')
+
+  NPROCX=NPROCX_SUB*NPROCX_IO
+  NPROCY=NPROCY_SUB*NPROCY_IO
+
+  call CheckStop(NPROCX*NPROCY,NPROC,'parinit: X*Y/=NPROC')
+ 
+! Check if the subdomain is large enough
+  if(GJMAX/NPROCY<min_grids.or.GIMAX/NPROCX<min_grids)then
+    if(MasterProc) write(*,*)'change number of processors, or rundomain ',min_grids
+    write(*,*)'change number of processors, or rundomain ',min_grids,GJMAX,NPROCY
+    call CheckStop(GJMAX/NPROCY<min_grids,'subdomains are too small in Y direction')
+    call CheckStop(GIMAX/NPROCX<min_grids,'subdomains are too small in X direction')
+  endif
+
+56  format(A,I3,A,I3,A)
+66  format(A,I3,A,I5,A)
+  if(MasterProc)then
+    write(*,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC,' available for calculations' !may be different in future versions
+    write(IO_LOG,56)' Using ',NPROCX*NPROCY ,' processors out of ',NPROC !may be different in future versions
+    write(*,66)' Divided rundomain into ',NPROCX ,' X',NPROCY ,' subdomains'
+    write(IO_LOG,66)' Divided rundomain into ',NPROCX ,' X',NPROCY ,' subdomains'
+  endif
+
+  MAXLIMAX = (GIMAX+NPROCX-1)/NPROCX ! Maximum number of local points in lon
+  MAXLJMAX = (GJMAX+NPROCY-1)/NPROCY !&! Maximum number of local points in lat
+
+
+  allocate(tlimax(0:NPROC-1),tgi0(0:NPROC-1),tgi1(0:NPROC-1))
+  allocate(tljmax(0:NPROC-1),tgj0(0:NPROC-1),tgj1(0:NPROC-1))
+  allocate(tlargeimax(0:NPROC_IO-1),tlargegi0(0:NPROC_IO-1),tlargegi1(0:NPROC_IO-1))
+  allocate(tlargejmax(0:NPROC_IO-1),tlargegj0(0:NPROC_IO-1),tlargegj1(0:NPROC_IO-1))
+
+!N*NPROCX_SUB = NPROCX
+!or
+!NPROC_SUB = N*NPROCX
+!NPROCX_IO=1
+
+!shuffle rank, so that CPUs that share memory cover the same largesubdomain ?
+!  me_new==0
+!  do i_io=0,NPROC_IO-1
+!     do j=1,NPROCY_SUB
+!     do i=1,NPROCX_SUB
+!        if(me==(NPROC_SUB*i_io ))me=me_new
+!        me_new=me_new+1
+!     enddo
+!     enddo
+!  enddo
+
+! Find the x-, y-, and z-addresses of the domain assigned to the processor
+  mey = me/NPROCX
+  mex = me - mey*NPROCX
+
+! Find the number of grid points in each direction for this processor.
+! We first try to divide the total number equally among the 
+! processors. Then the rest is distributed one by one to first processor 
+! in each direction. Here we also set the global address of the start
+! and end point in each direction.
+
+!  x-direction (longitude)
+  limax = GIMAX/NPROCX
+  rest = GIMAX - limax*NPROCX
+  gi0 = mex*limax + 1
+  if(rest>0)then
+    if(mex.eq.NPROCX-1)then
+      limax = limax+1
+      gi0 = gi0+rest-1
+    elseif (mex < rest-1) then
+      limax = limax + 1
+      gi0 = gi0 + mex
+    else
+      gi0 = gi0 + rest-1
+    endif
+  endif
+  gi1 = gi0 + limax - 1
+
+! y-direction (latitude)
+  ljmax = GJMAX/NPROCY
+  rest = GJMAX - ljmax*NPROCY
+  gj0 = mey*ljmax + 1
+  if(rest>0)then
+    if(mey.eq.NPROCY-1)then
+      ljmax = ljmax + 1
+      gj0 = gj0 + rest-1
+    elseif (mey < rest-1) then
+      ljmax = ljmax + 1
+      gj0 = gj0 + mey
+    else
+      gj0 = gj0 + rest-1
+    endif
+  endif
+  gj1 = gj0 + ljmax - 1
+
+  if(DEBUG_PAR) &
+     write(*,"(a12,20i6)") "DEBUG_PAR ", me, me_sub,IRUNBEG, JRUNBEG, &
+          GIMAX, GJMAX, gi0, gi1, limax, ljmax
+
+! Initialize the tables containing number of gridpoints and addresses
+! of start and endpoint in all directions, for all processors.
+! This is a repetition of the computations above, but now for all processors.
+  largeLIMAX=0
+  largeLJMAX=0
+  do ime = 0, NPROC-1
+    imey = ime/NPROCX
+    imex = ime - imey*NPROCX
+
+    ! x-direction (longitude)
+    tlimax(ime) = GIMAX/NPROCX
+    rest = GIMAX - tlimax(ime)*NPROCX
+    tgi0(ime) = imex*tlimax(ime) + 1
+    if(rest>0)then
+      if (imex .eq. NPROCX-1) then
+        tlimax(ime) = tlimax(ime) + 1
+        tgi0(ime) = tgi0(ime) + rest-1
+      elseif (imex < rest-1) then
+        tlimax(ime) = tlimax(ime) + 1
+        tgi0(ime) = tgi0(ime) + imex
+      else
+        tgi0(ime) = tgi0(ime) + rest-1
+      endif
+    endif
+    tgi1(ime) = tgi0(ime) + tlimax(ime) - 1
+    
+    ! y-direction (latitude)
+    tljmax(ime) = GJMAX/NPROCY
+    rest = GJMAX - tljmax(ime)*NPROCY
+    tgj0(ime) = imey*tljmax(ime) + 1
+    if(rest > 0)then
+      if (imey .eq. NPROCY-1) then
+        tljmax(ime) = tljmax(ime) + 1
+        tgj0(ime) = tgj0(ime) + rest-1
+      elseif (imey < rest-1) then
+        tljmax(ime) = tljmax(ime) + 1
+        tgj0(ime) = tgj0(ime) + imey
+      else
+        tgj0(ime) = tgj0(ime) + rest-1
+      endif
+    endif
+    tgj1(ime) = tgj0(ime) + tljmax(ime) - 1
+  enddo
+
+!For large subdomains
+  do ime = 0, NPROC_IO-1
+
+     tlargegi0(ime) = tgi0(NPROCX_SUB*ime)
+     tlargegi1(ime) = tgi1(NPROCX_SUB-1 + NPROCX_SUB*ime)
+
+     tlargegj0(ime) = tgj0(NPROCX*NPROCY_SUB*ime)
+     tlargegj1(ime) = tgj1(NPROCX*NPROCY_SUB*(ime+1)-NPROCX)
+
+     tlargeimax(ime) = tlargegi1(ime) - tlargegi0(ime) + 1
+     tlargejmax(ime) = tlargegj1(ime) - tlargegj0(ime) + 1
+
+  enddo
+
+  if(ME_IO>=0)then
+     largeLIMAX= tlargeimax(ME_IO)
+     largeLJMAX= tlargejmax(ME_IO)
+     gi0=tlargegi0(ME_IO)
+     gj0=tlargegj0(ME_IO)
+     gi1=tlargegi1(ME_IO)
+     gj1=tlargegj1(ME_IO)
+  else
+     i=ME_MPI/(NPROC_MPI/NPROC_IO)
+     largeLIMAX= tlargeimax(i)
+     largeLJMAX= tlargejmax(i)
+  endif
+  if(ME_SUB==0)write(*,*)ME_IO,'size large subdomain',largeLIMAX,'X',largeLJMAX
+  if(ME_SUB==0)write(*,*)ME_IO,'from ',gi0,',',gj0,'to',gi1,',',gj1
+     write(*,"(a12,20i6)") "gi ", me_io, me, me_sub, &
+           gi0, gi1,gj0, gj1, limax, ljmax,largeLIMAX,largeLJMAX
+
+  if(me>=0)then
+! The size of the grid cannot be too small.       
+     call CheckStop(limax < min_grids,"Subdomain too small!&
+          & Limax must be at least min_grids")
+     call CheckStop(ljmax < min_grids,"Subdomain too small!&
+          & Ljmax must be at least min_grids")
+  endif
+endsubroutine parinit_groups
+
 subroutine Topology(cyclicgrid,poles)   
 ! Defines the neighbors and boundaries of (sub)domain
 ! Boundaries are defined as having coordinates 
@@ -388,5 +680,62 @@ integer, intent(in) :: poles(2)    !  poles(1)=1 if North pole,
       li1 = limax
     endif
   endif
+
 endsubroutine topology
+subroutine Topology_io(cyclicgrid,poles)   
+! Defines the neighbors and boundaries of (sub)domain
+! Boundaries are defined as having coordinates 
+! between 1 and li0 or between li1 and limax or
+! between 1 and lj0 or between lj1 and ljmax
+
+implicit none
+integer, intent(in) :: cyclicgrid  ! rv2_4_1 1 if cyclic grid
+integer, intent(in) :: poles(2)    !  poles(1)=1 if North pole,
+                                   !  poles(2)=1 if South pole
+! Find the x-, y-, and z-addresses of the domain assigned to the processor
+  mey = me_IO/NPROCX_IO
+  mex = me_IO - mey*NPROCX_IO
+  write(*,*)'topo io',mex,mey,NPROCX_IO
+! Find the neighbors of this processor.
+! Allow cyclic map in i direction.
+! Do not define north and south poles as outer Boundaries
+  lj0 = 1
+  lj1 = largeljmax
+  if(mey>0) then
+    neighbor(SOUTH) = me_IO-NPROCX_IO
+  else
+    neighbor(SOUTH) = NOPROC
+    if(poles(2)==0)lj0 = 2
+  endif
+  if(mey<NPROCY_IO-1) then
+    neighbor(NORTH) = me_IO+NPROCX_IO
+  else
+    neighbor(NORTH) = NOPROC
+    if(poles(1)==0)lj1 = largeljmax - 1
+  endif
+  if(mex > 0) then
+    neighbor(WEST) = me_IO-1
+    li0 = 1
+  else
+    neighbor(WEST) = NOPROC
+    li0 = 2
+    if(Cyclicgrid==1)then
+      neighbor(WEST) =  me_IO+NPROCX_IO-1
+      li0 = 1
+    endif
+  endif
+  if(mex < NPROCX_IO-1) then
+    neighbor(EAST) = me_IO+1
+    li1 = largelimax
+  else
+    neighbor(EAST) = NOPROC
+    li1 = largelimax - 1
+    if(Cyclicgrid==1)then
+      neighbor(EAST) = me_IO-NPROCX_IO+1
+      li1 = largelimax
+    endif
+  endif
+  write(*,*)'topology io',me_mpi,neighbor(EAST),neighbor(WEST),neighbor(SOUTH),neighbor(NORTH)
+
+endsubroutine topology_io
 endmodule Par_ml

@@ -1,7 +1,7 @@
-! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,7 +34,7 @@ module StoFlux_ml
   use LocalVariables_ml, only : L, Grid
   use MicroMet_ml, only : AerRes, Wind_at_h
   use ModelConstants_ml, only : NLANDUSEMAX, dt_advec, DEBUG
-  use Par_ml, only : MAXLIMAX, MAXLJMAX
+  use Par_ml, only : LIMAX, LJMAX
   use PhysicalConstants_ml, only : AVOG, KARMAN
   use SmallUtils_ml, only : find_index
   use SubMet_ml, only : Sub
@@ -72,8 +72,8 @@ contains
     integer ::  istat, iL
 
      if ( my_first_call ) then
-       allocate(SumVPD(MAXLIMAX,MAXLJMAX,nSumVPD),stat=istat)
-       allocate(old_gsun(MAXLIMAX,MAXLJMAX,nSumVPD),stat=istat)
+       allocate(SumVPD(LIMAX,LJMAX,nSumVPD),stat=istat)
+       allocate(old_gsun(LIMAX,LJMAX,nSumVPD),stat=istat)
        do iL = 1, NLANDUSEMAX
          if ( do3se(iL)%VPDcrit > 0.0  ) then
            mapSumVPD(iL) = find_index( iL, SumVPD_LC )

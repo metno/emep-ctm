@@ -1,10 +1,8 @@
-!> SmallUtils_ml.f90 - MODULE - provides small utility routines to process
-!! test strings and key-valaue pairs
-!! <A component of the EMEP MSC-W Unified Eulerian Chemical transport Model>
-!*****************************************************************************! 
-!* 
-!*  Copyright (C) 2007-2015 met.no
-!* 
+! <SmallUtils_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2016 met.no
+!*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
 !*  Box 43 Blindern
@@ -12,19 +10,22 @@
 !*  NORWAY
 !*  email: emep.mscw@met.no
 !*  http://www.emep.int
-!*  
+!*
 !*    This program is free software: you can redistribute it and/or modify
 !*    it under the terms of the GNU General Public License as published by
 !*    the Free Software Foundation, either version 3 of the License, or
 !*    (at your option) any later version.
-!* 
+!*
 !*    This program is distributed in the hope that it will be useful,
 !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
 !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 !*    GNU General Public License for more details.
-!* 
+!*
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
+!> SmallUtils_ml.f90 - a component of the EMEP MSC-W Chemical transport Model>
+!! - provides small utility routines to process test strings and key-valaue pairs
 !*****************************************************************************! 
 module SmallUtils_ml
 
@@ -32,7 +33,7 @@ module SmallUtils_ml
 !> @brief small utility provides routines to process text strings,
 !!   find array indices, write arrays.
 !!
-!! @author Dave Simpson, 1999-2011
+!! @author Dave Simpson+Alvaro, 1999-2016
 !! Language: F-complaint
 !<____________________________________________________________________________
   implicit none
@@ -46,9 +47,10 @@ module SmallUtils_ml
   public :: find_index   !! Finds index of item in list 
   public :: find_indices !< Finds indices of arrays of items in list 
   public :: trims        !> removes all blanks from string
-  public :: num2str      !> converts  numbers to string
-  private :: num2str_i  
-  private :: num2str_r 
+  public :: key2str      ! replace keyword occurence(s) on a string by given value
+  private :: skey2str    !
+  private :: ikey2str
+  private :: rkey2str
   public :: to_upper     !> Converts string to upper case
   public :: Self_Test    !< For testing
 
@@ -62,10 +64,11 @@ module SmallUtils_ml
     module procedure find_index_i   ! For integer arrays
   end interface find_index
 
-  interface num2str
-    module procedure num2str_r   ! For real
-    module procedure num2str_i   ! For integer
-  end interface num2str
+  interface key2str   ! replace keyword occurence(s) on a string by string/integer/real value
+    module procedure skey2str   ! string values
+    module procedure ikey2str   ! integer values
+    module procedure rkey2str   ! real values
+  end interface key2str
 
 contains
 
@@ -169,7 +172,8 @@ subroutine AddArray(new,old,notset,errmsg)
   do i = 1,  size(new)
     N = N + 1
     if ( N > size(old) ) then
-      errmsg = "ERROR: Array Exceeded! "
+       55 format(A,I0,A)
+       write(errmsg, 55)"ERROR: Max Array size (",size(old),") exceeded!"
       return
     endif
     old(N) = new(i)
@@ -313,40 +317,6 @@ end function find_indices
   end do
 
  end function trims
-!=======================================================================
- function num2str_r(x,xfmt)  result(str)
-  real, intent(in) :: x
-  character(len=*), intent(in), optional :: xfmt
-  character(len=19) :: str
-
-  if( present( xfmt ) ) then
-     write(str, xfmt ) x
-     if ( index(str,'*') > 0  ) then
-      print *, "Problem with format", trim(str)
-      write(str, "(es15.3)" ) x
-      print *, "Re-format to ", trim(str)
-     end if
-  else
-     write(str, * ) x
-  end if
- end function num2str_r
-!============================================================================
- function num2str_i(n,xfmt)  result(str)
-  integer, intent(in):: n
-  character(len=*), intent(in), optional :: xfmt
-  character(len=19) :: str
-
-  if( present( xfmt ) ) then
-     write(str, xfmt ) n
-     if ( index(str,'*') > 0  ) then
-      print *, "Problem with format", trim(str)
-      write(str, * ) n
-      print *, "Re-format to ", trim(str)
-     end if
-  else
-     write(str, * ) n
-  end if
- end function num2str_i
 !============================================================================
 !> Function posted by SethMMorton at: 
 !! http://stackoverflow.com/questions/10759375/how-can-i-write-a-to-upper-or-to-lower-function-in-f90
@@ -376,6 +346,93 @@ Pure Function to_upper (str) Result (string)
 
 End Function to_upper
 !============================================================================
+! key2str 
+!   replace occurence(s) of keyword key on string iname by value val
+! module procedures
+!   skey2str replace string  values (main implementation)
+!   ikey2str replace integer values (uses skey2str)
+!   rkey2str replace real    values (uses skey2str/ikey2str)
+pure function skey2str(iname,key,val,xfmt) result(fname)
+  character(len=*), intent(in):: iname,key
+  character(len=*), intent(in):: val
+  character(len=*), intent(in), optional :: xfmt
+  character(len=len(iname))   :: fname
+  character(len=len(val))     :: aux
+  integer :: ind,n
+  fname=iname
+  ind=index(fname,trim(key))
+  if(ind==0)return
+  if(present(xfmt))then     ! user provided formated
+    write(aux,xfmt)trim(val)
+  else                      ! keyword lenght same as key
+    aux=trim(val)
+  endif
+  n=len_trim(key)
+  do while (ind>0)
+    fname=fname(1:ind-1)//trim(aux)//fname(ind+n:len_trim(fname))
+    ind=index(fname,trim(key))
+  enddo
+endfunction skey2str
+pure function ikey2str(iname,key,val,xfmt) result(fname)
+  character(len=*), intent(in):: iname,key
+  integer, intent(in)         :: val
+  character(len=*), intent(in), optional :: xfmt
+  character(len=len(iname))   :: fname
+  character(len=32)           :: sval
+  character(len=9)            :: ifmt!="(I??.??)"
+  integer :: n
+  if(index(iname,trim(key))==0)then
+    fname=iname
+    return
+  endif
+  if(present(xfmt))then     ! user supplied format
+    write(sval,xfmt)val
+    if(index(sval,'*')>0)&    ! problem with user format,
+      write(sval,"(I0)")val   !  reformat value
+  else                      ! guess format from keyword (same lenght as key)
+    if(val<0)then             ! negative numbers would be printed as ****
+      fname=iname             ! keep as it is
+      return
+    endif
+    n=len_trim(key)
+    write(ifmt,"('(I',I0,'.',I0,')')")n,n
+    write(sval,ifmt)val
+  endif
+  fname=trim(skey2str(iname,key,sval))
+endfunction ikey2str
+pure function rkey2str(iname,key,val,xfmt) result(fname)
+  character(len=*), intent(in):: iname,key
+  real, intent(in)            :: val
+  character(len=*), intent(in), optional :: xfmt
+  character(len=len(iname))   :: fname
+  character(len=32)           :: sval
+  character(len=9)            :: ifmt!="(F??.??)"
+  integer :: n,n1
+  if(index(iname,trim(key))==0)then
+    fname=iname
+    return
+  endif
+  if(present(xfmt))then     ! user supplied format
+    write(sval,xfmt)val
+    if(index(sval,'*')>0)&      ! problem with user format,
+      write(sval,"(ES15.3)")val !   reformat value
+  else                      ! guess format from keyword (same lenght as key)
+    if(val<0)then             ! negative numbers would be printed as ****
+      fname=iname             ! keep as it is
+      return
+    endif
+    n=len_trim(key)
+    n1=index(key,".")
+    if(n1>0)then
+      write(ifmt,"('(F',I0,'.',I0,')')")n,n-n1
+      write(sval,ifmt)val
+    else
+      write(sval,"(I0)")int(val)
+    endif
+  endif
+  fname=trim(skey2str(iname,key,sval))
+endfunction rkey2str
+!============================================================================
 subroutine Self_test()
 
   character(len=100) :: text = "Here is a line,split by spaces: note, commas don't work"
@@ -383,7 +440,7 @@ subroutine Self_test()
   character(len=5), dimension(3) :: wanted1 = (/ "yy", "x1", "zz" /)
   character(len=6), dimension(2) :: wanted2 = (/ " yy", "x1 " /)
   character(len=6), dimension(2) :: wanted3 = (/ "zz  ", "yy  " /)
-  character(len=16), dimension(6) :: wantedx  = NOT_SET_STRING
+  character(len=16),dimension(6) :: wantedx  = NOT_SET_STRING
   character(len=100) :: errmsg
   integer, parameter :: NWORD_MAX = 99
   character(len=20), dimension(NWORD_MAX) :: words
@@ -420,21 +477,24 @@ subroutine Self_test()
   call AddArray(wanted1,wantedx,NOT_SET_STRING,errmsg)
   call WriteArray(wantedx,size(wantedx),"Testing AddArray")
 
-
-  print "(/,a)", "4) Self-test - num2str   ================================="
-  print *, "1.23 Without fmt ", trim( num2str( 1.23 ))
-  print *, "1.23e19 Without fmt ", trim( num2str( 1.23e19 ))
-  print *, "1.23e19 With fmt es15.3 ", trim( num2str( 1.23e19, '(es15.3)' ))
-  print *, "1.23e19 With fmt f10.2 ", trim( num2str( 1.23e19, '(f10.2)' ))
-  
   print "(/,a)", "4) Self-test - to_upper  ================================="
   print *, "Upper case of AbCd efG is ", trim(to_Upper("AbCd efG"))
 
+  print "(/,a)", "5) Self-test - key2str ==============================="
+  print *, key2str('replace string:  "EmisYYYY.txt".','YYYY','2005')
+  print *, key2str('replace integer: "EmisYYYY.txt".','YYYY',2005)
+  print *, key2str('replace real:    "EmisYYYY.txt".','YYYY',2005.0)
+  print *, key2str('string w/spaces::"EmisYYYY.txt".','YYYY','99   ','(A)')
+  print *, key2str('1.23 w/2 decimals: "F.FF".' ,'F.FF' ,1.23)
+  print *, key2str('1.23 w/3 decimals: "F.FFF".','F.FFF',1.23)
+! note that the sting needs to be long enough to hold the formated value
+  print *, key2str('1.23 w/es10.3 fmt: "FFF".        ','FFF',1.23,'(es10.3)')
+  print *, key2str('1.23 w/f10.2  fmt: "FFF".        ','FFF',1.23,'(f10.2)')
 end subroutine Self_test
 
 end module SmallUtils_ml
 
-!DSX program tester
-!DSX   use SmallUtils_ml, only : Self_test
-!DSX   call Self_test()
-!DSX end program tester
+!TSTEMX program tester
+!TSTEMX   use SmallUtils_ml, only : Self_test
+!TSTEMX   call Self_test()
+!TSTEMX end program tester

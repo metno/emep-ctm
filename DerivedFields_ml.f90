@@ -1,7 +1,7 @@
-! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,8 +50,8 @@ module DerivedFields_ml
   ! Fields for storing derived-style outputs. Will be allocated
   ! in Derived_ml.
 
-  ! e.g. d_2d( num_deriv2d,MAXLIMAX, MAXLJMAX, LENOUT2D)
-  ! &    d_3d( num_deriv3d,MAXLIMAX, MAXLJMAX, KMAX_MID, LENOUT3D )
+  ! e.g. d_2d( num_deriv2d,LIMAX, LJMAX, LENOUT2D)
+  ! &    d_3d( num_deriv3d,LIMAX, LJMAX, KMAX_MID, LENOUT3D )
    real, save, public, allocatable, dimension(:,:,:,:) :: d_2d
    real, save, public, allocatable, dimension(:,:,:,:,:) :: d_3d
 

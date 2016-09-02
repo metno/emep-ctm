@@ -1,7 +1,7 @@
-! <ExternalBICs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <ExternalBICs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

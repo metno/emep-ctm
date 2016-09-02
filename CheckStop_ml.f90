@@ -1,7 +1,7 @@
-! <CheckStop_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <CheckStop_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,8 +39,10 @@ module CheckStop_ml
 !   (g)  rangeI   int  outside [range(0)..range(1)]
 
 use netcdf, only: NF90_NOERR,NF90_STRERROR
+use MPI_Groups_ml  , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_INTEGER&
+                                     ,MPI_COMM_CALC, IERROR
+
 implicit none
-INCLUDE 'mpif.h'
 
 public  :: StopAll, CheckStop, CheckNC
 private :: CheckStop_ok, CheckStop_okinfo, CheckStop_int1, CheckStop_int2, &
@@ -60,15 +62,14 @@ contains
 
 subroutine StopAll(errmsg)
   character(len=*), intent(in) :: errmsg
-  INTEGER :: INFO
   ! Stops all processors.
-  ! MPI_COMM_WORLD indicates all processors, in other programs you could have
+  ! MPI_COMM_CALC indicates all processors, in other programs you could have
   ! different groups of processes.
   ! INFO is the error message from MPI
 
   if(errmsg/="ok") then
     write(*,*) "STOP-ALL ERROR: ", trim(errmsg)
-    call MPI_ABORT(MPI_COMM_WORLD,9,INFO)
+    call MPI_ABORT(MPI_COMM_CALC,9,IERROR)
   endif
 endsubroutine StopAll
 

@@ -1,7 +1,7 @@
-! <isocom.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <isocom.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@
 
 !  INPUT:
 !  1. [WI]
-!     DOUBLE PRECISION array of length [8].
+!     real array of length [8].
 !     Concentrations, expressed in moles/m3. Depending on the type of
 !     problem solved (specified in CNTRL(1)), WI contains either
 !     GAS+AEROSOL or AEROSOL only concentratios.
@@ -49,15 +49,15 @@
 !     WI(8) - magnesium
 
 !  2. [RHI]
-!     DOUBLE PRECISION variable.
+!     real variable.
 !     Ambient relative humidity expressed on a (0,1) scale.
 
 !  3. [TEMPI]
-!     DOUBLE PRECISION variable.
+!     real variable.
 !     Ambient temperature expressed in Kelvins.
 
 !  4. [CNTRL]
-!     DOUBLE PRECISION array of length [2].
+!     real array of length [2].
 !     Parameters that control the type of problem solved.
 
 !     CNTRL(1): Defines the type of problem solved.
@@ -72,7 +72,7 @@
 
 !  OUTPUT:
 !  1. [WT]
-!     DOUBLE PRECISION array of length [8].
+!     real array of length [8].
 !     Total concentrations (GAS+AEROSOL) of species, expressed in moles/m3.
 !     If the foreward probelm is solved (CNTRL(1)=0), array WT is
 !     identical to array WI.
@@ -86,14 +86,14 @@
 !     WT(8) - total magnesium
 
 !  2. [GAS]
-!     DOUBLE PRECISION array of length [03].
+!     real array of length [03].
 !     Gaseous species concentrations, expressed in moles/m3.
 !     GAS(1) - NH3
 !     GAS(2) - HNO3
 !     GAS(3) - HCl
 
 !  3. [AERLIQ]
-!     DOUBLE PRECISION array of length [15].
+!     real array of length [15].
 !     Liquid aerosol species concentrations, expressed in moles/m3.
 !     AERLIQ(01) - H+(aq)
 !     AERLIQ(02) - Na+(aq)
@@ -112,7 +112,7 @@
 !     AERLIQ(15) - Mg2+(aq)
 
 !  4. [AERSLD]
-!     DOUBLE PRECISION array of length [19].
+!     real array of length [19].
 !     Solid aerosol species concentrations, expressed in moles/m3.
 !     AERSLD(01) - NaNO3(s)
 !     AERSLD(02) - NH4NO3(s)
@@ -139,7 +139,7 @@
 !     Returns the subcase which the input corresponds to.
 
 !  6. [OTHER]
-!     DOUBLE PRECISION array of length [9].
+!     real array of length [9].
 !     Returns solution information.
 
 !     OTHER(1): Shows if aerosol water exists.
@@ -362,7 +362,7 @@
 !     calculations.
 
 !  6. [EPSACTI]
-!     DOUBLE PRECISION variable.
+!     real variable.
 !     Defines the convergence criterion for activity coefficient
 !     calculations.
 
@@ -2492,7 +2492,7 @@
 
     SUBROUTINE ADJUST (WI)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: WI(*)
+    real :: WI(*)
 
 ! *** FOR AMMONIUM *****************************************************
 
@@ -2693,10 +2693,12 @@
 
 !=======================================================================
 
-    DOUBLE PRECISION FUNCTION GETASR (SO4I, RHI)
+    real FUNCTION GETASR (SO4I, RHI)
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     PARAMETER (NSO4S=14, NRHS=20, NASRD=NSO4S*NRHS)
     COMMON /ASRC/ ASRAT(NASRD), ASSO4(NSO4S)
-    DOUBLE PRECISION :: SO4I, RHI
+    real :: SO4I, RHI
 ! C
 ! C *** SOLVE USING FULL COMPUTATIONS, NOT LOOK-UP TABLES **************
 ! C
@@ -2750,6 +2752,8 @@
 !=======================================================================
 
     BLOCK DATA AERSR
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     PARAMETER (NSO4S=14, NRHS=20, NASRD=NSO4S*NRHS)
     COMMON /ASRC/ ASRAT(NASRD), ASSO4(NSO4S)
 
@@ -2845,7 +2849,7 @@
 
     SUBROUTINE CALCHA
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: KAPA
+    real :: KAPA
 !C      CHARACTER ERRINF*40
 
 ! *** CALCULATE HCL DISSOLUTION *****************************************
@@ -2942,7 +2946,7 @@
 
     SUBROUTINE CALCNA
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: KAPA
+    real :: KAPA
 !C      CHARACTER ERRINF*40
 
 ! *** CALCULATE HNO3 DISSOLUTION ****************************************
@@ -3132,7 +3136,7 @@
 
     SUBROUTINE CALCNHA
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: M1, M2, M3
+    real :: M1, M2, M3
     CHARACTER ERRINF*40
 
 ! *** SPECIAL CASE; WATER=ZERO ******************************************
@@ -3300,7 +3304,7 @@
 
 !      SUBROUTINE CALCHCO3
 !      INCLUDE 'isrpia.inc'
-!      DOUBLE PRECISION KAPA
+!      real KAPA
 ! C      CHARACTER ERRINF*40
 !C
 !C *** SPECIAL CASE; WATER=ZERO ******************************************
@@ -3365,7 +3369,7 @@
 
     SUBROUTINE CALCAMAQ (NH4I, OHI, DELT)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: NH4I
+    real :: NH4I
 !C      CHARACTER ERRINF*40
 
 ! *** EQUILIBRIUM CONSTANTS
@@ -3427,7 +3431,7 @@
 
     SUBROUTINE CALCAMAQ2 (GGNH3, NH4I, OHI, NH3AQ)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: NH4I, NH3AQ
+    real :: NH4I, NH3AQ
 
 ! *** EQUILIBRIUM CONSTANTS
 
@@ -3473,7 +3477,7 @@
 
     SUBROUTINE CALCCLAQ (CLI, HI, DELT)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: CLI
+    real :: CLI
 
 ! *** EQUILIBRIUM CONSTANTS
 
@@ -3526,7 +3530,7 @@
 
     SUBROUTINE CALCCLAQ2 (GGCL, CLI, HI, CLAQ)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: CLI
+    real :: CLI
 
 ! *** EQUILIBRIUM CONSTANTS
 
@@ -3571,7 +3575,7 @@
 
     SUBROUTINE CALCNIAQ (NO3I, HI, DELT)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: NO3I, HI, DELT
+    real :: NO3I, HI, DELT
 
 ! *** EQUILIBRIUM CONSTANTS
 
@@ -3628,7 +3632,7 @@
 
     SUBROUTINE CALCNIAQ2 (GGNO3, NO3I, HI, NO3AQ)
     INCLUDE 'isrpia.inc'
-    DOUBLE PRECISION :: NO3I, NO3AQ
+    real :: NO3I, NO3AQ
 
 ! *** EQUILIBRIUM CONSTANTS
 
@@ -4768,7 +4772,7 @@
 
     REAL :: EX10
     REAL :: G0(6,4),ZPL,ZMI,AGAMA,SION,H,CH,F1(6),F2A(4),F2B(4)
-    DOUBLE PRECISION :: MPL, XIJ, YJI
+    real :: MPL, XIJ, YJI
     DATA G0/24*0D0/
 
 
@@ -4941,7 +4945,7 @@
 
     REAL :: EX10, URF
     REAL :: G0(6,4),ZPL,ZMI,AGAMA,SION,H,CH,F1(3),F2(4)
-    DOUBLE PRECISION :: MPL, XIJ, YJI
+    real :: MPL, XIJ, YJI
     PARAMETER (URF=0.5)
 !      PARAMETER (LN10=2.30258509299404568402D0)
 
@@ -5084,7 +5088,7 @@
 
     REAL :: EX10, URF
     REAL :: G0(6,4),ZPL,ZMI,AGAMA,SION,H,CH,F1(3),F2(4)
-    DOUBLE PRECISION :: MPL, XIJ, YJI
+    real :: MPL, XIJ, YJI
     PARAMETER (URF=0.5)
 !      PARAMETER (LN10=2.30258509299404568402D0)
 
@@ -5259,7 +5263,7 @@
 
     REAL :: EX10, URF
     REAL :: G0(6,4),ZPL,ZMI,AGAMA,SION,H,CH,F1(3),F2(4)
-    DOUBLE PRECISION :: MPL, XIJ, YJI
+    real :: MPL, XIJ, YJI
     PARAMETER (URF=0.5)
 !      PARAMETER (LN10=2.30258509299404568402D0)
 
@@ -5456,6 +5460,7 @@
     SUBROUTINE KMFUL4 (IONIC,TEMP,G01,G02,G03,G04,G05,G06,G07,G08,G09, &
     G10,G11,G12,G15,G16,G17,G18,G19,G20, &
     G21,G22,G23)
+    IMPLICIT real (A-H,O-Z)
     REAL :: Ionic, TEMP
     DATA Z01,Z02,Z03,Z04,Z05,Z06,Z07,Z08,Z10,Z11,Z15,Z16,Z17,Z19,Z20, &
     Z21,Z22,Z23/1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 2, 2, 2, 1, 1, 4, &
@@ -5537,6 +5542,7 @@
 
     SUBROUTINE KMFUL3 (IONIC,TEMP,G01,G02,G03,G04,G05,G06,G07,G08,G09, &
     G10,G11,G12)
+    IMPLICIT real (A-H,O-Z)
     REAL :: Ionic, TEMP
     DATA Z01,Z02,Z03,Z04,Z05,Z06,Z07,Z08,Z10,Z11 &
     /1,  2,  1,  2,  1,  1,  2,  1,  1,  1/
@@ -5597,6 +5603,7 @@
 !=======================================================================
 
     SUBROUTINE KMFUL2 (IONIC,TEMP,G04,G05,G07,G08,G09,G10)
+    IMPLICIT real (A-H,O-Z)
     REAL :: Ionic, TEMP
     DATA Z01,Z02,Z03,Z04,Z05,Z06,Z07,Z08,Z10,Z11 &
     /1,  2,  1,  2,  1,  1,  2,  1,  1,  1/
@@ -5657,6 +5664,7 @@
 !=======================================================================
 
     SUBROUTINE KMFUL1 (IONIC,TEMP,G04,G07,G08,G09)
+    IMPLICIT real (A-H,O-Z)
     REAL :: Ionic, TEMP
     DATA Z01,Z02,Z03,Z04,Z05,Z06,Z07,Z08,Z10,Z11 &
     /1,  2,  1,  2,  1,  1,  2,  1,  1,  1/
@@ -5718,6 +5726,7 @@
 
     SUBROUTINE MKBI(Q,IONIC,SION,ZIP,BI)
 
+    IMPLICIT real (A-H,O-Z)
     REAL :: IONIC
 
     B=.75-.065*Q
@@ -5747,6 +5756,8 @@
 
     SUBROUTINE KMTAB (IN,TEMP,G01,G02,G03,G04,G05,G06,G07,G08,G09,G10, &
     G11,G12,G15,G16,G17,G18,G19,G20,G21,G22,G23)
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     REAL :: IN, Temp, binarray (23)
 
 ! *** Find temperature range
@@ -5840,6 +5851,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC198/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -5893,6 +5906,9 @@
     BLOCK DATA KMCF198
 
 ! *** Common block definition
+
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
 
     COMMON /KMC198/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
@@ -7490,6 +7506,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC223/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -7544,6 +7562,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC223/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -9140,6 +9160,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC248/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -9194,6 +9216,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC248/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -10790,6 +10814,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC273/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -10844,6 +10870,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC273/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -12440,6 +12468,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC298/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -12494,6 +12524,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC298/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -14090,6 +14122,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC323/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -14144,6 +14178,8 @@
 
 ! *** Common block definition
 
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     COMMON /KMC323/ &
     BNC01M(  561),BNC02M(  561),BNC03M(  561),BNC04M(  561), &
     BNC05M(  561),BNC06M(  561),BNC07M(  561),BNC08M(  561), &
@@ -15749,6 +15785,7 @@
     SUBROUTINE CHRBLN (STR, IBLK)
 !C
 !C***********************************************************************
+    IMPLICIT INTEGER (I-N)
     CHARACTER*(*) STR
 
     IBLK = 1                       ! Substring pointer (default=1)
@@ -15788,6 +15825,7 @@
     SUBROUTINE SHFTRGHT (CHR)
 !C
 !C***********************************************************************
+    IMPLICIT INTEGER (I-N)
     CHARACTER CHR*(*)
 
     I1  = LEN(CHR)             ! Total length of string
@@ -15835,6 +15873,7 @@
     SUBROUTINE RPLSTR (STRING, OLD, NEW, IERR)
 !C
 !C***********************************************************************
+    IMPLICIT INTEGER (I-N)
     CHARACTER STRING*(*), OLD*(*), NEW*(*)
 
 ! *** INITIALIZE ********************************************************
@@ -15873,8 +15912,8 @@
 !C
 !C  ======================= ARGUMENTS / USAGE =============================
 !C
-!C  VAR        is the DOUBLE PRECISION variable which value is to be saved
-!C  DEF        is a DOUBLE PRECISION variable, with the default value of VAR.
+!C  VAR        is the real variable which value is to be saved
+!C  DEF        is a real variable, with the default value of VAR.
 !C  PROMPT     is a CHARACTER varible containing the prompt string.
 !C  PRFMT      is a CHARACTER variable containing the FORMAT specifier
 !C             for the default value DEF.
@@ -15896,8 +15935,9 @@
     SUBROUTINE INPTD (VAR, DEF, PROMPT, PRFMT, IERR)
 !C
 !C***********************************************************************
+    IMPLICIT INTEGER (I-N)
     CHARACTER PROMPT*(*), PRFMT*(*), BUFFER*128
-    DOUBLE PRECISION :: DEF, VAR
+    real :: DEF, VAR
     INTEGER :: IERR
 
     IERR = 0
@@ -15962,6 +16002,7 @@
 !C
 !C***********************************************************************
 
+    IMPLICIT INTEGER (I-N)
     LOGICAL :: OPNED
 
 ! *** INQUIRE IF Iunit CONNECTED TO FILE ********************************
@@ -16012,6 +16053,7 @@
     SUBROUTINE Appendext (Filename, Defext, Overwrite)
 !C
 !C***********************************************************************
+    IMPLICIT INTEGER (I-N)
     CHARACTER*(*) Filename, Defext
     LOGICAL ::       Overwrite
 
@@ -16062,10 +16104,11 @@
 
     SUBROUTINE POLY3 (A1, A2, A3, ROOT, ISLV)
 
-    IMPLICIT DOUBLE PRECISION (A-H, O-Z)
+    IMPLICIT real (A-H, O-Z)
+    IMPLICIT INTEGER (I-N)
     PARAMETER (EXPON=1.D0/3.D0,     ZERO=0.D0, THET1=120.D0/180.D0, &
     THET2=240.D0/180.D0, PI=3.14159265358932, EPS=1D-50)
-    DOUBLE PRECISION ::  X(3)
+    real ::  X(3)
 
 ! *** SPECIAL CASE : QUADRATIC*X EQUATION *****************************
 
@@ -16107,7 +16150,7 @@
         
         ELSE IF (D <= EPS) THEN    ! -EPS <= D <= EPS  : D = ZERO
             IX   = 2
-            SSIG = SIGN (1.D0, R)
+            SSIG = SIGN (1.0, R)
             S    = SSIG*(ABS(R))**EXPON
             X(1) = 2.D0*S  - EXPON*A1
             X(2) =     -S  - EXPON*A1
@@ -16117,8 +16160,8 @@
         ELSE                       ! D > EPS  : D > ZERO
             IX   = 1
             SQD  = SQRT(D)
-            SSIG = SIGN (1.D0, R+SQD)       ! TRANSFER SIGN TO SSIG
-            TSIG = SIGN (1.D0, R-SQD)
+            SSIG = SIGN (1.0, R+SQD)       ! TRANSFER SIGN TO SSIG
+            TSIG = SIGN (1.0, R-SQD)
             S    = SSIG*(ABS(R+SQD))**EXPON ! EXPONENTIATE ABS()
             T    = TSIG*(ABS(R-SQD))**EXPON
             X(1) = S + T - EXPON*A1
@@ -16162,7 +16205,8 @@
 
     SUBROUTINE POLY3B (A1, A2, A3, RTLW, RTHI, ROOT, ISLV)
 
-    IMPLICIT DOUBLE PRECISION (A-H, O-Z)
+    IMPLICIT INTEGER (I-N)
+    IMPLICIT real (A-H, O-Z)
     PARAMETER (ZERO=0.D0, EPS=1D-15, MAXIT=100, NDIV=5)
 
     FUNC(X) = X**3.d0 + A1*X**2.0 + A2*X + A3
@@ -16182,7 +16226,7 @@
     DO 10 I=1,NDIV
         X2 = X1+DX
         Y2 = FUNC (X2)
-        IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2) < ZERO) GOTO 20 ! (Y1*Y2 < ZERO)
+        IF (SIGN(1.d0,1.d0*Y1)*SIGN(1.d0,1.d0*Y2) < ZERO) GOTO 20 ! (Y1*Y2 < ZERO)
         X1 = X2
         Y1 = Y2
     10 END DO
@@ -16202,7 +16246,7 @@
     20 DO 30 I=1,MAXIT
         X3 = 0.5*(X1+X2)
         Y3 = FUNC (X3)
-        IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) <= ZERO) THEN  ! (Y1*Y3 <= ZERO)
+        IF (SIGN(1.d0,1.d0*Y1)*SIGN(1.d0,1.d0*Y3) <= ZERO) THEN  ! (Y1*Y3 <= ZERO)
             Y2    = Y3
             X2    = X3
         ELSE
@@ -16228,7 +16272,7 @@
 
 
 ! c      PROGRAM DRIVER
-! c      DOUBLE PRECISION ROOT
+! c      real ROOT
 ! cC
 ! c      CALL POLY3 (-1.d0, 1.d0, -1.d0, ROOT, ISLV)
 ! c      IF (ISLV.NE.0) STOP 'Error in POLY3'
@@ -16305,6 +16349,7 @@
 
 ! *** Common block definition
 
+    IMPLICIT INTEGER (I-N)
     REAL :: AINT10, ADEC10
     COMMON /EXPNC/ AINT10(20), ADEC10(200)
 
@@ -16614,11 +16659,11 @@
 !     be stored before the stack exhausts).
 
 !  7. [TIN]
-!     DOUBLE PRECISION variable
+!     real variable
 !     The value used for a very small number.
 
 !  8. [GRT]
-!     DOUBLE PRECISION variable
+!     real variable
 !     The value used for a very large number.
 
 ! *** COPYRIGHT 1996-2006, UNIVERSITY OF MIAMI, CARNEGIE MELLON UNIVERSITY,

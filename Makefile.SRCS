@@ -13,10 +13,10 @@ FOBJ ?=	\
 	Io_ml.o Io_Nums_ml.o Io_Progs_ml.o KeyValueTypes.o  LandDefs_ml.o Landuse_ml.o \
 	LandPFT_ml.o LocalVariables_ml.o MARS_ml.o MARS_Aero_water_ml.o \
 	MassBudget_ml.o Met_ml.o MetFields_ml.o EQSAM_ml.o MicroMet_ml.o \
-	ModelConstants_ml.o MosaicOutputs_ml.o AerosolCalls.o My_Derived_ml.o \
-	My_SOA_ml.o My_Outputs_ml.o NetCDF_ml.o \
+	ModelConstants_ml.o MosaicOutputs_ml.o MPI_Groups_ml.o AerosolCalls.o My_Derived_ml.o \
+	SOA_ml.o My_Outputs_ml.o NetCDF_ml.o \
 	Nest_ml.o NumberConstants.o \
-        Output_hourly.o OutputChem_ml.o OwnDataTypes_ml.o Par_ml.o \
+	Output_hourly.o OutputChem_ml.o OwnDataTypes_ml.o Par_ml.o \
 	PhysicalConstants_ml.o PlumeRise_ml.o PointSource_ml.o \
 	Precision_ml.o Radiation_ml.o Rb_ml.o \
 	ReadField_ml.o Rsurface_ml.o Runchem_ml.o Setup_1d_ml.o \
@@ -24,29 +24,5 @@ FOBJ ?=	\
 	SeaSalt_ml.o StoFlux_ml.o \
 	SubMet_ml.o Tabulations_ml.o TimeDate_ml.o TimeDate_ExtraUtil_ml.o Timefactors_ml.o Timing_ml.o \
 	Trajectory_ml.o Units_ml.o Unimod.o Wesely_ml.o \
-        isocom.o ISOFWD.o isorev.o \
-	global2local.o local2global.o PhyChem_ml.o My_3DVar_ml.o My_Pollen_ml.o My_ESX_ml.o
-
-ESX_FOBJ = ZD_ESX/AllocInit.o \
-		   ZD_ESX/CheckStops.o \
-		   ZD_ESX/ChemFunctions.o \
-		   ZD_ESX/CM_ChemDims.o \
-		   ZD_ESX/CM_ChemRates.o \
-		   ZD_ESX/CM_ChemSpecs.o \
-		   ZD_ESX/DefPhotolysis.o \
-		   ZD_ESX/esx_Variables.o \
-		   ZD_ESX/esx_Zchem.o \
-		   ZD_ESX/esx_Zgrid.o \
-		   ZD_ESX/esx_Zveg.o \
-		   ZD_ESX/Io_Routines.o \
-		   ZD_ESX/LocalVariables.o \
-		   ZD_ESX/ModelConstants.o \
-		   ZD_ESX/ZchemData.o \
-		   ZD_ESX/Zmet_ml.o \
-		   ZD_ESX/My_ESX_ml.o
-
-# default target
-all:
-
-# ensure pollen_const_ml.mod is updated for `make MACC`
-Pollen_const_ml.o: My_Pollen_ml.o
+	isocom.o ISOFWD.o isorev.o \
+	global2local.o PhyChem_ml.o My_3DVar_ml.o My_Pollen_ml.o My_ESX_ml.o

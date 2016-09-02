@@ -1,7 +1,7 @@
-! <My_Outputs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <My_Outputs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,10 +37,11 @@ module  My_Outputs_ml
 use CheckStop_ml,      only: CheckStop
 use ChemSpecs
 use ChemGroups_ml,     only: chemgroups
-use DerivedFields_ml,  only: f_2d               ! D2D houtly output type
+use DerivedFields_ml,  only: f_2d,f_3d          ! D2D/D3D houtly output type
 use ModelConstants_ml, only: PPBINV, PPTINV, MasterProc, KMAX_MID,&
                              MY_OUTPUTS, FORECAST, DEBUG_COLSRC,&
-                             USE_AOD, USE_POLLEN, DEBUG_POLLEN, SELECT_LEVELS_HOURLY
+                             USE_AOD, USE_POLLEN, DEBUG_POLLEN, &
+                             SELECT_LEVELS_HOURLY!, FREQ_HOURLY
 use PhysicalConstants_ml, only: ATWAIR
 use OwnDataTypes_ml,   only: Asc2D
 use Par_ml,            only: GIMAX,GJMAX,IRUNBEG,JRUNBEG,me
@@ -55,7 +56,6 @@ implicit none
 
 logical, public, parameter :: out_binary = .false.
 logical, public, parameter :: Ascii3D_WANTED = .false.
-logical, private,parameter :: DEBUG_PBL = .false., DEBUG_PM10 = .false.
 
 ! Site outputs   (used in Sites_ml)
 !==============================================================
@@ -65,18 +65,18 @@ logical, private,parameter :: DEBUG_PBL = .false., DEBUG_PM10 = .false.
 
 integer, private :: isite              ! To assign arrays, if needed
 integer, public, parameter :: &
-   NSITES_MAX =       99      & ! Max. no surface sites allowed
-  ,FREQ_SITE  =        1      & ! Interval (hrs) between outputs
-  ,NADV_SITE  = NSPEC_ADV  & ! No. advected species (1 up to NSPEC_ADV)
-  ,NSHL_SITE  = NSPEC_SHL  & ! No. short-lived species
+   NSITES_MAX =        99     & ! Max. no surface sites allowed
+  ,FREQ_SITE  =         1     & ! Interval (hrs) between outputs
+  ,NADV_SITE  = NSPEC_ADV     & ! No. advected species (1 up to NSPEC_ADV)
+  ,NSHL_SITE  = NSPEC_SHL     & ! No. short-lived species
   ,NXTRA_SITE_MISC =    2     & ! No. Misc. met. params  ( e.g. T2, d_2d)
-  ,NXTRA_SITE_D2D  =    9+8   ! No. Misc. met. params  ( e.g. T2, d_2d)
+  ,NXTRA_SITE_D2D  =  9+8       ! No. Misc. met. params  ( e.g. T2, d_2d)
 
 integer, public, parameter, dimension(NADV_SITE) :: &
-  SITE_ADV =  (/ (isite, isite=1,NADV_SITE) /)  ! Everything
+  SITE_ADV = [(isite, isite=1,NADV_SITE)]  ! Everything
 
 integer, public, parameter, dimension(NSHL_SITE) :: &
-  SITE_SHL =  (/ (isite, isite=1,NSHL_SITE) /)  ! All short-lived species
+  SITE_SHL = [(isite, isite=1,NSHL_SITE)]  ! All short-lived species
 
 ! Extra parameters - need to be coded in Sites_ml also. So far
 ! we can choose from hmix, T2, or th (pot. temp.) or d_2d fields.
@@ -88,33 +88,23 @@ integer, public, parameter, dimension(NSHL_SITE) :: &
 !** fields in SITE_XTRA and their names in SITE_XTRA_CODE
 
 character(len=18), public, parameter, dimension(NXTRA_SITE_MISC) :: &
-  SITE_XTRA_MISC=(/"th   ","T2   "/)
+  SITE_XTRA_MISC=[character(len=18):: "th","T2"]
 
 !These variables must have been set in My_Derived for them to be used.
 character(len=24), public, parameter, dimension(NXTRA_SITE_D2D) :: &
-  SITE_XTRA_D2D= (/ &
-   character(len=24) :: &
-    "HMIX                   ",&
-    "PSURF                  ", &
-    "ws_10m                 ", &
-    "rh2m                   ", &
-    "Emis_mgm2_BioNatC5H8   ", &
-    "Emis_mgm2_BioNatAPINENE", &
-    "Emis_mgm2_BioNatNO     ",&
-    "Emis_mgm2_nox          ",&
-    'WDEP_PREC', &
-!    'Idirect', 'Idiffuse', 'SNratio', 'SMI_deep', &
-    'met2d_uref', & ! Idirect', 'Idiffuse', 'SNratio', 'SMI_deep', &
-    'met2d_u10', & ! Idirect', 'Idiffuse', 'SNratio', 'SMI_deep', &
-    'met2d_rh2m', & ! Idirect', 'Idiffuse', 'SNratio', 'SMI_deep', &
-    'SMI_deep', 'met2d_SMI_d', &
-    'SMI_uppr', 'met2d_SMI_s', &
-!   "SoilWater_deep ","EVAP_CF        ","EVAP_DF        ", &
-!   "EVAP_BF        ","EVAP_NF        ","WDEP_PREC      ", &
-!   "RH_GR          ","CanopyO3_GR    ","VPD_GR         ","FstO3_GR       ", &
-!   "RH_IAM_DF      ","CanopyO3_IAM_DF","VPD_IAM_DF     ","FstO3_IAM_DF   ", &
-!   "COLUMN_CO_k20  ","COLUMN_C2H6_k20","COLUMN_HCHO_k20","COLUMN_CH4_k20 ",
-    "COLUMN_NO2_k20         " /)
+  SITE_XTRA_D2D=[character(len=24):: & 
+    "HMIX","PSURF","ws_10m","rh2m",&
+    "Emis_mgm2_BioNatC5H8","Emis_mgm2_BioNatAPINENE",&
+    "Emis_mgm2_BioNatNO","Emis_mgm2_nox",&
+    'WDEP_PREC',&!'Idirect','Idiffuse','SNratio','SMI_deep',&
+    'met2d_uref','met2d_u10','met2d_rh2m', &
+    'SMI_deep','met2d_SMI_d','SMI_uppr','met2d_SMI_s',&
+!   "SoilWater_deep","EVAP_CF","EVAP_DF",&
+!   "EVAP_BF","EVAP_NF","WDEP_PREC",&
+!   "RH_GR","CanopyO3_GR","VPD_GR","FstO3_GR",&
+!   "RH_IAM_DF","CanopyO3_IAM_DF","VPD_IAM_DF","FstO3_IAM_DF",&
+!   "COLUMN_CO_k20","COLUMN_C2H6_k20","COLUMN_HCHO_k20","COLUMN_CH4_k20",
+    "COLUMN_NO2_k20"]
 
 !**** Aircraft outputs   (used in Polinat_ml)
 !==============================================================
@@ -146,14 +136,14 @@ integer, public, parameter :: &
   ,NXTRA_SONDE =    4             ! No. Misc. met. params
 
 integer, public, parameter, dimension(NADV_SONDE) :: &
-   SONDE_ADV =  (/ IXADV_O3, IXADV_NO2, IXADV_NO, IXADV_PAN,  &
-                IXADV_NO3_c, IXADV_NO3_f, IXADV_SO4, IXADV_NH4_f, IXADV_NH3/)
+  SONDE_ADV = [ IXADV_O3, IXADV_NO2, IXADV_NO, IXADV_PAN,  &
+                IXADV_NO3_c, IXADV_NO3_f, IXADV_SO4, IXADV_NH4_f, IXADV_NH3 ]
 
 integer, public, parameter, dimension(NSHL_SONDE) :: &
-  SONDE_SHL =  (/ IXSHL_OH, IXSHL_OD, IXSHL_OP /)
+  SONDE_SHL = [ IXSHL_OH, IXSHL_OD, IXSHL_OP ]
 character(len=10), public, parameter, dimension(NXTRA_SONDE) :: &
-  SONDE_XTRA=  (/ "NOy   ", "z_mid ", "p_mid ", "th    " /) !, "Kz_m2s" /)
-
+  SONDE_XTRA= [character(len=10):: &
+   "NOy","z_mid","p_mid","th"]!,"Kz_m2s"]
 
 !   can access d_3d fields through index here, by
 !   setting "D3D" above and say D3_XKSIG12 here:
@@ -175,23 +165,17 @@ character(len=10), public, parameter, dimension(NXTRA_SONDE) :: &
 !  Or BCVppbv to get grid-centre concentrations (relevant for all layers)
 !----------------------------------------------------------------
 
-!TESTHH integer, public            :: NHOURLY_OUT =  9 ! No. outputs
-!TESTHH integer, public, parameter :: NLEVELS_HOURLY = 4 ! No. outputs
-integer, public, save      :: nhourly_out=0    ! No. outputs
-integer, public, save      :: nlevels_hourly=0 ! No. outputs
-integer, public, parameter :: FREQ_HOURLY = 1  ! 1 hours between outputs
+integer, public, save :: &
+  nhourly_out=0,    & ! No. output variables
+  nlevels_hourly=0, & ! No. output levels
+  nmax6_hourly = 0    ! No of 6 hourly max outputs
 
 ! Output selected model levels
-!NML logical, public, parameter ::  &
-!NML   SELECT_LEVELS_HOURLY = .false..or.FORECAST.or.(MY_OUTPUTS=="3DPROFILES")
-! Decide which levels to print out
-! 20<==>uppermost model level (m01)
-! 01<==>lowermost model level (m20)
-! 00<==>surface approx. from lowermost model level
-! 00 and 01 can be both printed out,
-! but it might create loads of missing values...
-!TESTHH integer, public, parameter, dimension(NLEVELS_HOURLY) :: &
-!TESTHH   LEVELS_HOURLY = (/0,4,6,10/)
+! If SELECT_LEVELS_HOURLY (ModelConstants_config NML)
+! levels_hourly contains which levels to print out
+!   20<==>uppermost model level (m01)
+!   01<==>lowermost model level (m20)
+!   00<==>surface approx. from lowermost model level
 integer, public, dimension(:), allocatable :: levels_hourly  ! Set below
 
 type(Asc2D), public, dimension(:), allocatable :: hr_out  ! Set below
@@ -221,17 +205,6 @@ subroutine set_output_defs
   ! introduce some integers to make specification of domain simpler
   ! and less error-prone. Numbers can be changed as desired.
 
- !integer, save :: ix1 = 36, ix2 = 167, iy1=12, iy2 =  122  ! EMEP
- ! integer, save :: ix1 = 65, ix2 = 167, iy1=12, iy2 =  122  ! restricted EMEP
- integer, save :: ix1, ix2, iy1, iy2
-
-  ! WARNING: If the specification of the subdomain is different for
-  !            different components (ix1=125 for ozone and ix1=98 for
-  !            NH4 for example) , the variables i_EMEP, j_EMEP
-  !            latitude and longitude in NetCDF output will be
-  !            wrong.
-
-
   !==============================================================
   ! Conversion to ug/m3
   !   xn_adv(ixadv,ix,iy,k)*roa(ix,iy,k,1)*to_ug_ADV(ixadv)
@@ -251,29 +224,25 @@ subroutine set_output_defs
   ! ** REMEMBER : SHL species are in molecules/cm3, not mixing ratio !!
   ! ** REMEMBER : No spaces in name, except at end !!
 
-!default
-  ix1=IRUNBEG
-  ix2=IRUNBEG+GIMAX-1
-  iy1=JRUNBEG
-  iy2=JRUNBEG+GJMAX-1 
-
-!  if(MasterProc) write(*,*) "TESTHH INSIDE set_output_defs",MY_OUTPUTS
+  if(MasterProc) write(*,*) "TESTHH INSIDE set_output_defs",MY_OUTPUTS
 
   select case(MY_OUTPUTS)
   case("EMERGENCY")
     nlevels_hourly = 1+18
-    nhourly_out=5    !PM*,AOD & Z
+    nhourly_out=4    !PM*,AOD & Z
     ash=find_index("ASH",chemgroups(:)%name)
-    nuc_conc=find_index("NUCRACT",chemgroups(:)%name)
-    nuc_wdep=find_index("DDEP_NUCRACT",chemgroups(:)%name)
-    nuc_ddep=find_index("WDEP_NUCRACT",chemgroups(:)%name)
-    call CheckStop((ash+nuc_conc+nuc_ddep+nuc_wdep)<1,"set_output_defs: Unknown group 'ASH'/'NUC'")
+    nuc_conc=0  ! find_index("NUCRACT",chemgroups(:)%name)
+    nuc_wdep=0  ! find_index("DDEP_NUCRACT",chemgroups(:)%name)
+    nuc_ddep=0  ! find_index("WDEP_NUCRACT",chemgroups(:)%name)
+    call CheckStop((ash+nuc_conc+nuc_ddep+nuc_wdep)<1,&
+      "set_output_defs: Unknown group 'ASH'/'NUC'")
     if(ash>0)then
       name="none"
       do i=1,size(chemgroups(ash)%ptr)
         if(species(chemgroups(ash)%ptr(i))%name(1:9)==name)cycle
         name=species(chemgroups(ash)%ptr(i))%name(1:9)
-        nhourly_out=nhourly_out+2
+        nhourly_out=nhourly_out+2+1  ! 
+        nmax6_hourly=nmax6_hourly+1  ! 
         if(MasterProc.and.DEBUG_COLSRC)&
           write(*,*)'EMERGENCY: Volcanic Ash, Vent=',name
       enddo
@@ -307,29 +276,33 @@ subroutine set_output_defs
       enddo
     endif
     endif
-  case("INVERSION")
+  case("INVERSION") ! use hourly Derived output in the near future
     nhourly_out=19
     nlevels_hourly = 1
-  case("MACC_NMC")
+  case("MACC_ENS","CAMS50_ENS","FORECAST")
     nhourly_out=0
-    return
-  case("MACC_ENS","FORECAST")
-    nhourly_out=15
     nlevels_hourly=9
-    if(any(species_adv(:)%name=="RN222"))nhourly_out=nhourly_out+1
-    if(USE_AOD     )nhourly_out=nhourly_out+1
+!- moved to Hourly/Derived
+!-  nhourly_out=nhourly_out+15
+!-  if(any(species_adv(:)%name=="RN222"))nhourly_out=nhourly_out+1
+!-  if(USE_AOD     )nhourly_out=nhourly_out+1
     if(USE_POLLEN  )then
-      call pollen_check(gpoll)
-      nhourly_out=nhourly_out+size(chemgroups(gpoll)%ptr)
+!-    call pollen_check(gpoll)
+!-    nhourly_out=nhourly_out+size(chemgroups(gpoll)%ptr)
       if(DEBUG_POLLEN)&
       nhourly_out=nhourly_out+size(chemgroups(gpoll)%ptr)*2
     endif
-    if(DEBUG_PBL   )nhourly_out=nhourly_out+3
-    if(DEBUG_PM10  )nhourly_out=nhourly_out+5
-  case("MACC_EVA")
-    nhourly_out=4
-    nlevels_hourly = 1
-    if(DEBUG_PM10  )nhourly_out=nhourly_out+6
+!- moved to Hourly/Derived
+!-case("MACC_EVA","CAMS50_EVA","CAMS50_IRA")
+!-  nhourly_out=4
+!-  nlevels_hourly=1
+!-case("MACC_POL","CAMS71_SR","CITYSR")
+!-  nhourly_out=2
+!-  nlevels_hourly=1
+!-case("MACC_NMC")
+!-  nhourly_out=4
+!-  nlevels_hourly=KMAX_MID     ! nb zero is *not* one of levels
+!-  call CheckStop(.not.USE_AOD,"MACC_NMC hourly output needs USE_AOD")
   case("3DPROFILES")
     nhourly_out=2
     nlevels_hourly = 2  ! nb zero is one of levels in this system
@@ -350,37 +323,38 @@ subroutine set_output_defs
   case("TRENDS@12UTC")
     nhourly_out=3
     nlevels_hourly = KMAX_MID  ! nb zero is *not* one of levels
+!- moved to Hourly/Derived
+!-case default
+!-  nhourly_out=1
+!-  nlevels_hourly = 1  ! nb zero is *not* one of levels
   case default
-    nhourly_out=1
-    nlevels_hourly = 1  ! nb zero is *not* one of levels
+    nhourly_out=0
   endselect
 
+  if(nhourly_out==0)then
+    nlevels_hourly=0
+    return
+  endif
   if(allocated(hr_out))       deallocate(hr_out)
   if(allocated(levels_hourly))deallocate(levels_hourly)
   allocate(hr_out(nhourly_out),levels_hourly(nlevels_hourly))
-  hr_out(:)=Asc2D("none","none",-99,-99,-99,-99,-99,-99,"none",-99.9,-99.9)
+  hr_out(:)=Asc2D("none","none",-99,-99,"none",-99.9,-99.9)
 
   select case(MY_OUTPUTS)
   case("EMERGENCY")
-!   ix1=IRUNBEG;ix2=IRUNBEG+GIMAX-1
-!   iy1=JRUNBEG;iy2=JRUNBEG+GJMAX-1
     levels_hourly = (/(i-1,i=1,nlevels_hourly)/)
 
     pm25=find_index("PMFINE",chemgroups(:)%name) !NB There is no "PM25" group
     pm10=find_index("PM10"  ,chemgroups(:)%name)
 !**               name     type     ofmt
-!**               ispec    ix1 ix2 iy1 iy2 nk sellev? unit conv  max
-    j=5;hr_out(1:j) = (/&
-      Asc2D("pm25_3km"  ,"BCVugXXgroup",pm25,&
-             ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
-      Asc2D("pm10_3km"  ,"BCVugXXgroup",pm10,&
-             ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
-      Asc2D("pm_h2o_3km","PMwater",00         ,&
-             ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
-      Asc2D("AOD_550nm" ,"D2D_inst",find_index("AOD_550nm",f_2d(:)%name),&
-             ix1,ix2,iy1,iy2,1," ",1.0    ,-9999.9),&
-      Asc2D("z"         ,"Z_MID" ,00         ,&
-             ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"km",1e-3,-9999.9)/)
+!**               ispec    nk sellev? unit conv  max
+    j=4;hr_out(1:j) = (/&
+      Asc2D("pm25_3km"  ,"BCVugXXgroup",pm25,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
+      Asc2D("pm10_3km"  ,"BCVugXXgroup",pm10,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
+      Asc2D("pm_h2o_3km","PMwater"     ,00  ,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
+!     Asc2D("AOD_550nm" ,"D2D",find_index("AOD_550nm",f_2d(:)%name),&
+!            1," ",1.0    ,-9999.9),&
+      Asc2D("z"         ,"Z_MID" ,00,NLEVELS_HOURLY,"km",1e-3,-9999.9)/)
     if(ash>0)then
       name="none"
       do i=1,size(chemgroups(ash)%ptr)
@@ -388,11 +362,13 @@ subroutine set_output_defs
         name=species(chemgroups(ash)%ptr(i))%name(1:9)
         igrp=find_index(name,chemgroups(:)%name)
         call CheckStop(igrp<1,"set_output_defs: Unknown group '"//name//"'")
-        j=j+2;hr_out(j-1:j)=(/&
+        j=j+3;hr_out(j-2:j)=(/&
           Asc2D(trim(name)       ,"BCVugXXgroup",igrp,&
-                ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
+                NLEVELS_HOURLY,"ug/m3",1.0,-999.9),&
           Asc2D(trim(name)//"_col","COLUMNgroup" ,igrp,&
-                ix1,ix2,iy1,iy2,1,"ug/m2",1.0,-999.9)/)
+                1,"ug/m2",1.0,-999.9),&
+          Asc2D(trim(name)//"_6hour_max","MAX6Hgroup" ,igrp,&
+                4,"ug/m3",1.0,-999.9)/)
       enddo
     endif
     if(nuc_conc>0)then
@@ -403,10 +379,8 @@ subroutine set_output_defs
         !call CheckStop(igrp<1,"set_output_defs: Unknown conc group '"//name//"'")
         j=j+1;
         idx= chemgroups(nuc_conc)%ptr(i) - NSPEC_SHL ! offset between xn_adv and species
-        hr_out(j)= Asc2D(trim(name),"BCVugXX",idx,&
-                ix1,ix2,iy1,iy2,1,"uBq h/m3",&
-                PPBINV/ATWAIR*species(chemgroups(nuc_conc)%ptr(i))%molwt,&
-                -999.9)
+        hr_out(j)= Asc2D(trim(name),"BCVugXX",idx,1,"uBq h/m3",&
+                PPBINV/ATWAIR*species(chemgroups(nuc_conc)%ptr(i))%molwt,-999.9)
       enddo
     endif
     if (.false.) then
@@ -417,12 +391,12 @@ subroutine set_output_defs
         igrp=find_index(name,chemgroups(:)%name) ! position of NPP/NUC -group
         call CheckStop(igrp<1,"set_output_defs: Unknown wdep group '"//name//"'")
         j=j+1;
-!        hr_out(j)=(/&
-!          Asc2D(name        ,"BCVugXXgroup",igrp,&
-!                ix1,ix2,iy1,iy2,1,"uBqh/m2",1.0,-999.9)&
-!                /)
+!       hr_out(j)=(/&
+!         Asc2D(name        ,"BCVugXXgroup",igrp,&
+!               1,"uBqh/m2",1.0,-999.9)&
+!                 /)
         hr_out(j)=Asc2D(trim(name)//"_WDEP","D2D_accum",&
-              find_index("WDEP_"//trim(name),f_2d(:)%name),ix1,ix2,iy1,iy2,1,"",1.0,-999.9)
+              find_index("WDEP_"//trim(name),f_2d(:)%name),1,"",1.0,-999.9)
 
       enddo
     endif
@@ -433,12 +407,12 @@ subroutine set_output_defs
         igrp=find_index(name,chemgroups(:)%name) ! position of NPP/NUC -group
         call CheckStop(igrp<1,"set_output_defs: Unknown ddep group '"//name//"'")
         j=j+1;
-!        hr_out(j:j)=(/&
-!          Asc2D(name        ,"BCVugXXgroup",igrp,&
-!                ix1,ix2,iy1,iy2,1,"uBqh/m2",1.0,-999.9)&
-!                /)
+!       hr_out(j:j)=(/&
+!         Asc2D(name        ,"BCVugXXgroup",igrp,&
+!               1,"uBqh/m2",1.0,-999.9)&
+!               /)
         hr_out(j)=Asc2D(trim(name)//"_DDEP","D2D_accum",&
-              find_index("DDEP_"//name,f_2d(:)%name),ix1,ix2,iy1,iy2,1,"",1.0,-999.9)
+              find_index("DDEP_"//name,f_2d(:)%name),1,"",1.0,-999.9)
       enddo
     endif
     endif ! if false
@@ -450,145 +424,130 @@ subroutine set_output_defs
       call CheckStop(igrp<1,"set_output_defs: Unknown ASH group '"//name//"'")
       if(MasterProc)write(*,*) "AshInv: ",trim(name),igrp
       hr_out(j)=Asc2D(trim(name)//"_col","COLUMNgroup" ,igrp,&
-           ix1,ix2,iy1,iy2,1,"ug/m2",1e0/3600.,-999.9)  ! 1kg/s --> 1kg/h
+           1,"ug/m2",1e0/3600.,-999.9)  ! 1kg/s --> 1kg/h
     enddo
-  case("MACC_ENS","FORECAST")
+  case("MACC_ENS","CAMS50_ENS","FORECAST")
     levels_hourly = [0,1,2,3,4,6,9,10,12]
     pm25 =find_index("PMFINE"  ,chemgroups(:)%name) !NB There is no "PM25" group
     pm10 =find_index("PM10"    ,chemgroups(:)%name)
     nmvoc=find_index("NMVOC"   ,chemgroups(:)%name)
-    rn222=find_index("RN222"   ,species_adv(:)%name)
-!**               name     type     ofmt
-!**               ispec    ix1 ix2 iy1 iy2 nk sellev? unit conv  max
-    j=15;hr_out(1:j) = (/&
-      Asc2D("o3_5km"    ,"BCVugXX",IXADV_O3   ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_O3) ,600.0*2.0),&
-      Asc2D("no_5km"    ,"BCVugXX",IXADV_NO   ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_NO) ,-999.9),&
-      Asc2D("no2_5km"   ,"BCVugXX",IXADV_NO2  ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_NO2),600.0*1.91),&
-      Asc2D("so2_5km"   ,"BCVugXX",IXADV_SO2  ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_SO2),-999.9),&
-      Asc2D("co_5km"    ,"BCVugXX",IXADV_CO   ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_CO) ,-999.9),&
-      Asc2D("nh3_5km"   ,"BCVugXX",IXADV_NH3  ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_NH3),-999.9),&
-      Asc2D("pan_5km"   ,"BCVugXX",IXADV_PAN  ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_PAN),-999.9),&
-      Asc2D("nmvoc_5km" ,"BCVugXXgroup",nmvoc,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ugC",1.0                ,-999.9),&
-      Asc2D("pm25_5km"  ,"BCVugXXgroup",pm25,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
-      Asc2D("pm10_5km"  ,"BCVugXXgroup",pm10,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
-      Asc2D("pm_h2o_5km","PMwater",00         ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
+    rn222=find_index("RN222"  ,species_adv(:)%name)
+!**               name     type     ispec
+!**               nk unit unit_conv  max
+!- moved to Hourly/Derived
+!-  j=15;hr_out(1:j) = (/&
+!-    Asc2D("o3_5km"    ,"BCVugXX",IXADV_O3   ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_O3) ,600.0*2.0),&
+!-    Asc2D("no_5km"    ,"BCVugXX",IXADV_NO   ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_NO) ,-999.9),&
+!-    Asc2D("no2_5km"   ,"BCVugXX",IXADV_NO2  ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_NO2),600.0*1.91),&
+!-    Asc2D("so2_5km"   ,"BCVugXX",IXADV_SO2  ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_SO2),-999.9),&
+!-    Asc2D("co_5km"    ,"BCVugXX",IXADV_CO   ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_CO) ,-999.9),&
+!-    Asc2D("nh3_5km"   ,"BCVugXX",IXADV_NH3  ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_NH3),-999.9),&
+!-    Asc2D("pan_5km"   ,"BCVugXX",IXADV_PAN  ,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(IXADV_PAN),-999.9),&
+!-    Asc2D("nmvoc_5km" ,"BCVugXXgroup",nmvoc,&
+!-          NLEVELS_HOURLY,"ugC",1.0                ,-999.9),&
+!-    Asc2D("pm25_5km"  ,"BCVugXXgroup",pm25,&
+!-          NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
+!-    Asc2D("pm10_5km"  ,"BCVugXXgroup",pm10,&
+!-          NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
+!-    Asc2D("pm_h2o_5km","PMwater",00         ,&
+!-          NLEVELS_HOURLY,"ug",1.0                 ,-999.9)/)
 !! Partial/Full COLUMN/COLUMgroup calculations:kk$
 !!   hr_out%nk indecate the number of levels in the column,
 !!     1<%nk<KMAX_MID  ==>  Partial column: %nk lowermost levels
 !!       otherwise     ==>  Full column: all model levels
-      Asc2D("no2_col"   ,"COLUMN",IXADV_NO2  ,&
-            ix1,ix2,iy1,iy2,1,"ug",to_ug_ADV(IXADV_NO2)             ,-999.9),&
-      Asc2D("o3_col"    ,"COLUMN",IXADV_O3   ,&
-            ix1,ix2,iy1,iy2,1,"ug",to_ug_ADV(IXADV_O3)              ,-999.9),&
-      Asc2D("co_col"    ,"COLUMN",IXADV_CO   ,&
-            ix1,ix2,iy1,iy2,1,"ug",to_ug_ADV(IXADV_CO)              ,-999.9),&
-      Asc2D("hcho_col"  ,"COLUMN",IXADV_HCHO ,&
-            ix1,ix2,iy1,iy2,1,"ug",to_ug_ADV(IXADV_HCHO)            ,-999.9)/)
-!!          ix1,ix2,iy1,iy2,1,"1e15molec/cm2",to_molec_cm2*1e-15    ,-999.9)/)
-    if(rn222>0)then
-      j=j+1;hr_out(j) = &
-      Asc2D("Rn222_3km" ,"BCVugXX",rn222,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",to_ug_ADV(rn222)    ,-999.9)
-    endif
-    if(USE_AOD)then
-      j=j+1;hr_out(j) = &
-      Asc2D("AOD_550nm" ,"D2D_inst",find_index("AOD_550nm",f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1," ",1.0                               ,-999.9)
-    endif
+!- moved to Hourly/Derived
+!-     Asc2D("no2_col"   ,"COLUMN",IXADV_NO2  ,&
+!-           1,"ug",to_ug_ADV(IXADV_NO2)             ,-999.9),&
+!-     Asc2D("o3_col"    ,"COLUMN",IXADV_O3   ,&
+!-           1,"ug",to_ug_ADV(IXADV_O3)              ,-999.9),&
+!-     Asc2D("co_col"    ,"COLUMN",IXADV_CO   ,&
+!-           1,"ug",to_ug_ADV(IXADV_CO)              ,-999.9),&
+!-     Asc2D("hcho_col"  ,"COLUMN",IXADV_HCHO ,&
+!-           1,"ug",to_ug_ADV(IXADV_HCHO)            ,-999.9)/)
+!!          1,"1e15molec/cm2",to_molec_cm2*1e-15    ,-999.9)/)
+!- moved to Hourly/Derived
+!-  if(rn222>0)then
+!-    j=j+1;hr_out(j) = &
+!-    Asc2D("Rn222_3km" ,"BCVugXX",rn222,&
+!-          NLEVELS_HOURLY,"ug",to_ug_ADV(rn222)    ,-999.9)
+!-  endif
+!-  if(USE_AOD)then
+!-    j=j+1;hr_out(j) = &
+!-    Asc2D("AOD_550nm" ,"D2D_inst",find_index("AOD_550nm",f_2d(:)%name),&
+!-          1," ",1.0                               ,-999.9)
+!-  endif
     if(USE_POLLEN)then
-      do i=1,size(chemgroups(gpoll)%ptr)
-        idx=chemgroups(gpoll)%ptr(i)-NSPEC_SHL ! offset between xn_adv and species
-        j=j+1;hr_out(j) = &
-        Asc2D(trim(species_adv(idx)%name),"ADVugXX",idx, &
-              ix1,ix2,iy1,iy2,1,"grains/m3",to_ug_ADV(idx)*ug2grains,-999.9)
-      enddo
+!- moved to Hourly/Derived
+!-    do i=1,size(chemgroups(gpoll)%ptr)
+!-      idx=chemgroups(gpoll)%ptr(i)-NSPEC_SHL ! offset between xn_adv and species
+!-      j=j+1;hr_out(j) = &
+!-      Asc2D(trim(species_adv(idx)%name),"ADVugXX",idx, &
+!-            1,"grains/m3",to_ug_ADV(idx)*ug2grains,-999.9)
+!-    enddo
       if(DEBUG_POLLEN)then
         do i=1,size(chemgroups(gpoll)%ptr)
           idx=chemgroups(gpoll)%ptr(i)-NSPEC_SHL ! offset between xn_adv and species
           j=j+2;hr_out(j-1:j) = (/&
   !       Asc2D(trim(species_adv(idx)%name)//"_heatsum","heatsum"     ,i,&
-  !           ix1,ix2,iy1,iy2,1,"degree day" ,1.0,-999.9),&
+  !           1,"degree day" ,1.0,-999.9),&
           Asc2D(trim(species_adv(idx)%name)//"_emiss"  ,"pollen_emiss",i,&
-              ix1,ix2,iy1,iy2,1,"grains/m2/h",1.0,-999.9),&
+              1,"grains/m2/h",1.0,-999.9),&
           Asc2D(trim(species_adv(idx)%name)//"_left"   ,"pollen_left" ,i,&
-              ix1,ix2,iy1,iy2,1,"grains/m3"  ,1.0,-999.9)/)
+              1,"grains/m3"  ,1.0,-999.9)/)
         enddo
       endif
     endif
-    if(DEBUG_PBL   )then
-      j=j+3;hr_out(j-2:j) = (/&
-      Asc2D("HMIX","D2D_inst",find_index("HMIX",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "m",1.0,10000.0), &
-      Asc2D("USTAR_NWP","D2D_inst",find_index("USTAR_NWP",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "m/s",1.0,-999.9), &
-      Asc2D("Kz_m2s","D2D_inst",find_index("Kz_m2s",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "m2/s",1.0,-999.9)/)
-    endif
-    if(DEBUG_PM10  )then
-      j=j+5;hr_out(j-4:j) = (/&
-      Asc2D("sia_5km" ,"BCVugXXgroup",find_index("SIA"  ,chemgroups(:)%name),&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
-      Asc2D("dust_5km" ,"BCVugXXgroup",find_index("DUST",chemgroups(:)%name),&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
-      Asc2D("salt_5km","BCVugXXgroup",find_index("SS"   ,chemgroups(:)%name),&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
-      Asc2D("ppm_5km" ,"BCVugXXgroup",find_index("PPM10",chemgroups(:)%name),&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9),&
-      Asc2D("fire_5km","BCVugXXgroup",find_index("PPM25_FIRE",chemgroups(:)%name),&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug",1.0                 ,-999.9)/)
-    endif
-  case("MACC_EVA")
+  case("MACC_EVA","CAMS50_EVA","CAMS50_IRA")
+    call CheckStop("set_output_defs: Use hourly Derived instead of "//trim(MY_OUTPUTS))
     levels_hourly = [0]
 !**         name     type     ofmt    ispec    
 !**         ix1 ix2 iy1 iy2 nk sellev? unit conv  max
     hr_out(:) = (/&
-      Asc2D("O3"  ,"D2D_inst",find_index("SURF_ug_O3"        ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("NO2" ,"D2D_inst",find_index("SURF_ug_NO2"       ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("PM25","D2D_inst",find_index("SURF_ug_PM25X_rh50",f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("PM10","D2D_inst",find_index("SURF_ug_PM10_rh50" ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9)/)
-    if(DEBUG_PM10  )then
-      j=j+6;hr_out(j-5:j) = (/&
-      Asc2D("PPM25","D2D_inst",find_index("SURF_ug_PPM25"    ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("PPM_C","D2D_inst",find_index("SURF_ug_PPM_C"    ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("SIA" ,"D2D_inst",find_index("SURF_ug_SIA"       ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("DUST","D2D_inst",find_index("SURF_ug_DUST"      ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("SALT","D2D_inst",find_index("SURF_ug_SS"        ,f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9),&
-      Asc2D("FIRE","D2D_inst",find_index("SURF_ug_PPM25_FIRE",f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1             ,"ug",1.0                 ,-999.9)/)
-    endif
+      Asc2D("O3"  ,"D2D_inst",find_index("SURF_ug_O3"       ,f_2d(:)%name),&
+            1,"ug",1.0,-999.9),&
+      Asc2D("NO2" ,"D2D_inst",find_index("SURF_ug_NO2"      ,f_2d(:)%name),&
+            1,"ug",1.0,-999.9),&
+      Asc2D("PM25","D2D_inst",find_index("SURF_ug_PM25_rh50",f_2d(:)%name),&
+            1,"ug",1.0,-999.9),&
+      Asc2D("PM10","D2D_inst",find_index("SURF_ug_PM10_rh50",f_2d(:)%name),&
+            1,"ug",1.0,-999.9)/)
+  case("MACC_POL","CAMS71_SR","CITYSR")
+    levels_hourly = [0]
+    j=2;hr_out(1:j) = (/&
+      Asc2D("O3"  ,"D2D_inst",find_index("SURF_ug_O3"       ,f_2d(:)%name),1,"ug",1.0,-999.9),&
+      Asc2D("PM10","D2D_inst",find_index("SURF_ug_PM10_rh50",f_2d(:)%name),1,"ug",1.0,-999.9)/)
+  case("MACC_NMC")
+    call CheckStop("set_output_defs: Use hourly Derived instead of "//trim(MY_OUTPUTS))
+    SELECT_LEVELS_HOURLY=.false.  ! do not select levels, get them all
+    hr_out(:)= (/ &
+      Asc2D("AOD_550nm" ,"D2D_inst",find_index("AOD_550nm",f_2d(:)%name),&
+           1             ,"",1.0,-9999.9),&
+      Asc2D("EXT_550nm" ,"D3D_inst",find_index("EXT_550nm",f_3d(:)%name),&
+           NLEVELS_HOURLY,"",1.0,-9999.9),&
+      Asc2D("PMFINE","BCVugXXgroup",find_index("PMFINE",chemgroups(:)%name),&
+           NLEVELS_HOURLY,"ug/m3",1.0,-9999.9),&
+      Asc2D("PM10" ,"BCVugXXgroup",find_index("PM10"   ,chemgroups(:)%name),&
+           NLEVELS_HOURLY,"ug/m3",1.0,-9999.9)/)
   case("IMPACT2C") ! Dave's starting set. Uses Out3D to get 3m and 45m concs.
     levels_hourly = (/ (i, i= 0,nlevels_hourly-1) /)  ! -1 will give surfac
     hr_out(:)= (/ &
         Asc2D("o3_3dppb"    ,"Out3D",O3   ,&
-             ix1,ix2,iy1,iy2,nlevels_hourly,"ppbv", PPBINV,600.0*2.0) &
+             nlevels_hourly,"ppbv", PPBINV,600.0*2.0) &
        ,Asc2D("no_3dppb"   ,"Out3D",&
-             NO  ,ix1,ix2,iy1,iy2,nlevels_hourly,"ppbv",PPBINV ,600.0*1.91) &
+             NO  ,nlevels_hourly,"ppbv",PPBINV ,600.0*1.91) &
        ,Asc2D("no2_3dppb"   ,"Out3D",& 
-             NO2  ,ix1,ix2,iy1,iy2,nlevels_hourly,"ppbv",PPBINV ,600.0*1.91) &
+             NO2  ,nlevels_hourly,"ppbv",PPBINV ,600.0*1.91) &
        ,Asc2D("ho2_3dppt"   ,"Out3D",&  !NOTE ppt
-             HO2  ,ix1,ix2,iy1,iy2,nlevels_hourly,"pptv",PPBINV ,600.0*1.91) &
+             HO2  ,nlevels_hourly,"pptv",PPBINV ,600.0*1.91) &
        ,Asc2D("HMIX","D2D_inst",find_index("HMIX",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1,"m",1.0,10000.0) &
+            1,"m",1.0,10000.0) &
      /)
   case("3DPROFILES")
    ! nb Out3D uses totals, e.g. O3, not IXADV_O3
@@ -596,14 +555,14 @@ subroutine set_output_defs
     levels_hourly = (/ (i, i= 0,nlevels_hourly-1) /)  ! -1 will give surfac
     hr_out(:)= (/ &
         Asc2D("o3_3dppb"    ,"Out3D",O3   ,&
-             ix1,ix2,iy1,iy2,nlevels_hourly,"ppbv", PPBINV,600.0*2.0) &
-       ,Asc2D("no2_3dppb"   ,"Out3D",&
-             NO2  ,ix1,ix2,iy1,iy2,nlevels_hourly,"ppbv",PPBINV ,600.0*1.91) &
-!       ,Asc2D("o3_3dug"   ,"Out3D",&
-!         O3, ix1,ix2,iy1,iy2,nlevels_hourly,"ug",to_ug_ADV(IXADV_O3) ,600.0*2.0) &
+             nlevels_hourly,"ppbv",PPBINV,600.0*2.00) &
+       ,Asc2D("no2_3dppb"   ,"Out3D",NO2  ,&
+             nlevels_hourly,"ppbv",PPBINV,600.0*1.91) &
+!      ,Asc2D("o3_3dug"   ,"Out3D",O3     ,&
+!            nlevels_hourly,"ug",to_ug_ADV(IXADV_O3),600.0*2.0) &
     /)
 
-!    if(MasterProc ) write(*,*) "TESTHH 3D O3 SET", nlevels_hourly
+    if(MasterProc ) write(*,*) "TESTHH 3D O3 SET", nlevels_hourly
   case("TFMM")
 
 !**               name     type     ofmt
@@ -615,116 +574,108 @@ subroutine set_output_defs
 !!!!  as ADVugXXXgroup. The results were identical.)
 
    hr_out(:) = (/  &
-      Asc2D("o3_3m", "ADVppbv", IXADV_o3, &
-            ix1,ix2,iy1,iy2,1, "ppbv",PPBINV,600.0) &
-     ,Asc2D("no3_f"  ,"ADVugXX",IXADV_NO3_F  ,&
-            ix1,ix2,iy1,iy2,1,"ug/m3",to_ug_ADV(IXADV_NO3_F)  ,-999.9) &
-     ,Asc2D("no3_c"  ,"ADVugXX",IXADV_NO3_C  ,&
-            ix1,ix2,iy1,iy2,1,"ug/m3",to_ug_ADV(IXADV_NO3_C)  ,-999.9) &
-     ,Asc2D("nh4_f"  ,"ADVugXX",IXADV_NH4_F  ,&
-            ix1,ix2,iy1,iy2,1,"ug/m3",to_ug_ADV(IXADV_NH4_F)  ,-999.9) &
-     ,Asc2D("so4_f"  ,"ADVugXX",IXADV_SO4  ,&
-            ix1,ix2,iy1,iy2,1,"ug/m3",to_ug_ADV(IXADV_SO4)  ,-999.9) &
+      Asc2D("o3_3m", "ADVppbv", IXADV_O3    ,1,"ppbv" ,PPBINV,600.0) &
+     ,Asc2D("no3_f"  ,"ADVugXX",IXADV_NO3_F ,&
+            1,"ug/m3",to_ug_ADV(IXADV_NO3_F),-999.9) &
+     ,Asc2D("no3_c"  ,"ADVugXX",IXADV_NO3_C ,&
+            1,"ug/m3",to_ug_ADV(IXADV_NO3_C),-999.9) &
+     ,Asc2D("nh4_f"  ,"ADVugXX",IXADV_NH4_F ,&
+            1,"ug/m3",to_ug_ADV(IXADV_NH4_F),-999.9) &
+     ,Asc2D("so4_f"  ,"ADVugXX",IXADV_SO4   ,&
+            1,"ug/m3",to_ug_ADV(IXADV_SO4)  ,-999.9) &
    ! Organics
-     ,Asc2D("OM25_3m" ,"D2D_inst",find_index("SURF_ug_PART_OM_F",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+     ,Asc2D("OM25_3m" ,"D2D_inst",find_index("SURF_ug_OM25_P",f_2d(:)%name), &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("EC25_3m" ,"D2D_inst",find_index("SURF_ug_ECFINE",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("OM_c_3m" ,"D2D_inst",find_index("SURF_ug_OMCOARSE",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("EC_c_3m" ,"D2D_inst",find_index("SURF_ug_ECCOARSE",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("NatDust_f","D2D_inst",find_index("SURF_ug_DUST_NAT_F",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("NatDust_c","D2D_inst",find_index("SURF_ug_DUST_NAT_C",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("RoadDust_f","D2D_inst",find_index("SURF_ug_DUST_ROAD_F",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("RoadDust_c","D2D_inst",find_index("SURF_ug_DUST_ROAD_C",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("SeaSalt_f","D2D_inst",find_index("SURF_ug_SEASALT_F",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("SeaSalt_c","D2D_inst",find_index("SURF_ug_SEASALT_C",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
     ! Sums
      ,Asc2D("PM25_3m" ,"D2D_inst",find_index("SURF_ug_PM25_rh50",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("PMFINE"  ,"D2D_inst",find_index("SURF_ug_PMFINE",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("pm_h2o_3m","D2D_inst",find_index("SURF_PM25water",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1,"ug",1.0,-999.9) &
+            1,"ug",1.0,-999.9) &
      ,Asc2D("PM25dry_3m","D2D_inst",find_index("SURF_ug_PM25",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("PM10_3m" ,"D2D_inst",find_index("SURF_ug_PM10_rh50",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("PM10dry_3m","D2D_inst",find_index("SURF_ug_PM10",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "ug/m3",1.0,-999.9) &
+            1, "ug/m3",1.0,-999.9) &
      ,Asc2D("no_3m" ,"ADVppbv", IXADV_NO,&
-            ix1,ix2,iy1,iy2,1,"ppbv",PPBINV ,600.0*1.91) &
+            1,"ppbv",PPBINV ,600.0*1.91) &
      ,Asc2D("no2_3m","ADVppbv", IXADV_NO2,&
-            ix1,ix2,iy1,iy2,1,"ppbv",PPBINV ,600.0*1.91) &
+            1,"ppbv",PPBINV ,600.0*1.91) &
      ,Asc2D("T2_C",   "T2_C"  , 00, &
-            ix1,ix2,iy1,iy2,1, "degC",1.0   ,100.0) &
+            1, "degC",1.0   ,100.0) &
      ,Asc2D("ws_10m", "ws_10m", 00, &
-            ix1,ix2,iy1,iy2,1, "m/s",1.0   ,100.0) &
+            1, "m/s",1.0   ,100.0) &
      ,Asc2D("HMIX","D2D_inst",find_index("HMIX",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "m",1.0,10000.0) &
+            1, "m",1.0,10000.0) &
      ,Asc2D("USTAR_NWP","D2D_inst",find_index("USTAR_NWP",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "m/s",1.0,-999.9) &
+            1, "m/s",1.0,-999.9) &
      ,Asc2D("Kz_m2s","D2D_inst",find_index("Kz_m2s",f_2d(:)%name), &
-            ix1,ix2,iy1,iy2,1, "m2/s",1.0,-999.9) &
+            1, "m2/s",1.0,-999.9) &
      /)
   case("average_vs_instantaneous")
   ! Example of different hourly output types - hourly average and hourly instantaneous value
   ! variables of type "ADVppbv" will be outputted instantaneous and
   ! variables of type "D2D_mean" will be hourly averages. 
     hr_out(:) = (/  &
-      Asc2D("SURF_ppb_O3_inst"  ,"ADVppbv", IXADV_O3, &
-           ix1,ix2,iy1,iy2,1,"ppbv",PPBINV,600.0) ,&
-      Asc2D("SURF_ppb_O3_mean"  ,"D2D_mean",find_index("SURF_ppb_O3",f_2d(:)%name), &
-           ix1,ix2,iy1,iy2,1,"ppbv",1.0   ,600.0), &
+      Asc2D("SURF_ppb_O3_inst","ADVppbv", IXADV_O3,1,"ppbv",PPBINV,600.0) ,&
+      Asc2D("SURF_ppb_O3_mean","D2D_mean",find_index("SURF_ppb_O3",f_2d(:)%name), &
+           1,"ppbv",1.0   ,600.0), &
       Asc2D("SURF_ug_NO3_F_inst","ADVugXX",IXADV_NO3_F,&
-          ix1,ix2,iy1,iy2,1,"ug/m3",to_ug_ADV(IXADV_NO3_F),-999.9), &
+          1,"ug/m3",to_ug_ADV(IXADV_NO3_F),-999.9), &
       Asc2D("SURF_ug_NO3_F_mean","D2D_mean",find_index("SURF_ug_NO3_F",f_2d(:)%name),&
-          ix1,ix2,iy1,iy2,1,"ug/m3",1.0,-999.9), &
+          1,"ug/m3",1.0,-999.9), &
       Asc2D("SURF_ug_PMFINE_inst"  ,"ADVugXX",IXADV_NO3_F  ,&
-          ix1,ix2,iy1,iy2,1,"ug/m3",to_ug_ADV(IXADV_NO3_F)  ,-999.9), &
+          1,"ug/m3",to_ug_ADV(IXADV_NO3_F)  ,-999.9), &
       Asc2D("SURF_ug_PMFINE_mean","D2D_mean",find_index("SURF_ug_PMFINE",f_2d(:)%name),&
-          ix1,ix2,iy1,iy2,1,"ug/m3",1.0,-999.9) &
+          1,"ug/m3",1.0,-999.9) &
     /)
   case("TRENDS")
     j=2;hr_out(1:j) = (/  &
-      Asc2D("o3_3m"  ,"ADVppbv",IXADV_O3 ,&
-            ix1,ix2,iy1,iy2,1,"ppbv",PPBINV,600.0), &
-      Asc2D("no2_col","COLUMN" ,IXADV_NO2,&
-            ix1,ix2,iy1,iy2,1,"molec/cm2",to_molec_cm2,-999.9) &
-!!          ix1,ix2,iy1,iy2,1,"ug",to_ug_ADV(IXADV_NO2),-999.9) &
+      Asc2D("o3_3m"  ,"ADVppbv",IXADV_O3 ,1,"ppbv",PPBINV,600.0), &
+      Asc2D("no2_col","COLUMN" ,IXADV_NO2,1,"molec/cm2",to_molec_cm2,-999.9) &
+!!    Asc2D("no2_col","COLUMN" ,IXADV_NO2,1,"ug",to_ug_ADV(IXADV_NO2),-999.9) &
     /)
     if(USE_AOD)then
       j=j+1;hr_out(j) = &
       Asc2D("AOD_550nm","D2D_inst",find_index("AOD_550nm",f_2d(:)%name),&
-            ix1,ix2,iy1,iy2,1," ",1.0,-999.9)
+            1," ",1.0,-999.9)
     endif
   case("TRENDS@12UTC")
     levels_hourly = (/(i,i=1,nlevels_hourly)/)
     j=3;hr_out(1:j) = (/  &
 !!    Asc2D("so2"    ,"BCVppbv",IXADV_SO2, &
-!!          ix1,ix2,iy1,iy2,nlevels_hourly,"ppbv",PPBINV,-999.9),&
-      Asc2D("so2"    ,"BCVugXX",IXADV_SO2  ,&
-            ix1,ix2,iy1,iy2,NLEVELS_HOURLY,"ug/m3",to_ug_ADV(IXADV_SO2),-999.9),&
-      Asc2D("so2_3m" ,"ADVppbv",IXADV_SO2, &
-            ix1,ix2,iy1,iy2,1             ,"ppbv",PPBINV,-999.9),&
-      Asc2D("so2_col","COLUMN" ,IXADV_SO2, &
-            ix1,ix2,iy1,iy2,1,"molec/cm2",to_molec_cm2,-999.9) &
-!!          ix1,ix2,iy1,iy2,1,"ug",to_ug_ADV(IXADV_SO2),-999.9) &
-!!    Asc2D("ws_10m", "ws_10m", 00, &
-!!          ix1,ix2,iy1,iy2,1,"m/s",1.0,100.0) &
+!!          nlevels_hourly,"ppbv",PPBINV,-999.9),&
+      Asc2D("so2"    ,"BCVugXX",IXADV_SO2,&
+            NLEVELS_HOURLY,"ug/m3",to_ug_ADV(IXADV_SO2),-999.9),&
+      Asc2D("so2_3m" ,"ADVppbv",IXADV_SO2,1,"ppbv",PPBINV,-999.9),&
+      Asc2D("so2_col","COLUMN" ,IXADV_SO2,1,"molec/cm2",to_molec_cm2,-999.9) &
+!!    Asc2D("so2_col","COLUMN" ,IXADV_SO2,1,"ug",to_ug_ADV(IXADV_SO2),-999.9) &
+!!    Asc2D("ws_10m", "ws_10m", 00,1,"m/s",1.0,100.0) &
     /)
 
   case default
     hr_out(:) = (/  &
-      Asc2D("o3_3m", "ADVppbv", IXADV_O3, &
-                   ix1,ix2,iy1,iy2,1, "ppbv",PPBINV,600.0) &
+      Asc2D("o3_3m", "ADVppbv", IXADV_O3,1, "ppbv",PPBINV,600.0) &
     /)
   endselect
 
@@ -733,7 +684,7 @@ subroutine set_output_defs
   ! Was the D2D/Group found?     R: %spec>=0
   ! Is the variable name unique? R: find_index((i)%name,(:)%name)==i
   do i=1,nhourly_out
-!    if(MasterProc)write(*,*) "TESTHH O3 ATEND", i, nlevels_hourly
+    if(MasterProc)write(*,*) "TESTHH O3 ATEND", i, nlevels_hourly
     idx = find_index(hr_out(i)%name,hr_out(:)%name)
     if((hr_out(i)%name/="none").and.(hr_out(i)%spec>=0).and.&
        (idx==i)) cycle
@@ -757,6 +708,5 @@ subroutine set_output_defs
   wanted_dates_inst(2) = date(-1,1,1,3,0)
   wanted_dates_inst(3) = date(-1,1,1,6,0)
 
-end subroutine set_output_defs
-
-end module My_Outputs_ml
+endsubroutine set_output_defs
+endmodule My_Outputs_ml

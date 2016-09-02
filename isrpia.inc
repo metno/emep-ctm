@@ -11,7 +11,8 @@
 !
 !=======================================================================
 !
-    IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+    IMPLICIT real (A-H,O-Z)
+    IMPLICIT INTEGER (I-N)
     PARAMETER (NCOMP=8,NIONS=10,NGASAQ=3,NSLDS=19,NPAIR=23,NZSR=100, &
     NERRMX=25)
 !
@@ -51,7 +52,7 @@
 !
 ! *** VARIABLES FOR LIQUID AEROSOL PHASE *******************************
 !
-    DOUBLE PRECISION :: MOLAL, MOLALR, M0
+    real :: MOLAL, MOLALR, M0
     REAL :: IONIC
     LOGICAL :: CALAOU, CALAIN, FRST, DRYF
     COMMON /IONS/ MOLAL(NIONS), MOLALR(NPAIR), GAMA(NPAIR), ZZ(NPAIR),&
@@ -82,7 +83,7 @@
 !
 ! *** MOLECULAR WEIGHTS ************************************************
 !
-    DOUBLE PRECISION :: IMW
+    real :: IMW
     COMMON /OTHR/ R, IMW(NIONS), WMW(NCOMP), SMW(NPAIR)
 !
 ! *** SOLUTION/INFO VARIABLES ******************************************

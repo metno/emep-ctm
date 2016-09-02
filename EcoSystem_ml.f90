@@ -1,7 +1,7 @@
-! <EcoSystem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <EcoSystem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,99 +26,84 @@
 !*****************************************************************************!
 module EcoSystem_ml
 
- use CheckStop_ml,       only : CheckStop, StopAll
- use GridValues_ml,      only : debug_proc, debug_li, debug_lj
- use LandDefs_ml,        only : LandDefs, LandType
- use ModelConstants_ml , only : MasterProc, DEBUG_ECOSYSTEMS &
-                                , NLANDUSEMAX, IOU_YEAR
- use OwnDataTypes_ml,    only : Deriv, print_deriv_type &
-                                ,TXTLEN_DERIV, TXTLEN_SHORT
- use Par_ml,             only : li0, lj0, li1, lj1, MAXLIMAX, MAXLJMAX
- implicit none
- private
+use LandDefs_ml,        only: LandType
+use ModelConstants_ml , only: MasterProc, DEBUG=>DEBUG_ECOSYSTEMS, &
+                              NLANDUSEMAX, IOU_YEAR, IOU_KEY
+use OwnDataTypes_ml,    only: Deriv, print_deriv_type &
+                              ,TXTLEN_DERIV, TXTLEN_SHORT
+use Par_ml,             only: LIMAX, LJMAX
 
-    public :: Init_EcoSystems
+implicit none
+private
+public :: Init_EcoSystems
 
-  ! depositions are calculated to the following landuse classes, where
-  ! e.g. conif may include both temperate and Medit. forests
+! depositions are calculated to the following landuse classes, where
+! e.g. conif may include both temperate and Medit. forests
 
-   integer, public, parameter :: FULL_ECOGRID=1
-   integer, private, parameter :: &
-    CONIF=2, DECID=3, CROP=4, SEMINAT=5, WATER_D=6 ! try to skip
+integer, public, parameter :: FULL_ECOGRID=1
+integer, private, parameter :: &
+  CONIF=2, DECID=3, CROP=4, SEMINAT=5, WATER_D=6 ! try to skip
 
-  ! We also keep the parameter for FULL_LCGRID=0 here, which is used
-  ! for e.g. Vg values. Do not confuse LC with ECO stuff!
-  ! 
+! We also keep the parameter for FULL_LCGRID=0 here, which is used
+! for e.g. Vg values. Do not confuse LC with ECO stuff!
 
-   integer, public, parameter :: FULL_LCGRID=0
+integer, public, parameter :: FULL_LCGRID=0
 
-  ! Water_D
-  ! *** Note *** Water_D is introduced for some NEU work, with direct 
-  ! deposition to the water surface. This is not to be used for IAM, 
-  ! since CCE want to have deposition to the watershed, which means 
-  ! the grid in practice.
+! Water_D
+! *** Note *** Water_D is introduced for some NEU work, with direct 
+! deposition to the water surface. This is not to be used for IAM, 
+! since CCE want to have deposition to the watershed, which means 
+! the grid in practice.
 
-   integer, parameter, public :: NDEF_ECOSYSTEMS = 6
-   character(len=8), public, dimension(NDEF_ECOSYSTEMS), parameter :: &
-    DEF_ECOSYSTEMS = (/ "Grid    " &
-                      , "Conif   " &
-                      , "Decid   " &
-                      , "Crops   " &
-                      , "Seminat " &
-                      , "Water_D " /)
-   type(Deriv), public, dimension(NDEF_ECOSYSTEMS), save :: DepEcoSystem
+integer, public, parameter :: NDEF_ECOSYSTEMS = 6
+character(len=8),public,dimension(NDEF_ECOSYSTEMS),parameter :: &
+  DEF_ECOSYSTEMS = [character(len=8):: &
+    "Grid","Conif","Decid","Crops","Seminat","Water_D"]
 
-   logical, public, dimension(NDEF_ECOSYSTEMS,NLANDUSEMAX), &
-            save :: Is_EcoSystem
-
-   real, public, dimension(:,:,:), &
-            save,allocatable :: EcoSystemFrac
+type(Deriv),public,dimension(NDEF_ECOSYSTEMS)            ,save:: DepEcoSystem
+logical,    public,dimension(NDEF_ECOSYSTEMS,NLANDUSEMAX),save:: Is_EcoSystem
+real,       public,dimension(:,:,:),allocatable          ,save:: EcoSystemFrac
 
 contains
  !<---------------------------------------------------------------------------
-  subroutine Init_EcoSystems()
+subroutine Init_EcoSystems()
+  character(len=TXTLEN_DERIV) :: name
+  character(len=TXTLEN_SHORT) :: unit
+  integer :: iEco
+  logical, parameter :: T = .true., F = .false. ! shorthands only
 
-    character(len=TXTLEN_DERIV) :: name
-    character(len=TXTLEN_SHORT) :: unit
-    integer :: iEco
-    logical, parameter :: T = .true., F = .false. ! shorthands only
+  allocate(EcoSystemFrac(NDEF_ECOSYSTEMS,LIMAX,LJMAX))
+  if(MasterProc) write(*,*) "Defining ecosystems: ",&
+    (trim(DEF_ECOSYSTEMS(iEco))," ",iEco = 1, NDEF_ECOSYSTEMS)
 
-    allocate(EcoSystemFrac(NDEF_ECOSYSTEMS,MAXLIMAX,MAXLJMAX))
+  do iEco = 1, NDEF_ECOSYSTEMS
+    name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_Frac"
+    unit = "Fraction"
+    if(iEco==FULL_ECOGRID) then
+      name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_km2"
+      unit = "km2"
+    endif
 
-      if( MasterProc ) &
-           write(*,*) "Defining ecosystems: ",(trim(DEF_ECOSYSTEMS(iEco))," ",iEco = 1, NDEF_ECOSYSTEMS)
-    do iEco = 1, NDEF_ECOSYSTEMS
+    ! Deriv(name, class,    subc,  txt,           unit
+    ! Deriv index, f2d, dt_scale, scale, avg? Inst Yr Mn Day
+    DepEcoSystem(iEco) = Deriv(  &
+      trim(name), "EcoFrac", "Area",trim(DEF_ECOSYSTEMS(iEco)) , trim(unit), &
+      iEco, -99, F, 1.0, F, IOU_KEY(IOU_YEAR) )
 
- 
-       name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_Frac"
-       unit = "Fraction"
-       if(iEco==FULL_ECOGRID) then
-          name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_km2"
-          unit = "km2"
-       end if
+    if(DEBUG .and. MasterProc) &
+      call print_deriv_type( DepEcoSystem(iEco) )
+  enddo
 
-          !Deriv(name, class,    subc,  txt,           unit
-          !Deriv index, f2d, dt_scale, scale, avg? Inst Yr Mn Day
-        DepEcoSystem(iEco) = Deriv(  &
-               trim(name), "EcoFrac", "Area",trim(DEF_ECOSYSTEMS(iEco)) , trim(unit), &
-                  iEco, -99, F, 1.0, F, IOU_YEAR   )
+!  Define which landcovers belong to which ecosystem
+  Is_EcoSystem(FULL_ECOGRID,:)    =  .true.
+  Is_EcoSystem(CONIF,:)   =  LandType(:)%is_conif
+  Is_EcoSystem(DECID,:)   =  LandType(:)%is_decid
+  Is_EcoSystem(CROP,:)    =  LandType(:)%is_crop
+  Is_EcoSystem(SEMINAT,:) =  LandType(:)%is_seminat
+  Is_EcoSystem(WATER_D,:) =  LandType(:)%is_water
 
-        if(DEBUG_ECOSYSTEMS .and. MasterProc) &
-             call print_deriv_type( DepEcoSystem(iEco) )
+  EcoSystemFrac(:,:,:) = 0.0
 
-    end do
+endsubroutine Init_EcoSystems
 
- !  Define which landcovers belong to which ecosystem
-
-        Is_EcoSystem(FULL_ECOGRID,:)    =  .true.
-        Is_EcoSystem(CONIF,:)   =  LandType(:)%is_conif
-        Is_EcoSystem(DECID,:)   =  LandType(:)%is_decid
-        Is_EcoSystem(CROP,:)    =  LandType(:)%is_crop
-        Is_EcoSystem(SEMINAT,:) =  LandType(:)%is_seminat
-        Is_EcoSystem(WATER_D,:) =  LandType(:)%is_water
-
-    EcoSystemFrac(:,:,:) = 0.0
-
-  end subroutine Init_EcoSystems
-
-end module EcoSystem_ml
+endmodule EcoSystem_ml

@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -60,7 +60,7 @@
     use Io_ml,             only : IO_LOG, datewrite
     use ModelConstants_ml, only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv, &
                                  DebugCell, MasterProc, DEBUG, USE_SEASALT
-    use Par_ml,            only: me, MAXLIMAX, MAXLJMAX
+    use Par_ml,            only: me, LIMAX, LJMAX
     use PhysicalConstants_ml, only:  RGAS_J
     use Precision_ml, only:  dp
     use Setup_1dfields_ml, only: rcemis,        & ! photolysis, emissions
@@ -126,7 +126,7 @@ contains
 
 
     if ( first_call ) then
-       allocate( Dchem(NSPEC_TOT,KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX))
+       allocate( Dchem(NSPEC_TOT,KCHEMTOP:KMAX_MID,LIMAX,LJMAX))
        Dchem=0.0
        call makedt(dti,nchem,coeff1,coeff2,cc)
        if ( MasterProc ) then

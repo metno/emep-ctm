@@ -1,7 +1,7 @@
-! <InterpolationRoutines_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <InterpolationRoutines_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -423,6 +423,35 @@ endsubroutine point2grid_coeff
 
    end subroutine Averageconserved_interpolate
 
+
+   subroutine tabulated_interpolate(x1,x2,x,fx1,fx2,fx,tab_f,Ntab)
+     !interpolate a function f(x) given as tabulated values
+     !f(x) defined for 0<= x <=1
+     !very robust:  min(fx2,fx1) <= fx <=max(fx2,fx1)
+     !but will force a "convex" interpolation
+     integer, intent(in)  ::Ntab
+     real,intent(in)  ::x1,x2,x !x is the value at which f(x) must be evaluated
+     real,intent(in)  ::fx1,fx2
+     real,intent(out) ::fx !the interpolated value of f(x)
+     real,intent(in)  ::tab_f(0:Ntab) !tabulated values of f(x). x=i/Ntab, i=0,1,...Ntab
+     
+     integer:: ix1,ix2,ix
+     real ::weight1,weight2,y,y1,y2
+
+     ix1=nint(x1*Ntab)
+     ix2=nint(x2*Ntab)
+     ix=nint(x*Ntab)
+     y=tab_f(ix)
+     y1=tab_f(ix1)
+     y2=tab_f(ix2)
+     
+     weight1 = (abs(y-y2)+0.5e-8)/(abs(y-y2)+abs(y-y1)+1.0e-8)
+     weight2 = 1.0 - weight1 != (abs(y-y1)+0.5e-8)/(abs(y-y2)+abs(y-y1)+1.0e-8)
+     
+     fx = weight1*fx1 + weight2*fx2
+     
+   end subroutine tabulated_interpolate
+      
 end module InterpolationRoutines_ml
 
 !UNCOMMENT THE FOLLOWING TO TEST-RUN THIS MODULE AS STAND-ALONE

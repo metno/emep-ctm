@@ -1,7 +1,7 @@
-! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,7 +47,7 @@ use CheckStop_ml,         only: CheckStop
 use GridValues_ml,        only: i_fdom, j_fdom
 use MetFields_ml,         only: z_bnd
 use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, ANALYSIS, USE_AOD
-use Par_ml,               only: MAXLIMAX,MAXLJMAX   ! => x, y dimensions
+use Par_ml,               only: LIMAX,LJMAX   ! => x, y dimensions
 use PhysicalConstants_ml, only: AVOG
 use Setup_1dfields_ml,    only: xn_2d, rh
 use SmallUtils_ml,        only: find_index
@@ -60,7 +60,6 @@ public :: AOD_Ext,AOD_init
 public :: Qm_grp ! mass extinction efficiency [m2/g] for any spc/group
 
 character(len=*), parameter :: EXT_MODE="WET" ! use wet|dry extinction
-
 
 ! wavelengths for AOD/extinction calcualtions
 integer, parameter, public :: &
@@ -94,7 +93,7 @@ integer, public, parameter :: &
   CEXT_NO3c=9             ! NO3_c sitting on SSc:
                           ! assume rho_dry as SO4, Q and GF as SSc
 type :: ExtEffMap
-  integer :: itot,cext,mode
+  integer :: itot,cext
 endtype ExtEffMap
 
 !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -102,131 +101,137 @@ include 'CM_AerExt.inc'
 !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 integer, parameter :: NumRH=7
-real, parameter, dimension(NumRH) ::    &
-  RelHum = [0.0  ,0.5  ,0.7  ,0.8  ,0.9  ,0.95 ,0.99 ], &
-  RH_CNT = [1.0  ,1.0  ,1.0  ,1.0  ,1.0  ,1.0  ,1.0  ]
+real, parameter, dimension(NumRH) ::          &
+  RelHum=[0.0 ,0.5 ,0.7 ,0.8 ,0.9 ,0.95,0.99],&
+  RH_CNT=[1.0 ,1.0 ,1.0 ,1.0 ,1.0 ,1.0 ,1.0 ]
 real, parameter, dimension(NUM_CEXT,NumRH) :: &
-  Gf_ref=reshape(&
-           [RH_CNT,                                     & ! 1:DDf (constant)
-            RH_CNT,                                     & ! 2:DDc (constant)
-            1.0  ,1.6  ,1.8  ,2.0  ,2.4  ,2.9  ,4.8  ,  & ! 3:SSf (SS)
-            1.0  ,1.6  ,1.8  ,2.0  ,2.4  ,2.9  ,4.8  ,  & ! 4:SSc (SS) 
-            1.0  ,1.0  ,1.0  ,1.2  ,1.4  ,1.5  ,1.9  ,  & ! 5:ECn (EC)
-            1.0  ,1.0  ,1.0  ,1.2  ,1.4  ,1.5  ,1.9  ,  & ! 6:ECa (EC)
-            1.0  ,1.2  ,1.4  ,1.5  ,1.6  ,1.8  ,2.2  ,  & ! 7:OC  
-            1.0  ,1.4  ,1.5  ,1.6  ,1.8  ,1.9  ,2.2  ,  & ! 8:SO4 
-            1.0  ,1.6  ,1.8  ,2.0  ,2.4  ,2.9  ,4.8  ], & ! 9:NO3c (SSc)
-            [NUM_CEXT,NumRH],order=[2,1])
+  Gf_ref=reshape(                             &
+         [RH_CNT,                             & ! 1:DDf (constant)
+          RH_CNT,                             & ! 2:DDc (constant)
+          1.0 ,1.6 ,1.8 ,2.0 ,2.4 ,2.9 ,4.8 , & ! 3:SSf (SS)
+          1.0 ,1.6 ,1.8 ,2.0 ,2.4 ,2.9 ,4.8 , & ! 4:SSc (SS) 
+          RH_CNT,                             & ! 5:ECn (constant)
+          1.0 ,1.0 ,1.0 ,1.2 ,1.4 ,1.5 ,1.9 , & ! 6:ECa
+          1.0 ,1.2 ,1.4 ,1.5 ,1.6 ,1.8 ,2.2 , & ! 7:OC  
+          1.0 ,1.4 ,1.5 ,1.6 ,1.8 ,1.9 ,2.2 , & ! 8:SO4 
+          1.0 ,1.6 ,1.8 ,2.0 ,2.4 ,2.9 ,4.8 ],& ! 9:NO3c (SSc)
+          [NUM_CEXT,NumRH],order=[2,1])
 
 real, parameter, dimension(NUM_CEXT,NumRH,W340:W1020) :: &
   Qm_ref=reshape(&
-       [ &!(wet) mass extinction efficiency [m2/g] at 340 nm
-        2.4900*RH_CNT,                                    & ! 1:DDf (constant)
-        2.1350*RH_CNT,                                    & ! 2:DDc (constant)
-        2.5250,2.3980,2.3460,2.3060,2.2690,2.2420,2.1640, & ! 3:SSf
-        2.1080,2.0760,2.0810,2.0890,2.0620,2.0550,2.0440, & ! 4:SSc
-        0.9230*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.9230,0.9238,0.9012,0.8142,0.7405,0.7216,0.7413, & ! 6:ECa (EC:wet)
-        1.2670,1.3510,1.4050,1.4580,1.5720,1.7120,2.0420, & ! 7:OC 
-        2.4510,2.7020,2.7720,2.8150,2.8890,2.9690,3.1000, & ! 8:SO4 (H2SO4)
-        2.1080,2.0760,2.0810,2.0890,2.0620,2.0550,2.0440, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 350 nm for EARLINET
-        2.5030*RH_CNT,                                    & ! 1:DDf (constant)
-        2.0940*RH_CNT,                                    & ! 2:DDc (constant)
-        2.5390,2.4100,2.3600,2.3080,2.2770,2.2510,2.1650, & ! 3:SSf
-        2.1030,2.0750,2.0800,2.0930,2.0630,2.0550,2.0450, & ! 4:SSc
-        8.8900*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        8.8900,8.8970,8.6780,7.8250,7.0900,6.8930,7.0530, & ! 6:ECa (EC:wet)
-        1.2180,1.3030,1.3570,1.4100,1.5240,1.6650,2.0010, & ! 7:OC 
-        2.3790,2.6690,2.7550,2.8060,2.8930,2.9860,3.1480, & ! 8:SO4 (H2SO4)
-        2.1030,2.0750,2.0800,2.0930,2.0630,2.0550,2.0450, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 380 nm
-        2.5480*RH_CNT,                                    & ! 1:DDf (constant)
-        2.1460*RH_CNT,                                    & ! 2:DDc (constant)
-        2.5650,2.4270,2.3710,2.3480,2.3080,2.2590,2.1680, & ! 3:SSf
-        2.1140,2.0880,2.0810,2.0800,2.0720,2.0620,2.0460, & ! 4:SSc
-        0.8070*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.8070,0.8077,0.7875,0.7074,0.6363,0.6158,0.6251, & ! 6:ECa (EC:wet)
-        1.0900,1.1790,1.2340,1.2860,1.3960,1.5340,1.8700, & ! 7:OC 
-        2.1380,2.5000,2.6240,2.7000,2.8140,2.9360,3.1650, & ! 8:SO4 (H2SO4)
-        2.1140,2.0880,2.0810,2.0800,2.0720,2.0620,2.0460, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 440 nm
-        2.6100*RH_CNT,                                    & ! 1:DDf (constant)
-        2.1610*RH_CNT,                                    & ! 2:DDc (constant)
-        2.6230,2.4930,2.4190,2.4090,2.3370,2.2930,2.1900, & ! 3:SSf
-        2.1230,2.0940,2.0840,2.0900,2.0830,2.0690,2.0490, & ! 4:SSc
-        0.6657*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.6657,0.6665,0.6493,0.5791,0.5135,0.4922,0.4908, & ! 6:ECa (EC:wet)
-        0.8612,0.9563,1.0110,1.0590,1.1600,1.2870,1.6070, & ! 7:OC 
-        1.6870,2.1380,2.3170,2.4280,2.5840,2.7430,3.0650, & ! 8:SO4 (H2SO4)
-        2.1230,2.0940,2.0840,2.0900,2.0830,2.0690,2.0490, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 500 nm
-        2.6820*RH_CNT,                                    & ! 1:DDf (constant)
-        2.1780*RH_CNT,                                    & ! 2:DDc (constant)
-        2.6960,2.5080,2.5180,2.4680,2.3890,2.3130,2.1990, & ! 3:SSf
-        2.1430,2.1030,2.1060,2.1110,2.0840,2.0700,2.0640, & ! 4:SSc
-        0.5574*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.5574,0.5583,0.5435,0.4822,0.4226,0.4017,0.3941, & ! 6:ECa (EC:wet)
-        0.6797,0.7744,0.8271,0.8709,0.9615,1.0750,1.3650, & ! 7:OC 
-        1.3430,1.7980,1.9990,2.1190,2.2910,2.4640,2.8200, & ! 8:SO4 (H2SO4)
-        2.1430,2.1030,2.1060,2.1110,2.0840,2.0700,2.0640, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 550 nm
-!rep15        2.7060*RH_CNT,                                    & ! 1:DDf (constant)
-!rep15        2.1890*RH_CNT,                                    & ! 2:DDc (constant)
-        2.6060*RH_CNT,                                    & ! 1:DDf (constant)
-        2.1260*RH_CNT,                                    & ! 2:DDc (constant)
-        2.6990,2.5470,2.5440,2.5080,2.4440,2.3620,2.2210, & ! 3:SSf
-        2.1430,2.1030,2.0900,2.1060,2.0840,2.0700,2.0640, & ! 4:SSc
-        0.4830*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.4830,0.4840,0.4710,0.4170,0.3630,0.3430,0.3320, & ! 6:ECa (EC:wet)
-        0.5600,0.6520,0.7010,0.7410,0.8210,0.9210,1.1810, & ! 7:OC 
-        1.1140,1.5450,1.7420,1.8620,2.0360,2.2060,2.5580, & ! 8:SO4 (H2SO4)
-        2.1430,2.1030,2.0900,2.1060,2.0840,2.0700,2.0640, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 675 nm
-        2.7720*RH_CNT,                                    & ! 1:DDf (constant)
-        2.2100*RH_CNT,                                    & ! 2:DDc (constant)
-        2.7450,2.6250,2.6200,2.5970,2.5270,2.4280,2.2730, & ! 3:SSf
-        2.1790,2.1330,2.1180,2.1200,2.1140,2.0960,2.0640, & ! 4:SSc
-        0.3618*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.3618,0.3629,0.3530,0.3100,0.2645,0.2463,0.2305, & ! 6:ECa (EC:wet)
-        0.3551,0.4327,0.4723,0.5028,0.5623,0.6359,0.8295, & ! 7:OC 
-        0.7095,1.0630,1.2350,1.3400,1.4900,1.6350,1.9400, & ! 8:SO4 (H2SO4)
-        2.1790,2.1330,2.1180,2.1200,2.1140,2.0960,2.0640, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 870 nm
-        2.7750*RH_CNT,                                    & ! 1:DDf (constant)
-        2.2660*RH_CNT,                                    & ! 2:DDc (constant)
-        2.6990,2.6680,2.6690,2.6590,2.6110,2.5350,2.3440, & ! 3:SSf
-        2.2310,2.1630,2.1630,2.1470,2.1180,2.1100,2.0740, & ! 4:SSc
-        0.2570*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.2570,0.2581,0.2510,0.2185,0.1820,0.1659,0.1471, & ! 6:ECa (EC:wet)
-        0.1848,0.2388,0.2660,0.2858,0.3232,0.3688,0.4900, & ! 7:OC 
-        0.3668,0.6075,0.7312,0.8078,0.9153,1.0180,1.2350, & ! 8:SO4 (H2SO4)
-        2.2310,2.1630,2.1630,2.1470,2.1180,2.1100,2.0740, & ! 9:NO3c (SSc)
-        !(wet) mass extinction efficiency [m2/g] at 1020 nm
-        2.7280*RH_CNT,                                    & ! 1:DDf (constant)
-        2.2820*RH_CNT,                                    & ! 2:DDc (constant)
-        2.5810,2.6120,2.6500,2.6580,2.6450,2.5780,2.3990, & ! 3:SSf
-        2.2610,2.1850,2.1780,2.1620,2.1360,2.1230,2.0850, & ! 4:SSc
-        0.2173*RH_CNT,                                    & ! 5:ECn (EC:dry)
-        0.2173,0.2185,0.2125,0.1844,0.1519,0.1371,0.1180, & ! 6:ECa (EC:wet)
-        0.1336,0.1744,0.1954,0.2103,0.2380,0.2718,0.3626, & ! 7:OC 
-        0.2539,0.4393,0.5375,0.5985,0.6836,0.7644,0.9356, & ! 8:SO4 (H2SO4)
-        2.2610,2.1850,2.1780,2.1620,2.1360,2.1230,2.0850],& ! 9:NO3c (SSc)
-        [NUM_CEXT,NumRH,W1020],order=[2,1,3])
+  !(wet) mass extinction efficiency [m2/g] at 340 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+   [2.4900*RH_CNT,                                    & ! 1:DDf (constant)
+    2.1350*RH_CNT,                                    & ! 2:DDc (constant)
+    2.5250,2.3980,2.3460,2.3060,2.2690,2.2420,2.1640, & ! 3:SSf
+    2.1080,2.0760,2.0810,2.0890,2.0620,2.0550,2.0440, & ! 4:SSc
+    0.9230*RH_CNT,                                    & ! 5:ECn (constant)
+    0.9230,0.9238,0.9012,0.8142,0.7405,0.7216,0.7413, & ! 6:ECa
+    1.2670,1.3510,1.4050,1.4580,1.5720,1.7120,2.0420, & ! 7:OC 
+    2.4510,2.7020,2.7720,2.8150,2.8890,2.9690,3.1000, & ! 8:SO4 (H2SO4)
+    2.1080,2.0760,2.0810,2.0890,2.0620,2.0550,2.0440, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 350 nm for EARLINET
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.5030*RH_CNT,                                    & ! 1:DDf (constant)
+    2.0940*RH_CNT,                                    & ! 2:DDc (constant)
+    2.5390,2.4100,2.3600,2.3080,2.2770,2.2510,2.1650, & ! 3:SSf
+    2.1030,2.0750,2.0800,2.0930,2.0630,2.0550,2.0450, & ! 4:SSc
+    0.8890*RH_CNT,                                    & ! 5:ECn (constant)
+    0.8890,0.8897,0.8678,0.7825,0.7090,0.6893,0.7053, & ! 6:ECa
+    1.2180,1.3030,1.3570,1.4100,1.5240,1.6650,2.0010, & ! 7:OC 
+    2.3790,2.6690,2.7550,2.8060,2.8930,2.9860,3.1480, & ! 8:SO4 (H2SO4)
+    2.1030,2.0750,2.0800,2.0930,2.0630,2.0550,2.0450, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 380 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.5480*RH_CNT,                                    & ! 1:DDf (constant)
+    2.1460*RH_CNT,                                    & ! 2:DDc (constant)
+    2.5650,2.4270,2.3710,2.3480,2.3080,2.2590,2.1680, & ! 3:SSf
+    2.1140,2.0880,2.0810,2.0800,2.0720,2.0620,2.0460, & ! 4:SSc
+    0.8070*RH_CNT,                                    & ! 5:ECn (constant)
+    0.8070,0.8077,0.7875,0.7074,0.6363,0.6158,0.6251, & ! 6:ECa
+    1.0900,1.1790,1.2340,1.2860,1.3960,1.5340,1.8700, & ! 7:OC 
+    2.1380,2.5000,2.6240,2.7000,2.8140,2.9360,3.1650, & ! 8:SO4 (H2SO4)
+    2.1140,2.0880,2.0810,2.0800,2.0720,2.0620,2.0460, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 440 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.6100*RH_CNT,                                    & ! 1:DDf (constant)
+    2.1610*RH_CNT,                                    & ! 2:DDc (constant)
+    2.6230,2.4930,2.4190,2.4090,2.3370,2.2930,2.1900, & ! 3:SSf
+    2.1230,2.0940,2.0840,2.0900,2.0830,2.0690,2.0490, & ! 4:SSc
+    0.6657*RH_CNT,                                    & ! 5:ECn (constant)
+    0.6657,0.6665,0.6493,0.5791,0.5135,0.4922,0.4908, & ! 6:ECa
+    0.8612,0.9563,1.0110,1.0590,1.1600,1.2870,1.6070, & ! 7:OC 
+    1.6870,2.1380,2.3170,2.4280,2.5840,2.7430,3.0650, & ! 8:SO4 (H2SO4)
+    2.1230,2.0940,2.0840,2.0900,2.0830,2.0690,2.0490, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 500 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.6820*RH_CNT,                                    & ! 1:DDf (constant)
+    2.1780*RH_CNT,                                    & ! 2:DDc (constant)
+    2.6960,2.5080,2.5180,2.4680,2.3890,2.3130,2.1990, & ! 3:SSf
+    2.1430,2.1030,2.1060,2.1110,2.0840,2.0700,2.0640, & ! 4:SSc
+    0.5574*RH_CNT,                                    & ! 5:ECn (constant)
+    0.5574,0.5583,0.5435,0.4822,0.4226,0.4017,0.3941, & ! 6:ECa
+    0.6797,0.7744,0.8271,0.8709,0.9615,1.0750,1.3650, & ! 7:OC 
+    1.3430,1.7980,1.9990,2.1190,2.2910,2.4640,2.8200, & ! 8:SO4 (H2SO4)
+    2.1430,2.1030,2.1060,2.1110,2.0840,2.0700,2.0640, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 550 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+!rep15  2.7060*RH_CNT,                                    & ! 1:DDf (constant)
+!rep15  2.1890*RH_CNT,                                    & ! 2:DDc (constant)
+    2.6060*RH_CNT,                                    & ! 1:DDf (constant)
+    2.1260*RH_CNT,                                    & ! 2:DDc (constant)
+    2.6990,2.5470,2.5440,2.5080,2.4440,2.3620,2.2210, & ! 3:SSf
+    2.1430,2.1030,2.0900,2.1060,2.0840,2.0700,2.0640, & ! 4:SSc
+    0.4830*RH_CNT,                                    & ! 5:ECn (constant)
+    0.4830,0.4840,0.4710,0.4170,0.3630,0.3430,0.3320, & ! 6:ECa
+    0.5600,0.6520,0.7010,0.7410,0.8210,0.9210,1.1810, & ! 7:OC 
+    1.1140,1.5450,1.7420,1.8620,2.0360,2.2060,2.5580, & ! 8:SO4 (H2SO4)
+    2.1430,2.1030,2.0900,2.1060,2.0840,2.0700,2.0640, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 675 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.7720*RH_CNT,                                    & ! 1:DDf (constant)
+    2.2100*RH_CNT,                                    & ! 2:DDc (constant)
+    2.7450,2.6250,2.6200,2.5970,2.5270,2.4280,2.2730, & ! 3:SSf
+    2.1790,2.1330,2.1180,2.1200,2.1140,2.0960,2.0640, & ! 4:SSc
+    0.3618*RH_CNT,                                    & ! 5:ECn (constant)
+    0.3618,0.3629,0.3530,0.3100,0.2645,0.2463,0.2305, & ! 6:ECa
+    0.3551,0.4327,0.4723,0.5028,0.5623,0.6359,0.8295, & ! 7:OC 
+    0.7095,1.0630,1.2350,1.3400,1.4900,1.6350,1.9400, & ! 8:SO4 (H2SO4)
+    2.1790,2.1330,2.1180,2.1200,2.1140,2.0960,2.0640, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 870 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.7750*RH_CNT,                                    & ! 1:DDf (constant)
+    2.2660*RH_CNT,                                    & ! 2:DDc (constant)
+    2.6990,2.6680,2.6690,2.6590,2.6110,2.5350,2.3440, & ! 3:SSf
+    2.2310,2.1630,2.1630,2.1470,2.1180,2.1100,2.0740, & ! 4:SSc
+    0.2570*RH_CNT,                                    & ! 5:ECn (constant)
+    0.2570,0.2581,0.2510,0.2185,0.1820,0.1659,0.1471, & ! 6:ECa
+    0.1848,0.2388,0.2660,0.2858,0.3232,0.3688,0.4900, & ! 7:OC 
+    0.3668,0.6075,0.7312,0.8078,0.9153,1.0180,1.2350, & ! 8:SO4 (H2SO4)
+    2.2310,2.1630,2.1630,2.1470,2.1180,2.1100,2.0740, & ! 9:NO3c (SSc)
+  !(wet) mass extinction efficiency [m2/g] at 1020 nm
+  !RH:  0%    50%    70%    80%    90%    95%    99%
+    2.7280*RH_CNT,                                    & ! 1:DDf (constant)
+    2.2820*RH_CNT,                                    & ! 2:DDc (constant)
+    2.5810,2.6120,2.6500,2.6580,2.6450,2.5780,2.3990, & ! 3:SSf
+    2.2610,2.1850,2.1780,2.1620,2.1360,2.1230,2.0850, & ! 4:SSc
+    0.2173*RH_CNT,                                    & ! 5:ECn (constant)
+    0.2173,0.2185,0.2125,0.1844,0.1519,0.1371,0.1180, & ! 6:ECa
+    0.1336,0.1744,0.1954,0.2103,0.2380,0.2718,0.3626, & ! 7:OC 
+    0.2539,0.4393,0.5375,0.5985,0.6836,0.7644,0.9356, & ! 8:SO4 (H2SO4)
+    2.2610,2.1850,2.1780,2.1620,2.1360,2.1230,2.0850],& ! 9:NO3c (SSc)
+    [NUM_CEXT,NumRH,W1020-W340+1],order=[2,1,3])
 
 real,parameter,dimension(NUM_CEXT) :: &
   Qm_Dabs= & ! (dry) mass absorption efficiency [m?/g] at 550 nm
           [0.0  ,0.0  ,0.0  ,0.0  ,8.5  ,11.5 ,0.0  ,0.0  ,0.0  ], & 
   rho_dry=[2.6  ,2.6  ,2.2  ,2.2  ,1.0  ,1.0  ,1.8  ,1.6  ,1.6  ], &
   rad_eff=[0.80 ,4.5  ,0.80 ,5.73 ,0.039,0.039,0.087,0.156,5.73 ]
-        ! 1:DDf 2:DDc 3:SSf 4:SSc 5:ECn 6:ECa 7:OC  8:SO4 9:NO3c
-
-real,parameter,dimension(NUM_CEXT,W340:W1020) :: &
-  Qm_Dext=Qm_ref(:,1,:) ! (dry) mass extinction efficiency [m2/g] at Wxxx nm
+         ! 1:DDf 2:DDc 3:SSf 4:SSc 5:ECn 6:ECa 7:OC  8:SO4 9:NO3c
 
 real, pointer,dimension(:,:,:,:,:),public,save :: SpecExtCross=>null()
 contains
-! <---------------------------------------------------------->
+
 function Qm(mode,rh,wlen,debug) result(Qm_arr)
 !-----------------------------------------------------------------------!
 ! Calculate specific extinction (or mass extinction efficiency)
@@ -242,18 +247,20 @@ function Qm(mode,rh,wlen,debug) result(Qm_arr)
   real, dimension(NUM_EXT)  :: Qm_arr
   integer,save              :: rh_n=NumRH
   real, dimension(0:1)      :: rh_w
-  real, dimension(NUM_CEXT) :: Gf,ExtEff,Qm_Wext
+  real, dimension(NUM_CEXT) :: Gf,ExtEff,Qm_cext
 
   select case(mode)
-  case("d","D","dry","Dry","DRY")   ! (dry) mass extinction efficiency [m2/g]
-    Qm_arr(:)=Qm_Dext(ExtMap%cext,wlen)
-  case("w","W","wet","Wet","WET")   ! (wet) mass extinction efficiency [m2/g]
+  case("d","D","dry","Dry","DRY")   ! Dry mass extinction efficiency [m2/g]
+    Gf    =Gf_ref(:,1)              !  0% RH: Growth factors
+    ExtEff=Qm_ref(:,1,wlen)         !  0% RH: Extinction efficiencies
+
+  case("w","W","wet","Wet","WET")   ! Wet mass extinction efficiency [m2/g]
     if(rh<=RelHum(1))then
-      Gf    =Gf_ref(:,1)            ! Growth factors
-      ExtEff=Qm_ref(:,1,wlen)       ! (wet) Extinction efficiencies
+      Gf    =Gf_ref(:,1)            !  0% RH: Growth factors
+      ExtEff=Qm_ref(:,1,wlen)       !  0% RH: Extinction efficiencies
     elseif(rh>=RelHum(NumRH))then
-      Gf    =Gf_ref(:,NumRH)        ! Growth factors
-      ExtEff=Qm_ref(:,NumRH,wlen)   ! (wet) Extinction efficiencies
+      Gf    =Gf_ref(:,NumRH)        ! 99% RH: Growth factors
+      ExtEff=Qm_ref(:,NumRH,wlen)   ! 99% RH: Extinction efficiencies
     else
       !.. rh interpolation weights 
       ! rh_n is updated only if the one from last call does not work
@@ -266,40 +273,35 @@ function Qm(mode,rh,wlen,debug) result(Qm_arr)
                   sum(RelHum(rh_n-1:rh_n)*rh_w)*1e2   ! check interpolation
       !.. Interpolate
       Gf    =MATMUL(Gf_ref(:,rh_n-1:rh_n)     ,rh_w)  ! Growth factors
-      ExtEff=MATMUL(Qm_ref(:,rh_n-1:rh_n,wlen),rh_w)  ! (wet) Extinction efficiencies
+      ExtEff=MATMUL(Qm_ref(:,rh_n-1:rh_n,wlen),rh_w)  ! Extinction efficiencies
       if(debug) write(*,'((a15,9f10.3))') &
         '## GFs   =',gf(:),'## ExtEff=',ExtEff(:)
     endif
 
-    !.. mass extinction efficiency [m2/g]
-    !beta = 3/4 * ExtEff/rho_wet/rad_eff * Mwet/Mdry
-    !     = 3/4 * ExtEff/rho_wet/rad_eff * Gf^3*rho_wet/rho_dry
-    !     = 3/4 * ExtEff/rad_eff * Gf^3/rho_dry
-    Qm_Wext= 0.75* ExtEff/rad_eff * Gf**3/rho_dry
-
-    !** Backward compatibility: NO3c characterized by
-    !  rho_dry(SO4),rad_eff(SSc),Gf_ref(SSc),Qm_ref(SSc), and
-    !beta = 3/4 * ExtEff(SSc)/rho_wet(NO3c)/rad_eff(SSc) * Mwet(SSc)/Mdry(SSc)
-    !     = 3/4 * ExtEff(SSc)/rho_wet(NO3c)/rad_eff(SSc) * Gf(SSc)^3*rho_wet(SSc)/rho_dry(SSc)
-    !     = Qm_Wext(SSc)*rho_wet(SSc)/rho_wet(NO3c)
-    ! with rho_wet(NO3c) derived from rho_dry(SO4) and Gf(SSc)
-    Qm_Wext(CEXT_NO3c)=Qm_Wext(CEXT_SSc)*rho_wet(CEXT_SSc)/rho_wet(CEXT_NO3c)
-
-    !** Backward compatibility: Different fractions within NO3c
-    Qm_Wext(CEXT_NO3c)=0.3*Qm_Wext(CEXT_NO3f)+0.7*Qm_Wext(CEXT_NO3c)
-
-    !.. mass extinction efficiency [m2/g]
-    where(ExtMap%mode==WET_MODE) 
-      Qm_arr(:)=Qm_Wext(ExtMap%cext)
-    elsewhere(ExtMap%mode==DRY_MODE)
-    !** Backward compatibility: Road Dust on "DRY" mode
-      Qm_arr(:)=Qm_Dext(ExtMap%cext,wlen)
-    elsewhere
-      Qm_arr(:)=0.0
-    endwhere
   case default
     call CheckStop("Unknown extinction mode: "//trim(mode))
   endselect
+
+  !.. mass extinction efficiency [m2/g]
+  !beta = 3/4 * ExtEff/rho_wet/rad_eff * Mwet/Mdry
+  !     = 3/4 * ExtEff/rho_wet/rad_eff * Gf^3*rho_wet/rho_dry
+  !     = 3/4 * ExtEff/rad_eff * Gf^3/rho_dry
+  Qm_cext=0.75* ExtEff/rad_eff * Gf**3/rho_dry
+
+  !** Backward compatibility: NO3c characterized by
+  !  rho_dry(SO4),rad_eff(SSc),Gf_ref(SSc),Qm_ref(SSc), and
+  !beta = 3/4 * ExtEff(SSc)/rho_wet(NO3c)/rad_eff(SSc) * Mwet(SSc)/Mdry(SSc)
+  !     = 3/4 * ExtEff(SSc)/rho_wet(NO3c)/rad_eff(SSc) * Gf(SSc)^3*rho_wet(SSc)/rho_dry(SSc)
+  !     = Qm_cext(SSc)*rho_wet(SSc)/rho_wet(NO3c)
+  ! with rho_wet(NO3c) derived from rho_dry(SO4) and Gf(SSc)
+  Qm_cext(CEXT_NO3c)=Qm_cext(CEXT_SSc)*rho_wet(CEXT_SSc)/rho_wet(CEXT_NO3c)
+
+  !** Backward compatibility: Different fractions within NO3c
+  Qm_cext(CEXT_NO3c)=0.3*Qm_cext(CEXT_NO3f)+0.7*Qm_cext(CEXT_NO3c)
+
+  !.. mass extinction efficiency [m2/g]
+  Qm_arr(:)=Qm_cext(ExtMap%cext)
+
 contains
 function rho_wet(nc)
   integer,intent(in) :: nc          ! index: 1..NUM_CEXT
@@ -311,7 +313,7 @@ function rho_wet(nc)
   rho_wet = (rho_dry(nc)-RHO_H2O)/Gf(nc)**3 + RHO_H2O
 endfunction rho_wet
 endfunction Qm
-! <---------------------------------------------------------->
+
 function Qm_grp(gtot,rh,debug) result(Qm_arr)
 !-----------------------------------------------------------------------!
 ! Returns mass extinction efficiencies [m2/g] for any spc array/group
@@ -343,7 +345,7 @@ function Qm_grp(gtot,rh,debug) result(Qm_arr)
     if(i>0)Qm_arr(n)=Qm_aux(i)
   enddo
 endfunction Qm_grp
-! <---------------------------------------------------------->
+
 subroutine AOD_init(msg,wlen,out3d)
   character(len=*), intent(in) :: msg
   character(len=*),intent(in),optional:: wlen
@@ -374,24 +376,36 @@ subroutine AOD_init(msg,wlen,out3d)
       trim(msg)//" Incompatibe AOD_GROUP def.")
   endif   
 !-----------------------------------------------------------------------!
+! Consistency checks for Qm_ref array
+!-----------------------------------------------------------------------!
+  call CheckStop(any(Qm_ref(:,5,W440)/=&
+      [2.6100,2.1610,2.3370,2.0830,0.6657,0.5135,1.1600,2.5840,2.0830]),&
+    trim(msg)//" Failed Qm_ref(90%,440nm) check")
+  call CheckStop(any(Qm_ref(:,4,W550)/=&
+      [2.6060,2.1260,2.5080,2.1060,0.4830,0.4170,0.7410,1.8620,2.1060]),&
+    trim(msg)//" Failed Qm_ref(80%,550nm) check")
+  call CheckStop(any(Qm_ref(:,6,W870)/=&
+      [2.7750,2.2660,2.5350,2.1100,0.2570,0.1659,0.3688,1.0180,2.1100]),&
+    trim(msg)//" Failed Qm_ref(95%,870nm) check")
+!-----------------------------------------------------------------------!
 ! Allocate AOD arrays
 !-----------------------------------------------------------------------!
   !!wanted_wlen(W550)=.true.  ! calculate 550nm for debug output
   if(any(wanted_wlen(:)).and..not.allocated(AOD))then
-    allocate(AOD(NUM_EXT,MAXLIMAX,MAXLJMAX,W340:W1020))
+    allocate(AOD(NUM_EXT,LIMAX,LJMAX,W340:W1020))
     AOD=0.0
   endif
   if(wanted_ext3d.and..not.allocated(Extin_coeff))then
-    allocate(Extin_coeff(NUM_EXT,MAXLIMAX,MAXLJMAX,KMAX_MID,W340:W1020))
+    allocate(Extin_coeff(NUM_EXT,LIMAX,LJMAX,KMAX_MID,W340:W1020))
     Extin_coeff=0.0
   endif 
   if(ANALYSIS.and..not.associated(SpecExtCross))then
   !!wanted_wlen(W550)=.true.  ! calculate 550nm for AOD assimilation
-    allocate(SpecExtCross(NUM_EXT,KMAX_MID,MAXLIMAX,MAXLJMAX,W340:W1020))
+    allocate(SpecExtCross(NUM_EXT,KMAX_MID,LIMAX,LJMAX,W340:W1020))
     SpecExtCross=0.0
   endif
 endsubroutine AOD_init
-! <---------------------------------------------------------->
+
 subroutine AOD_Ext(i,j,debug)
 !-----------------------------------------------------------------------!
 ! Calculates AOD on 'DRY'/'WET' mode, as defined by EXT_MODE parameter
