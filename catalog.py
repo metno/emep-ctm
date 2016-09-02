@@ -6,14 +6,15 @@ simplified access to the source code, input data and benchmark results.
 """
 
 _CONST={
-  'VERSION':"0.0.1",      # script version
-  'LASTREL':"rv4_8",      # last model release
-  'LASTMET':2013,         # last met-year released
+  'VERSION':"0.1.0",                      # script version
+  'RELEASE':['rv3','v201106','rv4_0','rv4_3','rv4_4','rv4_5','rv4_8',
+             'rv4_10'],                   # released model versions
+  'METYEAR':[2005,2008]+range(2010,2014), # released met-years
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
   'GIT':"https://github.com/metno/emep-ctm/",
-  'CSV':'/catalog.csv',  # list all files from all releases
-  'TMPDIR':"./downloads", # temp path for downloads
-  'DATADIR':'.'           # base path for datasets
+  'CSV':'/catalog.csv',                   # list all files from all releases
+  'TMPDIR':"./downloads",                 # temp path for downloads
+  'DATADIR':'.'                           # base path for datasets
 }
 
 def parse_arguments():
@@ -34,8 +35,8 @@ Examples:
   Download meteorological input for YEAR ({MET})
     %prog -Y YEAR -m
 """.format(
-  REV="|".join(['rv3','v201106','rv4_0','rv4_3','rv4_4','rv4_5','rv4_8']),
-  MET="|".join(['2005','2008','2010..%d'%_CONST['LASTMET']]))
+  REV="|".join(_CONST['RELEASE']),
+  MET="|".join(["%d"%y for y in _CONST['METYEAR']]))
 
   parser = OptionParser(usage,version=_CONST['VERSION'])
   parser.set_defaults(verbose=1)
@@ -104,7 +105,7 @@ Examples:
  
   opts,args = parser.parse_args(args[1:])
   if(all(getattr(opts,attr) is None for attr in ['tag','status','year'])):
-    opts.tag=[_CONST['LASTREL']]
+    opts.tag=[_CONST['RELEASE'][-1]]
   if opts.data==None :
     opts.data=["meteo","input","output","source","docs"]
   if opts.extras :
