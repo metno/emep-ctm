@@ -12,53 +12,19 @@ chmod +x catalog.py
 catalog.py
 ```
 
-## Get partial/older datasets
-```
-Usage: catalog.py [options]
+### Get partial/older datasets
+```bash
+# help and usage information
+catalog.py -h
 
-Examples:
+# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8)
+catalog.py -R REV          
 
-  Retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8)
-    catalog.py -R REV          
+# get only the source code and user guide for revision REV
+catalog.py -R REV -sd
 
-  Get Only the source code and user guide for revision REV
-    catalog.py -R REV -sd
-
-  Download meteorological input for YEAR (2005|2008|2010..2013)
-    catalog.py -Y YEAR -m
-
-
-Options:
-  --version             show program's version number and exit
-  -h, --help            show this help message and exit
-  -q, --quiet           don't print status messages to stdout
-  -v, --verbose         Increase verbosity
-  --catalog=CATALOG     Override dataset cataloque path/file
-                        (default:./catalog.csv)
-
-  Release options:
-    Select a release dataset
-
-    -R REV, --revision=REV
-                        revision REV
-    -Y YEAR, --year=YEAR
-                        Meteorological/run YEAR
-
-  Dataset options:
-    Get parts of a release dataset
-
-    -m, --meteo         get meteorology input
-    -i, --input         get other input
-    -o, --output        get model benckmark
-    -s, --source        get source code for benckmark
-    -d, --docs          get corresponding user guide
-    --extras            also get the extras, if any
-
-  Download options:
-    --yes               Don't ask before start downloading/unpacking
-    --outpath=OUTPATH   Override output (dataset) directory
-    --tmppath=TMPPATH   Override temporary (download) directory
-    --cleanup           Remove ALL temporary (download) files
+# download meteorological input for YEAR (2005|2008|2010..2013)
+catalog.py -Y YEAR -m
 ```
 
 # Tools to read sites and sondes output
@@ -75,8 +41,8 @@ In future the ascii outputs will be removed.
 
 We provide two programmes:
 
-* Rd_ncsites.py:  python script to read and plot netcdf site files
-* Rd_ncsondes.py: python script to read and plot netcdf sonde files
+* `Rd_ncsites.py`:  python script to read and plot netcdf site files
+* `Rd_ncsondes.py`: python script to read and plot netcdf sonde files
 
 The codes have a number of things in common:
 
@@ -101,7 +67,7 @@ usually readily available, e.g. in standard Ubuntu repositories.
 ### Examples
 
 ```bash
-# produces help with usage information
+# help and usage information
 Rd_ncsondes.py -h
 
 # suggest list of sites and then pollutants
