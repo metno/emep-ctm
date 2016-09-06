@@ -3,7 +3,7 @@
 # Minimalistic script for run the Unified EMEP model
 
 # Link the input data
-inputdir=.
+inputdir=../
 ln -s $inputdir/input/* .   # input files except meteorology
 
 # Run the model
