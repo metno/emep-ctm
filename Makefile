@@ -12,6 +12,10 @@ LIBS = -lnetcdff -lnetcdf
 INCL = -I/global/apps/netcdf/4.1.3/include
 LLIB = -L/global/apps/netcdf/4.1.3/lib
 
+# options by nc-config/nf-config utility
+INCL = $(shell nc-config --fflags)
+LLIB = $(shell nc-config --flibs)
+
 F90 = mpif90
 
 # GNU gfortran compiler (version 4.4.3 or later)
