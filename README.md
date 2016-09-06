@@ -16,7 +16,7 @@ catalog.py
 # help and usage information
 catalog.py -h
 
-# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8)
+# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8|rv4_10)
 catalog.py -R REV          
 
 # get only the source code and user guide for revision REV
@@ -28,30 +28,30 @@ catalog.py -Y YEAR -m
 
 # Tools to read sites and sondes output
 
-The EMEP model currently provides detailed outputs for slected locations.
+The EMEP model currently provides detailed outputs for selected locations.
 The 'sites' outputs provide surface concentrations (at ca. 3m),
 and typically many (or all) chemical compounds are provided for each site and hour.
 The 'sondes' type of outputs provide vertical profiles,
 typically for a selection of compounds (to prevent huge files)
 and possibly with time-resolution of e.g. 3 or 6 hours.
-The model has historically provided ascii outputs,
-but recently a parallel system with netcdf outouts has been introduced.
-In future the ascii outputs will be removed.
+The model has historically provided ASCII outputs,
+but recently a parallel system with netCDF outputs has been introduced.
+In future the ASCII outputs will be removed.
 
-We provide two programmes:
+We provide two programs:
 
-* `Rd_ncsites.py`:  python script to read and plot netcdf site files
-* `Rd_ncsondes.py`: python script to read and plot netcdf sonde files
+* `Rd_ncsites.py`:  python script to read and plot netCDF site files
+* `Rd_ncsondes.py`: python script to read and plot netCDF sonde files
 
 The codes have a number of things in common:
 
 * they can be called either directly with site names and  pollutant, or
 * they can be used in a simple menu-like approach in which case the user is
-  presented with a list of stations, pollutants and other choices as appopriate.
-* they produce ascii files for the desired sites and pollutants.
+  presented with a list of stations, pollutants and other choices as appropriate.
+* they produce ASCII files for the desired sites and pollutants.
 
 The python scripts also produce plots, e.g. of daily or monthly mean
-concenrations - as time-series for sites data (see [Fig. 1](#fig1)),
+concentrations - as time-series for sites data (see [Fig. 1](#fig1)),
 and as 2-D plots for sonde data (see [Fig. 1](#fig1)).  
 
 
