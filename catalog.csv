@@ -122,6 +122,8 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/Base_model_rv4_8_results_withFF.tar.bz2,,385662970,eaf51f73b1a0aa2e7992ef1b901aecab
 201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/README,,226,e4301f9b708fe448162962bb23f37baf
 201510,docs,,rv4_8,{GIT}/releases/download/{MOD}/User_Guide.pdf,,359164,ff89ea1b9b16a909b2fa1069b1bd1c7c
+201609,extra,,,{FTP}/{REL}/extra.tar.bz2,,211229,36b050fe6352d0ec89df4a6d72c54ad8
+201609,input,2014,rv4_10,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2130724710,afec8b9b490e393cb2ca727de282b75b
 201609,output,2014,rv4_10,{FTP}/{REL}/model_results_rv4_10_2014/Base_model_rv4_10_results.tar.bz2,,0,x
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201401.tar.bz2,,1923832453,a2d4b20f411395dfd4dd1ee7de3f774a
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201402.tar.bz2,,1728260551,7cd5ad29ef1473eb2e4f53462a9b5453
@@ -135,4 +137,3 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201410.tar.bz2,,1921662605,253dbb74754a1b85c54e0923809dadba
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201411.tar.bz2,,1857245870,973e3d71f60e2931679ae1b33d7b7e28
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201412.tar.bz2,,2036311088,d53e8bc117b84bb85be95607dbeddd8c
-201609,extra,,,{FTP}/{REL}/extra.tar.bz2,,211229,36b050fe6352d0ec89df4a6d72c54ad8
