@@ -32,10 +32,10 @@ Examples:
     %prog -R REV
 
   Get Only the source code and user guide for revision REV
-    %prog -R REV -sd
+    %prog -R REV --source --docs
 
   Download meteorological input for YEAR ({MET})
-    %prog -Y YEAR -m
+    %prog -Y YEAR --meteo
 """.format(
   REV="|".join(_CONST['RELEASE']),
   MET="|".join(["%d"%y for y in _CONST['METYEAR']]))
