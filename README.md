@@ -3,9 +3,8 @@ Simplified access to the source code, input data and benchmark results
 
 ## Get the latest release dataset
 ```bash
-# download the catalog tool/files
+# download the catalog tool
 wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.py
-wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.csv
 
 # make it executable and run it
 chmod +x catalog.py
@@ -49,7 +48,7 @@ The codes have a number of things in common:
 * they can be called either directly with site names and  pollutant, or
 * they can be used in a simple menu-like approach in which case the user is
   presented with a list of stations, pollutants and other choices as appopriate.
-* they produce ascii files for the desired sites and pollutants. 
+* they produce ascii files for the desired sites and pollutants.
 
 The python scripts also produce plots, e.g. of daily or monthly mean
 concenrations - as time-series for sites data (see [Fig. 1](#fig1)),

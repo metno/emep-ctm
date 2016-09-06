@@ -13,6 +13,8 @@ _CONST={
   'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
   'GIT':"https://github.com/metno/emep-ctm/",
   'CSV':'/catalog.csv',                   # list all files from all releases
+  'RAW':'https://raw.githubusercontent.com/metno/emep-ctm/'+
+    'master/tools/catalog.csv',           # catalog on the repo
   'TMPDIR':"./downloads",                 # temp path for downloads
   'DATADIR':'.'                           # base path for datasets
 }
@@ -27,7 +29,7 @@ def parse_arguments():
 Examples:
 
   Retrieve release dataset for revision REV ({REV})
-    %prog -R REV          
+    %prog -R REV
 
   Get Only the source code and user guide for revision REV
     %prog -R REV -sd
@@ -102,7 +104,7 @@ Examples:
     action="store_true", dest="cleanup",
     help="Remove ALL temporary (download) files")
   parser.add_option_group(group)
- 
+
   opts,args = parser.parse_args(args[1:])
   if(all(getattr(opts,attr) is None for attr in ['tag','status','year'])):
     opts.tag=[_CONST['RELEASE'][-1]]
@@ -120,7 +122,7 @@ def userConsent(question,ask=True,default='yes'):
   """Ask user for confirmation"""
   from sys import version_info as version
 
-  # format question   
+  # format question
   q={'y':"%s [Y]/n:"%question,'n':"%s y/[N]:"%question}
   q.update({'yes':q['y'],'no':q['n']})
   try:
@@ -187,10 +189,10 @@ class dataPoint(object):
   def __init__(self,release,key,year,model,src,dst='',byteSize=0,md5sum=None):
     '''Initialize object'''
     from os.path import basename
-    
+
     self.release= int(release)        # release date (YYYYMM)
     self.key    = str(key)
-    try: 
+    try:
       self.tag  = {'other':'{KEY}{REL}',
                    'meteo':'{KEY}{YEAR}'}[self.key]
     except:
@@ -294,7 +296,7 @@ class dataPoint(object):
     d=dirname(self.dst)
     if (not isdir(d))and(d!=''):
       makedirs(d)
-    
+
     u = urlopen(self.src)
     with open(self.dst,'wb') as f:
       block = 1024*8        #   8K
@@ -324,10 +326,10 @@ class dataPoint(object):
     import sys
     if not self.check(verbose>2):
       return
-      
+
     if is_tarfile(self.dst):
       print("%-8s %s"%('Untar',self))
-      with open(self.dst,'r') as f:      
+      with open(self.dst,'r') as f:
         if userConsent('  See the contents first?',inspect,'no'):
           print(f.list(verbose=(verbose>1)))
           if not userConsent('  Do you wish to proceed?',inspect):
@@ -387,8 +389,13 @@ def readCatalog(filename,verbose=1):
     index(dict):      catalog sorted into meteo|input|output|source|docs
     archive(list):    all dataSet
   '''
+  from os.path import isfile
   from csv import reader as csvreader
-  
+
+  # download catalog if file not found
+  if not isfile(filename):
+    dataPoint(0,'catalog',0,'',_CONST['RAW'],filename).download(verbose)
+
   try:
     f=open(filename)
   except IOError as e:
@@ -417,7 +424,7 @@ def readCatalog(filename,verbose=1):
   if verbose>1:
     print("%s read(srcs:%d)"%(filename,len(catalog)))
   f.close()
-    
+
   index=dict.fromkeys(rels) # index[releases][keys:meteo,source,&c]
   if verbose>2:
     print("Indexing")
@@ -433,7 +440,7 @@ def readCatalog(filename,verbose=1):
   # repack index from dict({key:dataPoint,}) to dict(dataSet)
   if verbose>2:
     print("Compiling releases")
-  for r,v in index.items(): 
+  for r,v in index.items():
     # pack index[r] into a dataSet object
     #   before index[r]:{meteo:dataPoint,source:dataPoint,..}
     #   after  index[r]:dataSet (with search metadata)
@@ -448,7 +455,7 @@ def readCatalog(filename,verbose=1):
 if __name__ == "__main__":
   import sys
   opts,args = parse_arguments()
- 
+
   catalog=readCatalog(opts.catalog,opts.verbose)
 
   down=[] # files to download
@@ -495,10 +502,9 @@ if __name__ == "__main__":
   if not userConsent('Do you wish to proceed?',opts.ask):
     print("OK, bye")
     sys.exit(0)
-    
+
   for x in down:
     x.download(opts.verbose)
     x.unpack(opts.verbose,opts.ask)
     if opts.cleanup:
       x.cleanup(opts.verbose)
-
