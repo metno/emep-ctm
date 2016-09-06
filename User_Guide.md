@@ -1,15 +1,11 @@
-% The EMEP/MSC-W Model\
-  unofficial User’s Guide
-%
-% October 2015
+# The EMEP/MSC-W Model<br> unofficial User's Guide
+September 2016
 
-page0
 
-Welcome to EMEP
-================
+# Welcome to EMEP
 
 This guide gives a brief documentation of the EMEP/MSC-W model version
-rv4.8. It is intended primarily as a guide on how to run the model, and
+rv4.10. It is intended primarily as a guide on how to run the model, and
 to help users wishing to understand or change the model in terms of
 domains, outputs, chemistry, etc.
 
@@ -29,40 +25,40 @@ The model source code is available from the EMEP/MSC-W Open Source
 website:\
 <https://wiki.met.no/emep/page1/emepmscw_opensource>
 
-Licenses and Caveats
---------------------
+## Licenses and Caveats
 
 The EMEP code is provided under the GNU General Public License version 3
 (<http://fsf.org> and/or <http://www.gnu.org/copyleft/gpl.html>).
 
-Each code module is prefaced with something like:\
-
->     ! <EXAMPLE_CODE.f90 - A component of the EMEP MSC-W  Eulerian
->     !          Chemical transport Model>
->     !*******************************************************************!
->     !*
->     !*  Copyright (C) 2007-2016 met.no
->     !*
->     !*  Contact information:
->     !*  Norwegian Meteorological Institute
->     !*  Box 43 Blindern
->     !*  0313 OSLO
->     !*  NORWAY
->     !*  email: emep.mscw@met.no
->     !*
->     !*    This program is free software: you can redistribute it and/or modify
->     !*    it under the terms of the GNU General Public License as published by
->     !*    the Free Software Foundation, either version 3 of the License, or
->     !*    (at your option) any later version.
->     !*
->     !*    This program is distributed in the hope that it will be useful,
->     !*    but WITHOUT ANY WARRANTY; without even the implied warranty of
->     !*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->     !*    GNU General Public License for more details.
->     !*
->     !*    You should have received a copy of the GNU General Public License
->     !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
->     !*******************************************************************!
+Each code module is prefaced with something like:
+```
+! <EXAMPLE_CODE.f90 - A component of the EMEP MSC-W  Eulerian
+!          Chemical transport Model>
+!*******************************************************************!
+!*
+!*  Copyright (C) 2007-2016 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*******************************************************************!
+```
 
 And a copy of the license file, **gpl.txt**, is provided with the model
 code source files.
@@ -71,18 +67,12 @@ It is important to note that the code is provided “as it is”, and
 EMEP/MSC-W has very limited resources with which to support usage of the
 code.
 
-Computer Information
---------------------
+## Computer Information [sec:compinf]
 
-[sec:compinf]
-
-To compile the EMEP/MSC-W model you need:\
-
-**Fortran 95 compiler**
-
-**NetCDF Library ($>$4.1.3)**
-
-**MPI Library ($>$1.0)**\
+To compile the EMEP/MSC-W model you need:
+* Fortran 95 compiler
+* NetCDF Library (>4.1.3)
+* MPI Library (>1.0)
 
 It is necessary to compile with double precision reals (8 bytes reals).
 The program has been used on computers ranging from a Linux laptop to
@@ -106,8 +96,7 @@ meteorology input files. The model can be run for shorter periods, users
 can download meteorology for only the period they are interested in,
 pluss one day.
 
-Getting Started
----------------
+## Getting Started
 
 It is recommended to read all the chapters of this EMEP/MSC-W model User
 Guide before you start downloading anything from the EMEP/MSC-W Open
@@ -115,70 +104,75 @@ Source website.
 
 This is what you need to do before you can do a “base run” with the
 EMEP/MSC-W model:
-
 -   Read the EMEP/MSC-W model User Guide
-
 -   Download input data (description in Chapter [ch:InputFiles] and data
     available from the EMEP/MSC-W Open Source website under “Download”
     section: “Input Data”)
-
 -   Download the EMEP/MSC-W model source code (description in
     section [sec:ModelCode] and the files are available from the
     EMEP/MSC-W Open Source website under “Download” section: “Model
     Code”)
-
 -   Follow the instructions for “Submitting a Run” description in
     Chapter [ch:SubmitARun].
-
 -   Download some model results for comparison, description in
     Chapter [ch:output] and the files are available from the EMEP/MSC-W
     Open Source website under “Download” section: “Model Results”.
 
-Model code
-----------
+## Model code
+[sec:ModelCode]: #sec:ModelCode
+<a name=sec:ModelCode></a>
 
-[sec:ModelCode]
+The latest release Open Source of the EMEP/MSC-W model is [version rv4_10][latest].
+This and previous releases can be found on the [releases section][releases]
+of the EMEP/MSC-W Open Source [github page][emep-ctm].
 
-The EMEP/MSC-W model code version rv.4.8 are archived as a tar file. The
-tar file is called “EMEP\_MSC-W\_model.rv4.8.OpenSource.tar.gz” and is
-downloadable from the EMEP/MSC-W Open Source website.
+[emep-ctm]: https://github.com/metno/emep-ctm
+[releases]: https://github.com/metno/emep-ctm/releases
+[catalog]:  https://github.com/metno/emep-ctm/tree/master/tools
+[latest]:   https://github.com/metno/emep-ctm/releases/tag/rv4_10
 
-Once this file is untarred all model files needed for a model run will
-be found under the directory\
-**EMEP\_MSC-W\_model.rv4.8.OpenSource/code/** where the model source
-code, makefiles, and a copy of the license file are stored. An overview
-is given in Table [Tab:modelfiles]
+Although the source code is available for download as a single compressed file on
+the [release page][rv4_10], the preferred retrieval method is via the [catalog tool][catalog] as follows:
 
-[h]
+```bash
+# download the catalog tool
+wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.py
 
-Contents of “EMEP\_MSC-W\_model.rv4.8.OpenSource.tar” file
-[Tab:modelfiles]
+# make it executable and run it
+chmod +x catalog.py
 
+# download the source code for rv4_10 release
+catalog.py -R 4_10 --source
+```
 
-  -------------------------- ------------------------------------------
-  Type                       Filename
+The model source code, makefiles, and a copy of the license file
+will be placed under the directory `EMEP_MSC-W_model.rv4.10.OpenSource/source/`.
+An overview of the files is given in [Table 1][Tab:modelfiles]
 
-  **Model code directory**   EMEP\_MSC-W\_model.rv4.8.OpenSource/code
-  modules files              \*.f90
-  include files              \*.inc
-  namelist                   config\_emep.nml
-  makefiles                  Makefile and Makefile.SRCS
-  dependency file            dependencies
-  a copy of the license      gpl.txt
+[Tab:modelfiles]: #Tab:modelfiles
+<a name=Tab:modelfiles></a>
 
-In addition there is a run script called “modrun.sh”, which will be
-placed in the\
-**EMEP\_MSC-W\_model.rv4.8.OpenSource/** directory. The run script,
-“modrun.sh”, can easily be modified to work on your computer system.
-This script is described in detail in Chapter [ch:SubmitARun].
+| Type                     | Filename                       |
+|--------------------------|--------------------------------|
+| **Model code directory** | `emep-ctm-rv4_10`              |
+|  modules files           | `*.f90`                        |
+|  include files           | `*.inc`                        |
+|  makefiles               | `Makefile` and `Makefile.SRCS` |
+|  dependency file         | `dependencies`                 |
+|  configuration file      | `config_emep.nml`              |
+|  driver script           | `modrun.sh`                    |
+|  a copy of the license   | `gpl.txt`                      |
 
-Model grid
-----------
+*Table 1: Model source files*
 
-[sec:ModelGrid]
+The driver script (`modrun.sh`) represents the minimum required to
+run the model. It needs to be modified to work on your computer system,
+and will be described in detail in Chapter [ch:SubmitARun].
+
+## Model grid [sec:ModelGrid]
 
 The current EMEP model version, and the provided gridded input data,
-have a horizontal resolution of $50\times50$ km$^2$ (at 60$^\circ$N) and
+have a horizontal resolution of 50&times;50 km$^2$ (at 60&deg;N) and
 are defined on a polar stereographic projection with 20 sigma levels
 vertically. The model is very flexible with regard to the horizontal
 resolution, in that it readily makes use of meteorological data provided
@@ -188,280 +182,278 @@ in Chapter 2 of the EMEP Status Report 1/2003 Part I (Simpson *et al.*,
 2003).
 
 In 2008 the EMEP domain was extended eastwards in order to include the
-EECCA countries in the EMEP model grid, see Figure [fig:EECCA]. To
+EECCA countries in the EMEP model grid, see [Figure 1][#fig:EECCA]. To
 distinguish the new grid from the old EMEP grid, the new grid is called
-EECCA in this text and in the config\_emep.nml.
+EECCA in this text and in the `config_emep.nml`.
 
-[ht] ![image](EECCA) The extended EMEP grid covering EECCA area with
-$132\times159$ gridpoints on $50\times50$ km$^2$ resolution defined on a
-polar stereographic projection.[fig:EECCA]
+<a name=fig:EECCA></a>
+![fig:EECCA](EECCA.png)
+*Figure 1: The extended EMEP grid covering EECCA area with
+$132&times;159$ gridpoints on $50&times;50$ km$^2$ resolution defined on a
+polar stereographic projection*
 
-Input files
-===========
-
-[ch:InputFiles]
+# Input files
+[ch:InputFiles]: #ch:InputFiles
+<a name=ch:InputFiles></a>
 
 This chapter provides an overview on the necessary input files to run
 the EMEP/MSC-W model. A complete set of input files is provided in the
-EMEP/MSC-W Open Source web page to allow model runs for the
-meteorological year 2013.
+EMEP/MSC-W Open Source web page to allow model runs for the meteorological year 2014.
+[Table 2][#Tab:inputdata] lists the input files.
 
-The input files are zipped in 13 different files. There are 12 zipped
-files for the meteorology, one for each month, called
-meteo2013MM.tar.bz2 (where MM is the month). The last file for December
-also include a met file for January 1$^{st}$ 2014. The last zipped input
-file (called other\_input\_files.tar.bz2) contains all other input files
-needed for running the EMEP/MSC-W model, except the aircraft emissions,
-AircraftEmis\_FL.nc, and the forest fire emissions,
-FINN\_ForestFireEmis\_2013.nc. See sections [emisair] and [emisff] for
-details about these emissions data.
+The input files can be downloaded directly from our
+ftp server (ftp://ftp.met.no/projects/emep/OpenSource/201606/),
+However, the preferred retrieval method is via the [catalog tool][catalog] as follows:
 
-After unzipping all the meteo tar files, the meteorology are placed
-under a catalogue called **EMEP\_MSC-W\_model.OpenSource2015/**. The
-met/ catalogue should be moved over to current version of model, for
-rv4.8: **EMEP\_MSC-W\_model.rv4.8.OpenSource**. So now there will be two
-directories under **EMEP\_MSC-W\_model.rv4.8.OpenSource**. All
-meteorology are placed under /met, and the rest of the input files under
-/input. All files, both meteorological and the other input files, are
-described in this chapter.
+```bash
+# download the meteorology
+catalog.py -R 4_10 --meteo
+
+# download other input files
+catalog.py -R 4_10 --input
+```
+
+The meteorology files will be placed under
+`EMEP_MSC-W_model.rv4.10.OpenSource/meteo2014/`,
+and the remaining input files will be placed under
+`EMEP_MSC-W_model.rv4.10.OpenSource/input/`
+
+This are all input files needed to run the EMEP/MSC-W model,
+except the aircraft emissions (`AircraftEmis_FL.nc`),
+and forest fire emissions (`FINN_ForestFireEmis_2014.nc`).
+See sections [emisair][#emisair] and [emisff][#emisff]
+for details about these emissions data.
+.
 
 **IMPORTANT:**
-
 The input data available in the EMEP/MSC-W Open Source Web site should
 be appropriately acknowledged when used for model runs. If nothing else
 is specified according to references further in this chapter, please
 acknowledge EMEP/MSC-W in any use of these data.
 
-[List of input data files]List of input data files. Note: YYYY: year,
-MM: month, DD: day, SS: seasons, POLL: pollutant type (NH$_3$, CO,
-NO$_x$, SO$_x$, NMVOC, PM$_{2.5}$ and PM$_{co}$). [Tab:inputdata]
+[Tab:inputdata]: #Tab:inputdata
+<a name=Tab:inputdata></a>
 
-  -------------------------------------- ------------------------------------------------------- ---------------------
-  **Data**                               **Name**                                                **Format**
-  **Meteorology data**                   met/                                                    
-  Meteorology                            meteoYYYYMMDD.nc (365+1 files)                          netCDF
+| **Meteorology data**  | `meteoYYYY/` (netCDF)                   |
+|:----------------------|:----------------------------------------|
+| Meteorology           | `meteoYYYYMMDD.nc` (365+1 files)        |
+| Degree-day factor     | `DegreeDayFactors.nc`                   |
 
-  **Other Input files**                  input/                                                  
-  Global Ozone                           GLOBAL\_O3.nc                                           netCDF
-  New Global Ozone                       Logan\_P.nc                                             netCDF $^*$$^*$
-  BVOC emissions                         EMEP\_EuroBVOC.nc                                       netCDF
-  Landuse                                LanduseGLC.nc and Landuse\_PS\_5km\_LC.nc               netCDF
-  Degree-day factor                      DegreeDayFactors.nc                                     netCDF
-  N depositions                          annualNdep.nc                                           netCDF
-  Road dust                              RoadMap.nc and AVG\_SMI\_2005\_2010.nc                  netCDF$\dagger$
-  Aircraft emissions                     AircraftEmis\_FL.nc                                     netCDF$\dagger$
-  Surface Pressure                       SurfacePressure.nc                                      netCDF$\dagger$
-  Forest Fire                            FINN\_ForestFireEmis\_YYYY.nc                           netCDF$\dagger$
+| **Other Input files** | `input/` (netCDF)                       |
+|:----------------------|:----------------------------------------|
+| Global Ozone          | `GLOBAL_O3.nc`                          |
+| New Global Ozone      | `Logan_P.nc`                       $^*$ |
+| BVOC emissions        | `EMEP_EuroBVOC.nc`                      |
+| Landuse               | `LanduseGLC.nc`                         |
+|                       | `Landuse_PS_5km_LC.nc`                  |
+| N depositions         | `annualNdep.nc`                         |
+| Road dust             | `RoadMap.nc`                  $\dagger$ |
+|                       | `AVG_SMI_2005_2010.nc`        $\dagger$ |
+| Aircraft emissions    | `AircraftEmis_FL.nc`          $\dagger$ |
+| Surface Pressure      | `SurfacePressure.nc`          $\dagger$ |
+| Forest Fire           | `FINN_ForestFireEmis_YYYY.nc` $\dagger$ |
+| Dust files            | `Soil_Tegen.nc`               $\dagger$ |
+|                       | `SoilTypes_IFS.nc`            $\dagger$ |
 
-  Dust files                             Soil\_Tegen.nc                                          netCDF$\dagger$
-                                         SoilTypes\_IFS.nc                                       netCDF$\dagger$
-  Emissions                              emislist.POLL (7 files, EMEP 50km PS grid)              ASCII
-                                         Emis\_TNO7.nc (regional, $0.125\times0.0625$ lon-lat)   netCDF$\dagger$
-                                         Emis\_GLOB\_05.nc (global, $0.5\times0.5$ lon-lat)      netCDF$\dagger$
-  Vertical level distribution            Vertical\_levels.txt                                    ASCII
-  Time factors for monthly emissions     MonthlyFac.POLL (7 files)                               ASCII
-  Time factors for daily emissions       DailyFac.POLL (7 files)                                 ASCII
-  Time factors for hourly emissions      HOURLY-FACS                                             ASCII$^*$
-  Emission heights                       EmisHeights.txt                                         ASCII$^*$
-  Natural SO$_2$                         natso2MM.dat (12 files)                                 ASCII
-  Volcanoes                              columnsource\_emission.csv                              ASCII$^*$
-                                         columnsource\_location.csv                              ASCII$^*$
-  Lightning emissions                    lightningMM.dat (12 files)                              ASCII$^*$
-  Emissions speciation                   emissplit.defaults.POLL                                 ASCII$^*$
-                                         emissplit.specials.POLL                                 ASCII$^{*,\dagger}$
-  Emission factors for scenario runs     femis.dat                                               ASCII
-  Photo-dissociation rates               jclearSS.dat (4 files)                                  ASCII
-                                         jcl1kmSS.dat (4 files) + jcl1.jun                       ASCII
-                                         jcl3kmSS.dat (4 files) + jcl3.jun                       ASCII
-  Landuse definitions                    Inputs\_LandDefs.csv                                    ASCII$^*$
-  Stomatal conductance                   Inputs\_DO3SE.csv                                       ASCII$^*$
-  Sites locations for surface output     sites.dat                                               ASCII$^*$
-  Sondes locations for vertical output   sondes.dat                                              ASCII$^*$
-  -------------------------------------- ------------------------------------------------------- ---------------------
+| **Other Input files** | `input/` (ASCII)                        |
+|:----------------------|:----------------------------------------|
+| Emissions        | `emislist.POLL` (7 files, EMEP 50km PS grid) |
+| | `Emis_TNO7.nc` (regional, $0.125&times;0.0625$ lon-lat) $\dagger$|
+| | `Emis_GLOB_05.nc` (global, $0.5&times;0.5$ lon-lat)     $\dagger$|
+| Vertical level distribution | `Vertical_levels.txt`             |
+| Monthly emissions factors   | `MonthlyFac.POLL` (7 files)       |
+| Daily emissions factors     | `DailyFac.POLL` (7 files)         |
+| Hourly emissions factors    | `HOURLY-FACS`                     |
+| Emission heights      | `EmisHeights.txt`                       |
+| Natural SO$_2$        | `natso2MM.dat` (12 files)               |
+| Volcanoes             | `columnsource_emission.csv`             |
+|                       | `columnsource_location.csv`             |
+| Lightning emissions   | `lightningMM.dat` (12 files)            |
+| Emissions speciation  | `emissplit.defaults.POLL` (7 files)     |
+|                       | `emissplit.specials.POLL` (7 files)     |
+| Emission factors for scenario runs | `femis.dat`                |
+| Photo-dissociation rates           | `jclearSS.dat` (4 files)   |
+|                       | `jcl1kmSS.dat` (4 files) and `jcl1.jun` |
+|                       | `jcl3kmSS.dat` (4 files) and `jcl3.jun  |
+| Landuse definitions   | `Inputs_LandDefs.csv`                   |
+| Stomatal conductance  | `Inputs_DO3SE.csv`                      |
+| Sites locations for surface output    | `sites.dat`             |
+| Sondes locations for vertical output  | `sondes.dat`            |
 
+| Notes: |
+|:-------|
+| `YYYY`: year, `MM`: month, `DD: day, `SS`: seasons, |
+| `POLL`: pollutant type (NH$_3$, CO,NO$_x$, SO$_x$, NMVOC, PM$_{2.5}$ and PM$_{co}$)|
+| $\dagger$: optional (in most cases) |
+| $^*$ New O3 boundary condition data in 30 levels. Can be used with `NewLogan=.true.` in `BoundaryConditions\_ml.f90`.|
 
-Notes: $\dagger$ - optional (in most cases); $^*$ means ASCII files with
-header. $^*$$^*$ New O3 boundary condition data in 30 levels. Can be
-used with ’NewLogan=.true.’ in ’BoundaryConditions\_ml.f90’.
+*Table 2: List of input data files.*
 
-
-NetCDF files
-------------
+##NetCDF files
 
 ### Meteorology
 
-The daily meteorological input data (“meteoYYYYMMDD.nc”, where YYYY is
-year, MM is month and DD is day) used for the EMEP/MSC-W Model are based
+The daily meteorological input data (`meteoYYYYMMDD.nc`, where `YYYY` is
+year, `MM` is month and `DD` is day) used for the EMEP/MSC-W Model are based
 on forecast experiment runs with the Integrated Forecast System (IFS), a
 global operational forecasting model from the European Centre for
 Medium-Range Weather Forecasts (ECMWF).
 
 The IFS forecasts has been run by MSC-W as independent experiments on
-the HPCs at ECMWF with special requests on some output parameters. The
-meteorological fields are retrieved on a
-$0.1^\circ\times0.1^\circ$ longitude latitude coordinates and
-interpolated to $50\times50$ km$^2$ polar-stereographic grid projection.
+the HPCs at ECMWF with special requests on some output parameters.
+The meteorological fields are retrieved on a
+0.1^&deg;&times;0.1^&deg; longitude latitude coordinates and
+interpolated to 50&times;50 km$^2$ polar-stereographic grid projection.
 Vertically, the fields on 60 eta levels from the IFS model are
 interpolated onto the 37 EMEP sigma levels. The meteorology is prepared
 into 37 sigma levels since the model is under test for a finer vertical
-resolution. But the Opensource code is released with 20 sigma levels and
+resolution.
+
+The Opensource code is released with 20 sigma levels and
 to make the model read the meteorology properly, a description of the 20
 vertical sigma levels is needed. This is provided in an ascii file
-called ’Vertical\_levels.txt’ together with the other\_input data. The
-version of the IFS model used for preparing these fields, Cycle 38r2, is
+called `Vertical_levels.txt` together with the [other input data][Tab:inputdata].
+The version of the IFS model used for preparing these fields, Cycle 38r2, is
 documented in <http://www.ecmwf.int/research/ifsdocs/index.html>.
 Previous years are based on Cycle 36r1 with a resolution of
-$0.2^\circ\times0.2^\circ$ on a spherical grid. Meteorological
+0.2^&deg;&times;0.2^&deg; on a spherical grid. Meteorological
 fields currently used for EMEP/MSC-W Model runs are given in
-Table [Tab:metinput]. Some verification and description of these
+[Table 3][Tab:metinput]. Some verification and description of these
 meteorological fields are given in Chapter 2 of the EMEP Status Report
-1/2015.
+1/2016.
 
 **Acknowledgement:**
-
 ECMWF, met.no
 
-[h!] Input meteorological data used in the EMEP/MSC-W Model
-[Tab:metinput]
 
-p6cmlll
+[Tab:metinput]: #Tab:metinput
+<a name=Tab:metinput></a>
 
-Parameter & Unit & Description\
-3l3D fields - for 37 $\sigma$ levels\
-$u,v$ & m/s & Horizontal wind velocity components\
-$q$ & $kg/kg$ & Specific humidity\
-$\theta$ & K & Potential temperature\
-$CW$ & $kg/kg$ & Cloud water\
-$CL$ & % & 3D Cloud cover\
-$cnvuf$ & $kg/sm^2$ & Convective updraft flux\
-$cnvdf$ & $kg/sm^2$ & Convective downdraft flux\
-$PR$ & mm & Precipitation\
-3l2D fields - for Surface\
-$PS$ & hPa & Surface pressure\
-$T2$ & K & Temperature at 2m height\
-$Rh2$ & % & Relative humidity at 2m height\
-SH & $W/m^2$ & Surface flux of sensible heat\
-LH & $W/m^2$ & Surface flux of latent heat\
-$\tau$ & $N/m^2$ & Surface stress\
-SST & K & Sea surface temperature\
-SWC & $m^3/m^3$ & Soil water content\
-lspr & m & Large scale precipitation\
-cpr & m & Convective precipitation\
-sdepth & m & Snow depth\
-ice & % & Fraction of ice\
-$SMI1$ & & Soil moisture index level 1\
-$SMI3$ & & Soil moisture index level 3\
-u10/v10 & m/s & wind at 10 m height\
+| Parameter  | Unit             | Description                         |
+|------------|:-----------------|:------------------------------------|
+|            | 3D fields -- for 37 &sigma; levels                    ||
+|`u`, `v`    | m/s              | Horizontal wind velocity components |
+|`q`         | kg/kg            | Specific humidity                   |
+|&theta;     | K                | Potential temperature               |
+|`CW`        | kg/kg            | Cloud water                         |
+|`CL`        | %                | 3D Cloud cover                      |
+|`cnvuf`     | kg/sm^2^         | Convective updraft flux             |
+|`cnvdf`     | kg/sm^2^         | Convective downdraft flux           |
+|`PR`        | mm               | Precipitation                       |
+|            | 2D fields -- for Surface                              ||
+|`PS`        | hPa              | Surface pressure                    |
+|`T2`        | K                | Temperature at 2m height            |
+|`Rh2`       | %                | Relative humidity at 2m height      |
+|`SH`        | W/m^2^           | Surface flux of sensible heat       |
+|`LH`        | W/m^2^           | Surface flux of latent heat         |
+|&tau;       | N/m^2^           | Surface stress                      |
+|`SST`       | K                | Sea surface temperature             |
+|`SWC`       |m^3^/m^3^         | Soil water content                  |
+|`lspr`      | m                | Large scale precipitation           |
+|`cpr`       | m                | Convective precipitation            |
+|`sdepth`    | m                | Snow depth                          |
+|`ice`       | %                | Fraction of ice                     |
+|`SMI1`      |                  | Soil moisture index level 1         |
+|`SMI3`      |                  | Soil moisture index level 3         |
+|`u10`, `v10`| m/s              | Wind at 10 m height                 |
 
-\
+*Table 3: Input meteorological data used in the EMEP/MSC-W Model*
 
-### Gridded emissions
+### Gridded emissions { #emisnew }
 
-[emisnew]
+Since 2015 different formats of gridded emissions can be used and
+mixed (with some restrictions) under one common framework. The
+different formats that are presently supported are:
 
-Since 2015 different formats of gridded emissions can be used and mixed
-(with some restrictions) under one common framework. The different
-formats that are presently supported are:
 
-1.  “Old style” ASCII emissions format. Total yearly emissions.
+* "Old style" ASCII emissions format. Total yearly emissions.
+  : The gridded emission files contain 16 columns where the first column
+    represents the country code <http://www.emep.int/grid/country_numbers.txt>),
+    the second and the third columns are the 'i' and 'j' indices of the
+    EMEP grid, the fourth and fifth columns are the total emissions from
+    low and high sources, and the last 11 columns contain emissions from
+    10 anthropogenic SNAP sectors.
 
-    The gridded emission files contain 16 columns where the first column
-    represents the country code
-    (<http://www.emep.int/grid/country_numbers.txt>), the second and the
-    third columns are the ‘i’ and ‘j’ indices of the EMEP grid, the
-    fourth and fifth columns are the total emissions from low and high
-    sources, and the last 11 columns contain emissions from 10
-    anthropogenic SNAP sectors.
+    The advantage of the ASCII emissions format, is that they are easy to
+    modify, and the interpretation of the numbers is straightforward.
+    The main disadvantage of the ASCII emissions format, is that they are
+    only valid for one specific grid projection. Visualization of these
+    emissions, needs also some more efforts.
 
-    The advantage of the ASCII emissions format, is that they are easy
-    to modify, and the interpretation of the numbers is straightforward.
-    The main disadvantage of the ASCII emissions format, is that they
-    are only valid for one specific grid projection. Visualization of
-    these emissions, needs also some more efforts.
-
-2.  Countrywise NetCDF emissions. Yearly totals.
-
-    Each country and sector has its own NetCDF field.
+* Countrywise NetCDF emissions. Yearly totals.
+  : Each country and sector has its own NetCDF field.
 
     The main advantage of NetCDF emissions is that all the information
     about the data (projection, units) is given in the same file. This
     allows the code to reproject the emissions to any grid projection on
     the fly. It is easy to visualize the emissions of one country with
     simple tools, like ncview. The data is simple to interpret and it is
-    possible to add new countries to an existing file (with appropriate
-    tools).
+    possible to add new countries to an existing file (with appropriate tools).
 
     The disadvantage of countrywise NetCDF emissions, is that there are
-    quite a large number of fields, with most of the data being zero.
-    NetCDF will compress the data, but it will still take some time for
-    the model to read all the data.
+    quite a large number of fields, with most of the data being
+    zero. NetCDF will compress the data, but it will still take some time
+    for the model to read all the data.
 
-3.  “Fraction type” NetCDF emissions. Yearly totals.
-
-    The total emissions are stored in one gridded map, and in addition
+* "Fraction type" NetCDF emissions. Yearly totals.
+  : The total emissions are stored in one gridded map, and in addition
     information about which country the emission belongs to.
 
-    The main advantage of “fraction type” NetCDF emissions, is that they
-    will keep the grid flexibility, have a more compact form and be
-    faster to read in.
+    The main advantage of "fraction type" NetCDF emissions, is that they
+    will keep the grid flexibility, have a more compact form and be faster
+    to read in.
 
     The disadvantage is that the interpretation of the content of the
     fields is more difficult and it is hard, for instance, to add a new
     country to the file. Total emissions and coverage of countries can
     easily be visualized, but not emissions from one single country.
 
-    Description of main fields for “fraction type” NetCDF Emissions
-    [Tab:Emisdata]
+[Tab:Emisdata]: #Tab-Emisdata
+<a name=Tab:Emisdata></a>
 
-    lll
+| **Variable name**     | **Description**                                |
+|:----------------------|:-----------------------------------------------|
+|`Ncodes`               | Number of countries sharing the same grid cell |
+|`poll_secNN`           | Pollutant from each sector                     |
+|`Codes`                | Country code number                            |
+|`fractions_poll_secNN` | Fraction of emissions to assign to one country |
 
-    **Variable name **
+*Table 4: Description of main fields for "fraction type" NetCDF Emissions*
 
-    & **Description**\
 
-    Ncodes & Number of countries sharing the same grid cell\
-    poll\_secNN & Pollutant from each sector\
-    Codes & Country code number\
-    fractions\_poll\_secNN & Fraction of emissions to assign to one
-    country\
+* Monthly "fraction type" NetCDF emissions.
+  : This is similar to the yearly "fraction type" NetCDF emissions,
+    but there are 12 monthly values for each field.
+    This format cannot be combined with other formats.
 
-4.  Monthly “fraction type” NetCDF emissions.
+### Using and combining gridded Emissions
 
-    This is similar to the yearly “fraction type” NetCDF emissions, but
-    there are 12 monthly values for each field. This format cannot be
-    combined with other formats.
+These gridded emission files are controlled via the `config_emep.nml` file.
+Each file is assigned as one set of values for `emis_inputlist`.
+An ASCII emission file can be included for instance with the line:
+```
+emis_inputlist(1)%name = '/My/Path/To/Emissions/emislist.POLL',
+```
+`POLL` is a keyword, which will be replaced by the model by all the emitted pollutants,
+according to the names defined in `CM_EmisFiles.inc`.
 
-#### Using and combining gridded Emissions
+An additional NetCDF emission file can be included for instance with the line:
+```
+emis_inputlist(2)%name = '/My/Path/To/Emissions/Emis_GLOB_05.nc',
+```
+Now all emissions from both ASCII file and NetCDF file will be used.
 
-These gridded emission files are controlled via the “config\_emep.nml”
-file. Each file is assigned as one set of values for emis\_inputlist. An
-ASCII emission file can be included for instance with the line:
+In practice some countries might be counted twice.
+Therefore some new data can be included in the `emis_inputlist`,
+to specify which countries to keep or to avoid. Example:
+```
+emis_inputlist(1)%incl(1:) = 'NO','SE','FI',
+emis_inputlist(2)%excl(1:) = 'NO','SE','FI',
+```
+Will include only 'NO', 'SE' and 'FI' from the first file (ASCII),
+and take all countries except 'NO', 'SE' and 'FI' from the second file (NetCDF).
 
->     emis_inputlist(1)\%name = '/MyPathToEmissions/emislist.POLL',
-
-“POLL” is a keyword, which will be replaced by the model by all the
-emitted pollutants (according to the names defined in
-“CM\_EmisFiles.inc”).
-
-An additional NetCDF emission file can be included for instance with the
-line:
-
->     emis_inputlist(2)\%name = '/MyPathToEmissions/Emis\_GLOB\_05.nc',
-
-Now all emissions from both ASCII file and NetCDF file will be used. In
-practice some countries might be counted twice. Therefore some new data
-can be included in the “emis\_inputlist”, to specify which countries to
-keep or to avoid. Example:
-
->     emis_inputlist(1)\%incl(1:) = 'NO','SE','FI',
->     emis_inputlist(2)\%excl(1:) = 'NO','SE','FI',
-
-Will include only ’NO’,’SE’ and ’FI’ from the first file (ASCII), and
-take all countries except ’NO’,’SE’ and ’FI’ from the second file
-(NetCDF).
-
-Sets of countries can in principle be defined; for now only the set
-’EUMACC2’ is defined.
+Sets of countries can in principle be defined; for now only the set 'EUMACC2' is defined.
 
 ### Global Ozone
 
@@ -469,7 +461,7 @@ Initial concentration of ozone are required in order to initialize the
 model runs. Boundary conditions along the sides of the model domain and
 at the top of the domain are then required as the model is running.
 
-The Logan\_P.nc file contains monthly averaged fields in netCDF format.
+The `Logan_P.nc` file contains monthly averaged fields in netCDF format.
 The initial and background concentrations are based on the Logan (1998)
 climatology. The Logan climatology is scaled by Unimod according to the
 Mace Head measurements as described in Simpson *et al.* (2003). For a
@@ -485,12 +477,12 @@ landuse datasets. The light and temperature depencies are similar to
 those used in the original open source model, see Chapter 4.2 of the
 EMEP Status Report 1/2003 Part I (Simpson *et al.*, 2003).
 
-Biogenic VOC emission potentials (i.e. rates at 30$^\circ$C and full
+Biogenic VOC emission potentials (i.e. rates at 30&deg;C and full
 sunlight) are included for four different forest types in the netCDF
-file EMEP\_EuroBVOC.nc. These emission potentials have unit
-$\mu g/m^{2} /h$, and refer to emissions per area of the appropriate
+file `EMEP_EuroBVOC.nc`. These emission potentials have unit
+&mu;g/m&sup2;/h, and refer to emissions per area of the appropriate
 forest category. In addition, default emission potentials are given for
-other land-cover categories in the file Inputs\_LandDefs.csv. The
+other land-cover categories in the file `Inputs_LandDefs.csv`. The
 underlying emission potentials, land-cover data bases, and model coding
 have however changed substantially since model version v.2011-06. The
 new approach is documented in Simpson *et al.*, 2012.
@@ -509,9 +501,9 @@ module in the model, and three additional “fake” landuse classes are
 used for providing results for integrated assessment modeling and
 effects work.
 
-There are two netcdf files included, one file
-\`‘Landuse\_PS\_5km\_LC.nc‘’’ on 5 km resolution over the EMEP domain,
-and a global “LanduseGLC.nc”. The different landuse types are desribed
+There are two netCDF files included, one file
+`Landuse_PS_5km_LC.nc` on 5 km resolution over the EMEP domain,
+and a global `LanduseGLC.nc`. The different landuse types are desribed
 in Simpson et al (2012).
 
 ### Degree-day factor
@@ -519,77 +511,68 @@ in Simpson et al (2012).
 Domestic combustion which contribute to a large part of SNAP 2, varies
 on the daily mean temperature. The variation is based on the heating
 degree-day concept. These degree days are pre-calculated for each day
-and stored in the file DegreeDayFactors.nc. See Simpson et al. (2012)
+and stored in the file `DegreeDayFactors.nc`. See Simpson et al. (2012)
 section 6.1.2.
 
-### NO$_x$ depositions
+### NO<sub>x</sub> depositions
 
 Areas with high NO deposition loads have greater soil-NO emissions. To
-include this in the model, a netcdf file where pre-calculated
+include this in the model, a netCDF file where pre-calculated
 N-depositions are included. The file made by the results from the
 EMEP/MSC-W model runs over a 5-year period.
 
 ### Road Dust
 
-Road traffic produces dust. These emissions are handled in the
-EMEP/MSC-W model in the **Emissions\_ml.f90** module. To include road
-dust, set USE\_ROADDUST = .true. in “config\_emep.nml”. There are two
-files included in input data, RoadMap.nc and AVG\_SMI\_2005-2010.nc.
-RoadMap.nc include gridded roads and PM emissions over Europe,
-AVG\_SMI\_2005-2010.nc are global.
+Road traffic produces dust.
+These emissions are handled in the EMEP/MSC-W model in the `Emissions_ml.f90` module.
+To include road dust, set `USE_ROADDUST = .true.` in `config_emep.nml`.
+There are two files included in input data, `RoadMap.nc` and  `AVG_SMI_2005-2010.nc`.
+`RoadMap.nc` include gridded roads and PM emissions over Europe, AVG_SMI_2005-2010.nc` are global.
 
-### Aircraft emissions
+### Aircraft emissions [emisair]
 
-[emisair]
-
-In the EMEP/MSC-W model aircraft emissions are ’OFF’ by default. They
-can be switched ’ON’ by setting USE\_AIRCRAFT\_EMIS = .true. in
-“config\_emep.nml” and download the data from
-<http://www.pa.op.dlr.de/quantify>. The EMEP model uses data provided by
-the EU-Framework Programme 6 Integrated Project QUANTIFY
-(<http://www.pa.op.dlr.de/quantify>). However, before using these data a
-protocol has to be signed, which is why the data file can not be
-provided directly on the EMEP/MSC-W Open Source website. If you want to
-use aircraft emissions go to <http://www.pa.op.dlr.de/quantify>, click
-on ’QUANTIFY emission inventories and scenarios’, and then click on
-’Register’. That page will provide information about the registration
-process and the protocol that has to be signed. Once you are registered,
-click ’Login’ and provide user name and password. On the new page,
-search for ’Emissions for EMEP’, which links directly to the Readme file
-and the emission data file in netCDF format. Download the emission data
-file and place it in the input folder.
+In the EMEP/MSC-W model aircraft emissions are 'OFF' by default.
+They can be switched 'ON' by setting `USE_AIRCRAFT_EMIS = .true.` in `config_emep.nml`
+and download the data from <http://www.pa.op.dlr.de/quantify>.
+The EMEP model uses data provided by the EU-Framework Programme 6 Integrated
+Project QUANTIFY (<http://www.pa.op.dlr.de/quantify>). However, before using
+these data a protocol has to be signed, which is why the data file can not be provided
+directly on the EMEP/MSC-W Open Source website. If you want to use aircraft emissions go to
+<http://www.pa.op.dlr.de/quantify>, click on 'QUANTIFY emission inventories and scenarios',
+and then click on 'Register'. That page will provide information about the registration
+process and the protocol that has to be signed. Once you are registered, click 'Login' and
+provide user name and password. On the new page, search for 'Emissions for EMEP', which
+links directly to the Readme file and the emission data file in NetCDF format. Download the
+emission data file and place it in the input folder.
 
 ### Surface Pressure
 
-If USE\_AIRCRAFT\_EMIS = .true. in **config\_emep.nml,** then in
-addition to the Aircraft Emission file, there will be need for a
-SurfacePressure.nc file, which is already in the /input folder. The
-netCDF file consists of surface pressure fields for each of the months
-in 2008 called surface\_pressure, and one field for the whole year
-called surface\_pressure\_year. All fields are given in Pa.
+If `USE_AIRCRAFT_EMIS = .true.` in `config_emep.nml`, then in addition to the Aircraft Emission file,
+there will be need for a `SurfacePressure.nc` file, which is already in the `/input` folder.
+The NetCDF file consists of surface pressure fields for each of the months in 2008 called `surface_pressure`,
+and one field for the whole year called `surface_pressure_year`.
+All fields are given in `Pa`.
 
-### Forest Fire
-
-[emisff]
+### Forest Fire [emisff]
 
 Since model version rv3.9 (November 2011), daily emissions from forest
 and vegetation fires are taken from the “Fire INventory from NCAR
 version 1.0” (FINNv1, Wiedinmyer et al. 2011). Data are available from
-2005, with daily resolution, on a fine $1 km\times1 km$ grid. We store these
-data on a slightly coarser grid ($0.2^\circ\times0.2^\circ$) globally for
+2005, with daily resolution, on a fine 1 km&times;1 km grid. We store these
+data on a slightly coarser grid (0.2^&deg;&times;0.2^&deg$) globally for
 access by the EMEP/MSC-W model. To include forest fire emissions set
-USE\_FOREST\_FIRES = .true. in “config\_emep.nml” and download the 2012
-GEOS-chem daily data <http://bai.acd.ucar.edu/Data/fire/>. The data
-needs to be stored with units mole/day in a netCDF file called
-FINN\_ForestFireEmis\_2013.nc compatible with the **ForestFire\_ml.f90
-** module.
+`USE_FOREST_FIRES = .true.` in `config_emep.nml` and download the
+GEOS-chem daily data <http://bai.acd.ucar.edu/Data/fire/> for the corresponding year.
+The data needs to be stored with units mole/day in a netCDF file called
+`FINN_ForestFireEmis_YYYY.nc` compatible with the `ForestFire_ml.f90` module,
+where `YYYY` stands for the year.
 
 ### Dust files
 
-The annual ascii data for sand and clay frations as well as the monthly
+The annual ASCII data for sand and clay fractions as well as the monthly
 data for boundary and initial conditions for dust from Sahara are
-replaced with a single netCDF file ’Soil\_Tegen.nc’ since 2013. This
-covers data for a global domain in $0.5\times0.5$ degree resolution.
+replaced with a single netCDF file `Soil_Tegen.nc` since 2013. This
+covers data for a global domain in 0.5&times;0.5 degree resolution.
 
 The variables ’sand’ and ’clay’ gives the fraction (in %) of sand an
 clay in the soil for each grid cell over land.
@@ -746,9 +729,9 @@ VOC speciation of forest fires in this file.
 ### Lightning emissions
 
 Emissions of NO$_{x}$ from lightning are included in the model as
-monthly averages on T21 ($5.65^\circ\times5.65^\circ$) resolution
+monthly averages on T21 ($5.65^&deg;&times;5.65^&deg;$) resolution
 (Køhler *et al.*, 1995). The lightning emissions are defined on a
-$64\times32$ grid with 17 vertical levels, with global coverage, and are
+$64&times;32$ grid with 17 vertical levels, with global coverage, and are
 provided as 12 **ASCII** files “lightningMM.dat”.
 
 ### Landuse definitions
@@ -1082,7 +1065,7 @@ namely:
 
 Base run
   ~ This is the default set up for yearly transport model calculations
-    in $50\times50$ km$^2$ grid.
+    in $50&times;50$ km$^2$ grid.
 
 Scenario run
   ~ A run with reduced emissions from a particular country or several
