@@ -9,12 +9,12 @@ include Makefile.SRCS
 
 # prefered netCDF 4.2.1.1 or later
 LIBS = -lnetcdff -lnetcdf
-INCL = -I/global/apps/netcdf/4.1.2/include
-LLIB = -L/global/apps/netcdf/4.1.2/lib
+INCL = -I/global/apps/netcdf/4.1.3/include
+LLIB = -L/global/apps/netcdf/4.1.3/lib
 
 F90 = mpif90
 
-# GNU gfortran compiler (version 4.4.3 or later) 
+# GNU gfortran compiler (version 4.4.3 or later)
 F90FLAGS = -ffree-line-length-none -fdefault-real-8 -O3
 
 # Intel ifort compiler
@@ -48,4 +48,3 @@ diskclean:
 	rm -f $(PROG) *.o *.mod
 
 ##########################################################
-
