@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,8 +42,11 @@ module Trajectory_ml
   use Chemfields_ml  ,    only : xn_adv
   use GridValues_ml ,     only : glon, glat
   use Io_ml,              only : IO_AIRCR
-  use MetFields_ml,             only : z_bnd,z_mid
+  use MetFields_ml,       only : z_bnd,z_mid
   use ModelConstants_ml , only : dt_advec,PPBINV,KMAX_BND,NPROC, METSTEP
+  use MPI_Groups_ml , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
+                             MPI_MIN, MPI_MAX, MPI_SUM, &
+                             MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
   use Par_ml   ,          only : gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG,me
   use TimeDate_ml,        only : current_date
   implicit none
@@ -53,8 +56,6 @@ module Trajectory_ml
   public trajectory_in
   public trajectory_out
 
-  INCLUDE 'mpif.h'
-  INTEGER STATUS(MPI_STATUS_SIZE),INFO
   integer, private, save :: iimax, iii
   integer, private, save ::  fapos(2,999)
   real, private, save ::  kfalc(999), rhour(999)
@@ -115,10 +116,10 @@ contains
 !    read on node 0
 912       continue
 !    now distribute
-          CALL MPI_BCAST( iimax ,4*1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-          CALL MPI_BCAST( rhour ,8*iimax+1,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-          CALL MPI_BCAST( kfalc ,8*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
-          CALL MPI_BCAST( fapos ,4*2*iimax,MPI_BYTE, 0,MPI_COMM_WORLD,INFO) 
+          CALL MPI_BCAST( iimax ,4*1,MPI_BYTE, 0,MPI_COMM_CALC,IERROR) 
+          CALL MPI_BCAST( rhour ,8*iimax+1,MPI_BYTE, 0,MPI_COMM_CALC,IERROR) 
+          CALL MPI_BCAST( kfalc ,8*iimax,MPI_BYTE, 0,MPI_COMM_CALC,IERROR) 
+          CALL MPI_BCAST( fapos ,4*2*iimax,MPI_BYTE, 0,MPI_COMM_CALC,IERROR) 
 !    all distributed
        endif
     endif
@@ -151,7 +152,7 @@ contains
 !    we have to synchronise the processors, since for next jjj(iii)
 !    the aircraft can be on another processor !!!!
 
-             CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
+             CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
 
              if(me == 0) write(6,*) 'inne i tidsjekk2'    &
                   ,fapos(1,iii),fapos(1,iii), ttt

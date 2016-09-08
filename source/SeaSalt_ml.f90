@@ -1,7 +1,7 @@
-! <SeaSalt_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <SeaSalt_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,7 +39,7 @@
 ! Programmed by Svetlana Tsyro
 !-----------------------------------------------------------------------------
 
- use AeroFunctions,        only : WetRad, umWetRad, GbSeaSalt
+ use AeroFunctions,        only : WetRad, cmWetRad, GbSeaSalt
  use Biogenics_ml,         only : EMIS_BioNat, EmisNat  
  use ChemSpecs,            only : species
  use GridValues_ml,        only : glat, glon, i_fdom, j_fdom 
@@ -50,10 +50,9 @@
                                   u_ref, foundSST, &
                                    foundws10_met,ws_10m
  use MicroMet_ml,          only : Wind_at_h
- use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, &
+ use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, USES, &
                                   MasterProc, & 
                                   DEBUG   ! -> SEASALT
- use Par_ml,               only : MAXLIMAX,MAXLJMAX   ! => x, y dimensions
  use PhysicalConstants_ml, only : CHARNOCK, AVOG ,PI
  use Setup_1dfields_ml,    only : rcemis 
  use SmallUtils_ml,        only : find_index
@@ -107,7 +106,8 @@
 
    real, parameter :: Z10 = 10.0  ! 10m height
    integer :: ii, jj, nlu, ilu, lu
-   real    :: invdz, n2m, u10, u10_341, Tw, flux_help, total_flux
+   real    :: invdz, n2m, u10, u10_341, Tw, flux_help, total_flux, &
+              whitecap
    real, save  ::   moleccm3s_2_kgm2h 
    real    :: ss_flux(SS_MAAR+SS_MONA), d3(SS_MAAR+SS_MONA) 
    real    :: rcss(NSS)
@@ -191,6 +191,27 @@
 
          u10_341=exp(log(u10) * (3.41))
 
+         !.. Alternatives for whitecap fraction (Monahan etal.1986; 
+         !                     Norris eta. 2013; Callaghan etal. 2008)
+
+    select case ( USES%WHITECAPS )
+      case ( 'Monahan' )
+          whitecap   = u10_341 * 3.84e-6
+      case ( 'Norris' )
+          whitecap   = 1.03e-5 * (u10-2.62)**3
+         if (u10 <= 2.62)   &
+          whitecap   = 1.0e-10
+      case ( 'Callaghan')
+          whitecap   = 1.0e-10
+         if (u10 > 3.71 .and. u10 <= 10.18) then    !(11.25)
+          whitecap   = 3.18e-5 * (u10 - 3.70)**3 
+         elseif (u10 <= 23.09) then
+          whitecap   = 4.82e-6 * (u10 + 1.98)**3 
+         else
+          whitecap   = 4.82e-6 * (23.09 + 1.98)**3 !7.594  !
+         endif
+    end select
+
          if(DEBUG%SEASALT .and. debug_flag) &
              write(6,'(a,L2,4f12.4,es14.4)')'SSALT ** U*, Uref, U10, Uh, invL ** ',&
                foundws10_met, Sub(lu)%ustar, Grid%u_ref, u10, &
@@ -219,7 +240,8 @@
                flux_help  = a(ii) * Tw + b(ii)
   
                ss_flux(ii) = flux_help * ( log_dbin(ii+1) - log_dbin(ii) )    &
-                                   * u10_341 * 3.84e-6 
+                                       * whitecap   ! * u10_341 * 3.84e-6 
+
                d3(ii) = dp3(ii)  ! diameter cubed
 
                total_flux =  total_flux + ss_flux(ii)
@@ -232,7 +254,8 @@
           do ii = 1, SS_MONA
              jj = ii + SS_MAAR
 
-               ss_flux(jj) = temp_Monah (ii) * u10_341
+               ss_flux(jj) = temp_Monah(ii) * whitecap
+!                                           * u10_341
 
                d3(jj) = dSS3(ii)  ! diameter cubed
 
@@ -394,9 +417,12 @@
         !Gb          log10(0.8))+RLIM(i)**3) ** third
 
         !ds now use Gerber functions
-        radSS(i) = umWetRad(rdry(i), 0.8, GbSeaSalt)
-        lim1     = umWetRad(rlim(i+1), 0.8, GbSeaSalt)
-        lim2     = umWetRad(rlim(i), 0.8, GbSeaSalt)
+!STbug        radSS(i) = umWetRad(rdry(i), 0.8, GbSeaSalt)
+!STbug        lim1     = umWetRad(rlim(i+1), 0.8, GbSeaSalt)
+!STbug        lim2     = umWetRad(rlim(i), 0.8, GbSeaSalt)
+        radSS(i) = cmWetRad(rdry(i), 0.8, GbSeaSalt)
+        lim1     = cmWetRad(rlim(i+1), 0.8, GbSeaSalt)
+        lim2     = cmWetRad(rlim(i), 0.8, GbSeaSalt)
         Rrange(i) = lim1 - lim2       ! bin size intervals 
 
        if( DEBUG%SEASALT ) then
@@ -416,7 +442,8 @@
           a1 = ( 0.380 - log10(radSS(i)) ) / 0.650
           a2 = 1.19 * exp(-a1*a1)
 
-          temp_Monah(i) = 1.373 * radSS(i)**(-3) * Rrange(i) *      &
+!st update /3.84e-6     temp_Monah(i) = 1.373 * radSS(i)**(-3) * Rrange(i) *
+          temp_Monah(i) = 3.5755e5 * radSS(i)**(-3) * Rrange(i) *      &
                           ( 1.0 + 0.057 * radSS(i)**1.05 )* 10.0**a2
      enddo
 

@@ -1,7 +1,7 @@
-! <Biogenics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Biogenics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -76,8 +76,9 @@ module Biogenics_ml
                            DEBUG_SOILNOX, USE_SOILNH3
   use NetCDF_ml,        only : ReadField_CDF, printCDF
   use OwnDataTypes_ml,  only : Deriv, TXTLEN_SHORT
-  use Par_ml   , only :  MAXLIMAX,MAXLJMAX,MSG_READ1,me, limax, ljmax
-  use Par_ml,            only : limax, ljmax, MAXLIMAX, MAXLJMAX, me
+!  use Paleo_ml, only : PALEO_mlai, PALEO_miso, PALEO_mmon
+  use Par_ml   , only :  LIMAX,LJMAX,MSG_READ1,me, limax, ljmax
+  use Par_ml,            only : limax, ljmax, LIMAX, LJMAX, me
   use PhysicalConstants_ml,  only :  AVOG, GRAV
   use Radiation_ml,          only : PARfrac, Wm2_uE
   use Setup_1dfields_ml,     only : rcemis  
@@ -122,7 +123,7 @@ module Biogenics_ml
  ! (Currently for 1st four LCC, CF, DF, BF, NF)
   logical, private, dimension(NLANDUSEMAX), save :: HaveLocalEF 
 
-! real, public, save, dimension(MAXLIMAX,MAXLJMAX,size(BVOC_USED)+NSOIL_EMIS) :: &
+! real, public, save, dimension(LIMAX,LJMAX,size(BVOC_USED)+NSOIL_EMIS) :: &
 
   ! EmisNat is used for BVOC; soil-NO, also in futur for sea-salt etc.
   ! Main criteria is not provided in gridded data-bases, often land-use
@@ -170,14 +171,14 @@ module Biogenics_ml
 
     integer :: alloc_err
     
-    allocate(AnnualNdep(MAXLIMAX,MAXLJMAX), &
-                SoilNOx(MAXLIMAX,MAXLJMAX), &
-                SoilNH3(MAXLIMAX,MAXLJMAX))
-    allocate(EmisNat(NEMIS_BioNat,MAXLIMAX,MAXLJMAX))
+    allocate(AnnualNdep(LIMAX,LJMAX), &
+                SoilNOx(LIMAX,LJMAX), &
+                SoilNH3(LIMAX,LJMAX))
+    allocate(EmisNat(NEMIS_BioNat,LIMAX,LJMAX))
     EmisNat=0.0
-    allocate(day_embvoc(MAXLIMAX,MAXLJMAX,size(BVOC_USED)))
+    allocate(day_embvoc(LIMAX,LJMAX,size(BVOC_USED)))
     day_embvoc = 0.0
-    allocate(EuroMask(MAXLIMAX,MAXLJMAX))
+    allocate(EuroMask(LIMAX,LJMAX))
     EuroMask=.false.
 
       if ( size(BVOC_USED) == 0 ) then
@@ -211,7 +212,7 @@ module Biogenics_ml
 
     call Get_LCinfo() ! Gets landcover info, last_bvoc_LC
 
-    allocate(  bvocEF(MAXLIMAX,MAXLJMAX,last_bvoc_LC,size(BVOC_USED)),&
+    allocate(  bvocEF(LIMAX,LJMAX,last_bvoc_LC,size(BVOC_USED)),&
         stat=alloc_err )
     call CheckStop( alloc_err , "bvocEF alloc failed"  )
 
@@ -337,8 +338,8 @@ module Biogenics_ml
 
       if( MasterProc .and. DEBUG%BIO ) write(*,*) "Into MergedBVOC"
 
-      do i = 1, limax !PPP MAXLIMAX
-      do j = 1, ljmax !PPP MAXLJMAX
+      do i = 1, limax !PPP LIMAX
+      do j = 1, ljmax !PPP LJMAX
 
         nlu = LandCover(i,j)%ncodes
 
@@ -412,13 +413,13 @@ module Biogenics_ml
       last_daynumber = daynumber
 
       if ( DEBUG%BIO .and.  my_first_call  ) then
-           allocate(  workarray(MAXLIMAX,MAXLJMAX), stat=alloc_err )
+           allocate(  workarray(LIMAX,LJMAX), stat=alloc_err )
            call CheckStop( alloc_err , "workarray alloc failed"  )
            workarray = 0.0
       end if
 
-      do i = 1, limax !PPP MAXLIMAX
-      do j = 1, ljmax !PPP MAXLJMAX
+      do i = 1, limax !PPP LIMAX
+      do j = 1, ljmax !PPP LJMAX
 
         nlu = LandCover(i,j)%ncodes
 
@@ -459,6 +460,8 @@ module Biogenics_ml
                    LandCover(i,j)%fraction(iiL), &
                    LandCover(i,j)%LAI(iiL), LandDefs(iL)%LAImax, b,&
                      ( day_embvoc(i, j, ibvoc), ibvoc = 1, size(BVOC_USED) ) 
+     !PALEO write(*,'(a,i3,3g12.3)') "NPALEObvoc ", me, &
+     !   PALEO_mlai(i,j), PALEO_miso(i,j),PALEO_mmon(i,j)
                   
               end if
               ! When debugging it helps with an LAI map
@@ -579,7 +582,6 @@ module Biogenics_ml
      ! And we scale EmisNat to get units kg/m2 consistent with
      ! Emissions_ml (snapemis).  ug/m2/h -> kg/m2/s needs 1.0-9/3600.0. 
 
-      E_ISOP = day_embvoc(i,j,BIO_ISOP)*canopy_ecf(BIO_ISOP,it2m) * cL 
 
       rcemis(itot_C5H8,KG)   = rcemis(itot_C5H8,KG) + E_ISOP * biofac_ISOP/Grid%DeltaZ
       EmisNat(ispec_C5H8,i,j)= E_ISOP * 1.0e-9/3600.0

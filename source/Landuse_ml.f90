@@ -1,7 +1,7 @@
-! <Landuse_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Landuse_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,7 @@ module Landuse_ml
 use CheckStop_ml,   only: CheckStop,StopAll
 use DO3SE_ml,       only: fPhenology, Init_DO3SE
 use GridAllocate_ml,only: GridAllocate
-use GridValues_ml,  only: glat_fdom, glat , glon   & ! latitude,
+use GridValues_ml,  only:  glat , glon   & ! latitude,
                           , i_fdom, j_fdom   & ! coordinates
                           , i_local, j_local &
                           , debug_proc, debug_li, debug_lj
@@ -51,15 +51,15 @@ use ModelConstants_ml,only: DEBUG, NLANDUSEMAX, &
                             VEG_2dGS, VEG_2dGS_Params, & 
                             NPROC, IIFULLDOM, JJFULLDOM, &
                             DomainName, MasterProc
-use NetCDF_ml,      only: ReadField_CDF,printcdf
-use Par_ml,         only: MAXLIMAX, MAXLJMAX, &
+use MPI_Groups_ml, only : MPI_INTEGER,MPI_COMM_CALC, IERROR
+use Par_ml,         only: LIMAX, LJMAX, &
                           limax, ljmax, me
 !use Paleo_ml,       only: SetPaleo
 use SmallUtils_ml,  only: wordsplit, find_index, NOT_FOUND, WriteArray, trims
 use TimeDate_ml,    only: effectivdaynumber, nydays, current_date
 
 use netcdf
-use NetCDF_ml, only  : ReadField_CDF,check
+use NetCDF_ml, only  : ReadField_CDF,check,printcdf
 
 implicit none
 private
@@ -72,8 +72,6 @@ private
   public :: SetLanduse
   private :: Polygon         ! Used for LAI
   private :: MedLAI          ! Used for LAI, Medit.
- INCLUDE 'mpif.h'
- INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
  integer, public, parameter :: NLUMAX = 30 ! max no. landuse per grid
  integer, private, save :: NLand_codes = 0 ! no. landuse in input files
@@ -120,7 +118,7 @@ private
 
  character(len=80), private :: errmsg
 
-
+! integer ::ierror,mpi_comm_calc, mpi_integer
 contains
 
  !==========================================================================
@@ -139,10 +137,10 @@ contains
     !=====================================
 
     !ALLOCATE ARRAYS
-    allocate(LandCover(MAXLIMAX,MAXLJMAX))
-    allocate(likely_coastal(MAXLIMAX,MAXLJMAX) )
-    allocate(mainly_sea(MAXLIMAX,MAXLJMAX) )
-    allocate(water_fraction(MAXLIMAX,MAXLJMAX), ice_landcover(MAXLIMAX,MAXLJMAX))
+    allocate(LandCover(LIMAX,LJMAX))
+    allocate(likely_coastal(LIMAX,LJMAX) )
+    allocate(mainly_sea(LIMAX,LJMAX) )
+    allocate(water_fraction(LIMAX,LJMAX), ice_landcover(LIMAX,LJMAX))
 
     ! First, check the number of "extra" (fake) vegetation 
     nFluxVegs = 0
@@ -174,8 +172,8 @@ contains
     call CheckStop(.not.filefound,"InitLanduse failed!")
 
     if(MasterProc) then
-!        print *,  sub//" Into Init_LandDefs ", NLand_codes
-!        print *,  sub//" Codes: ", Land_codes
+        print *,  sub//" Into Init_LandDefs ", NLand_codes
+        print *,  sub//" Codes: ", Land_codes
     end if
     call Init_LandDefs(NLand_codes, Land_codes)   ! => LandType, LandDefs
 
@@ -187,7 +185,7 @@ contains
 
        n2dGSpars = count( VEG_2dGS_Params(:) /= "" ) - 1 ! First is fname
 
-       allocate(map2dGrowingSeasons(MAXLIMAX,MAXLJMAX,n2dGS*n2dGSpars))
+       allocate(map2dGrowingSeasons(LIMAX,LJMAX,n2dGS*n2dGSpars))
 
        fname = VEG_2dGS_Params(1)
        if(MasterProc) write(*,*) "CRU GS MAP ", trim(fname), n2dGS, n2dGSpars
@@ -322,10 +320,10 @@ contains
            keyval("Coords","ModelCoords") /)
 
  ! temporary arrays used.  Will re-write one day....
-   real, dimension(MAXLIMAX,MAXLJMAX,NLANDUSEMAX):: landuse_in ! tmp, with all data
-   real, dimension(MAXLIMAX,MAXLJMAX,NLUMAX):: landuse_data ! tmp, with all data
-   integer, dimension(MAXLIMAX,MAXLJMAX):: landuse_ncodes ! tmp, with all data
-   integer, dimension(MAXLIMAX,MAXLJMAX,NLUMAX):: landuse_codes ! tmp, with all data
+   real, dimension(LIMAX,LJMAX,NLANDUSEMAX):: landuse_in ! tmp, with all data
+   real, dimension(LIMAX,LJMAX,NLUMAX):: landuse_data ! tmp, with all data
+   integer, dimension(LIMAX,LJMAX):: landuse_ncodes ! tmp, with all data
+   integer, dimension(LIMAX,LJMAX,NLUMAX):: landuse_codes ! tmp, with all data
 
    if ( DEBUG%LANDUSE>0 .and. MasterProc ) &
         write(*,*) "LANDUSE: Starting ReadLandUse "
@@ -345,7 +343,7 @@ contains
       if ( MasterProc ) then
          call open_file(IO_TMP,"r",fname,needed=.false.)
       end if
-      call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,INFO)
+      call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
       if(ios==0)then
          if ( DEBUG%LANDUSE>0 .and. MasterProc ) write(*,*)'found '//trim(fname) 
          filefound=.true.
@@ -450,11 +448,11 @@ contains
     logical :: fexist=.false.!file exist flag
   
     ! temporary arrays used.  Will re-write one day....
-    real, dimension(MAXLIMAX,MAXLJMAX,NLANDUSEMAX):: landuse_in ! tmp, with all data
-    real, dimension(MAXLIMAX,MAXLJMAX):: landuse_tmp ! tmp, with all data
-    real, dimension(MAXLIMAX,MAXLJMAX,NLUMAX):: landuse_data ! tmp, with all data
-    integer, dimension(MAXLIMAX,MAXLJMAX):: landuse_ncodes ! tmp, with all data
-    integer, dimension(MAXLIMAX,MAXLJMAX,NLUMAX):: landuse_codes ! tmp, with all data
+    real, dimension(LIMAX,LJMAX,NLANDUSEMAX):: landuse_in ! tmp, with all data
+    real, dimension(LIMAX,LJMAX):: landuse_tmp ! tmp, with all data
+    real, dimension(LIMAX,LJMAX,NLUMAX):: landuse_data ! tmp, with all data
+    integer, dimension(LIMAX,LJMAX):: landuse_ncodes ! tmp, with all data
+    integer, dimension(LIMAX,LJMAX,NLUMAX):: landuse_codes ! tmp, with all data
     logical, save :: debug_Master=.false.
 
     if(  DEBUG%LANDUSE>0 .and. MasterProc )  then
@@ -492,7 +490,7 @@ contains
        !loop over all variables in file
        ilu=0
        do varid=1,nVariables
-          if ( DEBUG%LANDUSE>0 )  CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
+          if ( DEBUG%LANDUSE>0 )  CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
 
           call check(nf90_Inquire_Variable(ncFileID,varid,varname,xtype,ndims))
           if ( debug_Master )write(*,*) sub//"checking "//trim(varname), index( varname, "LC:") 

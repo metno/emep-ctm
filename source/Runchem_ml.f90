@@ -1,7 +1,7 @@
-! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,7 +33,7 @@
 
 module RunChem_ml
 
-  use AerosolCalls,     only: AerosolEquilib & !DEC2014 My_MARS, My_EQSAM, &
+  use AerosolCalls,     only: AerosolEquilib & !-> My_MARS, My_EQSAM, &
                              ,Aero_water, Aero_water_MARS   !DUST -> USE_DUST
   use My_Timing_ml,     only: Code_timer, Add_2timing,  &
                               tim_before, tim_after
@@ -60,7 +60,8 @@ module RunChem_ml
                               DEBUG_EMISSTACKS, & ! MKPS
                               DebugCell, DEBUG    ! RUNCHEM
   use OrganicAerosol_ml,only: ORGANIC_AEROSOLS, OrganicAerosol, &
-                              Init_OrganicAerosol, & !FEB2012
+                              Init_OrganicAerosol, & 
+                              Reset_OrganicAerosol, & 
                               SOA_MODULE_FLAG   ! ="VBS" or "NotUsed"
   use Pollen_ml,        only: Pollen_flux
   use Par_ml,           only: lj0,lj1,li0,li1, limax, ljmax,  &
@@ -68,8 +69,7 @@ module RunChem_ml
   use PointSource_ml,    only: pointsources, get_pointsources
   use SeaSalt_ml,       only: SeaSalt_flux
   use Setup_1d_ml,      only: setup_1d, setup_rcemis, reset_3d
-                      !FUTURE setup_nh3  ! NH3emis (NMR-NH3 project)
-  use Setup_1dfields_ml,only: first_call, & 
+  use Setup_1dfields_ml,only: first_call, &
                               amk, rcemis, xn_2d  ! DEBUG for testing
   use TimeDate_ml,      only: current_date,daynumber
 !--------------------------------
@@ -89,6 +89,7 @@ subroutine runchem()
   integer :: nmonth, nday, nhour     
   logical ::  Jan_1st, End_of_Run
   logical ::  debug_flag    ! =>   Set true for selected i,j
+  logical, save :: first_tstep = .true. ! J16 
   logical :: dbg
   character(len=*), parameter :: sub='RunChem:'
   character(len=10) :: dbgtxt
@@ -156,7 +157,8 @@ subroutine runchem()
 
       if(USE_FASTJ)then
 !         call setup_phot_fastj(i,j,errcode,0)! recalculate the column
-         call  phot_fastj_interpolate(i,j,errcode)!interpolate (intelligently) from 3-hourly values
+        !interpolate (intelligently) from 3-hourly values
+         call  phot_fastj_interpolate(i,j,errcode)
       else
          call setup_phot(i,j,errcode)
       endif
@@ -164,18 +166,15 @@ subroutine runchem()
       call CheckStop(errcode,"setup_photerror in Runchem") 
       call Add_2timing(29,tim_after,tim_before,"Runchem:1st setups")
 
-      ! Called every adv step, only updated every third hour
-!FUTURE call setup_nh3(i,j)    ! NH3emis, experimental (NMR-NH3)
-
-
       if(DEBUG%RUNCHEM.and.debug_flag) &
         call datewrite("Runchem Pre-Chem", (/ rcemis(NO,20), &
-!          rcemis(SHIPNOX,KMAX_MID), &!hardcoded chemical indice are not defined for all chem schemes, and should be avoided
+             !rcemis(SHIPNOX,KMAX_MID), !hardcoded chemical indice are not
+             ! defined for all chem schemes, and should usually be avoided
           rcemis(C5H8,KMAX_MID), xn_2d(NO,20),xn_2d(C5H8,20) /) )
       if(DEBUG%RUNCHEM) call check_negs(i,j,'A')
 
       if(ORGANIC_AEROSOLS) &
-        call OrganicAerosol(i,j,debug_flag)
+        call OrganicAerosol(i,j,first_tstep,debug_flag)  ! J16 first_tstep added
       if(DEBUG%RUNCHEM) call check_negs(i,j,'B')
 
       call Add_2timing(30,tim_after,tim_before,"Runchem:2nd setups")
@@ -225,6 +224,11 @@ subroutine runchem()
         call check_negs(i,j,'H')
       end if
 
+     !Should be no further concentration changes due to emissions or deposition
+
+      if(ORGANIC_AEROSOLS) call Reset_OrganicAerosol(i,j,debug_flag)
+
+
       !// Calculate Aerosol Optical Depth
       if(USE_AOD)  &
         call AOD_Ext(i,j,debug_flag)
@@ -251,6 +255,7 @@ subroutine runchem()
       first_call = .false.   ! end of first call 
     enddo ! j
   enddo ! i
+  first_tstep = .false.   ! end of first call  over all i,j
 
 endsubroutine runchem
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

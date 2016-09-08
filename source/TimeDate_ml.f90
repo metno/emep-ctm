@@ -1,7 +1,7 @@
-! <TimeDate_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <TimeDate_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -137,7 +137,7 @@ function print_date(cd) result(str)
 end function print_date
    
 !> FUNCTION same_date
-!! DS Returns true if dates equal
+!! Returns true if dates equal
 
 function same_date(cd1,cd2) result(tf)
   type(date) :: cd1, cd2
@@ -318,7 +318,7 @@ END SUBROUTINE get_ymd
 FUNCTION day_of_week (yyyy,mm,dd) RESULT (dow)
 ! Day_Of_Week: (0=Sunday,1=Monday...6=Saturday)
 ! cf J.D.Robertson, CACM 15(10):918
-! renamed dow->day_of_week, keep dow as internal,  DSF
+! renamed dow->day_of_week, keep dow as internal
   INTEGER,INTENT(IN)  :: yyyy,mm,dd
   INTEGER             :: dow
   dow = MODULO((13*(mm+10-(mm+10)/13*12)-1)/5+dd+77     &
@@ -329,7 +329,7 @@ END FUNCTION day_of_week
 FUNCTION day_of_year (yyyy,mm,dd) result (ndiy)
 ! day count in year
 ! cf J.D.Robertson, CACM 15(10):918
-! renamed ndiy->day_of_year, keep ndiy as internal,  DSF
+! renamed ndiy->day_of_year, keep ndiy as internal
   INTEGER,INTENT(IN)  :: yyyy,mm,dd
   INTEGER             :: ndiy
   ndiy = 3055*(mm+2)/100-(mm+10)/13*2-91                    &
@@ -393,7 +393,7 @@ SUBROUTINE Init_nmdays (indate)
 END SUBROUTINE Init_nmdays
 
 END MODULE TimeDate_ml
-!TSTESX program testr
-!TSTESX use TimeDate_ml, only : date, print_date
-!TSTESX print *, "DATE is ", print_date( date( 1999, 3, 2,21, 0 ))
-!TSTESX end program testr
+!TSTEMX program testr
+!TSTEMX use TimeDate_ml, only : date, print_date
+!TSTEMX print *, "DATE is ", print_date( date( 1999, 3, 2,21, 0 ))
+!TSTEMX end program testr

@@ -1,7 +1,7 @@
-! <Unimod.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Unimod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -51,7 +51,7 @@ program myeul
   use ChemGroups_ml,    only: Init_ChemGroups
   use Country_ml,       only: Country_Init
   use DefPhotolysis_ml, only: readdiss
-  use Derived_ml,       only: Init_Derived, iou_min, iou_max
+  use Derived_ml,       only: Init_Derived, wanted_iou
   use DerivedFields_ml, only: f_2d, f_3d
   use EcoSystem_ml,     only: Init_EcoSystems
   use Emissions_ml,     only: Emissions, newmonth
@@ -62,30 +62,33 @@ program myeul
   use Io_Progs_ml,      only: read_line, PrintLog
   use Landuse_ml,       only: InitLandUse, SetLanduse, Land_codes
   use MassBudget_ml,    only: Init_massbudget, massbudget
-  use Met_ml,           only: metfieldint, MetModel_LandUse, Meteoread, meteo
-  use ModelConstants_ml,only: MasterProc, &   ! set true for host processor, me==0
+  use Met_ml,           only: metfieldint, MetModel_LandUse, Meteoread
+  use ModelConstants_ml,only: MasterProc, &   ! set true for host processor, me==MasterPE
        RUNDOMAIN,  &   ! Model domain
        NPROC,      &   ! No. processors
        METSTEP,    &   ! Hours between met input
        runlabel1,  &   ! explanatory text
        runlabel2,  &   ! explanatory text
-       nterm,iyr_trend,    nmax,nstep ,                  &
-       IOU_INST,IOU_HOUR, IOU_YEAR,IOU_MON, IOU_DAY, &
+       nterm,iyr_trend, nmax,nstep , meteo,     &
+       IOU_INST,IOU_HOUR,IOU_HOUR_INST, IOU_YEAR,IOU_MON, IOU_DAY, &
        USES, USE_LIGHTNING_EMIS, &
-       FORECAST       ! FORECAST mode
-  use ModelConstants_ml,only: Config_ModelConstants,DEBUG
+       FORECAST,ANALYSIS  ! FORECAST/ANALYSIS mode
+  use ModelConstants_ml,only: Config_ModelConstants,DEBUG, startdate,enddate
+  use MPI_Groups_ml,    only: MPI_BYTE, ME_CALC, ME_MPI, MPISTATUS, MPI_COMM_CALC,MPI_COMM_WORLD, &
+                              MasterPE,IERROR, MPI_world_init, MPI_groups_split
   use NetCDF_ml,        only: Init_new_netCDF
   use OutputChem_ml,    only: WrtChem, wanted_iou
-  use Par_ml,           only: me, GIMAX, GJMAX, Topology, parinit
+  use Par_ml,           only: me, GIMAX, GJMAX, Topology_io, Topology, parinit
   use PhyChem_ml,       only: phyche    ! Calls phys/chem routines each dt_advec
   use Sites_ml,         only: sitesdef  ! to get output sites
+  use SmallUtils_ml,    only: key2str
   use Tabulations_ml,   only: tabulate
   use TimeDate_ml,      only: date, current_date, day_of_year, daynumber,&
-       tdif_secs,date,timestamp,make_timestamp,startdate, enddate,Init_nmdays
+       tdif_secs,date,timestamp,make_timestamp,Init_nmdays
   use TimeDate_ExtraUtil_ml,only : date2string, assign_NTERM
   use Trajectory_ml,    only: trajectory_init,trajectory_in
   use Nest_ml,          only: wrtxn     ! write nested output (IC/BC)
-  use DA_3DVar_ml,      only: NTIMING_3DVAR
+  use DA_3DVar_ml,      only: NTIMING_3DVAR,DA_3DVar_Init, DA_3DVar_Done
   !--------------------------------------------------------------------
   !
   !  Variables. There are too many to list here. Still, here are a
@@ -112,34 +115,24 @@ program myeul
   !
   implicit none
 
-  INCLUDE 'mpif.h'
-  INTEGER STATUS(MPI_STATUS_SIZE),INFO
-
-  integer :: i, oldseason, newseason
+  integer :: i, oldseason, newseason, status
   integer :: mm_old   ! month and old-month
-  integer :: nproc_mpi,cyclicgrid
-  character (len=230) :: errmsg,txt
+  integer :: cyclicgrid
   TYPE(timestamp)   :: ts1,ts2
   logical :: End_of_Run=.false.
 
-  namelist /INPUT_PARA/iyr_trend,runlabel1,runlabel2,&
-       startdate,enddate,meteo
 
   associate ( yyyy => current_date%year, mm => current_date%month, &
        dd => current_date%day,  hh => current_date%hour)
     !
     !     initialize the parallel topology
     !
-  nproc_mpi = NPROC
-  CALL MPI_INIT(INFO)
-  CALL MPI_COMM_RANK(MPI_COMM_WORLD, ME, INFO)
+    
+  call MPI_world_init(NPROC,ME)
+
   ! Set a logical from ModelConstants, which can be used for
   !   specifying the master processor for print-outs and such
-  MasterProc = ( me == 0 )
-  CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nproc_mpi, INFO)
-  NPROC=nproc_mpi 
-55 format(A,I5,A)
-  if(MasterProc)write(*,55)' Found ',NPROC,' MPI processes available'
+  MasterProc = ( me == MasterPE )
 
   call CheckStop(digits(1.0)<50, &
        "COMPILED WRONGLY: Need double precision, e.g. f90 -r8")
@@ -149,18 +142,18 @@ program myeul
   call define_chemicals()    ! sets up species details
   call Config_ModelConstants(IO_LOG)
 
-  rewind(IO_NML)
-  read(IO_NML,NML=INPUT_PARA)
-  startdate(4)=0                ! meteo hour to start/end the run 
-  enddate  (4)=0                ! are set in assign_NTERM
-
   if(MasterProc)then
      call PrintLog(trim(runlabel1))
      call PrintLog(trim(runlabel2))
      call PrintLog(date2string("startdate = YYYYMMDD",startdate(1:3)))
      call PrintLog(date2string("enddate   = YYYYMMDD",enddate  (1:3)))
-     ! write(txt,"(a,i4)") "iyr_trend= ", iyr_trend
-     ! call PrintLog(trim(txt))
+    !call PrintLog(key2str("iyr_trend = YYYY","YYYY",iyr_trend))
+  endif
+
+
+  if(ANALYSIS)then              ! init 3D-var module
+    call DA_3DVar_Init(status)  ! pass settings
+    call CheckStop(status,"DA_3DVar_Init in Unimod")
   endif
 
   !*** Timing ********
@@ -234,21 +227,24 @@ program myeul
   if (MasterProc.and.DEBUG%MAINCODE ) print *,"vgrid finish"
 
   ! open only output netCDF files if needed
-  if(MasterProc.and.DEBUG%MAINCODE )print *, "NETCDFINITS: minval, maxval", iou_min, iou_max
+  if(MasterProc.and.DEBUG%MAINCODE )&
+    print *, "NETCDFINITS: iou", (i,wanted_iou(i),i=IOU_INST,IOU_HOUR_INST)
   ! The fullrun file contains the accumulated or average results
   ! over the full run period, often a year, but even just for
   ! a few timesteps if that is all that is run:
 
-  if (wanted_iou(IOU_YEAR)) &
-       call Init_new_netCDF(trim(runlabel1)//'_fullrun.nc',IOU_YEAR)
-  if (wanted_iou(IOU_INST)) &
-       call Init_new_netCDF(trim(runlabel1)//'_inst.nc',IOU_INST)
-  ! if (wanted_iou(IOU_HOUR).or.NHOURLY_OUT>0) &
-  !   call Init_new_netCDF(trim(runlabel1)//'_hour.nc',IOU_HOUR)
-  if (wanted_iou(IOU_DAY)) &
-       call Init_new_netCDF(trim(runlabel1)//'_day.nc',IOU_DAY)
-  if (wanted_iou(IOU_MON)) &
-       call Init_new_netCDF(trim(runlabel1)//'_month.nc',IOU_MON)
+  if(wanted_iou(IOU_INST)) &
+    call Init_new_netCDF(trim(runlabel1)//'_inst.nc',IOU_INST)
+  if(wanted_iou(IOU_YEAR)) &
+    call Init_new_netCDF(trim(runlabel1)//'_fullrun.nc',IOU_YEAR)
+  if(wanted_iou(IOU_MON)) &
+    call Init_new_netCDF(trim(runlabel1)//'_month.nc',IOU_MON)
+  if(wanted_iou(IOU_DAY)) &
+    call Init_new_netCDF(trim(runlabel1)//'_day.nc',IOU_DAY)
+  if(wanted_iou(IOU_HOUR)) &
+    call Init_new_netCDF(trim(runlabel1)//'_hour.nc',IOU_HOUR)
+  if(wanted_iou(IOU_HOUR_INST)) &
+    call Init_new_netCDF(trim(runlabel1)//'_hourInst.nc',IOU_HOUR_INST)
 
   call Add_2timing(4,tim_after,tim_before,"After tabs, defs, adv_var")
 
@@ -265,110 +261,104 @@ program myeul
   !     performance of physical and chemical calculations,
   !     three-hourly time loop starts here
   !
-  do while (.not. End_of_Run)        ! main time-loop , timestep is dt_advec
+  do while(.not.End_of_Run)        ! main time-loop , timestep is dt_advec
 
-     nstep=mod(nstep,nmax)+1 !loops from 1 to nmax, between two meteo read
+    nstep=mod(nstep,nmax)+1 !loops from 1 to nmax, between two meteo read
 
-     !FUTURE if (NH3EMIS_VAR) call SetNH3()  ! NH3emis experimental
+    !FUTURE if (NH3EMIS_VAR) call SetNH3()  ! NH3emis experimental
 
-     select case (mm)
-     case(12,1:2);newseason = 1
-     case(3:5)   ;newseason = 2
-     case(6:8)   ;newseason = 3
-     case(9:11)  ;newseason = 4
-     endselect
+    select case (mm)
+      case(12,1:2);newseason = 1
+      case(3:5)   ;newseason = 2
+      case(6:8)   ;newseason = 3
+      case(9:11)  ;newseason = 4
+    endselect
 
-     ! daynumber needed for BCs
-     daynumber=day_of_year(yyyy,mm,dd)
+    ! daynumber needed for BCs
+    daynumber=day_of_year(yyyy,mm,dd)
      
-     if(mm==1 .and. dd==1 .and. hh==0)call Init_nmdays(current_date)!new year starts
+    if(mm==1 .and. dd==1 .and. hh==0)call Init_nmdays(current_date)!new year starts
 
-     call Code_timer(tim_before)
-     if (mm_old /= mm) then   ! START OF NEW MONTH !!!!!
-        call Code_timer(tim_before)
+    call Code_timer(tim_before)
+    if(mm_old/=mm) then   ! START OF NEW MONTH !!!!!
+      call Code_timer(tim_before)
 
-        !subroutines/data that must be updated every month
-        call readdiss(newseason)
+      !subroutines/data that must be updated every month
+      call readdiss(newseason)
 
-        if (MasterProc.and.DEBUG%MAINCODE ) print *,'maaned og sesong', &
-             mm,mm_old,newseason,oldseason
+      if(MasterProc.and.DEBUG%MAINCODE) &
+        print *,'maaned og sesong', mm,mm_old,newseason,oldseason
 
-        call Add_2timing(6,tim_after,tim_before,"readdiss, aircr_nox")
+      call Add_2timing(6,tim_after,tim_before,"readdiss, aircr_nox")
 
-        call MetModel_LandUse(2)   ! e.g.  gets snow_flag
-        if ( MasterProc .and. DEBUG%MAINCODE ) write(6,*)"vnewmonth start"
+      call MetModel_LandUse(2)   ! e.g.  gets snow_flag
+      if(MasterProc.and.DEBUG%MAINCODE) write(*,*)"vnewmonth start"
 
-        call newmonth
+      call newmonth
 
-        call Add_2timing(7,tim_after,tim_before,"newmonth")
+      call Add_2timing(7,tim_after,tim_before,"newmonth")
 
-        if (USE_LIGHTNING_EMIS) call lightning()
+      if(USE_LIGHTNING_EMIS) call lightning()
 
-        call init_aqueous()
+      call init_aqueous()
 
-        call Add_2timing(8,tim_after,tim_before,"init_aqueous")
-        ! Monthly call to BoundaryConditions.
-        if (DEBUG%MAINCODE ) print *, "Into BCs" , me
-        ! We set BCs using the specified iyr_trend
-        !   which may or may not equal the meteorology year
-        call BoundaryConditions(yyyy,mm)
-        if (DEBUG%MAINCODE ) print *, "Finished BCs" , me
+      call Add_2timing(8,tim_after,tim_before,"init_aqueous")
+      ! Monthly call to BoundaryConditions.
+      if(DEBUG%MAINCODE) print *, "Into BCs" , me
+      ! We set BCs using the specified iyr_trend
+      !   which may or may not equal the meteorology year
+      call BoundaryConditions(yyyy,mm)
+      if(DEBUG%MAINCODE) print *, "Finished BCs" , me
 
-        !must be called only once, after BC is set
-        if(mm_old==0)call Init_massbudget()
-        if (DEBUG%MAINCODE ) print *, "Finished Initmass" , me
+      !must be called only once, after BC is set
+      if(mm_old==0)call Init_massbudget()
+      if(DEBUG%MAINCODE) print *, "Finished Initmass" , me
 
-     endif
+    endif
 
-     oldseason = newseason
-     mm_old = mm
+    oldseason = newseason
+    mm_old = mm
 
-     call Add_2timing(9,tim_after,tim_before,"BoundaryConditions")
+    call Add_2timing(9,tim_after,tim_before,"BoundaryConditions")
 
-     if (DEBUG%MAINCODE ) print *, "1st Infield" , me
+    if(DEBUG%MAINCODE) print *, "1st Infield" , me
 
-     call SetLandUse(daynumber, mm) !daily
-     call Add_2timing(11,tim_after,tim_before,"SetLanduse")
+    call SetLandUse(daynumber, mm) !daily
+    call Add_2timing(11,tim_after,tim_before,"SetLanduse")
 
-     call Meteoread() ! 3-hourly or hourly
+    call Meteoread() ! 3-hourly or hourly
 
-     call Add_2timing(10,tim_after,tim_before,"Meteoread")
+    call Add_2timing(10,tim_after,tim_before,"Meteoread")
 
-     call SetDailyBVOC() !daily
+    call SetDailyBVOC() !daily
 
-     if (USES%FOREST_FIRES) call Fire_Emis(daynumber)
+    if(USES%FOREST_FIRES) call Fire_Emis(daynumber)
 
-     call Add_2timing(12,tim_after,tim_before,"Fires+BVOC")
+    call Add_2timing(12,tim_after,tim_before,"Fires+BVOC")
 
+    if(MasterProc) print "(2(1X,A))",'current date and time:',&
+      date2string("YYYY-MM-DD hh:mm:ss",current_date)
 
-     ! if(MasterProc) print "(a,2I2.2,I4,3x,i2.2,a,i2.2,a,i2.2)",' current date and time: ',&
-     !   current_date%day,current_date%month,current_date%year,&
-     !   current_date%hour, ':',current_date%seconds/60,':',current_date%seconds-60*(current_date%seconds/60)
-     if(MasterProc) print "(2(1X,A))",'current date and time:',&
-          date2string("YYYY-MM-DD hh:mm:ss",current_date)
+    call Code_timer(tim_before)
 
-     call Code_timer(tim_before)
+    call phyche()
+    call Add_2timing(14,tim_after,tim_before,"phyche")
 
-     call phyche()
-     call Add_2timing(14,tim_after,tim_before,"phyche")
- 
-     call WrtChem()
+    call WrtChem()
 
-     call trajectory_in
-     call Add_2timing(37,tim_after,tim_before,"massbud,wrtchem,trajectory_in")
+    call trajectory_in
+    call Add_2timing(37,tim_after,tim_before,"massbud,wrtchem,trajectory_in")
 
+    call metfieldint
+    call Add_2timing(36,tim_after,tim_before,"metfieldint")
 
-     call metfieldint
-     call Add_2timing(36,tim_after,tim_before,"metfieldint")
+    !this is a bit complicated because it must account for the fact that for instance 3feb24:00 = 4feb00:00 
+    ts1=make_timestamp(current_date)
+    ts2=make_timestamp(date(enddate(1),enddate(2),enddate(3),enddate(4),0))
+    End_of_Run =  (nint(tdif_secs(ts1,ts2))<=0)
 
-
-
-     !this is a bit complicated because it must account for the fact that for instance 3feb24:00 = 4feb00:00 
-     ts1=make_timestamp(current_date)
-     ts2=make_timestamp(date(enddate(1),enddate(2),enddate(3),enddate(4),0))
-     End_of_Run =  (nint(tdif_secs(ts1,ts2))<=0)
-
-     if( DEBUG%STOP_HH >= 0 .and. DEBUG%STOP_HH == current_date%hour ) End_of_Run = .true.
+    if(DEBUG%STOP_HH>=0 .and. DEBUG%STOP_HH==current_date%hour) &
+      End_of_Run=.true.
 
   enddo ! time-loop
 
@@ -383,28 +373,33 @@ program myeul
   call massbudget()
 
   if(MasterProc)then
-     print *,'programme is finished'
-     ! Gather timing info:
-     if(NPROC-1> 0)then
-        CALL MPI_RECV(lastptim,NTIMING*8,MPI_BYTE,NPROC-1,765,MPI_COMM_WORLD,STATUS,INFO)
-     else
-        lastptim(:) = mytimm(:)
-     endif
-     call Output_timing(IO_MYTIM,me,NPROC,nterm,GIMAX,GJMAX)
+    print *,'programme is finished'
+    ! Gather timing info:
+    if(NPROC-1> 0)then
+      CALL MPI_RECV(lastptim,NTIMING*8,MPI_BYTE,NPROC-1,765,MPI_COMM_CALC,MPISTATUS,IERROR)
+    else
+      lastptim(:) = mytimm(:)
+    endif
+    call Output_timing(IO_MYTIM,me,NPROC,nterm,GIMAX,GJMAX)
   elseif(me==NPROC-1) then
-     CALL MPI_SEND(mytimm,NTIMING*8,MPI_BYTE,0,765,MPI_COMM_WORLD,INFO)
+    CALL MPI_SEND(mytimm,NTIMING*8,MPI_BYTE,MasterPE,765,MPI_COMM_CALC,IERROR)
   endif
 
   ! write 'modelrun.finished' file to flag the end of the FORECAST
-  if (MasterProc.and.FORECAST) then
-     open(1,file='modelrun.finished')
-     close(1)
+  if(MasterProc.and.FORECAST)then
+    open(1,file='modelrun.finished')
+    close(1)
   endif
 
-  CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
-  CALL MPI_FINALIZE(INFO)
+  if(ANALYSIS)then              ! assimilation enabled
+    call DA_3DVar_Done(status)  ! done with 3D-var module:
+    call CheckStop(status,"DA_3DVar_Done in Unimod")
+  endif
 
-end associate   ! yyyy, mm, dd
-end program
+  CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
+  CALL MPI_FINALIZE(IERROR)
+
+endassociate   ! yyyy, mm, dd
+endprogram
 
 !===========================================================================

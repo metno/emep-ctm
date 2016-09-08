@@ -1,7 +1,7 @@
-! <Chem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Chem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,11 +26,12 @@
 !*****************************************************************************!
 module Chemfields_ml
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-use AllocInits,           only: AllocInit
-use ChemSpecs,            only: NSPEC_ADV, NSPEC_SHL, NSPEC_TOT ! => No. species 
+use AllocInits,   only: AllocInit
+use ChemSpecs,    only: NSPEC_ADV, NSPEC_SHL, NSPEC_TOT, & ! => No. species 
+                    FIRST_SEMIVOL, LAST_SEMIVOL ! both -999 unless SOA used
 use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, AERO        ! =>  z dimension
 use NumberConstants,      only: UNDEF_R
-use Par_ml,               only: MAXLIMAX,MAXLJMAX   ! => x, y dimensions
+use Par_ml,               only: LIMAX,LJMAX   ! => x, y dimensions
 use Setup_1dfields_ml
 implicit none
 private
@@ -87,37 +88,40 @@ contains
   subroutine alloc_ChemFields
 
     implicit none
-    integer :: nk
 
-    allocate(xn_adv(NSPEC_ADV,MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(xn_adv(NSPEC_ADV,LIMAX,LJMAX,KMAX_MID))
     xn_adv=0.0
-    allocate(xn_shl(NSPEC_SHL,MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(xn_shl(NSPEC_SHL,LIMAX,LJMAX,KMAX_MID))
     xn_shl=0.0
-    allocate(xn_bgn(NSPEC_BGN,MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(xn_bgn(NSPEC_BGN,LIMAX,LJMAX,KMAX_MID))
     xn_bgn=0.0
-    allocate(PM25_water(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(PM25_water(LIMAX,LJMAX,KMAX_MID))
     PM25_water=0.0
-    allocate(PM25_water_rh50(MAXLIMAX,MAXLJMAX))
+    allocate(PM25_water_rh50(LIMAX,LJMAX))
     PM25_water_rh50=0.0
-!   allocate(AOD(MAXLIMAX,MAXLJMAX))
-!   AOD=0.0
-!   allocate(Extin_coeff(MAXLIMAX,MAXLJMAX,KMAX_MID))
-!   Extin_coeff=0.0
-    allocate(cfac(NSPEC_ADV,MAXLIMAX,MAXLJMAX))
+    allocate(cfac(NSPEC_ADV,LIMAX,LJMAX))
     cfac=1.0
-    allocate(so2nh3_24hr(MAXLIMAX,MAXLJMAX))
+    allocate(so2nh3_24hr(LIMAX,LJMAX))
     so2nh3_24hr=0.0
-    allocate(Grid_snow(MAXLIMAX,MAXLJMAX))
+    allocate(Grid_snow(LIMAX,LJMAX))
     Grid_snow=0.0
     allocate(xn_2d_bgn(1,KCHEMTOP:KMAX_MID))
 
     allocate(xn_2d(NSPEC_TOT,KCHEMTOP:KMAX_MID))
-  xn_2d = 0.0
- !   nk = KMAX_MID-KCHEMTOP+1   ! number of levels used in column chemistry
- !   call AllocInit(xn_2d,0.0, NSPEC_TOT, nk)
+    xn_2d = 0.0
+
     allocate(Fgas(NSPEC_TOT,KCHEMTOP:KMAX_MID),Fpart(NSPEC_TOT,KCHEMTOP:KMAX_MID))
     Fgas  = 1.0! Fraction as gas-phase
     Fpart = 0.0
+
+  ! Fgas3D is only defined for the semivolatile VOC/SOA stuff
+  ! We need to assume something on 1st time-step though:
+
+    if(FIRST_SEMIVOL>0)then !FSOA
+      allocate(Fgas3d(FIRST_SEMIVOL:LAST_SEMIVOL,LIMAX,LJMAX,KCHEMTOP:KMAX_MID))
+      Fgas3d = 1.0
+    endif
+
     allocate(rcemis(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID))
     allocate(deltaZcm(KCHEMTOP:KMAX_MID))
     rcemis = 0.0
@@ -128,10 +132,10 @@ contains
     CHEMSIZE = KMAX_MID-KCHEMTOP+1
 
    ! Surface area and water
-!if( USES%SURF_AREA) then
-    allocate(surfarea_um2cm3(AERO%NSAREA,MAXLIMAX,MAXLJMAX))
+
+    allocate(surfarea_um2cm3(AERO%NSAREA,LIMAX,LJMAX))
     SurfArea_um2cm3=0.0
-    allocate(Gerber_water(MAXLIMAX,MAXLJMAX,KMAX_MID))
+    allocate(Gerber_water(LIMAX,LJMAX,KMAX_MID))
     Gerber_water=0.0
 
    ! wet DpgN and defaults from dry values
@@ -148,13 +152,15 @@ contains
     cho2= UNDEF_R
     co3=  UNDEF_R
     allocate(aero_fom(KCHEMTOP:KMAX_MID),aero_fdust(KCHEMTOP:KMAX_MID),&
-              aero_fss(KCHEMTOP:KMAX_MID))
+             aero_fbc(KCHEMTOP:KMAX_MID),aero_fss  (KCHEMTOP:KMAX_MID))
     aero_fom    = UNDEF_R
+    aero_fbc    = UNDEF_R
     aero_fss    = UNDEF_R
     aero_fdust  = UNDEF_R
-  
-!end if
 
+    allocate(gamN2O5(KCHEMTOP:KMAX_MID)) ! kHet  for output
+    allocate(cNO2(KCHEMTOP:KMAX_MID),cNO3(KCHEMTOP:KMAX_MID)) ! kHet test
+  
 
   end subroutine alloc_ChemFields
 

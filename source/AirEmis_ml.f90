@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,13 +34,16 @@ module AirEmis_ml
   ! Variable listing is given below
   
     
-   use Par_ml               , only : MAXLIMAX, MAXLJMAX, limax,ljmax, me
-   use ModelConstants_ml    , only : KCHEMTOP, KMAX_MID, KMAX_BND, NPROC, &
-                                     USE_LIGHTNING_EMIS
    use Io_ml                , only : IO_AIRN, IO_LIGHT, ios, open_file
    use GridValues_ml        , only : glon,glat, GRIDWIDTH_M
-   use PhysicalConstants_ml , only : AVOG
    use MetFields_ml         , only : z_bnd  
+   use ModelConstants_ml    , only : KCHEMTOP, KMAX_MID, KMAX_BND, NPROC, &
+                                     USE_LIGHTNING_EMIS
+   use MPI_Groups_ml, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
+                             MPI_MIN, MPI_MAX, MPI_SUM, &
+                             MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
+   use Par_ml               , only : LIMAX, LJMAX, limax,ljmax, me
+   use PhysicalConstants_ml , only : AVOG
    use TimeDate_ml,           only : current_date
 
    implicit none
@@ -54,9 +57,6 @@ module AirEmis_ml
 
    private :: air_inter !interpolate the data into required grid
  
-   include 'mpif.h'
-   
-   integer STATUS(MPI_STATUS_SIZE),INFO
    integer,private ,parameter :: ILEV=18
    logical, parameter :: MY_DEBUG = .false.
 
@@ -114,7 +114,7 @@ module AirEmis_ml
 
       
       if(.not.allocated(airlig))then
-         allocate(airlig(KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX))
+         allocate(airlig(KCHEMTOP:KMAX_MID,LIMAX,LJMAX))
          airlig=0.0
       endif
 
@@ -129,7 +129,7 @@ module AirEmis_ml
   
          call open_file(IO_LIGHT,"r",fname,needed=.true.,skip=1)
              if (ios /= 0 )   WRITE(*,*) 'MPI_ABORT: ', "ioserror: lightning" 
-                if (ios /= 0 ) call  MPI_ABORT(MPI_COMM_WORLD,9,INFO) 
+                if (ios /= 0 ) call  MPI_ABORT(MPI_COMM_CALC,9,IERROR) 
              end if
 
       if(me == 0)then
@@ -174,7 +174,7 @@ module AirEmis_ml
 
       real, intent(inout) ::   flux(ILON,GGL,-1:ILEV)
 
-      real, dimension(KCHEMTOP:KMAX_MID,MAXLIMAX,MAXLJMAX), intent(out) :: airem
+      real, dimension(KCHEMTOP:KMAX_MID,LIMAX,LJMAX), intent(out) :: airem
       real, intent(out)   :: ygrida(GGL)
       real, intent(out)   :: rlon(ILON+1)
 
@@ -186,8 +186,8 @@ module AirEmis_ml
               atwno2,     &  !  atomic weight of NO2
               vol            !  volume of model grid boxes
       real    frac, above, below, glij
-      real sum,sumnox,volcm,sum2
-      integer, dimension(MAXLIMAX,MAXLJMAX) :: ixn  & !  mapping of emission 
+      real sum,sumnox,volcm,sum2,sum2_out
+      integer, dimension(LIMAX,LJMAX) :: ixn  & !  mapping of emission 
                                               ,jxn    !  grid to model grid
       integer, dimension(KMAX_MID)          :: ilevel
       real    fraca(KMAX_MID), fracb(KMAX_MID)
@@ -235,7 +235,7 @@ module AirEmis_ml
 
 
       CALL MPI_BCAST(flux(1,1,iktop), 8*GGL*ILON*(ILEV+1-iktop), MPI_BYTE, 0,&
-          MPI_COMM_WORLD, INFO)
+          MPI_COMM_CALC, IERROR)
 
       ! -- N/S
       ygrida(1) = 90.
@@ -359,9 +359,9 @@ module AirEmis_ml
          end do
       end do
 
-        CALL MPI_ALLREDUCE(MPI_IN_PLACE,sum2, 1, &
-        MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, INFO) 
-      if(me == 0.and.MY_DEBUG) write(6,*) 'ancat on limited area:',sum,sum2
+        CALL MPI_ALLREDUCE(sum2, sum2_out,1, &
+        MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR) 
+      if(me == 0.and.MY_DEBUG) write(6,*) 'ancat on limited area:',sum,sum2_out
 
   end subroutine air_inter
   !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

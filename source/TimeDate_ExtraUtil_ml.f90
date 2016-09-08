@@ -1,7 +1,7 @@
-! <TimeDate_ExtraUtil_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <TimeDate_ExtraUtil_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -27,12 +27,14 @@
 MODULE TimeDate_ExtraUtil_ml
 
 use Par_ml,           only: me
-use ModelConstants_ml,only: METSTEP, MasterProc, IOU_MON,IOU_DAY,IOU_HOUR_MEAN
-use My_Outputs_ml,    only: FREQ_HOURLY
-use TimeDate_ml,      only: max_day,tdif_secs,tdif_days,add_secs,add_days,&
-                            ts2date=>make_current_date,date2ts=>make_timestamp,&
-                            timestamp,day_of_year,date,startdate,enddate
+use ModelConstants_ml,only: METSTEP, MasterProc, startdate,enddate , &
+                            IOU_MON,IOU_DAY,IOU_HOUR,IOU_HOUR_EXTRA_MEAN,FREQ_HOURLY
+use SmallUtils_ml,    only: key2str,to_upper
 use CheckStop_ml,     only: CheckStop
+use TimeDate_ml,      only: max_day,tdif_secs,tdif_days,&
+                            date_addSecs=>add2current_date,ts_addSecs=>add_secs,&
+                            ts2date=>make_current_date,date2ts=>make_timestamp,&
+                            timestamp,day_of_year,date
 
 IMPLICIT NONE
 PRIVATE
@@ -42,40 +44,50 @@ public :: &
   date2string,      & ! date (various formats) --> formatted string
   date2file,        & ! date (various formats) --> file name w/option for old file version
   string2date,      & ! formatted string & format (pattern) --> date (CD format)
-  idate2nctime,     & ! idate (int array)--> secs since(int)/days since(real)
-  nctime2idate,     & ! idate2nctime inverse
   date2nctime,      & ! date (various formats)--> secs since(int)/days since(real)
   nctime2date,      & ! date2nctime inverse
   nctime2string,    & ! as date2string, but from  secs/days since...
   compare_date,     & ! compare dates, accepts wildcards
   to_stamp,         & ! extended interface for make_timestamp (TimeDate_ml)
   to_date,          & ! extended interface for make_current_date (TimeDate_ml)
-  to_idate            ! create int array from timestap or date
+  to_idate,         & ! create int array from timestap or date
+  self_test           ! test/example ussages for different interface/module procedures
 
-interface date2string
-  module procedure  detail2str
-  module procedure  cd2str
-  module procedure  int2str
-  module procedure  ts2str
-  module procedure  cd2str_add
-  module procedure  int2str_add
+interface date2string!(iname,...,mode,debug) result(fname)
+!   character(len=*),intent(in) :: iname
+!   character(len=len(iname))   :: fname
+!   character(len=*),intent(in),optional :: mode
+!   logical,intent(in),optional :: debug
+  module procedure detail2str!(iname,year,month,day,hour,seconds,minute,second,days,&
+!                              fstep,ntme,nlev,nlat,nlon,nproc,mode,debug)
+!   integer,intent(in),optional :: year,month,day,hour,seconds,&
+!                                  minute,second,days,&
+!                                  fstep,ntme,nlev,nlat,nlon,nproc
+  module procedure cd2str !(iname,cd,addsecs,mode,debug)
+!   type(date),intent(in)       :: cd
+!   real,intent(in),optional    :: addsecs
+  module procedure ts2str !(iname,ts,addsecs,mode,debug)
+!   type(timestamp),intent(in)  :: ts
+!   real,intent(in),optional    :: addsecs
+  module procedure int2str!(iname,id,addsecs,mode,debug)
+!   integer,intent(in)          :: id(:)
+!   real,intent(in),optional    :: addsecs
 end interface date2string
 
-interface date2file
-  module procedure cd2file
-  module procedure int2file
-  module procedure ts2file
+interface date2file!(iname,...,max_age,age_unit,mode,last,debug) result(fname)
+!   character(len=*),intent(in) :: iname,age_unit
+!   character(len=len(iname))   :: fname
+!   integer,intent(in)          :: max_age
+!   character(len=*),intent(in),optional :: mode
+!   integer,intent(in),optional :: last
+!   logical,intent(in),optional :: debug
+  module procedure cd2file !(iname,cd,max_age,age_unit,mode,last,debug)
+!   type(date),intent(in)       :: cd
+  module procedure ts2file !(iname,ts,max_age,age_unit,mode,last,debug)
+!   type(timestamp),intent(in)  :: ts
+  module procedure int2file!(iname,id,max_age,age_unit,mode,last,debug)
+!   integer, intent(in)         :: id(:)
 end interface date2file
-
-interface idate2nctime
-  module procedure int_to_secs1970
-  module procedure int_to_days1900
-end interface idate2nctime
-
-interface nctime2idate
-  module procedure secs1970_to_int
-  module procedure days1900_to_int
-end interface nctime2idate
 
 interface date2nctime
   module procedure ts_to_secs1970
@@ -100,17 +112,33 @@ interface nctime2string
   module procedure days2str
 end interface nctime2string
 
+interface to_stamp
+  module procedure date2ts
+  module procedure int2ts
+  module procedure str2ts
+end interface to_stamp
+
+interface to_date
+  module procedure ts2date
+  module procedure int2date
+  module procedure string2date
+end interface to_date
+
+interface to_idate
+  module procedure ts2int
+  module procedure date2int
+  module procedure str2int
+end interface to_idate
+
 character(len=*), public, parameter :: &  ! Keywords for ncdate2string
-! secs1970_key="secs  19.70"           ,&
-! days1900_key="days  19.00"           ,&
-  nctime_key  ="12345678.12"
+! secs1970_key="secs  19.70",&
+! days1900_key="days  19.00",&
+! nctime_key  ="12345678.12"
+  nctime_key  ='#NCTIMEKEY#',nctime_fmt='(F11.2)'
 
 private ::  &
-  key2str,str2key,  & ! basic keyword substitution
-  ikey2str,rkey2str,& ! auxiliary keyword substitution tools
   detail2str,str2detail, & ! detailed date input<--> formatted string
   cd2str,int2str,ts2str, & ! date/idate (int array)/timestamp --> formatted string
-  cd2str_add,int2str_add,& ! optional addsecs parameter
   cd2file,int2file,ts2file,&  ! * --> file name w/option for old file version
   ts_to_secs1970,cd_to_secs1970,int_to_secs1970,& ! * --> secs since 1970-01-01 00:00 UTC (int)
   ts_to_days1900,cd_to_days1900,int_to_days1900,& ! * --> days since 1900-01-01 00:00 UTC (real)
@@ -118,22 +146,6 @@ private ::  &
   days1900_to_ts,days1900_to_cd,days1900_to_int,& ! *_to_days1900 inverse
   int2ts,int2date,ts2int,date2int,str2ts,str2int,& ! auxiliary dateformat transformation tools
   init_ts             ! init 1900 & 1970 timestamps
-
-interface key2str
-  module procedure ikey2str,rkey2str
-end interface key2str
-
-interface to_stamp
-  module procedure date2ts,int2ts,str2ts
-end interface to_stamp
-
-interface to_date
-  module procedure ts2date,int2date,string2date
-end interface to_date
-
-interface to_idate
-  module procedure ts2int,date2int,str2int
-end interface to_idate
 
 real, private, parameter        :: spd=86400.0,sph=3600.0,spm=60.0
 type(timestamp), private, save  :: ts1900,ts1970
@@ -145,6 +157,8 @@ function int2date (id) result (cd)
   type(date)                        :: cd
   integer, intent(in), dimension(:) :: id
   select case (size(id))
+    case (1);! ad-hoc convention
+    cd=date(id(1)/1000000,mod(id(1)/10000,100),mod(id(1)/100,100),mod(id(1),100),0)
     case (3);     cd=date(id(1),id(2),id(3),0,0)
     case (4);     cd=date(id(1),id(2),id(3),id(4),0)
     case (5);     cd=date(id(1),id(2),id(3),id(4),id(5))
@@ -160,9 +174,9 @@ function date2int (cd,n) result (id)
   integer, dimension(n)             :: id
   select case (n)
     case (1);     id=cd%year*1000000+cd%month*10000+cd%day*100+cd%hour ! ad-hoc convention
-    case (3);     id=(/cd%year,cd%month,cd%day/)
-    case (4);     id=(/cd%year,cd%month,cd%day,cd%hour/)
-    case (5);     id=(/cd%year,cd%month,cd%day,cd%hour,cd%seconds/)
+    case (3);     id=[cd%year,cd%month,cd%day]
+    case (4);     id=[cd%year,cd%month,cd%day,cd%hour]
+    case (5);     id=[cd%year,cd%month,cd%day,cd%hour,cd%seconds]
     case default; id(:)=-1
     call CheckStop("ERROR in date2int: undetermined date")
   endselect
@@ -187,53 +201,6 @@ subroutine init_ts()
   ts1970=to_stamp(date(1970,1,1,0,0))
   ts1900=to_stamp(date(1900,1,1,0,0))
 endsubroutine init_ts
-
-function str2key(str,fmt,key) result(val)
-  character(len=*), intent(in) :: str,fmt,key
-  integer :: val
-  integer :: ind=0
-  val=0
-  ind=index(fmt,trim(key))
-  if(ind>0)read(str(ind:ind+len_trim(key)-1),*)val
-endfunction str2key
-
-function ikey2str(iname,key,val) result(fname)
-  character(len=*), intent(in) :: iname,key
-  character(len=len(iname))    :: fname
-  integer, intent(in)          :: val
-  character(len=9)             :: ifmt="(I??.??)"
-  integer :: ind=0,n=0
-  fname=iname
-  if(val<0)return   ! fmt=Ix.x --> negative numbers are printed as ****
-  ind=index(fname,trim(key))
-  if(ind==0)return
-  n=len_trim(key)
-  write(ifmt,"('(I',I0,'.',I0,')')")n,n
-  do while (ind>0)
-    write(fname(ind:ind+n-1),ifmt)val
-    ind=index(fname,trim(key))
-  enddo
-endfunction ikey2str
-
-function rkey2str(iname,key,val) result(fname)
-  character(len=*), intent(in) :: iname,key
-  character(len=len(iname))    :: fname
-  real, intent(in)             :: val
-  character(len=9)             :: ifmt="(F??.??)"
-  integer :: ind=0,n=0,n1=0
-  fname=iname
-  if(val<0.0)return  ! fmt=Fx.x --> negative numbers are printed as ****
-  ind=index(fname,trim(key))
-  if(ind==0)return
-  n=len_trim(key)
-  n1=index(key,".")
-  if(n1==0)n1=n
-  write(ifmt,"('(F',I0,'.',I0,')')")n1-1,n-n1
-  do while (ind>0)
-    write(fname(ind:ind+n-1),ifmt)val
-    ind=index(fname,trim(key))
-  enddo
-endfunction rkey2str
 
 subroutine str2detail(str,fmt,year,month,day,hour,seconds,minute,second,days,&
                      fstep,ntme,nlev,nlat,nlon,debug)
@@ -264,6 +231,15 @@ subroutine str2detail(str,fmt,year,month,day,hour,seconds,minute,second,days,&
   if(present(debug))then
     if(debug) write(*,*)'string2date: ',trim(str),'/',trim(fmt)
   endif
+contains
+function str2key(str,xfmt,key) result(val)
+  character(len=*), intent(in) :: str,xfmt,key
+  integer :: val
+  integer :: ind=0
+  val=0
+  ind=index(xfmt,trim(key))
+  if(ind>0)read(str(ind:ind+len_trim(key)-1),*)val
+endfunction str2key
 endsubroutine str2detail
 
 function string2date(str,fmt,debug) result(cd)
@@ -290,86 +266,101 @@ function str2int(str,fmt,n,debug) result(id)
 endfunction str2int
 
 function detail2str(iname,year,month,day,hour,seconds,minute,second,days,&
-                        fstep,ntme,nlev,nlat,nlon,nproc,debug) result(fname)
-  character(len=*), intent(in) :: iname
-  character(len=len(iname))    :: fname
-  integer, intent(in),optional :: year,month,day,hour,seconds,&
-                                  minute,second,days,&
-                                  fstep,ntme,nlev,nlat,nlon,nproc
-  logical, intent(in),optional :: debug
+                    fstep,ntme,nlev,nlat,nlon,nproc,mode,debug) result(fname)
+  character(len=*),intent(in) :: iname
+  character(len=len(iname))   :: fname
+  integer,intent(in),optional :: year,month,day,hour,seconds,&
+                                 minute,second,days,&
+                                 fstep,ntme,nlev,nlat,nlon,nproc
+  character(len=*),intent(in),optional :: mode
+  character(len=len('YMDHMS'))         :: my_mode
+  logical,intent(in),optional :: debug
+
   fname=iname
-  if(present(seconds))fname=key2str(fname,'ssss',seconds)
-  if(present(second ))fname=key2str(fname,'ss'  ,second)
-  if(present(minute ))fname=key2str(fname,'mm'  ,minute)
-  if(present(hour   ))fname=key2str(fname,'hh'  ,hour  )
-  if(present(day    ))fname=key2str(fname,'DD'  ,day   )
-  if(present(month  ))fname=key2str(fname,'MM'  ,month )
-  if(present(year   ))fname=key2str(fname,'YYYY',year  )
-  if(present(year   ))fname=key2str(fname,'YY'  ,mod(year,100))
-  if(present(days   ))fname=key2str(fname,'JJJ' ,days  ) ! day of the year
-  if(present(nlon   ))fname=key2str(fname,'LON' ,nlon  )
-  if(present(nlat   ))fname=key2str(fname,'LAT' ,nlat  )
-  if(present(nlev   ))fname=key2str(fname,'LL'  ,nlev  )
-  if(present(ntme   ))fname=key2str(fname,'TTT' ,ntme  )
-  if(present(fstep  ))fname=key2str(fname,'FFFF',fstep )
-  if(present(fstep  ))fname=key2str(fname,'FFF' ,fstep )
-  if(present(nproc  ))fname=key2str(fname,'PPPP',nproc )
-  if(present(nproc  ))fname=key2str(fname,'PPP' ,nproc )
+  my_mode='ALL';if(present(mode))my_mode=mode
+  select case(to_upper(my_mode))
+  case('ALL')
+    if(present(seconds))fname=key2str(fname,'ssss',seconds)
+    if(present(second ))fname=key2str(fname,'ss'  ,second)
+    if(present(minute ))fname=key2str(fname,'mm'  ,minute)
+    if(present(hour   ))fname=key2str(fname,'hh'  ,hour  )
+    if(present(day    ))fname=key2str(fname,'DD'  ,day   )
+    if(present(month  ))fname=key2str(fname,'MM'  ,month )
+    if(present(year   ))fname=key2str(fname,'YYYY',year  )
+    if(present(year   ))fname=key2str(fname,'YY'  ,mod(year,100))
+    if(present(days   ))fname=key2str(fname,'JJJ' ,days  ) ! day of the year
+    if(present(nlon   ))fname=key2str(fname,'LON' ,nlon  )
+    if(present(nlat   ))fname=key2str(fname,'LAT' ,nlat  )
+    if(present(nlev   ))fname=key2str(fname,'LL'  ,nlev  )
+    if(present(ntme   ))fname=key2str(fname,'TTT' ,ntme  )
+    if(present(fstep  ))fname=key2str(fname,'FFFF',fstep )
+    if(present(fstep  ))fname=key2str(fname,'FFF' ,fstep )
+    if(present(nproc  ))fname=key2str(fname,'PPPP',nproc )
+    if(present(nproc  ))fname=key2str(fname,'PPP' ,nproc )
+  case('YMDHMS')
+    if(present(seconds))fname=key2str(fname,'ssss',seconds)
+    if(present(second ))fname=key2str(fname,'ss'  ,second)
+    if(present(minute ))fname=key2str(fname,'mm'  ,minute)
+    if(present(hour   ))fname=key2str(fname,'hh'  ,hour  )
+    if(present(day    ))fname=key2str(fname,'DD'  ,day   )
+    if(present(month  ))fname=key2str(fname,'MM'  ,month )
+    if(present(year   ))fname=key2str(fname,'YYYY',year  )
+    if(present(year   ))fname=key2str(fname,'YY'  ,mod(year,100))
+  case('YMDH')
+    if(present(hour   ))fname=key2str(fname,'hh'  ,hour  )
+    if(present(day    ))fname=key2str(fname,'DD'  ,day   )
+    if(present(month  ))fname=key2str(fname,'MM'  ,month )
+    if(present(year   ))fname=key2str(fname,'YYYY',year  )
+    if(present(year   ))fname=key2str(fname,'YY'  ,mod(year,100))
+  case default
+    call CheckStop("Unsupported date2string(mode='"//trim(my_mode)//"')")
+  endselect
   if(present(debug))then
     if(debug) write(*,*)'date2string: ',trim(iname),'-->',trim(fname)
   endif
 endfunction detail2str
 
-function cd2str(iname,cd,debug) result(fname)
-  character(len=*), intent(in)   :: iname
-  character(len=len(iname))      :: fname
-  type(date),intent(in)          :: cd
-  logical, intent(in),  optional :: debug
-  fname=detail2str(iname,year=cd%year,month=cd%month,day=cd%day,&
-                         hour=cd%hour,seconds=cd%seconds,&
-                         minute=cd%seconds/60,second=mod(cd%seconds,60),&
-                         days=day_of_year(cd%year,cd%month,cd%day),&
-                         fstep=nint(tdif_days(to_stamp(startdate),to_stamp(cd))*24),&
-                         nproc=me,debug=debug)
+function cd2str(iname,cd,addsecs,mode,debug) result(fname)
+  character(len=*),intent(in) :: iname
+  character(len=len(iname))   :: fname
+  type(date),intent(in)       :: cd
+  real,intent(in),optional    :: addsecs
+  character(len=*),intent(in),optional :: mode
+  logical,intent(in),optional :: debug
+
+  type(date) :: ccd
+  ccd=cd
+  if(present(addsecs))call date_addSecs(ccd,addsecs) 
+  fname=detail2str(iname,year=ccd%year,month=ccd%month,day=ccd%day,&
+                         hour=ccd%hour,seconds=ccd%seconds,&
+                         minute=ccd%seconds/60,second=mod(ccd%seconds,60),&
+                         days=day_of_year(ccd%year,ccd%month,ccd%day),&
+                         fstep=nint(tdif_days(to_stamp(startdate),to_stamp(ccd))*24),&
+                         nproc=me,mode=mode,debug=debug)
 endfunction cd2str
 
-function int2str(iname,id,debug) result(fname)
-  character(len=*), intent(in)      :: iname
-  character(len=len(iname))         :: fname
-  integer, intent(in), dimension(:) :: id
-  logical, intent(in),  optional    :: debug
-  fname=cd2str(iname,to_date(id),debug=debug)
-endfunction int2str
-
-function ts2str(iname,ts,addsecs,debug) result(fname)
-  character(len=*), intent(in)      :: iname
-  character(len=len(iname))         :: fname
-  type(timestamp), intent(in)       :: ts
-  real, intent(in),     optional    :: addsecs
-  logical, intent(in),  optional    :: debug
+function ts2str(iname,ts,addsecs,mode,debug) result(fname)
+  character(len=*),intent(in) :: iname
+  character(len=len(iname))   :: fname
+  type(timestamp),intent(in)  :: ts
+  real,intent(in),optional    :: addsecs
+  character(len=*),intent(in),optional :: mode
+  logical,intent(in),optional :: debug
   type(timestamp)       :: tts
   tts=ts
-  if(present(addsecs))call add_secs(tts,addsecs)
-  fname=cd2str(iname,to_date(tts),debug=debug)
+  if(present(addsecs))call ts_addSecs(tts,addsecs)
+  fname=cd2str(iname,to_date(tts),mode=mode,debug=debug)
 endfunction ts2str
 
-function cd2str_add(iname,cd,addsecs,debug) result(fname)
-  character(len=*), intent(in)      :: iname
-  character(len=len(iname))         :: fname
-  type(date),intent(in)             :: cd
-  real, intent(in)                  :: addsecs
-  logical, intent(in),  optional    :: debug
-  fname=ts2str(iname,to_stamp(cd),addsecs=addsecs,debug=debug)
-endfunction cd2str_add
-
-function int2str_add(iname,id,addsecs,debug) result(fname)
-  character(len=*), intent(in)      :: iname
-  character(len=len(iname))         :: fname
-  integer, intent(in), dimension(:) :: id
-  real, intent(in)                  :: addsecs
-  logical, intent(in),  optional    :: debug
-  fname=ts2str(iname,to_stamp(id),addsecs=addsecs,debug=debug)
-endfunction int2str_add
+function int2str(iname,id,addsecs,mode,debug) result(fname)
+  character(len=*),intent(in) :: iname
+  character(len=len(iname))   :: fname
+  integer, intent(in)         :: id(:)
+  real,intent(in),optional    :: addsecs
+  character(len=*),intent(in),optional :: mode
+  logical,intent(in),optional :: debug
+  fname=ts2str(iname,to_stamp(id),addsecs=addsecs,mode=mode,debug=debug)
+endfunction int2str
 
 subroutine ts_to_secs1970(ts,nsecs,iotyp)
 !calculate how many seconds have passed since the start of the year 1970
@@ -377,17 +368,23 @@ subroutine ts_to_secs1970(ts,nsecs,iotyp)
   integer, intent(out)              :: nsecs
   integer, optional, intent(in)     :: iotyp
   type(date)                        :: cd
+  integer, parameter ::   &
+    half_day =INT(spd/2), & ! 12h in seconds
+    half_hour=INT(sph/2)    ! 30m in seconds
 
   if(first_call)call init_ts()
-  nsecs=tdif_secs(ts1970,ts)
+  nsecs=INT(tdif_secs(ts1970,ts))
   call CheckStop(nsecs<0,"ERROR in date2nctime: date previous to 1970-01-01")
 
   if(present(iotyp))then
     select case (iotyp)  !middle of period: NB WORKS ONLY FOR COMPLETE PERIODS
-      case (IOU_MON      ); cd=to_date(ts)
-                            nsecs=nsecs-spd/2*max_day(cd%month,cd%year) !#days(jan)=#days(dec)
-      case (IOU_DAY      ); nsecs=nsecs-spd/2
-      case (IOU_HOUR_MEAN); nsecs=nsecs-sph/2*FREQ_HOURLY
+    case(IOU_MON)
+      cd=to_date(ts)
+      nsecs=nsecs-half_day*max_day(cd%month,cd%year) !#days(jan)=#days(dec)
+    case(IOU_DAY)
+      nsecs=nsecs-half_day
+    case(IOU_HOUR,IOU_HOUR_EXTRA_MEAN)
+      nsecs=nsecs-half_hour*FREQ_HOURLY
     endselect
   endif
 endsubroutine ts_to_secs1970
@@ -423,10 +420,13 @@ subroutine ts_to_days1900(ts,ndays,iotyp)
 
   if(present(iotyp))then
     select case (iotyp)  !middle of period: NB WORKS ONLY FOR COMPLETE PERIODS
-      case (IOU_MON      ); cd=to_date(ts)
-                            ndays=ndays-0.5*max_day(cd%month,cd%year) !#days(jan)=#days(dec)
-      case (IOU_DAY      ); ndays=ndays-0.5
-      case (IOU_HOUR_MEAN); ndays=ndays-FREQ_HOURLY/48.0  !1.0/48.0=half hour
+    case(IOU_MON)
+      cd=to_date(ts)
+      ndays=ndays-0.5*max_day(cd%month,cd%year) !#days(jan)=#days(dec)
+    case(IOU_DAY)
+      ndays=ndays-0.5
+    case(IOU_HOUR,IOU_HOUR_EXTRA_MEAN)
+      ndays=ndays-FREQ_HOURLY/48.0  !1.0/48.0=half hour
     endselect
   endif
 endsubroutine ts_to_days1900
@@ -457,7 +457,7 @@ subroutine secs1970_to_ts(ts,nsecs,msg)
 
   if(first_call)call init_ts()
   ts=ts1970
-  call add_days(ts,nsecs/spd)
+  call ts_addSecs(ts,float(nsecs))
 
   if(present(msg)) write(*,*)date2string(msg,ts)
 endsubroutine secs1970_to_ts
@@ -493,7 +493,7 @@ subroutine days1900_to_ts(ts,ndays,msg)
 
   if(first_call)call init_ts()
   ts=ts1900
-  call add_days(ts,ndays)
+  call ts_addSecs(ts,ndays*spd)
 
   if(present(msg)) write(*,*)date2string(msg,ts)
 endsubroutine days1900_to_ts
@@ -527,8 +527,8 @@ function secs2str(iname,nsecs,debug) result(fname)
   integer, intent(in)                     :: nsecs
   integer, dimension(5)                   :: idate
   logical, intent(in), optional           :: debug
-  call nctime2idate(idate,nsecs)
-  fname=date2string(key2str(iname,nctime_key,nsecs),idate,debug=debug)
+  call nctime2date(idate,nsecs)
+  fname=date2string(key2str(iname,nctime_key,nsecs,nctime_fmt),idate,debug=debug)
 endfunction secs2str
 
 function days2str(iname,ndays,debug) result(fname)
@@ -537,8 +537,8 @@ function days2str(iname,ndays,debug) result(fname)
   real(kind=8), intent(in)                :: ndays
   integer, dimension(5)                   :: idate
   logical, intent(in),  optional          :: debug
-  call nctime2idate(idate,ndays)
-  fname=date2string(key2str(iname,nctime_key,ndays),idate,debug=debug)
+  call nctime2date(idate,ndays)
+  fname=date2string(key2str(iname,nctime_key,ndays,nctime_fmt),idate,debug=debug)
 endfunction days2str
 
 subroutine assign_NTERM(NTERM)
@@ -589,15 +589,19 @@ function compare_date(n,dateA,dateB,wildcard) result(equal)
   enddo
 endfunction compare_date
 
-function ts2file(iname,ts,max_age,age_unit,debug) result(fname)
-  character(len=*), intent(in)      :: iname,age_unit
-  character(len=len(iname))         :: fname
-  type(timestamp), intent(in)       :: ts
-  integer, intent(in)               :: max_age
-  logical, intent(in), optional     :: debug
-  integer :: age
+function ts2file(iname,ts,max_age,age_unit,mode,last,debug) result(fname)
+  intent(in) :: iname,ts,max_age,age_unit,mode,last,debug
+  optional   :: mode,last,debug
+  type(timestamp) :: ts
+  character(len=*):: iname,age_unit,mode
+  character(len=len(iname)):: fname
+  integer         :: max_age,last
+  logical         :: debug
+  integer :: age,ind,i
   real :: nsecs
   logical :: fexist
+
+! nsecs: age_unit in seconds
   select case(age_unit)
   case('s','second','seconds','S','SECOND','SECONDS')
     nsecs=1e0
@@ -606,30 +610,131 @@ function ts2file(iname,ts,max_age,age_unit,debug) result(fname)
   case('d','day','days','D','DAY','DAYS')
     nsecs=864e2
   case default
-    call CheckStop("ERROR in string2file: unknown age_unit="//trim(age_unit))
+    call CheckStop("Unsupported string2file(age_unit='"//trim(age_unit)//"')")
   endselect
+
+! find the nth '/' from the end of iname
+  ind=0
+  if(present(last))then
+    ind=len_trim(iname)
+    do i=1,last
+      if(ind==0)exit
+      ind=index(iname(:ind),'/',BACK=.true.)
+    enddo
+  endif
+! do not pharse the 1st ind chadacters
+  if(ind>0)fname=iname(:ind)
+  
   do age=0,max_age
-    fname=date2string(iname,ts,addsecs=-age*nsecs,debug=debug)
+    ! pharse from ind+1
+    fname(ind+1:)=date2string(iname(ind+1:),ts,addsecs=-age*nsecs,&
+                              mode=mode,debug=debug)
     inquire(file=fname,exist=fexist)
     if(fexist)exit
   enddo
 endfunction ts2file
 
-function cd2file(iname,cd,max_age,age_unit,debug) result(fname)
-  character(len=*), intent(in)      :: iname,age_unit
-  character(len=len(iname))         :: fname
-  type(date),intent(in)             :: cd
-  integer, intent(in)               :: max_age
-  logical, intent(in), optional     :: debug
-  fname=ts2file(iname,to_stamp(cd),max_age,age_unit,debug=debug)
+function cd2file(iname,cd,max_age,age_unit,mode,last,debug) result(fname)
+  intent(in) :: iname,cd,max_age,age_unit,mode,last,debug
+  optional   :: mode,last,debug
+  type(date)      :: cd
+  character(len=*):: iname,age_unit,mode
+  character(len=len(iname)):: fname
+  integer         :: max_age,last
+  logical         :: debug
+  fname=ts2file(iname,to_stamp(cd),max_age,age_unit,&
+                mode=mode,last=last,debug=debug)
 endfunction cd2file
 
-function int2file(iname,id,max_age,age_unit,debug) result(fname)
-  character(len=*), intent(in)      :: iname,age_unit
-  character(len=len(iname))         :: fname
-  integer, intent(in), dimension(:) :: id
-  integer, intent(in)               :: max_age
-  logical, intent(in), optional     :: debug
-  fname=ts2file(iname,to_stamp(id),max_age,age_unit,debug=debug)
+function int2file(iname,id,max_age,age_unit,mode,last,debug) result(fname)
+  intent(in) :: iname,id,max_age,age_unit,mode,last,debug
+  optional   :: mode,last,debug
+  integer         :: id(:)
+  character(len=*):: iname,age_unit,mode
+  character(len=len(iname)):: fname
+  integer         :: max_age,last
+  logical         :: debug
+  fname=ts2file(iname,to_stamp(id),max_age,age_unit,&
+                mode=mode,last=last,debug=debug)
 endfunction int2file
+
+subroutine self_test()
+  character(len=*),parameter :: &
+    hfmt="(/I0,') Self-test - ',A,/32('='))", & ! header format
+    tfmt="(A,/2X,A,', ',A,'.')",              & ! test format
+    dfmt="YYYY-MM-DD hh:mm:ss",               & ! date format
+    test_file="YYYYMMDD.test"
+  integer, parameter :: &
+    IO_TMP=27
+  integer :: secs,intdate(1)
+  real    :: days
+
+  call init_ts()
+  print hfmt,1,"date2string"
+  print tfmt,'time stamp input',&
+    date2string(dfmt,ts1900),&    ! timestamps calculated by init_ts
+    date2string(dfmt,ts1970)
+  print tfmt,'date structure input',&
+    date2string(dfmt,date(1900,1,1,0,0)),&
+    date2string(dfmt,date(1970,1,1,0,0))
+  print tfmt,'int array (3..5 elements) input',&
+    date2string(dfmt,[1900,1,1,0,0]),&
+    date2string(dfmt,[1970,1,1,0,0])
+  print tfmt,'integer ([YYYYMMDDhh]) input',&
+    date2string(dfmt,[1900010100]),&
+    date2string(dfmt,[1970010100])
+  print tfmt,'add 10 days',&
+    date2string(dfmt,ts1900)//&       ! spd=86400.0 (seconds per day)
+      key2str("FFFFFFFFFF seconds","FFFFFFFFFF",10*spd,"(SP,F10.1)"),&
+    date2string(dfmt,ts1900,10*spd)   ! +10 days in seconds
+  print tfmt,'subtract 12 hour',&
+    date2string(dfmt,ts1970)//&       ! sph=3600.0 (seconds per hour)
+      key2str("FFFFFFFFFF seconds","FFFFFFFFFF",-12*sph,"(SP,F10.1)"),&
+    date2string(dfmt,ts1970,-12*sph)  ! -12 hours in seconds
+
+  print hfmt,2,"date2file"
+  ! create test_file, 1 day before date
+  open(IO_TMP,file=date2string(test_file,ts1970,-spd),status='replace')
+  print tfmt,'serch for '//test_file//' up to 3 before date',&
+    date2string(dfmt,ts1970),&
+    date2file(test_file,ts1970,3,"days")  ! found file from 1 days before date
+  ! delete test file
+  close(IO_TMP,status='delete') 
+  print tfmt,'serch for again',&
+    date2string(dfmt,ts1970),&
+    date2file(test_file,ts1970,3,"days")  ! no file found, return 3 days before date
+
+  print hfmt,3,"nctime2string"
+  days=1.25           ! real ==> days since 1900
+  secs=INT(days*spd)  ! int  ==> secs since 1970
+  print tfmt,'days since 1900 (real input)',&
+    key2str("F.FFFF days since ","F.FFFF",days)//date2string(dfmt,ts1900),&
+    nctime2string(dfmt,days)
+  print tfmt,'secs since 1970 (integer input)',&
+    key2str("HHHHHH secs since ","HHHHHH",secs)//date2string(dfmt,ts1970),&
+    nctime2string(dfmt,secs)     
+
+  print hfmt,4,"nctime2date/date2nctime"
+  call nctime2date(intdate,days)
+  print tfmt,'nctime2date',&
+    key2str("F.FFFF days since ","F.FFFF",days)//date2string(dfmt,ts1900),&
+    date2string(dfmt,intdate)              
+  call date2nctime(intdate,days)
+  print tfmt,'date2nctime',&
+    key2str("F.FFFF days since ","F.FFFF",days)//date2string(dfmt,ts1900),&
+    date2string(dfmt,intdate)              
+  call nctime2date(intdate,secs)
+  print tfmt,'nctime2date',&
+    key2str("HHHHHH secs since ","HHHHHH",secs)//date2string(dfmt,ts1970),&
+    date2string(dfmt,intdate)              
+  call date2nctime(intdate,secs)
+  print tfmt,'date2nctime',&
+    key2str("HHHHHH secs since ","HHHHHH",secs)//date2string(dfmt,ts1970),&
+    date2string(dfmt,intdate)              
+endsubroutine self_test
 ENDMODULE TimeDate_ExtraUtil_ml
+
+!DSX program tester
+!DSX   use TimeDate_ExtraUtil_ml, only : self_test
+!DSX   call self_test()
+!DSX end program tester

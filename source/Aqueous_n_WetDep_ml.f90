@@ -1,7 +1,7 @@
-! <Aqueous_n_WetDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Aqueous_n_WetDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -240,7 +240,7 @@ type(group_umap), private, allocatable, dimension(:), target, save :: wetGroupUn
 
 type(WScav), public, dimension(NWETDEP_CALC), save  :: WetDep
 
-integer, public, save  :: WDEP_PREC   ! Used in Aqueous_ml
+integer, public, save  :: WDEP_PREC=-1   ! Used in Aqueous_ml
 contains
 
 subroutine Init_WetDep()
@@ -798,7 +798,7 @@ subroutine WetDeposition(i,j,debug_flag)
 
   enddo ! icalc loop
 
-  d_2d(WDEP_PREC,i,j,IOU_INST) = pr(i,j,KMAX_MID) * dt ! Same for all models
+  if(WDEP_PREC>0)d_2d(WDEP_PREC,i,j,IOU_INST) = pr(i,j,KMAX_MID) * dt ! Same for all models
 
 ! add other losses into twetdep and wdep arrays:
   call WetDep_Budget(i,j,invgridarea,debug_flag)

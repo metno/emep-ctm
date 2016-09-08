@@ -1,7 +1,7 @@
-! <Sites_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Sites_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,19 +52,21 @@ use Io_ml,             only : check_file,open_file,ios &
                               , Read_Headers,read_line
 use ChemSpecs
 use ChemGroups_ml,     only : OXN_GROUP, PMFINE_GROUP, PMCO_GROUP
-use Met_ml,            only : meteo
 use MetFields_ml,      only : t2_nwp, th, pzpbl  &  ! output with concentrations
                               , z_bnd, z_mid, roa, Kz_m2s, q
 use MetFields_ml,      only : u_xmj, v_xmi, ps
 use ModelConstants_ml, only : NMET,PPBINV,PPTINV, KMAX_MID, MasterProc &
                               ,KMAX_BND,PT, NPROC, DEBUG & ! => DEBUG%SITES &
-                              ,DomainName, RUNDOMAIN, IOU_INST, SOURCE_RECEPTOR
+                              ,DomainName, RUNDOMAIN, IOU_INST, SOURCE_RECEPTOR, meteo
+use MPI_Groups_ml   , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
+                             MPI_MIN, MPI_MAX, MPI_SUM, &
+                             MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
 use PhysicalConstants_ml,only: ATWAIR
 use NetCDF_ml,         only : Create_CDF_sondes,Out_CDF_sondes,&
                               NF90_FILL_INT,NF90_FILL_DOUBLE
 use Par_ml,            only : li0,lj0,li1,lj1 &
                               ,GIMAX,GJMAX,IRUNBEG,JRUNBEG&
-                              ,GI0,GI1,GJ0,GJ1,me,MAXLIMAX,MAXLJMAX
+                              ,GI0,GI1,GJ0,GJ1,me,LIMAX,LJMAX
 use SmallUtils_ml,     only : find_index
 use Tabulations_ml,    only : tab_esat_Pa
 use TimeDate_ml,       only : current_date
@@ -87,8 +89,6 @@ private :: siteswrt_out     ! Collects output from all nodes and prints
 
 ! some variables used in following subroutines
 
-INCLUDE 'mpif.h'
-INTEGER :: STATUS(MPI_STATUS_SIZE),INFO
 integer, public, save :: nglobal_sites, nlocal_sites
 integer,private, save :: nglobal_sondes, nlocal_sondes
 
@@ -237,7 +237,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
   character(len=20) :: s       ! Name of site read in
   character(len=30) :: comment ! comment on site location
   character(len=40) :: infile, errmsg
-  real              :: lat,lon,x,y
+  real              :: lat,lon
   character(len=*),parameter :: sub='SitesInit:'
 
   character(len=20), dimension(4) :: Headers
@@ -259,7 +259,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
     endif
   endif
 
-  call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,INFO)
+  call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
   if(ios/=0)return
 
   call CheckStop(NMAX,size(s_name), sub//"Error : sitesdefNMAX problem")
@@ -276,9 +276,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       call read_line(io_num,txtinput,ios)
       if ( ios /= 0 ) exit  ! End of file
       read(unit=txtinput,fmt=*) s, lat, lon, lev
-      call lb2ij(lon,lat,x,y)
-      ix=nint(x)
-      iy=nint(y)
+      call lb2ij(lon,lat,ix,iy)
     else
       call read_line(io_num,txtinput,ios)
       lon=-999.0
@@ -365,18 +363,18 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
                            me, nlocal
 
   if ( .not.MasterProc ) then
-    call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 333, MPI_COMM_WORLD, INFO)
+    call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 333, MPI_COMM_CALC, IERROR)
     if(nlocal>0) call MPI_SEND(s_n, 4*nlocal, MPI_BYTE, 0, 334, &
-                               MPI_COMM_WORLD, INFO)
+                               MPI_COMM_CALC, IERROR)
   else
     if(DEBUG%SITES) write(6,*) sub//" for me =0 LOCAL_SITES", me, nlocal
     do n = 1, nlocal
       s_gindex(me,n) = s_n(n)
     enddo
     do d = 1, NPROC-1
-      call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 333, MPI_COMM_WORLD,STATUS, INFO)
+      call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 333, MPI_COMM_CALC,MPISTATUS, IERROR)
       if(nloc>0) call MPI_RECV(s_n_recv, 4*nloc, MPI_BYTE, d, 334, &
-                               MPI_COMM_WORLD,STATUS, INFO)
+                               MPI_COMM_CALC,MPISTATUS, IERROR)
       if(DEBUG%SITES) write(6,*) sub//" recv d ", fname, d,  &
                   " zzzz nloc : ", nloc, " zzzz me0 nlocal", nlocal
       do n = 1, nloc
@@ -399,9 +397,9 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
   ! -------------------------------------------------------------------
 
   ! arguments
-  real, dimension(NSPEC_ADV,MAXLIMAX,MAXLJMAX,KMAX_MID), intent(in) :: xn_adv
-  real, dimension(NSPEC_ADV,MAXLIMAX,MAXLJMAX), intent(in)          :: cfac
-  real, dimension(NSPEC_SHL,MAXLIMAX,MAXLJMAX,KMAX_MID), intent(in) :: xn_shl
+  real, dimension(NSPEC_ADV,LIMAX,LJMAX,KMAX_MID), intent(in) :: xn_adv
+  real, dimension(NSPEC_ADV,LIMAX,LJMAX), intent(in)          :: cfac
+  real, dimension(NSPEC_SHL,LIMAX,LJMAX,KMAX_MID), intent(in) :: xn_shl
 
   ! Local
   integer :: ix, iy,iz, ispec                  ! Site indices
@@ -539,6 +537,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
   real, dimension(KMAX_MID)              :: pp, temp, qsat, rh, sum_PM, sum_NOy
   real, dimension(NOUT_SONDE,NSONDES_MAX):: out
 
+  out=0.0
   ! Consistency check
   KTOP_SONDE = KMAX_MID - NLEVELS_SONDE + 1
   do ispec=1,NXTRA_SONDE
@@ -597,7 +596,8 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
                                   to_ug_ADV(PMCO_GROUP-NSPEC_SHL)) &
                         ) * roa(ix,iy,k,1)
           enddo !k
-          out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
+!bug?          out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
+          out(nn+1:nn+NLEVELS_SONDE,i) = sum_PM(KMAX_MID:KTOP_SONDE:-1)
           i_Att=i_Att+1
           Spec_Att(i_Att,1)='units:C:ug/m3'
 
@@ -608,7 +608,8 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
                                   to_ug_ADV(PMCO_GROUP-NSPEC_SHL)) &
                       * roa(ix,iy,k,1)
           enddo !k
-          out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
+!bug?          out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
+          out(nn+1:nn+NLEVELS_SONDE,i) = sum_PM(KMAX_MID:KTOP_SONDE:-1)
           i_Att=i_Att+1
           Spec_Att(i_Att,1)='units:C:ug/m3'
 
@@ -617,7 +618,8 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
           do k = 1, KMAX_MID
             sum_NOy(k) = sum(xn_adv(OXN_GROUP-NSPEC_SHL,ix,iy,k))
           enddo
-          out(nn+1:nn+KMAX_MID,i) = PPBINV * sum_NOy(KMAX_MID:1:-1)
+!bug?          out(nn+1:nn+KMAX_MID,i) = PPBINV * sum_NOy(KMAX_MID:1:-1)
+          out(nn+1:nn+NLEVELS_SONDE,i) = PPBINV * sum_NOy(KMAX_MID:KTOP_SONDE:-1)
           i_Att=i_Att+1
           Spec_Att(i_Att,1)='units:C:mix_ratio'
 
@@ -698,7 +700,6 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
     
     ps_sonde(i)=ps(ix,iy,1)!surface pressure always needed to define the vertical levels
   enddo ! i (nlocal_sondes)
-
 
   ! collect data into gout on me=0 t
 
@@ -853,13 +854,13 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
         write(*,*)'MISSING species attribute? ',i_Att,NSPEC
       endif
       do d = 1, NPROC-1
-        call MPI_RECV(i_Att_MPI, 4*1, MPI_BYTE, d, 746, MPI_COMM_WORLD,STATUS, INFO)
+        call MPI_RECV(i_Att_MPI, 4*1, MPI_BYTE, d, 746, MPI_COMM_CALC,MPISTATUS, IERROR)
         if(i_Att_MPI>0)then
           if(i_Att_MPI/=NSPEC)then
              write(*,*)'MISSING species attribute? ',i_Att_MPI,NSPEC
           endif
           call MPI_RECV(Spec_Att,Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, &
-               MPI_BYTE, d, 747, MPI_COMM_WORLD,STATUS, INFO)
+               MPI_BYTE, d, 747, MPI_COMM_CALC,MPISTATUS, IERROR)
         endif
       enddo
 
@@ -890,19 +891,19 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
     else
       !not MasterProc
       i_Att_MPI=i_Att
-      call MPI_SEND(i_Att_MPI, 4*1, MPI_BYTE, 0, 746, MPI_COMM_WORLD, INFO)
+      call MPI_SEND(i_Att_MPI, 4*1, MPI_BYTE, 0, 746, MPI_COMM_CALC, IERROR)
       if(i_Att>0)then
-        call MPI_SEND(Spec_Att, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, MPI_BYTE, 0, 747, MPI_COMM_WORLD, INFO)
+        call MPI_SEND(Spec_Att, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, MPI_BYTE, 0, 747, MPI_COMM_CALC, IERROR)
       endif
       prev_year(type) = current_date%year
     endif ! MasterProc 
   endif ! current_date%year /= prev_year(type)
 
   if(.not.MasterProc) then   ! send data to me=0 (MasterProc)
-    call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 346, MPI_COMM_WORLD, INFO)
-    call MPI_SEND(out, 8*nout*nlocal, MPI_BYTE, 0, 347, MPI_COMM_WORLD, INFO)
+    call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 346, MPI_COMM_CALC, IERROR)
+    call MPI_SEND(out, 8*nout*nlocal, MPI_BYTE, 0, 347, MPI_COMM_CALC, IERROR)
     if(trim(fname)=="sondes")&
-        call MPI_SEND(ps_sonde, 8*nlocal, MPI_BYTE, 0, 347, MPI_COMM_WORLD, INFO)
+        call MPI_SEND(ps_sonde, 8*nlocal, MPI_BYTE, 0, 348, MPI_COMM_CALC, IERROR)
   else ! MasterProc
     ! first, assign me=0 local data to g_out
     if ( DEBUG%SITES ) print *, "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
@@ -914,11 +915,11 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
     enddo ! n
 
     do d = 1, NPROC-1
-      call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 346, MPI_COMM_WORLD,STATUS, INFO)
-      call MPI_RECV(out, 8*nout*nloc, MPI_BYTE, d, 347, MPI_COMM_WORLD, &
-           STATUS, INFO)
+      call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 346, MPI_COMM_CALC,MPISTATUS, IERROR)
+      call MPI_RECV(out, 8*nout*nloc, MPI_BYTE, d, 347, MPI_COMM_CALC, &
+           MPISTATUS, IERROR)
       if(trim(fname)=="sondes")call MPI_RECV(ps_sonde, 8*nloc, MPI_BYTE, d, &
-           347, MPI_COMM_WORLD, STATUS, INFO)
+           348, MPI_COMM_CALC, MPISTATUS, IERROR)
       do n = 1, nloc
          nglob = s_gindex(d,n)
          g_out(:,nglob) = out(:,n)

@@ -1,7 +1,7 @@
-! <My_Pollen_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <My_Pollen_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -49,6 +49,9 @@ real, parameter :: &
   grain_wt = POLL_DENS*PI*D_POLL**3/6.0, &  ! 1 grain weight [g]
   ug2grains= 1e-6/grain_wt                  ! # grains in 1 ug
 
+real, parameter  :: &
+  N_TOT(3)=1.0  ! avoid div0
+
 contains
 
 subroutine pollen_check(igrp)
@@ -71,14 +74,14 @@ endmodule Pollen_const_ml
 ! Pollen particles are assumed of 22 um diameter and 800 kg/m3 density. 
 !-----------------------------------------------------------------------!
 module Pollen_ml
-  use Pollen_const_ml
-  implicit none
-  public:: pollen_flux,pollen_dump,pollen_read,pollen_check
+use Pollen_const_ml
+implicit none
+public:: pollen_flux,pollen_dump,pollen_read,pollen_check
 
-  real,public,save, allocatable,dimension(:,:,:) :: &
-    AreaPOLL,     & ! emission of pollen 
-    heatsum,      & ! heatsum, needs to be remembered for forecast
-    pollen_left     ! amount of pollen left in catkins, relative amount... 0:sr 1:end 
+real,public,save, allocatable,dimension(:,:,:) :: &
+  heatsum,      & ! heatsum, needs to be remembered for forecast
+  AreaPOLL,     & ! emission of pollen 
+  R               ! pollen released so far
 
 contains
 

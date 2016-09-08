@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -78,19 +78,63 @@ implicit none
                                                ! flat emissions) per grid
 
   ! Sector specific information
+   integer, save, public :: NSECTORS   ! Number of sectors used in emissions
 
+   integer, save, public :: & !must be compatible with:
+      ! timefac, fac_ehh24x7, fac_edd, fac_emm, fac_min, GridTfac, ISNAP_DOM, ISNAP_TRAF
+          N_TFAC  = 11  ! Number of timefactor classes defined
+   integer, save, pointer, dimension(:) :: sec2tfac_map => null()! mapping of sector to time factor class
+   integer, save, public :: & !must be compatible with:
+          N_HFAC  = 11  ! Number of height distribution classes defined
+   integer, save, pointer, dimension(:) :: sec2hfac_map => null()! mapping of sector to height distribution class
+   integer, save, public :: & !must be compatible with: emisfrac
+          N_SPLIT  = 11  ! Number of speciation classes defined
+   integer, save, pointer, dimension(:) :: sec2split_map => null()! mapping of sector to speciation class
+
+!SNAP specific definitions
    integer, public, parameter :: &
-          NSECTORS  = 11       ! Number of SNAP-sectors in emissions
+          NSECTORS_SNAP  = 11    ! Number of sectors defined in SNAP emissions. Do not modify
+   integer, save, target, dimension(NSECTORS_SNAP) :: & ! mapping of sector to time factor class
+        SNAP_sec2tfac_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_TFAC
+   integer, save, target, dimension(NSECTORS_SNAP) :: & ! mapping of sector to height distribution class
+        SNAP_sec2hfac_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_HFAC
+   integer, save, target, dimension(NSECTORS_SNAP) :: & ! mapping of sector to height distribution class
+        SNAP_sec2split_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_SPECIATION
 
-! Variables for NMR-NH3 project
-! hb NH3emis (ISNAP_AGR, ISNAP_TRAF)
+!GNFR  specific definitions
+   integer, public, parameter :: &
+          NSECTORS_GNFR  = 13    ! Number of sectors defined in GNFR emissions
+   integer, save, target, dimension(NSECTORS_GNFR) :: & ! mapping of sector to time factor class
+        GNFR_sec2tfac_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/) !values must be <= N_TFAC
+   integer, save, target, dimension(NSECTORS_GNFR) :: & ! mapping of sector to height distribution class
+        GNFR_sec2hfac_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/) !values must be <= N_HFAC
+   integer, save, target, dimension(NSECTORS_GNFR) :: & ! mapping of sector to height distribution class
+        GNFR_sec2split_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/) !values must be <= N_SPECIATION
+
+!TEST  specific definitions
+   integer, public, parameter :: &
+          NSECTORS_TEST  = 11    ! Number of sectors defined in SNAP emissions. Do not modify
+   integer, save, target, dimension(NSECTORS_TEST) :: & ! mapping of sector to time factor class
+        TEST_sec2tfac_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_TFAC
+   integer, save, target, dimension(NSECTORS_TEST) :: & ! mapping of sector to height distribution class
+        TEST_sec2hfac_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_HFAC
+   integer, save, target, dimension(NSECTORS_TEST) :: & ! mapping of sector to height distribution class
+        TEST_sec2split_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_SPECIATION
+
+
+!The sectors defined here are always SNAP sectors. Should NOT be changed if other
+!categories (for instance GNFR) are used!
    integer, public, parameter :: &
           ANTROP_SECTORS=10, &   ! Non-natural sectors
           ISNAP_DOM  =  2,   &   ! Domestic/residential, for degree-day Timefactors
-          ISNAP_NAT  = 11,   &   ! SNAP index for volcanoe emissions
-          ISNAP_SHIP = 8,    &   ! SNAP index for flat emissions, e.g ship
           ISNAP_AGR  = 10,   &   ! Note that flat emissions do NOT necessarily
           ISNAP_TRAF = 7         ! belong to the same SNAP sector
+
+!The sectors defined here are should be changed if other
+!categories (for instance GNFR) are used!
+   integer, public, parameter :: &
+          ISEC_NAT  = 11, &   ! index for natural (and flat?) emissions
+          ISEC_SHIP = 8       ! index for flat emissions, e.g ship
 
 
    !Dust
@@ -144,6 +188,21 @@ real, public, allocatable, save, dimension(:,:,:) :: &
   gridrcroadd,    & ! Road dust emissions
   gridrcroadd0      ! varies every hour
 
+real, public, allocatable, dimension(:,:,:,:), save :: &
+  loc_frac     ! Fraction of pollutants that are produced locally in the gridcell
+
+!Ocean variables
+type, public :: Ocean
+  real,  allocatable, dimension(:,:) :: emis
+  real,  allocatable, dimension(:,:) :: map
+  real :: sum_month
+  real :: sum_year
+  integer :: index
+end type Ocean
+
+type(Ocean), public, save:: O_NH3, O_DMS 
+
+real, public, save :: DMS_natso2_month=0.0, DMS_natso2_year=0.0
 !used for EEMEP 
 real, allocatable, save, dimension(:,:,:,:)       ::  Emis_4D !(i,j,k,pollutant)
 integer, save ::N_Emis_4D=0 !number of pollutants to read
@@ -174,6 +233,8 @@ integer, public, save :: KEMISTOP ! not defined yet= KMAX_MID - nemis_kprofile +
 
   integer, parameter, public :: MAXFEMISLONLAT = 10!max number of lines with lonlat reductions
   integer,   public          :: N_femis_lonlat    !number of femis lonlat lines defined
+
+
 ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
                      end module EmisDef_ml

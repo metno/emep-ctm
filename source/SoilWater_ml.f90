@@ -35,7 +35,7 @@ module SoilWater_ml
  use MetFields_ml,      only : SoilWater_deep, SoilWaterSource,fSW &
                                ,foundSoilWater_deep  ! false if no SW-deep
  use ModelConstants_ml, only : USE_SOILWATER, DEBUG_SOILWATER
- use Par_ml,            only : limax, ljmax, MAXLIMAX, MAXLJMAX, me
+ use Par_ml,            only : limax, ljmax, me
  use TimeDate_ml,       only : current_date, daynumber
 
 

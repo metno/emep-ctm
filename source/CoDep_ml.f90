@@ -1,7 +1,7 @@
-! <CoDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <CoDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,7 +29,7 @@ module CoDep_ml
   use Chemfields_ml, only : so2nh3_24hr
   use GridValues_ml, only : debug_proc, debug_li, debug_lj
   use ModelConstants_ml, only : MasterProc  ! for DEBUG
-  use Par_ml,        only : MAXLIMAX, MAXLJMAX
+  use Par_ml,        only : LIMAX, LJMAX
 
 
 
@@ -129,7 +129,7 @@ contains
 
      call Tabulate()
      my_first_call = .false.
-     allocate(so2nh3_hr(24,MAXLIMAX,MAXLJMAX))
+     allocate(so2nh3_hr(24,LIMAX,LJMAX))
      so2nh3_hr=1.0
      if( debug_proc ) write(*,"(a,2es12.4,f7.2,f7.3,L1)") "First CoDep call, ",  &
            so2nh3ratio24hr,so2nh3ratio, Ts_C, frh, forest
@@ -261,10 +261,10 @@ contains
   integer, intent (in) :: hour
   integer :: i,j
 
-  real, dimension(MAXLIMAX,MAXLJMAX), intent(in) :: so2conc
-  real, dimension(MAXLIMAX,MAXLJMAX), intent(in) :: nh3conc
-  real, dimension(MAXLIMAX,MAXLJMAX), intent(in) :: cfac_so2
-  real, dimension(MAXLIMAX,MAXLJMAX), intent(in) :: cfac_nh3
+  real, dimension(LIMAX,LJMAX), intent(in) :: so2conc
+  real, dimension(LIMAX,LJMAX), intent(in) :: nh3conc
+  real, dimension(LIMAX,LJMAX), intent(in) :: cfac_so2
+  real, dimension(LIMAX,LJMAX), intent(in) :: cfac_nh3
   logical :: debug_flag        ! set true when i,j match DEBUG_i, DEBUG_j
 
   nhour=hour
@@ -274,8 +274,8 @@ contains
 
   so2nh3_24hr(:,:)=0.0 !initialize each time step (hour)
 
-  do i=1, MAXLIMAX
-     do j=1, MAXLJMAX
+  do i=1, LIMAX
+     do j=1, LJMAX
         if( MY_DEBUG ) debug_flag =  &
            ( debug_proc .and. i == debug_li .and. j == debug_lj)
         do nhour=1,24

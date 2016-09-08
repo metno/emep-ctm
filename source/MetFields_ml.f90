@@ -1,7 +1,7 @@
-! <MetFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <MetFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +26,10 @@
 !*****************************************************************************!
 module MetFields_ml
 
-  use ModelConstants_ml,    only : USE_CONVECTION,USE_SOILWATER,USE_WRF_MET_NAMES
+  use ModelConstants_ml,  only : USE_CONVECTION,USE_SOILWATER,USE_WRF_MET_NAMES,NPROC
+  use MPI_Groups_ml     , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
+                                 MPI_COMM_CALC, MPI_COMM_WORLD, MPI_COMM_SUB, MPISTATUS, &
+                                 IERROR, ME_MPI, NPROC_MPI, largeLIMAX,largeLJMAX, share, share_logical
 
   implicit none
   private
@@ -140,6 +143,8 @@ module MetFields_ml
        ,Kz_met    ! vertical diffusivity in sigma coordinates from meteorology
 
   real,target,public, save,allocatable, dimension(:,:,:,:) :: rain! used only by wrf met
+  real,target,public, save,allocatable, dimension(:,:) :: irainc! used only by wrf met
+  real,target,public, save,allocatable, dimension(:,:) :: irainnc! used only by wrf met
 
 
   ! since pr,cc3d,cc3dmax,cnvuf,cnvdf used only for 1 time layer - define without NMET
@@ -250,14 +255,16 @@ module MetFields_ml
     ,foundcloudwater= .false.& !false if no cloudwater found
     ,foundSMI1= .true.& ! false if no Soil Moisture Index level 1 (shallow)
     ,foundSMI3= .true.& ! false if no Soil Moisture Index level 3 (deep)
-    ,foundrain= .false. ! false if no rain found or used
+    ,foundrain= .false.& ! false if no rain found or used
+    ,foundirainnc= .false. &! false if no irainnc found or used
+    ,foundirainc= .false. ! false if no irainc found or used
 
 ! specific indices of met
   integer, public, save   :: ix_u_xmj,ix_v_xmi, ix_q, ix_th, ix_sdot, ix_cc3d, ix_pr, ix_cw_met, ix_cnvuf, &
        ix_cnvdf, ix_Kz_met, ix_roa, ix_SigmaKz, ix_EtaKz, ix_Etadot, ix_cc3dmax, ix_lwc, ix_Kz_m2s, &
        ix_u_mid, ix_v_mid, ix_ps, ix_t2_nwp, ix_rh2m, ix_fh, ix_fl, ix_tau, ix_ustar_nwp, ix_sst, &
        ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_ice_nwp, ix_ws_10m, ix_surface_precip, &
-       ix_uw, ix_ue, ix_vs, ix_vn, ix_convective_precip, ix_rain
+       ix_uw, ix_ue, ix_vs, ix_vn, ix_convective_precip, ix_rain,ix_irainc,ix_irainnc
 
   type,  public :: metfield
      character(len = 100) :: name = 'empty' !name as defined in external meteo file
@@ -273,7 +280,11 @@ module MetFields_ml
      real, pointer :: field(:,:,:,:) => null() !actual values for the fields; must be pointed to
      integer :: zsize = 1 ! field, size of third index
      integer :: msize = 1 ! field, size of fourth index
+     real, pointer, dimension(:,:,:)::field_shared
+     logical, pointer :: ready ! The field must be present in the external meteo file
+     logical, pointer :: copied ! The field must be present in the external meteo file
   endtype metfield
+  logical, public,save, target::ready=.false.,copied=.false.
 
   integer, public, parameter   :: NmetfieldsMax=100 !maxnumber of metfields
   type(metfield),  public :: met(NmetfieldsMax)  !To put the metfirelds that need systematic treatment
@@ -288,19 +299,28 @@ module MetFields_ml
   logical, public :: MET_SHORT = .true.!metfields are stored as "short" (integer*2 and scaling)
   logical, public :: MET_C_GRID = .false.!true if u and v wind fields are in a C-staggered, larger grid.
   logical, public :: MET_REVERSE_K = .false.!set true if met fields are stored with lowest k at surface
+  logical, public :: found_wrf_bucket = .false.
+  real, public    :: wrf_bucket = 0.0 !constant used to define precipitation
+
+
+  integer, public :: Nshared_2d
+  integer, public :: Nshared_3d
+
   public :: Alloc_MetFields !allocate arrays
 
 contains
 
-subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
+subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
 !allocate MetFields arrays arrays
   implicit none
   
-  integer, intent(in) ::MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET
-  integer ::ix
+  integer, intent(in) ::LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET
+  integer ::ix,i,j,data_shape(3),xsize
 
   do ix=1,NmetfieldsMax
      met(ix)%found => metfieldfound(ix)!default target
+     if(.not. associated(met(ix)%ready))met(ix)%ready=>ready
+     if(.not. associated(met(ix)%copied))met(ix)%copied=>copied
   enddo
 
   ix=1
@@ -311,9 +331,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(u_xmj(0:MAXLIMAX,1:MAXLJMAX,KMAX_MID,NMET))
+  allocate(u_xmj(0:LIMAX,1:LJMAX,KMAX_MID,NMET))
   u_xmj=0.0
-  met(ix)%field(0:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => u_xmj
+  met(ix)%field(0:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => u_xmj
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_u_xmj=ix
@@ -326,9 +346,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(v_xmi(1:MAXLIMAX,0:MAXLJMAX,KMAX_MID,NMET))
+  allocate(v_xmi(1:LIMAX,0:LJMAX,KMAX_MID,NMET))
   v_xmi=0.0
-  met(ix)%field(1:MAXLIMAX,0:MAXLJMAX,1:KMAX_MID,1:NMET)  => v_xmi
+  met(ix)%field(1:LIMAX,0:LJMAX,1:KMAX_MID,1:NMET)  => v_xmi
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_v_xmi=ix
@@ -341,7 +361,7 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(q(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+  allocate(q(LIMAX,LJMAX,KMAX_MID,NMET))
   q=0.0
   met(ix)%field => q 
   met(ix)%zsize = KMAX_MID
@@ -356,9 +376,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(th(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+  allocate(th(LIMAX,LJMAX,KMAX_MID,NMET))
   th=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => th
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => th
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_th=ix
@@ -371,9 +391,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundsdot
-  allocate(sdot(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+  allocate(sdot(LIMAX,LJMAX,KMAX_BND,NMET))
   sdot=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:NMET)  => sdot
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:NMET)  => sdot
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = NMET
   ix_sdot=ix
@@ -386,9 +406,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundcc3d 
-  allocate(cc3d(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(cc3d(LIMAX,LJMAX,KMAX_MID))
   cc3d=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => cc3d
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cc3d
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_cc3d=ix
@@ -401,9 +421,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundprecip
-  allocate(pr(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(pr(LIMAX,LJMAX,KMAX_MID))
   pr=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => pr
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => pr
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_pr=ix
@@ -416,9 +436,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            => foundcloudwater
-  allocate(cw_met(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+  allocate(cw_met(LIMAX,LJMAX,KMAX_MID,NMET))
   cw_met=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => cw_met
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => cw_met
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_cw_met=ix
@@ -431,9 +451,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = USE_CONVECTION
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(cnvuf(MAXLIMAX,MAXLJMAX,KMAX_BND))
+  allocate(cnvuf(LIMAX,LJMAX,KMAX_BND))
   cnvuf=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:1)  => cnvuf
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:1)  => cnvuf
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = 1
   ix_cnvuf=ix
@@ -446,9 +466,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = USE_CONVECTION
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(cnvdf(MAXLIMAX,MAXLJMAX,KMAX_BND))
+  allocate(cnvdf(LIMAX,LJMAX,KMAX_BND))
   cnvdf=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:1)  => cnvdf
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:1)  => cnvdf
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = 1
   ix_cnvdf=ix
@@ -461,9 +481,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundKz_met
-  allocate(Kz_met(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+  allocate(Kz_met(LIMAX,LJMAX,KMAX_BND,NMET))
   Kz_met=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:NMET)  => Kz_met
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:NMET)  => Kz_met
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = NMET
   ix_Kz_met=ix
@@ -476,9 +496,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(roa(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+  allocate(roa(LIMAX,LJMAX,KMAX_MID,NMET))
   roa=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => roa
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => roa
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_roa=ix
@@ -491,9 +511,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(SigmaKz(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+  allocate(SigmaKz(LIMAX,LJMAX,KMAX_BND,NMET))
   SigmaKz=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:NMET)  => SigmaKz
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:NMET)  => SigmaKz
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = NMET
   ix_SigmaKz=ix
@@ -506,9 +526,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(EtaKz(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+  allocate(EtaKz(LIMAX,LJMAX,KMAX_BND,NMET))
   EtaKz=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:NMET)  => EtaKz
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:NMET)  => EtaKz
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = NMET
   ix_EtaKz=ix
@@ -521,9 +541,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(Etadot(MAXLIMAX,MAXLJMAX,KMAX_BND,NMET))
+  allocate(Etadot(LIMAX,LJMAX,KMAX_BND,NMET))
   Etadot=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_BND,1:NMET)  => Etadot
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_BND,1:NMET)  => Etadot
   met(ix)%zsize = KMAX_BND
   met(ix)%msize = NMET
   ix_Etadot=ix
@@ -536,9 +556,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(cc3dmax(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(cc3dmax(LIMAX,LJMAX,KMAX_MID))
   cc3dmax=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => cc3dmax
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cc3dmax
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_cc3dmax=ix
@@ -551,9 +571,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(lwc(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(lwc(LIMAX,LJMAX,KMAX_MID))
   lwc=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => lwc
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => lwc
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_lwc=ix
@@ -566,9 +586,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(Kz_m2s(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(Kz_m2s(LIMAX,LJMAX,KMAX_MID))
   Kz_m2s=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => Kz_m2s
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => Kz_m2s
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_Kz_m2s=ix
@@ -581,9 +601,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(u_mid(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(u_mid(LIMAX,LJMAX,KMAX_MID))
   u_mid=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => u_mid
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => u_mid
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_u_mid=ix
@@ -596,9 +616,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .false.
   met(ix)%found            = .false.
-  allocate(v_mid(MAXLIMAX,MAXLJMAX,KMAX_MID))
+  allocate(v_mid(LIMAX,LJMAX,KMAX_MID))
   v_mid=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:1)  => v_mid
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => v_mid
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_v_mid=ix
@@ -616,9 +636,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(ps(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(ps(LIMAX,LJMAX,NMET))
   ps=1.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => ps
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => ps
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_ps=ix
@@ -631,9 +651,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(t2_nwp(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(t2_nwp(LIMAX,LJMAX,NMET))
   t2_nwp=1.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => t2_nwp
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => t2_nwp
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_t2_nwp=ix
@@ -646,9 +666,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundrh2m
-  allocate(rh2m(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(rh2m(LIMAX,LJMAX,NMET))
   rh2m=1.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => rh2m
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => rh2m
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_rh2m=ix
@@ -661,9 +681,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(fh(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(fh(LIMAX,LJMAX,NMET))
   fh=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => fh
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => fh
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_fh=ix
@@ -676,9 +696,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(fl(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(fl(LIMAX,LJMAX,NMET))
   fl=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => fl
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => fl
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_fl=ix
@@ -691,9 +711,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundtau
-  allocate(tau(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(tau(LIMAX,LJMAX,NMET))
   tau=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => tau
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => tau
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_tau=ix
@@ -706,9 +726,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(ustar_nwp(MAXLIMAX,MAXLJMAX))
+  allocate(ustar_nwp(LIMAX,LJMAX))
   ustar_nwp=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:1)  => ustar_nwp
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:1)  => ustar_nwp
   met(ix)%zsize = 1
   met(ix)%msize = 1
   ix_ustar_nwp=ix
@@ -721,9 +741,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundSST
-  allocate(sst(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(sst(LIMAX,LJMAX,NMET))
   sst=1.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => sst
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => sst
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_sst=ix
@@ -736,9 +756,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = USE_SOILWATER
   met(ix)%needed           = .false.
   met(ix)%found            => foundSoilWater_uppr
-  allocate(SoilWater_uppr(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(SoilWater_uppr(LIMAX,LJMAX,NMET))
   SoilWater_uppr=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => SoilWater_uppr
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => SoilWater_uppr
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_SoilWater_uppr=ix
@@ -751,9 +771,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = USE_SOILWATER
   met(ix)%needed           = .false.
   met(ix)%found            =>  foundSoilWater_deep
-  allocate(SoilWater_deep(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(SoilWater_deep(LIMAX,LJMAX,NMET))
   SoilWater_deep=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => SoilWater_deep
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => SoilWater_deep
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_SoilWater_deep=ix
@@ -766,9 +786,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundsdepth
-  allocate(sdepth(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(sdepth(LIMAX,LJMAX,NMET))
   sdepth=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => sdepth
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => sdepth
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_sdepth=ix
@@ -781,9 +801,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundice
-  allocate(ice_nwp(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(ice_nwp(LIMAX,LJMAX,NMET))
   ice_nwp=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => ice_nwp
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => ice_nwp
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_ice_nwp=ix
@@ -796,9 +816,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundws10_met
-  allocate(ws_10m(MAXLIMAX,MAXLJMAX,NMET))
+  allocate(ws_10m(LIMAX,LJMAX,NMET))
   ws_10m=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:NMET)  => ws_10m
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => ws_10m
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_ws_10m=ix
@@ -811,9 +831,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(surface_precip(MAXLIMAX,MAXLJMAX))
+  allocate(surface_precip(LIMAX,LJMAX))
   surface_precip=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:1)  => surface_precip
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:1)  => surface_precip
   met(ix)%zsize = 1
   met(ix)%msize = 1
   ix_surface_precip=ix
@@ -826,9 +846,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(convective_precip(MAXLIMAX,MAXLJMAX))
+  allocate(convective_precip(LIMAX,LJMAX))
   convective_precip=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:1,1:1)  => convective_precip
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:1)  => convective_precip
   met(ix)%zsize = 1
   met(ix)%msize = 1
   ix_convective_precip=ix
@@ -841,9 +861,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(uw(MAXLJMAX,KMAX_MID,NMET))
+  allocate(uw(LJMAX,KMAX_MID,NMET))
   uw=0.0
-  met(ix)%field(1:1,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => uw
+  met(ix)%field(1:1,1:LJMAX,1:KMAX_MID,1:NMET)  => uw
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_uw=ix
@@ -856,9 +876,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(ue(MAXLJMAX,KMAX_MID,NMET))
+  allocate(ue(LJMAX,KMAX_MID,NMET))
   ue=0.0
-  met(ix)%field(1:1,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => ue
+  met(ix)%field(1:1,1:LJMAX,1:KMAX_MID,1:NMET)  => ue
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_ue=ix
@@ -871,9 +891,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(vs(MAXLIMAX,KMAX_MID,NMET))
+  allocate(vs(LIMAX,KMAX_MID,NMET))
   vs=0.0
-  met(ix)%field(1:MAXLIMAX,1:1,1:KMAX_MID,1:NMET)  => vs
+  met(ix)%field(1:LIMAX,1:1,1:KMAX_MID,1:NMET)  => vs
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_vs=ix
@@ -886,9 +906,9 @@ subroutine Alloc_MetFields(MAXLIMAX,MAXLJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  allocate(vn(MAXLIMAX,KMAX_MID,NMET))
+  allocate(vn(LIMAX,KMAX_MID,NMET))
   vn=0.0
-  met(ix)%field(1:MAXLIMAX,1:1,1:KMAX_MID,1:NMET)  => vn
+  met(ix)%field(1:LIMAX,1:1,1:KMAX_MID,1:NMET)  => vn
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_vn=ix
@@ -917,14 +937,46 @@ if(USE_WRF_MET_NAMES)then
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundrain
-  allocate(rain(MAXLIMAX,MAXLJMAX,KMAX_MID,NMET))
+  allocate(rain(LIMAX,LJMAX,KMAX_MID,NMET))
   rain=0.0
-  met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,1:KMAX_MID,1:NMET)  => rain
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => rain
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_rain=ix
 
 !2D
+!Use I_RAINNC and I_RAINC to make 2D precip 
+  ix=ix+1
+  met(ix)%name             = 'I_RAINNC'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .false.!to get new and old value stored
+  met(ix)%read_meteo       = .false.
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundirainnc
+  allocate(irainnc(LIMAX,LJMAX))
+  irainnc=0.0
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:1)  => irainnc
+  met(ix)%zsize = 1
+  met(ix)%msize = 1
+  ix_irainnc=ix
+
+  ix=ix+1
+  met(ix)%name             = 'I_RAINC'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .false.
+  met(ix)%read_meteo       = .false.
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundirainc
+  allocate(irainc(LIMAX,LJMAX))
+  irainc=0.0
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:1)  => irainc
+  met(ix)%zsize = 1
+  met(ix)%msize = 1
+  ix_irainc=ix
+
+!2D redefine names for wrf
    met(ix_surface_precip)%name    = 'RAINNC'
    met(ix_convective_precip)%name = 'RAINC'
    met(ix_ps)%name                = 'PSFC'
@@ -947,26 +999,56 @@ endif
      stop
   endif
 
-    allocate(u_ref(MAXLIMAX,MAXLJMAX))
-    allocate(rho_surf(MAXLIMAX,MAXLJMAX))
-    allocate(Tpot2m(MAXLIMAX,MAXLJMAX))
-    allocate(invL_nwp(MAXLIMAX,MAXLJMAX))
-    allocate(pzpbl(MAXLIMAX,MAXLJMAX))
-    allocate(pwp(MAXLIMAX,MAXLJMAX))
-    allocate(fc(MAXLIMAX,MAXLJMAX))
-    allocate(xwf(MAXLIMAX+2*NEXTEND,MAXLJMAX+2*NEXTEND)) 
-    allocate(fSW(MAXLIMAX,MAXLJMAX))
+    allocate(u_ref(LIMAX,LJMAX))
+    allocate(rho_surf(LIMAX,LJMAX))
+    allocate(Tpot2m(LIMAX,LJMAX))
+    allocate(invL_nwp(LIMAX,LJMAX))
+    allocate(pzpbl(LIMAX,LJMAX))
+    allocate(pwp(LIMAX,LJMAX))
+    allocate(fc(LIMAX,LJMAX))
+    allocate(xwf(LIMAX+2*NEXTEND,LJMAX+2*NEXTEND)) 
+    allocate(fSW(LIMAX,LJMAX))
     fSW = 1.0
-    allocate(zen(MAXLIMAX, MAXLJMAX))
-    allocate(coszen(MAXLIMAX, MAXLJMAX))
+    allocate(zen(LIMAX, LJMAX))
+    allocate(coszen(LIMAX, LJMAX))
     coszen=0.0
-    allocate(Idiffuse(MAXLIMAX, MAXLJMAX))
-    allocate(Idirect(MAXLIMAX, MAXLJMAX))
-    allocate(clay_frac(MAXLIMAX, MAXLJMAX))
-    allocate(sand_frac(MAXLIMAX, MAXLJMAX))
-    allocate(surface_precip_old(MAXLIMAX,MAXLJMAX))
+    allocate(Idiffuse(LIMAX, LJMAX))
+    allocate(Idirect(LIMAX, LJMAX))
+    allocate(clay_frac(LIMAX, LJMAX))
+    allocate(sand_frac(LIMAX, LJMAX))
+    allocate(surface_precip_old(LIMAX,LJMAX))
     surface_precip_old=0.0
 
+    if(NPROC/=NPROC_MPI)then
+!allocate shared memory within large subdomains
+
+    CALL MPI_BARRIER(MPI_COMM_SUB, IERROR)
+
+    i=1
+    j=1    
+    do ix = 1, Nmetfields
+       data_shape=(/1,1,1/)
+       xsize=1
+!       write(*,*)me_mpi,'share ',met(ix)%name
+       call share_logical(met(ix)%ready,data_shape,xsize,MPI_COMM_SUB)
+       call share_logical(met(ix)%copied,data_shape,xsize,MPI_COMM_SUB)
+       if(met(ix)%dim==2)then
+          data_shape=(/largeLIMAX,largeLJMAX,1/)
+          xsize=largeLIMAX*largeLJMAX
+          i=i+1
+          call share(met(ix)%field_shared,data_shape,xsize,MPI_COMM_SUB)
+       endif
+       if(met(ix)%dim==3)then
+          j=j+1
+          data_shape=(/largeLIMAX,largeLJMAX,KMAX_MID/)
+          xsize=largeLIMAX*largeLJMAX*KMAX_MID
+          call share(met(ix)%field_shared,data_shape,xsize,MPI_COMM_SUB)
+       endif
+       CALL MPI_BARRIER(MPI_COMM_SUB, IERROR)
+    enddo
+    Nshared_2d=i
+    Nshared_3d=j
+    endif
   end subroutine Alloc_MetFields
 
 ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

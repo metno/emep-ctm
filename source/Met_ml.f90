@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -94,15 +94,15 @@ use FastJ_ml,             only : setup_phot_fastj,rcphot_3D
 use Functions_ml,         only : Exner_tab, Exner_nd
 use Functions_ml,         only : T_2_Tpot  !OS_TESTS
 use GridValues_ml,        only : xmd, i_fdom, j_fdom, i_local,j_local&
-       ,glon,glat,gl_stagg,gb_stagg,glat_fdom,glon_fdom&
+       ,glon,glat,gl_stagg,gb_stagg&
        ,xm_i,xm_j ,xm2,xmd,xm2ji,xmdji,GridArea_m2&
        , projection &
-       ,glon,glat, glat_fdom, glon_fdom, MIN_ADVGRIDS   &
+       ,glon,glat, MIN_ADVGRIDS   &
        ,Poles, xm_i, xm_j, xm2, sigma_bnd,sigma_mid &
        ,xp, yp, fi, GRIDWIDTH_M,ref_latitude     &
        ,debug_proc, debug_li, debug_lj &
        ,grid_north_pole_latitude,grid_north_pole_longitude &
-       ,GlobalPosition,DefGrid,gl_stagg,gb_stagg,A_mid,B_mid &
+       ,gl_stagg,gb_stagg,A_mid,B_mid &
        ,Eta_bnd,Eta_mid,dA,dB,A_mid,B_mid,A_bnd,B_bnd &
        ,KMAX_MET,External_Levels_Def,k1_met,k2_met,x_k1_met,rot_angle
 
@@ -123,29 +123,29 @@ use ModelConstants_ml,    only : PASCAL, PT, Pref, METSTEP  &
      ,nstep,USE_CONVECTION,USE_EtaCOORDINATES,USE_FASTJ & 
      ,CONVECTION_FACTOR & 
      ,LANDIFY_MET,MANUAL_GRID  & 
-     ,CW_THRESHOLD,RH_THRESHOLD, CW2CC,IOU_INST,JUMPOVER29FEB
+     ,CW_THRESHOLD,RH_THRESHOLD, CW2CC,IOU_INST,JUMPOVER29FEB, meteo, startdate, enddate
+use MPI_Groups_ml,     only: MPI_DOUBLE_PRECISION, MPI_SUM,MPI_INTEGER, MPI_BYTE,MPI_LOGICAL,&
+                             MPI_COMM_IO, MPI_COMM_CALC, IERROR, ME_IO, ME_CALC,&
+                             request_e,request_n,request_s,request_w,LargeSub_Ix,&
+                             largeLIMAX,largeLJMAX, MPISTATUS, MPI_MIN
 use Par_ml           ,    only : MAXLIMAX,MAXLJMAX,GIMAX,GJMAX, me  &
      ,limax,ljmax  &
      ,neighbor,WEST,EAST,SOUTH,NORTH,NOPROC  &
      ,MSG_NORTH2,MSG_EAST2,MSG_SOUTH2,MSG_WEST2  &
      ,IRUNBEG,JRUNBEG, tgi0, tgj0,gi0,gj0  &
-     ,MSG_INIT3,MSG_READ4, tlimax, tljmax
+     ,MSG_INIT3,MSG_READ4, tlimax, tljmax &
+     ,tlargegi0,tlargegj0
 use PhysicalConstants_ml, only : KARMAN, KAPPA, RGAS_KG, CP, GRAV    &
      ,ROWATER, PI
 use TimeDate_ml,          only : current_date, date,nmdays, &
      add_secs,timestamp,&
-     make_timestamp, make_current_date, nydays, startdate, enddate
-use ReadField_ml,         only : ReadField ! reads ascii fields
+     make_timestamp, make_current_date, nydays
 use NetCDF_ml,         only : printCDF,ReadField_CDF,vertical_interpolate,Out_netCDF,GetCDF_modelgrid ! testoutputs
 use netcdf
-use TimeDate_ExtraUtil_ml,only: nctime2idate,date2string
+use TimeDate_ExtraUtil_ml,only: nctime2date,date2string
 
 implicit none
 private
-
-
-INCLUDE 'mpif.h'
-INTEGER MPISTATUS(MPI_STATUS_SIZE),INFO
 
 ! logical, private, save      :: debug_procloc = .false.
 integer, private, save      :: debug_iloc, debug_jloc  ! local coords
@@ -162,9 +162,7 @@ integer(kind=2),allocatable :: var_local(:,:,:)
 ! Aid for debugging check routine
 character (len = 100), private, save :: call_msg=" Not set"
 
-character (len = 100), public, save  ::  meteo   ! template for meteofile
-
-public :: MeteoRead
+public :: MeteoRead, MeteoRead_io
 public :: MetModel_LandUse
 public :: metfieldint
 public :: BLPhysics
@@ -174,7 +172,136 @@ public :: Getmeteofield
 public :: landify     ! replaces met variables from mixed sea/land with land
 
 contains
+  subroutine MeteoRead_io()
 
+    character (len = 100), save  ::  meteoname   ! name of the meteofile
+    character (len = 100)        ::  namefield  ! name of the requested field
+    integer :: ix, KMAX, istart,jstart,ijk,i,j,k,k1,k2
+    integer :: nr
+    integer ::   ndim,nyear,nmonth,nday,nhour
+    real ::meteo_3D(largeLIMAX,largeLJMAX,KMAX_MET)
+    logical,save :: first_call = .true.
+    type(date)      ::  next_inptime             ! hfTD,addhours_to_input
+    type(timestamp) ::  ts_now                   ! time in timestamp format
+    real :: nsec                                 ! step in seconds
+    logical :: fexist,found
+
+    if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
+
+    nr=2 !set to one only when the first time meteo is read
+    call_msg = "Meteoread"
+    if(me_IO>=0)then
+       if(first_call)then !first time meteo is read
+          nr = 1
+          nrec = 0
+          next_inptime = current_date
+
+          !On first call, check that date from meteo file correspond to dates requested. 
+          !Also defines nhour_first and Nhh (and METSTEP in case of WRF metdata).
+          call Check_Meteo_Date !note that all procs read this
+       else
+          nsec=METSTEP*3600.0 !from hr to sec
+          ts_now = make_timestamp(current_date)
+          call add_secs(ts_now,nsec)
+          if(JUMPOVER29FEB.and.current_date%month==2.and.current_date%day==29)then
+             if(MasterProc)write(*,*)'Jumping over one day for meteo_date!'
+             call add_secs(ts_now,24*3600.)
+          endif
+          next_inptime=make_current_date(ts_now)
+       endif
+       nyear=next_inptime%year
+       nmonth=next_inptime%month
+       nday=next_inptime%day
+       nhour=next_inptime%hour
+       nrec=nrec+1
+
+       if(nrec>Nhh.or.nrec==1) then              ! start reading a new meteo input file
+          meteoname = date2string(meteo,next_inptime)
+          nrec = 1
+          if(nday==1.and.nmonth==1)then
+             !hour 00:00 from 1st January may be missing;checking first:
+             inquire(file=meteoname,exist=fexist)
+             if(.not.fexist)then
+                if(MasterProc)write(*,*)trim(meteoname),&
+                     ' does not exist; using data from previous day'
+                meteoname=date2string(meteo,next_inptime,-24*3600.0) 
+                nrec=Nhh
+             endif
+          endif
+          if(ME_IO==0)write(*,*)'io procs reading ',trim(meteoname)
+       endif
+
+       do ix=1,Nmetfields
+          if(met(ix)%read_meteo)then
+             namefield=met(ix)%name
+             ndim=met(ix)%dim
+
+             if(ndim==3)KMAX=KMAX_MET
+             if(ndim==2)KMAX=1
+
+             istart=gi0
+             jstart=gj0
+             call GetCDF_modelgrid(namefield,meteoname,meteo_3D,1,KMAX,nrec,1,&
+                  imax_in=largeLIMAX,jmax_in=largeLJMAX,needed=met(ix)%needed,found=met(ix)%found)
+             if(met(ix)%found)then
+                if(KMAX==1)then       
+                   ijk=0
+                   k=1
+                   do j=1,largeLJMAX
+                      do i=1,largeLIMAX
+                         ijk=ijk+1
+                         met(ix)%field_shared(i,j,k)=meteo_3D(i,j,k)
+                      enddo
+                   enddo
+                else
+                   if(External_Levels_Def)then
+                      !interpolate vertically if the levels are not identical
+                      ijk=0
+                      do k=1,KMAX_MID
+                         k1=k1_met(k)
+                         k2=k2_met(k)
+                         do j=1,largeLJMAX
+                            do i=1,largeLIMAX
+                               ijk=ijk+1
+                               met(ix)%field_shared(i,j,k)=x_k1_met(k)*meteo_3D(i,j,k1)+(1.0-x_k1_met(k))*meteo_3D(i,j,k2)
+                            enddo
+                         enddo
+                      enddo
+                   else
+                      !use same vertical coordinates as meteo
+                      ijk=0
+                      do k=1,KMAX_MID
+                         do j=1,largeLJMAX
+                            do i=1,largeLIMAX
+                               ijk=ijk+1
+                               met(ix)%field_shared(i,j,k)=meteo_3D(i,j,k)
+                            enddo
+                         enddo
+                      enddo
+
+                   endif
+                endif
+                met(ix)%ready=.true.
+                met(ix)%copied=.false.
+             else
+                met(ix)%ready=.false.
+                met(ix)%copied=.false.
+             endif
+
+             if(me_io==0)then
+                if(met(ix)%found)write(*,*)'found ',trim(namefield),' in ',trim(meteoname)
+                if(met(ix)%found.and.ndim==2)write(*,*)'typical value 2D = ',trim(namefield),me_io,met(ix)%field_shared(5,5,1)
+                if(met(ix)%found.and.ndim==3)write(*,*)'typical value 3D = ',trim(namefield),me_io,met(ix)%field_shared(5,5,KMAX_MID)
+                if(.not.met(ix)%found)write(*,*)'did not find ',trim(namefield),' in ',trim(meteoname)
+             endif
+          endif
+       enddo
+       first_call = .false.
+    else
+     
+    endif
+
+  end subroutine MeteoRead_io
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
   subroutine MeteoRead()
     !    the subroutine reads meteorological fields and parameters (every
@@ -194,7 +321,7 @@ contains
 
     real :: nsec                                 ! step in seconds
 
-    real :: buff(MAXLIMAX,MAXLJMAX)!temporary metfields
+    real :: buff(LIMAX,LJMAX)!temporary metfields
     integer :: i, j, ix, k, kk, ii,jj,ii2,jj2, nrix, isw, KMAX
     logical :: fexist,found
     logical,save :: first_call = .true.
@@ -215,30 +342,29 @@ contains
          /)
     logical :: write_now
 
-    real :: relh1,relh2,temperature,swp,wp
+    real :: relh1,relh2,temperature,swp,wp, x_out
     real,   dimension(KMAX_MID)          ::  prhelp, exf2
     real,   dimension(KMAX_BND)          ::  exf1
 
-    real,   dimension(MAXLJMAX,KMAX_MID) :: usnd   ! send in x
-    real,   dimension(MAXLIMAX,KMAX_MID) :: vsnd   ! and in y direction
-    real,   dimension(MAXLJMAX,KMAX_MID) :: urcv   ! rcv in x
-    real,   dimension(MAXLIMAX,KMAX_MID) :: vrcv   ! and in y direction
+    real,   dimension(LJMAX,KMAX_MID) :: usnd   ! send in x
+    real,   dimension(LIMAX,KMAX_MID) :: vsnd   ! and in y direction
+    real,   dimension(LJMAX,KMAX_MID) :: urcv   ! rcv in x
+    real,   dimension(LIMAX,KMAX_MID) :: vrcv   ! and in y direction
 
     real   p1, p2, x, y
     real   prhelp_sum,divk(KMAX_MID),sumdiv,dB_sum
     real   divt, inv_METSTEP
 
-    integer request_s,request_n,request_e,request_w
-    real ::Ps_extended(0:MAXLIMAX+1,0:MAXLJMAX+1),Pmid,Pu1,Pu2,Pv1,Pv2
+    real ::Ps_extended(0:LIMAX+1,0:LJMAX+1),Pmid,Pu1,Pu2,Pv1,Pv2
 
     real :: tmpsw, landfrac, sumland  ! for soil water averaging
     real :: minprecip, tmpmax ! debug 
 
-    real buf_uw(MAXLJMAX,KMAX_MID)
-    real buf_ue(MAXLJMAX,KMAX_MID)
-    real buf_vn(MAXLIMAX,KMAX_MID)
-    real buf_vs(MAXLIMAX,KMAX_MID)
-
+    real buf_uw(LJMAX,KMAX_MID)
+    real buf_ue(LJMAX,KMAX_MID)
+    real buf_vn(LIMAX,KMAX_MID)
+    real buf_vs(LIMAX,KMAX_MID)
+    integer ::   INFO,i_large,j_large
 
     if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
 
@@ -262,7 +388,7 @@ contains
        allocate(var_local(MAXLIMAX,MAXLJMAX,KMAX))
 
        !On first call, check that date from meteo file correspond to dates requested. 
-       !Also defines nhour_first and Nhh (and METSTEP in case of WRF metdata).
+       !Also defines nhour_first and Nhh (and METSTEP and bucket in case of WRF metdata).
        call Check_Meteo_Date !note that all procs read this
  
        call Exner_tab()!init table
@@ -326,14 +452,49 @@ contains
           ndim=met(ix)%dim
           nrix=min(met(ix)%msize,nr)
 
-          call Getmeteofield(meteoname,namefield,nrec,ndim,unit,met(ix)%validity,&
-               met(ix)%field(1:MAXLIMAX,1:MAXLJMAX,:,nrix),needed=met(ix)%needed,&
-               found=met(ix)%found)
-
+!          if(met(ix)%ready .eqv. .true.)then
+          if(.false.)then
+                if(ndim==2)then
+                   do j=1,ljmax
+                      j_large=j+gj0-tlargegj0(LargeSub_Ix)
+                   do i=1,limax
+                      i_large=i+gi0-tlargegi0(LargeSub_Ix)
+                      met(ix)%field(i,j,1,nrix)=met(ix)%field_shared(i_large,j_large,1)
+                   enddo
+                   enddo
+                else if(ndim==3)then
+                   do k=1,KMAX_MID
+                   do j=1,ljmax
+                      j_large=j+gj0-tlargegj0(LargeSub_Ix)
+                   do i=1,limax
+                      i_large=i+gi0-tlargegi0(LargeSub_Ix)
+                      met(ix)%field(i,j,k,nrix)=met(ix)%field_shared(i_large,j_large,k)
+                   enddo
+                   enddo
+                   enddo
+                endif
+                met(ix)%found=.true.
+                met(ix_fh)%validity='averaged'!should be softified
+                met(ix_fl)%validity='averaged'!should be softified
+             else
+                call Getmeteofield(meteoname,namefield,nrec,ndim,unit,met(ix)%validity,&
+                     met(ix)%field(1:LIMAX,1:LJMAX,:,nrix),needed=met(ix)%needed,&
+                     found=met(ix)%found)
+             endif
           if(write_now)then
              if(met(ix)%found)write(*,*)'found ',trim(namefield),' in ',trim(meteoname)
-             if(met(ix)%found)write(*,*)'random value = ',met(ix)%field(5,5,1,nrix)
+             if(met(ix)%found.and.ndim==2)write(*,*)'typical value = ',&
+                  met(ix)%field(5,5,1,nrix),maxval(met(ix)%field(:,:,1,nrix))
+             if(met(ix)%found.and.ndim==3)write(*,*)'typical value = ',&
+                  met(ix)%field(5,5,kmax_mid,nrix),maxval(met(ix)%field(:,:,kmax_mid,nrix))
              if(.not.met(ix)%found)write(*,*)'did not find ',trim(namefield),' in ',trim(meteoname)
+             if(me_calc<0)then
+                if(ndim==2)then
+                write(*,*)'met compare 2D ',me,met(ix)%field(5,5,1,nrix),met(ix)%field_shared(i_large,j_large,1)
+                else
+                write(*,*)'met compare 3D ',me,met(ix)%field(5,5,KMAX_MID,nrix),met(ix)%field_shared(i_large,j_large,KMAX_MID)
+                endif
+             endif
           endif
        endif
     enddo
@@ -358,8 +519,8 @@ contains
         if (neighbor(WEST) .ne. NOPROC) then
            if(neighbor(WEST) .ne. me)then
               buf_uw(:,:) = u_xmj(1,:,:,nr)
-              CALL MPI_ISEND(buf_uw, 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-                   neighbor(WEST), MSG_EAST2, MPI_COMM_WORLD, request_w, INFO)
+              CALL MPI_ISEND(buf_uw, 8*LJMAX*KMAX_MID, MPI_BYTE, &
+                   neighbor(WEST), MSG_EAST2, MPI_COMM_CALC, request_w, IERROR)
            else
               ! cyclic grid: own neighbor
               ue(:,:,nr) = u_xmj(1,:,:,nr)
@@ -367,24 +528,24 @@ contains
         endif
         if (neighbor(SOUTH) .ne. NOPROC) then
            buf_vs(:,:) = v_xmi(:,1,:,nr)
-           CALL MPI_ISEND(buf_vs, 8*MAXLIMAX*KMAX_MID, MPI_BYTE, &
-                neighbor(SOUTH), MSG_NORTH2, MPI_COMM_WORLD, request_s, INFO)
+           CALL MPI_ISEND(buf_vs, 8*LIMAX*KMAX_MID, MPI_BYTE, &
+                neighbor(SOUTH), MSG_NORTH2, MPI_COMM_CALC, request_s, IERROR)
         endif
 
         if (neighbor(EAST) .ne. NOPROC .and. neighbor(EAST) .ne. me) then
-           CALL MPI_RECV(ue(1,1,nr), 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-                neighbor(EAST), MSG_EAST2, MPI_COMM_WORLD, MPISTATUS, INFO)
+           CALL MPI_RECV(ue(1,1,nr), 8*LJMAX*KMAX_MID, MPI_BYTE, &
+                neighbor(EAST), MSG_EAST2, MPI_COMM_CALC, MPISTATUS, IERROR)
         endif
         if (neighbor(NORTH) .ne. NOPROC) then
-           CALL MPI_RECV(vn(1,1,nr), 8*MAXLIMAX*KMAX_MID, MPI_BYTE, &
-                neighbor(NORTH), MSG_NORTH2, MPI_COMM_WORLD, MPISTATUS, INFO)
+           CALL MPI_RECV(vn(1,1,nr), 8*LIMAX*KMAX_MID, MPI_BYTE, &
+                neighbor(NORTH), MSG_NORTH2, MPI_COMM_CALC, MPISTATUS, IERROR)
         endif
         
         if (neighbor(WEST) .ne. NOPROC .and. neighbor(WEST) .ne. me) then
-           CALL MPI_WAIT(request_w, MPISTATUS, INFO)
+           CALL MPI_WAIT(request_w, MPISTATUS, IERROR)
         endif
         if (neighbor(SOUTH) .ne. NOPROC) then
-           CALL MPI_WAIT(request_s, MPISTATUS, INFO)
+           CALL MPI_WAIT(request_s, MPISTATUS, IERROR)
         endif
 
         do k=1,KMAX_MID
@@ -422,23 +583,23 @@ contains
     !extend the i or j index to 0
     if (neighbor(EAST) .ne. NOPROC) then
        usnd(:,:) = u_xmj(limax,:,:,nr)
-       CALL MPI_ISEND( usnd, 8*MAXLJMAX*KMAX_MID, MPI_BYTE,  &
-            neighbor(EAST), MSG_WEST2, MPI_COMM_WORLD, request_e, INFO)
+       CALL MPI_ISEND( usnd, 8*LJMAX*KMAX_MID, MPI_BYTE,  &
+            neighbor(EAST), MSG_WEST2, MPI_COMM_CALC, request_e, IERROR)
     endif
     if (neighbor(NORTH) .ne. NOPROC) then
        vsnd(:,:) = v_xmi(:,ljmax,:,nr)
-       CALL MPI_ISEND( vsnd , 8*MAXLIMAX*KMAX_MID, MPI_BYTE,  &
-            neighbor(NORTH), MSG_SOUTH2, MPI_COMM_WORLD, request_n, INFO)
+       CALL MPI_ISEND( vsnd , 8*LIMAX*KMAX_MID, MPI_BYTE,  &
+            neighbor(NORTH), MSG_SOUTH2, MPI_COMM_CALC, request_n, IERROR)
     endif
     if (neighbor(WEST) .ne. NOPROC) then
-       CALL MPI_RECV( u_xmj(0,:,:,nr), 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-            neighbor(WEST), MSG_WEST2, MPI_COMM_WORLD, MPISTATUS, INFO)
+       CALL MPI_RECV( u_xmj(0,:,:,nr), 8*LJMAX*KMAX_MID, MPI_BYTE, &
+            neighbor(WEST), MSG_WEST2, MPI_COMM_CALC, MPISTATUS, IERROR)
     else
        u_xmj(0,:,:,nr) = u_xmj(1,:,:,nr)
     endif
     if (neighbor(SOUTH) .ne. NOPROC) then
-       CALL MPI_RECV( v_xmi(:,0,:,nr) , 8*MAXLIMAX*KMAX_MID, MPI_BYTE,  &
-            neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_WORLD, MPISTATUS, INFO)
+       CALL MPI_RECV( v_xmi(:,0,:,nr) , 8*LIMAX*KMAX_MID, MPI_BYTE,  &
+            neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_CALC, MPISTATUS, IERROR)
     else
        if(Poles(2)/=1)  then
           v_xmi(:,0,:,nr) = v_xmi(:,1,:,nr)
@@ -451,8 +612,8 @@ contains
        !"close" the North pole
        v_xmi(:,ljmax,:,nr) = 0.0
     endif
-    if(neighbor(EAST) .ne. NOPROC) CALL MPI_WAIT(request_e, MPISTATUS, INFO)
-    if(neighbor(NORTH) .ne. NOPROC)CALL MPI_WAIT(request_n, MPISTATUS, INFO)
+    if(neighbor(EAST) .ne. NOPROC) CALL MPI_WAIT(request_e, MPISTATUS, IERROR)
+    if(neighbor(NORTH) .ne. NOPROC)CALL MPI_WAIT(request_n, MPISTATUS, IERROR)
 
     !divide by the scaling in the perpendicular direction to get effective 
     !u_xmj and v_xmi
@@ -520,11 +681,19 @@ contains
        surface_precip = surface_precip + convective_precip
        !write(*,*)'precip ',nrec,Nhh,surface_precip(5,5),convective_precip(5,5),surface_precip_old(5,5)
        if(WRF_MET_CORRECTIONS) then 
+          if(found_wrf_bucket)then
+             !wrf "bucket" definition for surface precipitation:
+             !surface_precip = I_RAINNC*bucket + RAINNC + I_RAINC*bucket + RAINC
+             surface_precip=surface_precip+irainnc*wrf_bucket+irainc*wrf_bucket
+          endif
           buff=surface_precip !save to save in old below
+
           !must first check that precipitation is increasing. At some dates WRF maybe restarted!
           minprecip=minval(surface_precip(1:limax,1:ljmax) - surface_precip_old(1:limax,1:ljmax))
-          CALL MPI_ALLREDUCE(MPI_IN_PLACE, minprecip, 1,MPI_DOUBLE_PRECISION, &
-               MPI_MIN, MPI_COMM_WORLD, INFO) 
+
+          CALL MPI_ALLREDUCE(minprecip, x_out, 1,MPI_DOUBLE_PRECISION, &
+               MPI_MIN, MPI_COMM_CALC, IERROR) 
+          minprecip=x_out
           if(minprecip<-10)then
              if(me==0)write(*,*)'WARNING: found negative precipitations. set precipitations to zero!',minprecip
              surface_precip = 0.0
@@ -538,7 +707,7 @@ contains
           do k=1,kmax_mid
              call smoosp(rain(1,1,k,nr),0.0,1.0E10)
           enddo
-       endif
+      endif
 
        !if available, will use cloudwater to determine the height of release
        !NB: array cw_met only used here
@@ -597,6 +766,7 @@ contains
                 endif
              enddo
           enddo
+    
         else if(foundcloudwater)then
 
           if(write_now)write(*,*)'release height for 3D precipitations derived from cloudwater'
@@ -981,71 +1151,71 @@ contains
        !we reuse usnd, vsnd etc
        if (neighbor(EAST) .ne. NOPROC) then
           usnd(:,1) = ps(limax,:,nr)
-          CALL MPI_ISEND( usnd, 8*MAXLJMAX, MPI_BYTE,  &
-               neighbor(EAST), MSG_WEST2, MPI_COMM_WORLD, request_e, INFO)
+          CALL MPI_ISEND( usnd, 8*LJMAX, MPI_BYTE,  &
+               neighbor(EAST), MSG_WEST2, MPI_COMM_CALC, request_e, IERROR)
        endif
        if (neighbor(NORTH) .ne. NOPROC) then
           vsnd(:,1) = ps(:,ljmax,nr)
-          CALL MPI_ISEND( vsnd , 8*MAXLIMAX, MPI_BYTE,  &
-               neighbor(NORTH), MSG_SOUTH2, MPI_COMM_WORLD, request_n, INFO)
+          CALL MPI_ISEND( vsnd , 8*LIMAX, MPI_BYTE,  &
+               neighbor(NORTH), MSG_SOUTH2, MPI_COMM_CALC, request_n, IERROR)
        endif
        !     receive from WEST neighbor if any
        if (neighbor(WEST) .ne. NOPROC) then
-          CALL MPI_RECV( urcv, 8*MAXLJMAX, MPI_BYTE, &
-               neighbor(WEST), MSG_WEST2, MPI_COMM_WORLD, MPISTATUS, INFO)
+          CALL MPI_RECV( urcv, 8*LJMAX, MPI_BYTE, &
+               neighbor(WEST), MSG_WEST2, MPI_COMM_CALC, MPISTATUS, IERROR)
           Ps_extended(0,1:ljmax) = urcv(1:ljmax,1)
        else
           Ps_extended(0,1:ljmax) = Ps_extended(1,1:ljmax)
        endif
        !     receive from SOUTH neighbor if any
        if (neighbor(SOUTH) .ne. NOPROC) then
-          CALL MPI_RECV( vrcv, 8*MAXLIMAX, MPI_BYTE,  &
-               neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_WORLD, MPISTATUS, INFO)
+          CALL MPI_RECV( vrcv, 8*LIMAX, MPI_BYTE,  &
+               neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_CALC, MPISTATUS, IERROR)
           Ps_extended(1:limax,0) = vrcv(1:limax,1)
        else
           Ps_extended(1:limax,0) = Ps_extended(1:limax,1)
        endif
        if (neighbor(WEST) .ne. NOPROC) then
           usnd(:,2) = ps(1,:,nr)
-          CALL MPI_ISEND( usnd(1,2), 8*MAXLJMAX, MPI_BYTE,  &
-               neighbor(WEST), MSG_WEST2, MPI_COMM_WORLD, request_w, INFO)
+          CALL MPI_ISEND( usnd(1,2), 8*LJMAX, MPI_BYTE,  &
+               neighbor(WEST), MSG_WEST2, MPI_COMM_CALC, request_w, IERROR)
        endif
        if (neighbor(SOUTH) .ne. NOPROC) then
           vsnd(:,2) = ps(:,1,nr)
-          CALL MPI_ISEND( vsnd(1,2) , 8*MAXLIMAX, MPI_BYTE,  &
-               neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_WORLD, request_s, INFO)
+          CALL MPI_ISEND( vsnd(1,2) , 8*LIMAX, MPI_BYTE,  &
+               neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_CALC, request_s, IERROR)
        endif
 
        !     receive from EAST neighbor if any
        if (neighbor(EAST) .ne. NOPROC) then
-          CALL MPI_RECV( urcv, 8*MAXLJMAX, MPI_BYTE, &
-               neighbor(EAST), MSG_WEST2, MPI_COMM_WORLD, MPISTATUS, INFO)
+          CALL MPI_RECV( urcv, 8*LJMAX, MPI_BYTE, &
+               neighbor(EAST), MSG_WEST2, MPI_COMM_CALC, MPISTATUS, IERROR)
           Ps_extended(limax+1,1:ljmax) = urcv(1:ljmax,1)
        else
           Ps_extended(limax+1,1:ljmax) = Ps_extended(limax,1:ljmax)
        endif
        !     receive from NORTH neighbor if any
        if (neighbor(NORTH) .ne. NOPROC) then
-          CALL MPI_RECV( vrcv, 8*MAXLIMAX, MPI_BYTE,  &
-               neighbor(NORTH), MSG_SOUTH2, MPI_COMM_WORLD, MPISTATUS, INFO)
+          CALL MPI_RECV( vrcv, 8*LIMAX, MPI_BYTE,  &
+               neighbor(NORTH), MSG_SOUTH2, MPI_COMM_CALC, MPISTATUS, IERROR)
           Ps_extended(1:limax,ljmax+1) = vrcv(1:limax,1)
        else
           Ps_extended(1:limax,ljmax+1) = Ps_extended(1:limax,ljmax)
        endif
 
        if (neighbor(EAST) .ne. NOPROC) then
-          CALL MPI_WAIT(request_e, MPISTATUS, INFO)
+          CALL MPI_WAIT(request_e, MPISTATUS, IERROR)
        endif
 
        if (neighbor(NORTH) .ne. NOPROC) then
-          CALL MPI_WAIT(request_n, MPISTATUS, INFO)
+          CALL MPI_WAIT(request_n, MPISTATUS, IERROR)
        endif
        if (neighbor(WEST) .ne. NOPROC) then
-          CALL MPI_WAIT(request_w, MPISTATUS, INFO)
+          CALL MPI_WAIT(request_w, MPISTATUS, IERROR)
        endif
 
        if (neighbor(SOUTH) .ne. NOPROC) then
-          CALL MPI_WAIT(request_s, MPISTATUS, INFO)
+          CALL MPI_WAIT(request_s, MPISTATUS, IERROR)
        endif
 
        do j = 1,ljmax
@@ -1153,8 +1323,8 @@ contains
     if (neighbor(WEST) .ne. NOPROC) then
        if(neighbor(WEST) .ne. me)then
           buf_uw(:,:) = u_xmj(1,:,:,nr)
-          CALL MPI_ISEND(buf_uw, 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-               neighbor(WEST), MSG_EAST2, MPI_COMM_WORLD, request_w, INFO)
+          CALL MPI_ISEND(buf_uw, 8*LJMAX*KMAX_MID, MPI_BYTE, &
+               neighbor(WEST), MSG_EAST2, MPI_COMM_CALC, request_w, IERROR)
        else
         ! cyclic grid: own neighbor
           ue(:,:,nr) = u_xmj(1,:,:,nr)
@@ -1165,8 +1335,8 @@ contains
     if (neighbor(EAST) .ne. NOPROC) then
       if (neighbor(EAST) .ne. me) then
          buf_ue(:,:) = u_xmj(limax-1,:,:,nr)
-         CALL MPI_ISEND(buf_ue, 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-              neighbor(EAST), MSG_WEST2, MPI_COMM_WORLD, request_e, INFO)
+         CALL MPI_ISEND(buf_ue, 8*LJMAX*KMAX_MID, MPI_BYTE, &
+              neighbor(EAST), MSG_WEST2, MPI_COMM_CALC, request_e, IERROR)
       else
         ! cyclic grid: own neighbor
          uw(:,:,nr) = u_xmj(limax-1,:,:,nr)
@@ -1176,53 +1346,53 @@ contains
 !     send to SOUTH neighbor if any
     if (neighbor(SOUTH) .ne. NOPROC) then
        buf_vs(:,:) = v_xmi(:,1,:,nr)
-      CALL MPI_ISEND(buf_vs, 8*MAXLIMAX*KMAX_MID, MPI_BYTE, &
-            neighbor(SOUTH), MSG_NORTH2, MPI_COMM_WORLD, request_s, INFO)
+      CALL MPI_ISEND(buf_vs, 8*LIMAX*KMAX_MID, MPI_BYTE, &
+            neighbor(SOUTH), MSG_NORTH2, MPI_COMM_CALC, request_s, IERROR)
     endif
 
 !     send to NORTH neighbor if any
     if (neighbor(NORTH) .ne. NOPROC) then
        buf_vn(:,:) = v_xmi(:,ljmax-1,:,nr)
-      CALL MPI_ISEND(buf_vn, 8*MAXLIMAX*KMAX_MID, MPI_BYTE, &
-            neighbor(NORTH), MSG_SOUTH2, MPI_COMM_WORLD, request_n, INFO)
+      CALL MPI_ISEND(buf_vn, 8*LIMAX*KMAX_MID, MPI_BYTE, &
+            neighbor(NORTH), MSG_SOUTH2, MPI_COMM_CALC, request_n, IERROR)
     endif
 
 !     receive from EAST neighbor if any
     if (neighbor(EAST) .ne. NOPROC .and. neighbor(EAST) .ne. me) then
-      CALL MPI_RECV(ue(1,1,nr), 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-          neighbor(EAST), MSG_EAST2, MPI_COMM_WORLD, MPISTATUS, INFO)
+      CALL MPI_RECV(ue(1,1,nr), 8*LJMAX*KMAX_MID, MPI_BYTE, &
+          neighbor(EAST), MSG_EAST2, MPI_COMM_CALC, MPISTATUS, IERROR)
     endif
 
 !     receive from WEST neighbor if any
     if (neighbor(WEST) .ne. NOPROC .and. neighbor(WEST) .ne. me) then
-      CALL MPI_RECV(uw(1,1,nr), 8*MAXLJMAX*KMAX_MID, MPI_BYTE, &
-           neighbor(WEST), MSG_WEST2, MPI_COMM_WORLD, MPISTATUS, INFO)
+      CALL MPI_RECV(uw(1,1,nr), 8*LJMAX*KMAX_MID, MPI_BYTE, &
+           neighbor(WEST), MSG_WEST2, MPI_COMM_CALC, MPISTATUS, IERROR)
     endif
 
 !     receive from NORTH neighbor if any
 
     if (neighbor(NORTH) .ne. NOPROC) then
-      CALL MPI_RECV(vn(1,1,nr), 8*MAXLIMAX*KMAX_MID, MPI_BYTE, &
-           neighbor(NORTH), MSG_NORTH2, MPI_COMM_WORLD, MPISTATUS, INFO)
+      CALL MPI_RECV(vn(1,1,nr), 8*LIMAX*KMAX_MID, MPI_BYTE, &
+           neighbor(NORTH), MSG_NORTH2, MPI_COMM_CALC, MPISTATUS, IERROR)
     endif
 
 !     receive from SOUTH neighbor if any
     if (neighbor(SOUTH) .ne. NOPROC) then
-      CALL MPI_RECV(vs(1,1,nr), 8*MAXLIMAX*KMAX_MID, MPI_BYTE, &
-          neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_WORLD, MPISTATUS, INFO)
+      CALL MPI_RECV(vs(1,1,nr), 8*LIMAX*KMAX_MID, MPI_BYTE, &
+          neighbor(SOUTH), MSG_SOUTH2, MPI_COMM_CALC, MPISTATUS, IERROR)
      endif
 
     if (neighbor(EAST) .ne. NOPROC .and. neighbor(EAST) .ne. me) then
-      CALL MPI_WAIT(request_e, MPISTATUS, INFO)
+      CALL MPI_WAIT(request_e, MPISTATUS, IERROR)
     endif
     if (neighbor(WEST) .ne. NOPROC .and. neighbor(WEST) .ne. me) then
-      CALL MPI_WAIT(request_w, MPISTATUS, INFO)
+      CALL MPI_WAIT(request_w, MPISTATUS, IERROR)
     endif
     if (neighbor(NORTH) .ne. NOPROC) then
-      CALL MPI_WAIT(request_n, MPISTATUS, INFO)
+      CALL MPI_WAIT(request_n, MPISTATUS, IERROR)
     endif
     if (neighbor(SOUTH) .ne. NOPROC) then
-      CALL MPI_WAIT(request_s, MPISTATUS, INFO)
+      CALL MPI_WAIT(request_s, MPISTATUS, IERROR)
     endif
 
     if(USE_FASTJ)then
@@ -1428,28 +1598,9 @@ contains
 
          else
             !use grid specific data
-            write(fname,fmt='(''clay_frac.dat'')') 
-            if (MasterProc)write(6,*)'filename for clay fraction ',fname, IO_CLAY, ios
-            call ReadField(IO_CLAY,fname,clay_frac)   
-            ! Convert from percent to fraction      
-            do j=1,ljmax
-               do i=1,limax
-                  clay_frac(i,j) = 0.01 * clay_frac(i,j)
-               enddo
-            enddo
-            !.. Sand soil content
-            ios = 0
-            write(fname,fmt='(''sand_frac.dat'')') 
-            if (MasterProc)write(6,*) 'filename for sand fraction ',fname, IO_SAND, ios
-            call ReadField(IO_SAND,fname,sand_frac)
-            ! Convert from percent to fraction      
-            do j=1,ljmax
-               do i=1,limax
-                  sand_frac(i,j) = 0.01 * sand_frac(i,j)
-               enddo
-            enddo
-        endif
-
+            if (MasterProc)write(6,*)'ASCII DUST NO MORE AVAILABLE! '
+            stop
+         endif
       end if ! USE_DUST
  
     end if ! callnum == 1
@@ -1498,8 +1649,8 @@ contains
     !c**********************************************************************
     logical, parameter :: TKE_DIFF = .false.  !!! CODE NEEDS TESTING/TIDY UP
 
-    real, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID)::exnm
-    real, dimension(MAXLIMAX,MAXLJMAX,KMAX_BND)::exns
+    real, dimension(LIMAX,LJMAX,KMAX_MID)::exnm
+    real, dimension(LIMAX,LJMAX,KMAX_BND)::exns
 
     real :: p_m, p_s, hs
 
@@ -1856,12 +2007,12 @@ contains
     !c
     implicit none
 
-    real, intent(inout) :: f(MAXLIMAX,MAXLJMAX)
+    real, intent(inout) :: f(LIMAX,LJMAX)
     real, intent(in)    :: rmin,rmax
 
-    real, dimension(MAXLIMAX+4,MAXLJMAX+4) :: h1, h2
-    real, dimension(MAXLIMAX,2)            :: f_south,f_north
-    real, dimension(MAXLJMAX+2*2,2)        :: f_west,f_east
+    real, dimension(LIMAX+4,LJMAX+4) :: h1, h2
+    real, dimension(LIMAX,2)            :: f_south,f_north
+    real, dimension(LJMAX+2*2,2)        :: f_west,f_east
     real s
 
     integer  thick
@@ -1963,7 +2114,7 @@ contains
     !     - returns extended array array, reading neighbour procs as needed
     !c----------------------------------------------------------------------
 
-    real, intent(in) :: f(:,:)
+    real, intent(in) :: f(LIMAX,LJMAX)
     real, intent(inout) :: h(:,:)
     logical, intent(in), optional :: debug_flag
     logical :: mydebug = .false.
@@ -2033,14 +2184,14 @@ contains
   !  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   subroutine landify(x,intxt,xmin,xmax,wfmin,xmask)
-    real, dimension(MAXLIMAX,MAXLJMAX), intent(inout) :: x
+    real, dimension(LIMAX,LJMAX), intent(inout) :: x
     character(len=*), intent(in), optional :: intxt
     real, intent(in), optional :: xmin, xmax  ! Limits of valid data for x
     real, intent(in), optional :: wfmin ! Limits of valid data for water frac
-    logical, dimension(MAXLIMAX,MAXLJMAX), intent(in), optional :: xmask 
+    logical, dimension(LIMAX,LJMAX), intent(in), optional :: xmask 
 
-    logical, dimension(MAXLIMAX,MAXLJMAX) :: mask 
-    real, dimension(MAXLIMAX+2*NEXTEND,MAXLJMAX+2*NEXTEND)  :: xx  ! extended
+    logical, dimension(LIMAX,LJMAX) :: mask 
+    real, dimension(LIMAX+2*NEXTEND,LJMAX+2*NEXTEND)  :: xx  ! extended
     character(len=30) :: txt, masktxt
     real :: xwfmin, xxmin, xxmax  
     logical :: debug_flag=.false.
@@ -2178,13 +2329,13 @@ contains
     implicit none
 
     integer, intent(in) :: thick
-    real,intent(in), dimension(MAXLIMAX,MAXLJMAX) ::data
-    real,intent(out), dimension(MAXLIMAX,thick) ::data_south,data_north
-    real,intent(out), dimension(MAXLJMAX+2*thick,thick) ::data_west,data_east
-    real, dimension(MAXLIMAX,thick) ::data_south_snd,data_north_snd
-    real, dimension(MAXLJMAX+2*thick,thick) ::data_west_snd,data_east_snd
+    real,intent(in), dimension(LIMAX,LJMAX) ::data
+    real,intent(out), dimension(LIMAX,thick) ::data_south,data_north
+    real,intent(out), dimension(LJMAX+2*thick,thick) ::data_west,data_east
+    real, dimension(LIMAX,thick) ::data_south_snd,data_north_snd
+    real, dimension(LJMAX+2*thick,thick) ::data_west_snd,data_east_snd
 
-    integer :: msgnr,info,request_s,request_n,request_e,request_w
+    integer :: msgnr,info
     integer :: j,tj,jj,jt
 
     !check that limax and ljmax are large enough
@@ -2197,25 +2348,25 @@ contains
     data_south_snd(:,:)=data(:,1:thick)
     data_north_snd(:,:)=data(:,ljmax-thick+1:ljmax)
     if(neighbor(SOUTH) >= 0 )then
-       CALL MPI_ISEND( data_south_snd , 8*MAXLIMAX*thick, MPI_BYTE,&
-            neighbor(SOUTH), msgnr, MPI_COMM_WORLD, request_s,INFO)
+       CALL MPI_ISEND( data_south_snd , 8*LIMAX*thick, MPI_BYTE,&
+            neighbor(SOUTH), msgnr, MPI_COMM_CALC, request_s,IERROR)
     endif
     if(neighbor(NORTH) >= 0 )then
-       CALL MPI_ISEND( data_north_snd , 8*MAXLIMAX*thick, MPI_BYTE,&
-            neighbor(NORTH), msgnr+9, MPI_COMM_WORLD, request_n,INFO)
+       CALL MPI_ISEND( data_north_snd , 8*LIMAX*thick, MPI_BYTE,&
+            neighbor(NORTH), msgnr+9, MPI_COMM_CALC, request_n,IERROR)
     endif
 
     if(neighbor(SOUTH) >= 0 )then
-       CALL MPI_RECV( data_south, 8*MAXLIMAX*thick, MPI_BYTE,&
-            neighbor(SOUTH), msgnr+9, MPI_COMM_WORLD, MPISTATUS, INFO)
+       CALL MPI_RECV( data_south, 8*LIMAX*thick, MPI_BYTE,&
+            neighbor(SOUTH), msgnr+9, MPI_COMM_CALC, MPISTATUS, IERROR)
     else
        do tj=1,thick
           data_south(:,tj)=data(:,1)
        enddo
     endif
     if(neighbor(NORTH) >= 0 )then
-       CALL MPI_RECV( data_north, 8*MAXLIMAX*thick, MPI_BYTE,&
-            neighbor(NORTH), msgnr, MPI_COMM_WORLD, MPISTATUS, INFO)
+       CALL MPI_RECV( data_north, 8*LIMAX*thick, MPI_BYTE,&
+            neighbor(NORTH), msgnr, MPI_COMM_CALC, MPISTATUS, IERROR)
     else
        do tj=1,thick
           data_north(:,tj)=data(:,ljmax)
@@ -2240,19 +2391,19 @@ contains
     enddo
 
     if(neighbor(WEST) >= 0 )then
-       CALL MPI_ISEND( data_west_snd , 8*(MAXLJMAX+2*thick)*thick, MPI_BYTE,&
-            neighbor(WEST), msgnr+3, MPI_COMM_WORLD, request_w,INFO)
+       CALL MPI_ISEND( data_west_snd , 8*(LJMAX+2*thick)*thick, MPI_BYTE,&
+            neighbor(WEST), msgnr+3, MPI_COMM_CALC, request_w,IERROR)
     endif
     if(neighbor(EAST) >= 0 )then
-       CALL MPI_ISEND( data_east_snd , 8*(MAXLJMAX+2*thick)*thick, MPI_BYTE,&
-            neighbor(EAST), msgnr+7, MPI_COMM_WORLD, request_e,INFO)
+       CALL MPI_ISEND( data_east_snd , 8*(LJMAX+2*thick)*thick, MPI_BYTE,&
+            neighbor(EAST), msgnr+7, MPI_COMM_CALC, request_e,IERROR)
     endif
 
 
 
     if(neighbor(WEST) >= 0 )then
-       CALL MPI_RECV( data_west, 8*(MAXLJMAX+2*thick)*thick, MPI_BYTE,&
-            neighbor(WEST), msgnr+7, MPI_COMM_WORLD, MPISTATUS, INFO)
+       CALL MPI_RECV( data_west, 8*(LJMAX+2*thick)*thick, MPI_BYTE,&
+            neighbor(WEST), msgnr+7, MPI_COMM_CALC, MPISTATUS, IERROR)
     else
        jj=0
        do jt=1,thick
@@ -2269,8 +2420,8 @@ contains
        enddo
     endif
     if(neighbor(EAST) >= 0 )then
-       CALL MPI_RECV( data_east, 8*(MAXLJMAX+2*thick)*thick, MPI_BYTE, &
-            neighbor(EAST), msgnr+3, MPI_COMM_WORLD, MPISTATUS, INFO)
+       CALL MPI_RECV( data_east, 8*(LJMAX+2*thick)*thick, MPI_BYTE, &
+            neighbor(EAST), msgnr+3, MPI_COMM_CALC, MPISTATUS, IERROR)
     else
        jj=0
        do jt=1,thick
@@ -2288,16 +2439,16 @@ contains
     endif
 
     if(neighbor(SOUTH) >= 0 )then
-       CALL MPI_WAIT(request_s, MPISTATUS,INFO)
+       CALL MPI_WAIT(request_s, MPISTATUS,IERROR)
     endif
     if(neighbor(NORTH) >= 0 )then
-       CALL MPI_WAIT(request_n, MPISTATUS,INFO)
+       CALL MPI_WAIT(request_n, MPISTATUS,IERROR)
     endif
     if(neighbor(WEST) >= 0 )then
-       CALL MPI_WAIT(request_w, MPISTATUS, INFO)
+       CALL MPI_WAIT(request_w, MPISTATUS, IERROR)
     endif
     if(neighbor(EAST) >= 0 )then
-       CALL MPI_WAIT(request_e, MPISTATUS,INFO)
+       CALL MPI_WAIT(request_e, MPISTATUS,IERROR)
     endif
 
  end subroutine readneighbors
@@ -2344,20 +2495,20 @@ contains
 
     !     Local arrays
 
-    integer, dimension(MAXLIMAX,MAXLJMAX)      :: iblht   ! Level of the PBL top
-    real, dimension(MAXLIMAX,MAXLJMAX,KMAX_BND):: eddyz   ! Eddy coefficients
+    integer, dimension(LIMAX,LJMAX)      :: iblht   ! Level of the PBL top
+    real, dimension(LIMAX,LJMAX,KMAX_BND):: eddyz   ! Eddy coefficients
     ! (m2/s)
-    real, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID):: &
+    real, dimension(LIMAX,LJMAX,KMAX_MID):: &
          t_virt    &! Potential temperature (K)
          ,e         &! Kinetic energy with respect to height (m2/s2)
          ,dzq       &! Thickness of sigma interface layers (m)
          ,u_mid     &! Wind speed in x-direction (m/s)
          ,v_mid      ! Wind speed in y-direction (m/s)
 
-    real, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID-1):: &
+    real, dimension(LIMAX,LJMAX,KMAX_MID-1):: &
          dza         ! Thickness of half sigma layers (m)
 
-    real, dimension(MAXLIMAX,MAXLJMAX):: &
+    real, dimension(LIMAX,LJMAX):: &
          pblht ,    &! PBL (Holstag, 1990) (m)
          h_flux,    &! Sensible heat flux  (W/m2)
          ust_r ,    &! Friction velocity (m/s)
@@ -2688,8 +2839,7 @@ contains
 
     implicit none
 
-    real, dimension(*),intent(out)  :: field ! dimensions: (MAXLIMAX,MAXLJMAX)
-    ! or     (MAXLIMAX,MAXLJMAX,KMAX)
+    real, dimension(*),intent(out)  :: field ! dimensions: (LIMAX,LJMAX)
 
     character(len=*),intent(in)  :: meteoname,namefield
     character(len=*),intent(out) :: unit,validity
@@ -2712,11 +2862,11 @@ contains
     if(ndim==3)KMAX=KMAX_MET
     if(ndim==2)KMAX=1
 
-       if(MANUAL_GRID)then
+    if(MANUAL_GRID)then
        Nlevel=37
 !             call ReadField_CDF(meteoname,namefield,field, &
 !                  Nlevel,interpol='conservative',needed=.true.,debug_flag=.false.)
-       if(.not.allocated(meteo_3D))allocate(meteo_3D(Nlevel,MAXLIMAX,MAXLJMAX))
+       if(.not.allocated(meteo_3D))allocate(meteo_3D(Nlevel,LIMAX,LJMAX))
        meteo_3D=0.0
        if(ndim==3)then
           if(trim(namefield)=='u_wind')then
@@ -2736,7 +2886,7 @@ contains
                   needed=needed,found=found,unit=unit,debug_flag=.false.)
           endif
           validity='not set'
-          !     CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
+          !     CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
           !interpolate vertically
           
           call vertical_interpolate(meteoname,meteo_3D,Nlevel,field,.false.)
@@ -2763,9 +2913,9 @@ contains
        call global2local_short(var_global,var_local,MSG_READ4,GIMAX,GJMAX,&
             KMAX,1,1)
 
-       CALL MPI_BCAST(scalefactors,8*2,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
-       CALL MPI_BCAST(validity,50,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
-       CALL MPI_BCAST(unit,50,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+       CALL MPI_BCAST(scalefactors,8*2,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
+       CALL MPI_BCAST(validity,50,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
+       CALL MPI_BCAST(unit,50,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
        !scalefactors=1.0
        !validity=' '
        !unit=' '
@@ -2776,8 +2926,8 @@ contains
        if(KMAX==1)then       
           ijk=0
           k=1
-          do j=1,MAXLJMAX
-             do i=1,MAXLIMAX
+          do j=1,LJMAX
+             do i=1,LIMAX
                 ijk=ijk+1
                 field(ijk)=var_local(i,j,k)*scalefactors(1)+scalefactors(2)
              enddo
@@ -2789,8 +2939,8 @@ contains
              do k=1,KMAX_MID
                 k1=k1_met(k)
                 k2=k2_met(k)
-                do j=1,MAXLJMAX
-                   do i=1,MAXLIMAX
+                do j=1,LJMAX
+                   do i=1,LIMAX
                       ijk=ijk+1
                       field(ijk)=(x_k1_met(k)*var_local(i,j,k1)+(1.0-x_k1_met(k))*var_local(i,j,k2))&
                            *scalefactors(1)+scalefactors(2)
@@ -2800,8 +2950,8 @@ contains
           else
              ijk=0
              do k=1,KMAX_MID!=KMAX
-                do j=1,MAXLJMAX
-                   do i=1,MAXLIMAX
+                do j=1,LJMAX
+                   do i=1,LIMAX
                       ijk=ijk+1
                       field(ijk)=var_local(i,j,k)*scalefactors(1)+scalefactors(2)
                    enddo
@@ -2824,7 +2974,7 @@ contains
        if(MET_REVERSE_K)reverse_k=.true.
 
        if(.not.allocated(meteo_3D))then
-          allocate(meteo_3D(MAXLIMAX,MAXLJMAX,KMAX_MET))
+          allocate(meteo_3D(LIMAX,LJMAX,KMAX_MET))
           meteo_3D=0.0
        endif
        kstart=1
@@ -2850,8 +3000,8 @@ contains
        if(KMAX==1)then       
           ijk=0
           k=1
-          do j=1,MAXLJMAX
-             do i=1,MAXLIMAX
+          do j=1,LJMAX
+             do i=1,LIMAX
                 ijk=ijk+1
                 field(ijk)=meteo_3D(i,j,k)
              enddo
@@ -2863,8 +3013,8 @@ contains
              do k=1,KMAX_MID
                 k1=k1_met(k)
                 k2=k2_met(k)
-                do j=1,MAXLJMAX
-                   do i=1,MAXLIMAX
+                do j=1,LJMAX
+                   do i=1,LIMAX
                       ijk=ijk+1
                       field(ijk)=x_k1_met(k)*meteo_3D(i,j,k1)+(1.0-x_k1_met(k))*meteo_3D(i,j,k2)
                    enddo
@@ -2874,8 +3024,8 @@ contains
              !use same vertical coordinates as meteo
              ijk=0
              do k=1,KMAX_MID
-                do j=1,MAXLJMAX
-                   do i=1,MAXLIMAX
+                do j=1,LJMAX
+                   do i=1,LIMAX
                       ijk=ijk+1
                       field(ijk)=meteo_3D(i,j,k)
                    enddo
@@ -3006,7 +3156,7 @@ subroutine Check_Meteo_Date
   character (len = 50) :: timeunit
   integer ::ihh,ndate(4),n1,nseconds(1)
   real :: ndays(1),Xminutes(24)
-  logical :: date_in_days
+  logical :: date_in_days,MasterProc_local
   nyear=startdate(1)
   nmonth=startdate(2)
   nday=startdate(3)
@@ -3014,7 +3164,8 @@ subroutine Check_Meteo_Date
 !56 FORMAT(a5,i4.4,i2.2,i2.2,a3)
 !   write(meteoname,56)'meteo',nyear,nmonth,nday,'.nc'
   meteoname=date2string(meteo,startdate) 
-  if(MasterProc)then
+  MasterProc_local = MasterProc.or.(ME_IO==0)
+  if(MasterProc_local)then
     status=nf90_open(path=trim(meteoname),mode=nf90_nowrite,ncid=ncFileID)
     call CheckStop(status,nf90_noerr,'meteo file not found: '//trim(meteoname))
     
@@ -3025,66 +3176,95 @@ subroutine Check_Meteo_Date
           if(MasterProc)write(*,*)'time variable not found'
           nhour_first=0 !hour of the first record
           Nhh=8
-          if(MasterProc)write(*,*)'Did not check times, and assume nhour_first =',nhour_first
-          if(MasterProc)write(*,*)'Assume  Nhh =',Nhh
+          if(MasterProc_local)write(*,*)'Did not check times, and assume nhour_first =',nhour_first
+          if(MasterProc_local)write(*,*)'Assume  Nhh =',Nhh
           goto 777
        else
           call check(nf90_inquire_dimension(ncid=ncFileID,dimID=timedimID,len=Nhh))
           nhour_first=0 !hour of the first record
-          if(MasterProc)write(*,*)'Did not check times, and assume nhour_first =',nhour_first            
-          if(MasterProc)write(*,*)'  Nhh =',Nhh
+          if(MasterProc_local)write(*,*)'Did not check times, and assume nhour_first =',nhour_first            
+          if(MasterProc_local)write(*,*)'  Nhh =',Nhh
           status=nf90_inq_varid(ncid=ncFileID,name="XTIME",varID=timeVarID)
           if(status==nf90_noerr)then
              call check(nf90_get_var(ncFileID,timeVarID,Xminutes,count=(/2/)))
              call CheckStop(60*(nint(Xminutes(2)-Xminutes(1))/60)/=nint(Xminutes(2)-Xminutes(1)),&
                   "Met_ml: METSTEP in hours must be an integer")
              METSTEP=nint(Xminutes(2)-Xminutes(1))/60
-             if(MasterProc)write(*,*)'METSTEP set to', METSTEP,' hours'      
+             if(MasterProc_local)write(*,*)'METSTEP reset to', METSTEP,' hours'      
           endif
           goto 777
        endif
     endif
     call check(nf90_inq_varid(ncid=ncFileID,name="time",varID=timeVarID))
     call check(nf90_inquire_dimension(ncid=ncFileID,dimID=timedimID,len=Nhh))
-    call CheckStop(24/Nhh,METSTEP,"Met_ml: METSTEP != meteostep")
+    call CheckStop(24/Nhh,METSTEP,"Met_ml: METSTEP inconsistent with number of records")
     call check(nf90_get_att(ncFileID,timeVarID,"units",timeunit))
     date_in_days=(trim(timeunit(1:19))==trim("days since 1900-1-1"))
 
     ihh=1
     n1=1
     if(date_in_days)then
-      if(MasterProc)write(*,*)'Date in days since 1900-1-1 0:0:0'
+      if(MasterProc_local)write(*,*)'Date in days since 1900-1-1 0:0:0'
       call check(nf90_get_var(ncFileID,timeVarID,ndays,start=(/ihh/),count=(/n1/)))
-      call nctime2idate(ndate,ndays(1))    ! for printout: msg="meteo hour YYYY-MM-DD hh"
+      call nctime2date(ndate,ndays(1))    ! for printout: msg="meteo hour YYYY-MM-DD hh"
     else
       call check(nf90_get_var(ncFileID,timeVarID,nseconds,start=(/ihh/),count=(/n1/)))
-      call nctime2idate(ndate,nseconds(1)) ! default
+      call nctime2date(ndate,nseconds(1)) ! default
     endif
     nhour_first=ndate(4)  
     call CheckStop(ndate(1),nyear ,"Met_ml: wrong year" )
     call CheckStop(ndate(2),nmonth,"Met_ml: wrong month")
     call CheckStop(ndate(3),nday  ,"Met_ml: wrong day"  )
     
+    if(MasterProc_local)write(*,*)'first meteo dates read:'     
     do ihh=1,Nhh
-      if(MasterProc)write(*,*)'first meteo dates read ',ndays(1),ndate(3),ndate(4)       
       if(date_in_days)then
         call check(nf90_get_var(ncFileID,timeVarID,ndays,start=(/ihh/),count=(/n1/)))
-        call nctime2idate(ndate,ndays(1))
-        if(MasterProc)write(*,*)'ndays ',ndays(1),ndate(3),ndate(4)
+        call nctime2date(ndate,ndays(1))
+        if(MasterProc_local)write(*,*)'ndays ',ndays(1),ndate(3),ndate(4)
       else
         call check(nf90_get_var(ncFileID,timeVarID,nseconds,start=(/ihh/),count=(/n1/)))
-        call nctime2idate(ndate,nseconds(1))
+        call nctime2date(ndate,nseconds(1))
       endif
       if(DEBUG_MET)write(*,*)'ihh,METSTEP,nhour_first,ndate(4) ',ihh,METSTEP,nhour_first,ndate(4)
       call CheckStop(mod((ihh-1)*METSTEP+nhour_first,24),ndate(4),&
                      date2string("Met_ml: wrong hour YYYY-MM-DD hh",ndate))
     enddo
  777 continue
+    if(WRF_MET_CORRECTIONS)then
+       !check if the "bucket" method is used
+       status = nf90_get_att(ncFileID,nf90_global,"BUCKET_MM",wrf_bucket)
+       if(status == nf90_noerr)then
+          if(wrf_bucket>0.0)then
+             found_wrf_bucket = .true.
+             write(*,*)'assuming constant bucket size: ',wrf_bucket
+          else
+              write(*,*)'Not using buckets ',wrf_bucket
+            
+          endif
+       endif
+    endif
    call check(nf90_close(ncFileID))
   endif
-  CALL MPI_BCAST(nhour_first,4*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
-  CALL MPI_BCAST(Nhh,4*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
-  CALL MPI_BCAST(METSTEP,4*1,MPI_BYTE,0,MPI_COMM_WORLD,INFO)
+  if(me_calc>=0)then
+     CALL MPI_BCAST(nhour_first,4*1,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
+     CALL MPI_BCAST(Nhh,4*1,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
+     CALL MPI_BCAST(METSTEP,4*1,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
+     CALL MPI_BCAST(found_wrf_bucket,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
+  else
+     CALL MPI_BCAST(nhour_first,4*1,MPI_BYTE,0,MPI_COMM_IO,IERROR)
+     CALL MPI_BCAST(Nhh,4*1,MPI_BYTE,0,MPI_COMM_IO,IERROR)
+     CALL MPI_BCAST(METSTEP,4*1,MPI_BYTE,0,MPI_COMM_IO,IERROR)
+     CALL MPI_BCAST(found_wrf_bucket,1,MPI_LOGICAL,0,MPI_COMM_IO,IERROR)
+  endif
+  if(found_wrf_bucket)then
+     if(me_calc>=0)CALL MPI_BCAST(wrf_bucket,8,MPI_BYTE,0,MPI_COMM_CALC,IERROR)     
+     if(me_calc<0)CALL MPI_BCAST(wrf_bucket,8,MPI_BYTE,0,MPI_COMM_IO,IERROR)     
+     met(ix_irainc)%read_meteo  = found_wrf_bucket
+     met(ix_irainc)%needed      = found_wrf_bucket
+     met(ix_irainnc)%read_meteo = found_wrf_bucket
+     met(ix_irainnc)%needed     = found_wrf_bucket
+  endif
 endsubroutine Check_Meteo_Date
 
 endmodule met_ml

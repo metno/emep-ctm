@@ -1,7 +1,7 @@
-! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,7 +44,7 @@ use ChemSpecs,            only  : NSPEC_ADV
 use ModelConstants_ml,    only  : KMAX_BND,KMAX_MID,PT,Pref
 use MetFields_ml ,        only  : ps,sdot,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
 use GridValues_ml,        only  : dA, dB, sigma_bnd
-use Par_ml,               only  : MAXLIMAX,MAXLJMAX,limax,ljmax,li0,li1,lj0,lj1
+use Par_ml,               only  : LIMAX,LJMAX,limax,ljmax,li0,li1,lj0,lj1
 use PhysicalConstants_ml, only  : GRAV
 
 public :: convection_pstar!in sigma coordinates
@@ -55,7 +55,7 @@ contains
 subroutine convection_pstar(ps3d,dt_conv)
 
   implicit none
-  real ,intent(inout):: ps3d(MAXLIMAX,MAXLJMAX,KMAX_MID),dt_conv
+  real ,intent(inout):: ps3d(LIMAX,LJMAX,KMAX_MID),dt_conv
  
   real ::xn_in_core(NSPEC_ADV,KMAX_MID+1)
   real ::mass_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), mass_air_core(KMAX_MID)
@@ -261,7 +261,7 @@ subroutine convection_pstar(ps3d,dt_conv)
  subroutine convection_Eta(dpdeta,dt_conv)
 
     implicit none
-    real ,intent(inout):: dpdeta(MAXLIMAX,MAXLJMAX,KMAX_MID),dt_conv
+    real ,intent(inout):: dpdeta(LIMAX,LJMAX,KMAX_MID),dt_conv
    
     real ::xn_in_core(NSPEC_ADV,KMAX_MID+1)
     real ::mass_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), mass_air_core(KMAX_MID)

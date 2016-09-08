@@ -1,7 +1,7 @@
-! <DefPhotolysis_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <DefPhotolysis_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,14 +46,14 @@
    use Io_ml,           only : IO_DJ, open_file, ios
    use MetFields_ml           , only : cc3d,cc3dmax,z_bnd
    use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, NPROC
-   use Par_ml      ,    only : me,MAXLIMAX,MAXLJMAX
+   use MPI_Groups_ml      , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_INTEGER&
+                                     ,MPI_COMM_CALC, IERROR
+   use Par_ml      ,    only : me,LIMAX,LJMAX
    use LocalVariables_ml, only : Grid  ! => izen
    implicit none
    private
 
-  INCLUDE 'mpif.h'
-  INTEGER STATUS(MPI_STATUS_SIZE),INFO
-  integer, public, parameter :: &
+   integer, public, parameter :: &
              NRCPHOT      = 17   ! Number of photolytic reactions
    
    real, allocatable,save,public, dimension(:,:) &
@@ -152,7 +152,7 @@
           close(IO_DJ)
         endif  ! me = 0
 
-        CALL MPI_BCAST(dj  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON*NLAT,MPI_BYTE,0,MPI_COMM_WORLD,INFO) 
+        CALL MPI_BCAST(dj  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON*NLAT,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
 
 
@@ -194,7 +194,7 @@
           close(IO_DJ)
         endif   ! me = 0
 
-        CALL MPI_BCAST(djcl1  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_WORLD,INFO) 
+        CALL MPI_BCAST(djcl1  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
 
 
@@ -235,7 +235,7 @@
           end do   ! izn
        endif      !  me = 0
 
-        CALL MPI_BCAST(djcl3  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_WORLD,INFO) 
+        CALL MPI_BCAST(djcl3  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
 
 !       if(me == 0) then

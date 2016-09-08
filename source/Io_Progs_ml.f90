@@ -1,7 +1,7 @@
-! <Io_Progs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Io_Progs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,14 +42,13 @@ use GridValues_ml,          only: i_local, j_local
 use Io_Nums_ml,             only: IO_TMP, IO_LOG
 use ModelConstants_ml,      only: DEBUG, DEBUG, DomainName, &
                                   MasterProc, IIFULLDOM, JJFULLDOM
-use KeyValueTypes,            only: KeyVal, KeyValue, LENKEYVAL
+use MPI_Groups_ml        , only : MPI_INTEGER, MPI_CHARACTER, MPI_COMM_CALC, IERROR, ME_MPI
+use KeyValueTypes,          only: KeyVal, KeyValue, LENKEYVAL
 use Par_ml,                 only: me, limax,ljmax
 use SmallUtils_ml,          only: wordsplit, WriteArray
 use TimeDate_ml,            only: date,current_date
 use TimeDate_ExtraUtil_ml,  only: date2string
 implicit none
-
-INCLUDE 'mpif.h' !MPI needed
 
 ! -- subroutines in this module:
 
@@ -91,8 +90,8 @@ subroutine PrintLog(txt,OutputProc,ioOption)
   if ( ok2print) then
     io = IO_LOG
     if ( present(ioOption) ) io = ioOption
-    write(*,*)  trim(txt)
-    write(io,*)  trim(txt)
+    write(*,fmt='(A)')  trim(txt)
+    write(io,fmt='(A)')  trim(txt)
   end if
 end subroutine PrintLog
 !-------------------------------------------------------------------------
@@ -143,13 +142,13 @@ subroutine read_line(io_in,txt,status,label,printif)
     endif
   endif
    
-  call MPI_BCAST( txt, len(txt), MPI_CHARACTER, 0, MPI_COMM_WORLD,INFO)
-  call MPI_BCAST( status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD,INFO)
+  call MPI_BCAST( txt, len(txt), MPI_CHARACTER, 0, MPI_COMM_CALC,IERROR)
+  call MPI_BCAST( status, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
   if ( DEBUG%IOPROG .and. me==1 ) then
     write(unit=errmsg,fmt=*) "proc(me) ", me, " BCAST_LINE:" // trim(txt)
     write(unit=*,fmt=*) trim(errmsg)
   endif
-  CALL MPI_BARRIER(MPI_COMM_WORLD, INFO)
+  CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
 
 end subroutine read_line
 !-------------------------------------------------------------------------
@@ -166,16 +165,16 @@ subroutine check_file(fname,fexist,needed,errmsg)
   errmsg = "ok"
   inquire(file=fname,exist=fexist)
 
-  if(DEBUG%IOPROG)write(unit=6,fmt=*) "check_file::: ", fname
+  if(DEBUG%IOPROG)write(unit=6,fmt='(A)') "check_file::: ", fname
   if ( .not. fexist .and. .not. needed ) then
-    write(unit=6,fmt=*) "not needed, skipping....." // trim(fname)
+    write(unit=6,fmt='(A)') "not needed, skipping....." // trim(fname)
     ios = 0
   elseif ( .not. fexist .and. needed ) then
     ios = -1
     if(MasterProc) print *, "ERROR: Missing!!! in check-file:" // trim(fname)
     call CheckStop("Missing!!! in check-file:" // trim(fname))
   else
-    if(MasterProc) write(unit=6,fmt=*) "IO check_file: Reading ",trim(fname)
+    if(MasterProc) write(unit=6,fmt='(A)') "IO check_file: Reading ",trim(fname)
   end if
 end subroutine check_file
 !-------------------------------------------------------------------------

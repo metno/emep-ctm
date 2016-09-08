@@ -34,6 +34,8 @@
 !    the input array gloarr may be already restricted or not
 !
     use ModelConstants_ml, only : NPROC  ! Actual total number of processors
+    use MPI_Groups_ml    , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER&
+                                 ,MPI_SUM,MPI_COMM_CALC, MPISTATUS,IERROR
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
              ,MAXLJMAX&    ! Maximum number of local points in latitude&
@@ -45,8 +47,6 @@
 !
     implicit none
 !
-        INCLUDE 'mpif.h'
-        INTEGER STATUS(MPI_STATUS_SIZE),INFO
 
 !    input
     integer msnr        ! message number
@@ -69,7 +69,7 @@
 !    receive from host
 !
            CALL MPI_RECV( locarr, 8*dim0*MAXLIMAX*MAXLJMAX*diml, &
-                MPI_BYTE,  0, msnr, MPI_COMM_WORLD, STATUS, INFO) 
+                MPI_BYTE,  0, msnr, MPI_COMM_CALC, MPISTATUS, IERROR) 
 
 !
     else ! me = 0
@@ -88,7 +88,7 @@
           enddo
         enddo
             CALL MPI_SEND(locarr,8*dim0*MAXLIMAX*MAXLJMAX*diml, MPI_BYTE, &
-                 d, msnr, MPI_COMM_WORLD, INFO) 
+                 d, msnr, MPI_COMM_CALC, IERROR) 
       enddo
 !
 !    now assign processor 0 itself
@@ -118,6 +118,7 @@
 !    the input array gloarr may be already restricted or not
 !
     use ModelConstants_ml, only : NPROC  ! Actual total number of processors
+    use MPI_Groups_ml
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
              ,MAXLJMAX&    ! Maximum number of local points in latitude&
@@ -128,9 +129,6 @@
              ,me        ! Address of processor, numbering starts at 0 in south-west corner of ground level
 !
     implicit none
-
-        INCLUDE 'mpif.h'
-        INTEGER STATUS(MPI_STATUS_SIZE),INFO
 !
 !    input
     integer msnr        ! message number
@@ -152,7 +150,7 @@
 !    receive from host
 !
         CALL MPI_RECV(locarr, 4*MAXLIMAX*MAXLJMAX*diml, MPI_BYTE,  0, &
-        msnr, MPI_COMM_WORLD,STATUS, INFO) 
+        msnr, MPI_COMM_CALC,MPISTATUS, IERROR) 
 !
     else ! me = 0
 !
@@ -168,7 +166,7 @@
           enddo
         enddo
           CALL MPI_SEND( locarr, 4*MAXLIMAX*MAXLJMAX*diml, &
-              MPI_BYTE, d, msnr, MPI_COMM_WORLD, INFO) 
+              MPI_BYTE, d, msnr, MPI_COMM_CALC, IERROR) 
       enddo
 !
 !    now assign processor 0 itself
@@ -196,6 +194,8 @@
 !
 
     use ModelConstants_ml, only : NPROC  ! Actual total number of processors
+    use MPI_Groups_ml    , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER,&
+                                  MPISTATUS, MPI_SUM,MPI_COMM_CALC, IERROR
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
              ,MAXLJMAX&    ! Maximum number of local points in latitude&
@@ -206,9 +206,6 @@
              ,me        ! Address of processor, numbering starts at 0 in south-west corner of ground level
 !
     implicit none
-
-      INCLUDE 'mpif.h'
-      INTEGER STATUS(MPI_STATUS_SIZE),INFO
 !
 !    input
     integer msnr        ! message number
@@ -231,7 +228,7 @@
 !
 
        CALL MPI_RECV(locarr, 2*MAXLIMAX*MAXLJMAX*diml, MPI_BYTE, 0,msnr,&
-          MPI_COMM_WORLD, STATUS, INFO)
+          MPI_COMM_CALC, MPISTATUS, IERROR)
 !
     else ! me = 0
 !
@@ -248,7 +245,7 @@
         enddo
 
             CALL MPI_SEND(locarr, MAXLIMAX*MAXLJMAX*diml*2, MPI_BYTE, &
-                 d, msnr,MPI_COMM_WORLD, info)
+                 d, msnr,MPI_COMM_CALC, IERROR)
 
       enddo
 !

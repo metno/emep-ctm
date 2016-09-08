@@ -1,7 +1,7 @@
-! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,7 @@ use ModelConstants_ml,    only: PPBINV
 use PhysicalConstants_ml, only: AVOG,ATWAIR
 use OwnDataTypes_ml,      only: TXTLEN_DERIV,TXTLEN_SHORT,Asc2D
 use SmallUtils_ml,        only: find_index
-
+use Pollen_const_ml,      only: ug2grains
 implicit none
 private
 
@@ -59,6 +59,7 @@ real, private, parameter :: &
   mgSm2 = mgXm2*atwS,       &                       ! species(?)%sulphurs
   mgNm2 = mgXm2*atwN,       &                       ! species(?)%nitrogens
   mgCm2 = mgXm2*atwC,       &                       ! species(?)%carbons
+  grainsXm3=ugXm3*ug2grains,& ! will be multiplied by species(?)%molwt
 ! Extinction coefficient [1/m] = %ExtC [m2/g] * mass [g/m3]
   extX  = ugXm3*1e-6,       & ! will be multiplied by species(?)%molwt*%ExtC
   s2h   = 1.0/3600.           ! sec to hour conversion factor
@@ -97,7 +98,7 @@ type, public :: group_umap
   real,   pointer,dimension(:) :: uconv=>null() ! conversion factor
 endtype group_umap
 
-type(umap), public, save :: unit_map(23-1)=(/&
+type(umap), public, save :: unit_map(23)=(/&
 ! Air concentration
   umap("mix_ratio","mol/mol",T,F,1.0),&  ! Internal model unit
   umap("mass_ratio","kg/kg" ,T,F,1.0/ATWAIR), &  ! mass mixing ratio
@@ -105,7 +106,7 @@ type(umap), public, save :: unit_map(23-1)=(/&
   umap("ppbC","ppbC" ,T,F,PPBINV),&
   umap("ppbN","ppbN" ,T,F,PPBINV),&
   umap("ppbS","ppbS" ,T,F,PPBINV),&
-  umap("ppbh","ppb h",T,F,s2h   ),&  ! PPBINV already included in AOT calculations
+  umap("ppbh","ppb h",T,F,s2h   ),& ! PPBINV already included in AOT calculations
   umap("ug" ,"ug/m3" ,F,T,ugXm3),&  ! ug* units need to be further multiplied
   umap("ugC","ugC/m3",F,T,ugCm3),&  !   by the air density (roa) as part of the
   umap("ugN","ugN/m3",F,T,ugNm3),&  !   unit covnersion
@@ -116,6 +117,8 @@ type(umap), public, save :: unit_map(23-1)=(/&
   umap("mgC","mgC/m2",F,F,mgCm2),&
   umap("mgN","mgN/m2",F,F,mgNm2),&
   umap("mgS","mgS/m2",F,F,mgSm2),&
+! Pollen concentration
+  umap("grains","grains/m3",F,T,grainsXm3),&  ! needs to be further multiplied
 ! Exposure to radioactive material
   umap("uBq" ,"uBq/m3"  ,F,T,ugXm3),& ! inst/mean   exposure
   umap("uBqh","uBq h/m3",F,T,ugXm3),& ! accumulated exposure over 1 hour
@@ -147,7 +150,7 @@ subroutine Init_Units()
 
  do i=1,size(unit_map)
    select case (unit_map(i)%utxt)
-    case("ug","mg","uBq","uBqh","mBq","ugm2","mass_ratio")
+    case("ug","mg","uBq","uBqh","mBq","ugm2","mass_ratio","grains")
       uconv_spec = species_adv%molwt
     case("ugC","mgC","ppbC")
       uconv_spec = species_adv%carbons
@@ -230,14 +233,14 @@ function Group_Scale(igrp,unit,debug,volunit,needroa) result(gmap)
                          name=gmap%name,volunit=volunit,needroa=needroa)
 endfunction Group_Scale
 
-function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(unitscale)
+subroutine Units_Scale(txtin,iadv,unitscale,unitstxt,volunit,needroa,semivol,debug_msg)
   character(len=*), intent(in) :: txtin
   integer, intent(in) :: iadv  ! species_adv index, used if > 0
-  character(len=*), intent(out), optional :: unitstxt
-  logical,          intent(out), optional :: volunit,needroa
-  character(len=*), intent(in), optional :: debug_msg
+  real, intent(out) :: unitscale
+  character(len=*),intent(out),optional :: unitstxt
+  logical,         intent(out),optional :: volunit,needroa,semivol
+  character(len=*),intent(in) ,optional :: debug_msg
   character(len=len(txtin)) :: txt
-  real :: unitscale
   integer :: i
 
   if(Initialize_Units) call Init_Units
@@ -246,11 +249,14 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
     if(ichar(txt(i:i))==0)txt(i:i)=' '  ! char(0)
   enddo
   select case (txt)
-  case("ugSS","ugSS/m3","ugP","ugP/m3",&
+  case("ugSS","ugSS/m3","ugP","ugP/m3",& 
        "mgSS","mgSS/m2","mgP","mgP/m2")
     txt=txt(1:2)
   case("micro g/m3")
     txt="ug"
+  case("ug_PM","ug_PM/m3","ugC_PM","ugC_PM/m3",&
+     "ugN_PM","ugN_PM/m3","ugS_PM","ugS_PM/m3")
+    txt=txt(1:index(txt,'_')-1)
   case("mol/mol","mole mole-1","mixratio","vmr")
     txt="mix_ratio"
   case("kg/kg","kg kg-1","kg kg**-1","massratio","mmr")
@@ -265,6 +271,7 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
   if(present(unitstxt))unitstxt = trim(unit_map(i)%units)
   if(present(volunit )) volunit = unit_map(i)%volunit
   if(present(needroa )) needroa = unit_map(i)%needroa
+  if(present(semivol))  semivol = (txtin=='ugPM').or.(index(txtin,'_PM')>0)
   select case (iadv)
   case (-1)
 ! groups (called iadv==-1) do not get a scaling factor at this stage.
@@ -282,6 +289,6 @@ function Units_Scale(txtin,iadv,unitstxt,volunit,needroa,debug_msg) result(units
     call CheckStop(iadv,"Units_Scale Error: Unknown iadv.")
   endselect
 
-endfunction Units_Scale
+endsubroutine Units_Scale
 
 endmodule Units_ml

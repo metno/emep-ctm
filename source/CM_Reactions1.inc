@@ -355,13 +355,13 @@
 !-> TERPPEROXY 
 
       P =   &
-          rct(75,k)*xnew(O3) * xnew(APINENE )  &
-        + rct(76,k)*xnew(OH) * xnew(APINENE )  &
-        + rct(77,k)*xnew(NO3) * xnew(APINENE ) 
+          rct(76,k)*xnew(O3) * xnew(APINENE )  &
+        + rct(77,k)*xnew(OH) * xnew(APINENE )  &
+        + rct(78,k)*xnew(NO3) * xnew(APINENE ) 
 
       L =  &
           rct(40,k)*xnew(NO)  &
-        + rct(78,k)*xnew(HO2) 
+        + rct(79,k)*xnew(HO2) 
 
       xnew(TERPPEROXY)=  ( xold(TERPPEROXY) + dt2 * P) /(1.0 + dt2*L )
 
@@ -839,9 +839,9 @@
           rcemis(APINENE,k) 
 
       L =  &
-          rct(75,k)*xnew(O3)  &
-        + rct(76,k)*xnew(OH)  &
-        + rct(77,k)*xnew(NO3) 
+          rct(76,k)*xnew(O3)  &
+        + rct(77,k)*xnew(OH)  &
+        + rct(78,k)*xnew(NO3) 
 
       xnew(APINENE)=  ( xold(APINENE) + dt2 * P) /(1.0 + dt2*L )
 

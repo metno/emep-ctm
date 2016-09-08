@@ -4,7 +4,7 @@
 !-------------------------------------------------------------------------!
 
   character(len=*), public, parameter :: &
-      BiomassBurningMapping = "FINNv1.5toEmChem09"
+      BiomassBurningMapping = "FINNv1.5toEmChem09soa"
   !FINNv1.5 uses 7 more GEOS-CHEM species and 2 more EMEP:
   integer, private, parameter :: &
     NBB_DEFS  = 26 & ! No mapping lines below

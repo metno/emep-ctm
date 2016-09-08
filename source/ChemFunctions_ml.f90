@@ -1,7 +1,7 @@
-! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version 3049(3049)>
+! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2015 met.no
+!*  Copyright (C) 2007-2016 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -48,8 +48,8 @@ module ChemFunctions_ml
  use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID, USES, AERO
  use PhysicalConstants_ml,  only : AVOG, RGAS_J, DAY_ZEN
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk, &
-     aero_fom,aero_fss,aero_fdust, &
-     cN2O5, temp, DpgNw, S_m2m3 ! for surface area
+     aero_fom,aero_fss,aero_fdust, aero_fbc,  &
+     gamN2O5, cN2O5, temp, DpgNw, S_m2m3 ! for gammas & surface area
  use ChemSpecs,             only : SO4, NO3_f, NH4_f, NO3_c
   implicit none
   private
@@ -58,7 +58,6 @@ module ChemFunctions_ml
   public :: troeInLog  ! When log(Fc) provided
   public :: IUPAC_troe ! Using the approximate expression for F from 
                        !  Atkinson et al., 2006 (ACP6, 3625)
-  !April2015 to AeroFunctions
   public ::  xkaero 
   public ::  kaero2    ! for testing
   public ::  RiemerN2O5
@@ -68,7 +67,7 @@ module ChemFunctions_ml
   public ::  kmt3      ! For 3-body reactions, from Robert OCt 2009
 
 
-! weighting factor for N2O5 hydrolysis
+! weighting factor for N2O5 hydrolysis. OLD SCHEME! NOT USED
 ! Some help factors (VOLFAC)  pre-defined here. 0.068e-6 is
 ! number median radius, assumed for fine aerosol
 ! 1.2648 is the term 3* exp( -2.5 * (log(sig=1.8))**2 ) used below
@@ -92,6 +91,7 @@ module ChemFunctions_ml
        k1 = a1 * EXP(C1*TINV)
        k3 = a3 * EXP(C3*TINV)
        k4 = a4 * EXP(C4*TINV)
+!QUERY amk&m?...
        rckmt3 = k1 + (k3*amk)/(1.0+(k3*m)/k4)
        !rckmt3 = k1 + (k3*M)/(1.0+(k3*M)/k4)
   end function kmt3
@@ -222,6 +222,7 @@ module ChemFunctions_ml
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
+!OLD VOLFAC SYSTEM  - WILL SOON BE DELETED FROM ALL CODE
 ! N2O5 -> nitrate calculation
 !===========================================================================
 ! N2O5 -> nitrate calculation. Some constants for
@@ -367,6 +368,7 @@ module ChemFunctions_ml
    real    :: f   ! Was f_Riemer
    real    :: gam, S, Rwet  ! for newer methods
    real, save :: g1 = 0.02, g2=0.002 ! gammas for 100% SO4, 100% NO3, default
+   real, save :: gFix  ! for Gamma:xxxx values
    real, parameter :: EPSIL = 1.0  ! One mol/cm3 to stop div by zero
    integer :: k
    real :: xNO3  ! As the partitioning between fine and coarse is so difficult
@@ -377,6 +379,11 @@ module ChemFunctions_ml
    method = USES%n2o5HydrolysisMethod
    if ( present(ormethod) )then
      method = ormethod
+   end if
+   if( first_call .and. method(1:6)=="Gamma:"  ) then
+       gFix = 0.002
+       if( method == "Gamma:0.05" ) gFix = 0.05
+       if( method == "Gamma:0.005" ) gFix = 0.005
    end if
 
    select case ( method )
@@ -414,14 +421,16 @@ module ChemFunctions_ml
 
             S = S_m2m3(AERO%PM_F,k) !NOW all fine PM
             gam = GammaN2O5(temp(k),rh(k),&
-                   f,aero_fom(k),aero_fss(k),aero_fdust(k))
+                   f,aero_fom(k),aero_fss(k),aero_fdust(k),aero_fbc(k))
 
             if( method == "SmixTen") gam = 0.1 * gam ! cf Brown et al, 2009!
 
             rate(k) = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
        else
+            gam = 0.0 ! just for export
             rate(k) = 0.0
        end if
+       gamN2O5(k) = gam ! just for export
     end do
 
       
@@ -439,7 +448,8 @@ module ChemFunctions_ml
          else if( method == "RiemerSIAc3" ) then
             S = S_m2m3(AERO%SIA_F,k)
             Rwet = 0.5*DpgNw(AERO%SIA_F,k)
-            if( first_call ) g2=g1/3.0   ! Chang notes that the factor  of ten reduction was too high
+            if( first_call ) g2=g1/3.0   ! Chang notes that the factor  of ten
+                                         ! reduction was too high
 
          ! use whole aerosol area, but Riemer nitrate (factor 3 though):
          else ! if( USES%n2o5HydrolysisMethod == "RiemerPMF" ) then
@@ -447,8 +457,8 @@ module ChemFunctions_ml
 
             S = S_m2m3(AERO%PM_F,k)
             !Rwet = 0.5*DpgNw(AERO%PM_F,k)
-! Chang notes that the factor  of ten reduction was too high, and in PMF we also
-! have EC, OM, etc.
+          ! Chang notes that the factor  of ten reduction was too high, and
+          ! in PMF we also have EC, OM, etc.
             if( first_call ) g2=g1/3.0   
          end if
 
@@ -484,17 +494,20 @@ module ChemFunctions_ml
          rate(k) = 0.0
       endif
     end do ! k
-    case ( "Gamma:0.002")  ! Inspired by Brown et al. 2009
+    case ( "Gamma:0.002", "Gamma:0.05", "Gamma:0.005")  ! Inspired by Brown et al. 2009
      do k = K1, K2
 
        if ( rh(k)  > 0.4) then ! QUERY???
 
-          gam = 0.002
+          gam = gFix ! Found above
+ 
           S = S_m2m3(AERO%PM_F,k) !fine SIA +OM + ...
           rate(k) = UptakeRate(cN2O5(k),gam,S) 
       else
          rate(k) = 0.0
-       end if
+         gam     = 0.0 ! just for export
+      end if
+      gamN2O5(k) = gam ! just for export
 
     end do ! k
 

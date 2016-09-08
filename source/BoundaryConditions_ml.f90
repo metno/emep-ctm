@@ -1,3 +1,29 @@
+! <BoundaryConditions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+!*****************************************************************************!
+!*
+!*  Copyright (C) 2007-2016 met.no
+!*
+!*  Contact information:
+!*  Norwegian Meteorological Institute
+!*  Box 43 Blindern
+!*  0313 OSLO
+!*  NORWAY
+!*  email: emep.mscw@met.no
+!*  http://www.emep.int
+!*
+!*    This program is free software: you can redistribute it and/or modify
+!*    it under the terms of the GNU General Public License as published by
+!*    the Free Software Foundation, either version 3 of the License, or
+!*    (at your option) any later version.
+!*
+!*    This program is distributed in the hope that it will be useful,
+!*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+!*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!*    GNU General Public License for more details.
+!*
+!*    You should have received a copy of the GNU General Public License
+!*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+!*****************************************************************************!
 module BoundaryConditions_ml
 ! -----------------------------------------------------------------------
 ! This module is the main driver module for defining and setting
@@ -50,9 +76,11 @@ use ModelConstants_ml, only: KMAX_MID  &  ! Number of levels in vertical
                             ,USE_SEASALT,USE_DUST & 
                             ,USES,DEBUG  & ! %BCs
                             ,MasterProc, PPB, Pref
-use NetCDF_ml,         only:ReadField_CDF,vertical_interpolate
+use MPI_Groups_ml,     only: MPI_DOUBLE_PRECISION, MPI_SUM,MPI_INTEGER, &
+                             MPI_COMM_CALC, IERROR
+use NetCDF_ml,         only: ReadField_CDF,vertical_interpolate
 use Par_ml,          only: &
-   MAXLIMAX, MAXLJMAX, limax, ljmax, me &
+   LIMAX, LJMAX, limax, ljmax, me &
   ,neighbor, NORTH, SOUTH, EAST, WEST   &  ! domain neighbours
   ,NOPROC&
   ,IRUNBEG,JRUNBEG,li1,li0,lj0,lj1
@@ -160,9 +188,6 @@ integer, allocatable, dimension(:,:),save :: &
 real, allocatable,dimension(:,:,:),save   :: O3_logan,O3_logan_emep
 real, allocatable,dimension(:,:,:),save   :: Dust_3D, Dust_3D_emep
 
-INCLUDE 'mpif.h'
-INTEGER STATUS(MPI_STATUS_SIZE),INFO
-
 contains
 
   subroutine BoundaryConditions(year,month)
@@ -185,13 +210,11 @@ contains
     real    :: bc_fac      ! Set to 1.0, except sea-salt over land = 0.01
     logical :: bc_seaspec  ! if sea-salt species
 
-    !/ data arrays for boundary data (BCs) - quite large, so NOT saved
-    real, save, allocatable,dimension(:,:,:)   :: bc_data   ! for one bc species
-
     integer  :: errcode, Nlevel_logan
     integer, save :: idebug=0, itest=1, i_test=0, j_test=0
     character(len = 100) ::fileName,varname
     logical :: NewLogan=.true.! under testing
+    real :: bc_data(LIMAX,LJMAX,KMAX_MID)
 
     if (first_call) then
        if (DEBUG%BCS) write(*,"(a,I3,1X,a,i5)") &
@@ -206,8 +229,6 @@ contains
             "BCs: num_bgn_changed: ", num_bgn_changed,  &
             "BCs: num     changed: ", num_changed
 
-       allocate(bc_data(MAXLIMAX,MAXLJMAX,KMAX_MID),stat=alloc_err)!could use an existing buffer?
-       call CheckStop(alloc_err, "alloc1 failed in BoundaryConditions_ml")
        bc_data=0.0
 
     endif ! first call
@@ -881,7 +902,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   integer,             intent(in) :: month
   integer,             intent(in) :: ibc        ! Index of BC
   integer,             intent(in) :: used       ! set to 1 if species wanted
-  real, dimension(MAXLIMAX,MAXLJMAX,KMAX_MID), &
+  real, dimension(LIMAX,LJMAX,KMAX_MID), &
                       intent(out) :: bc_data   ! BC Data defined here
   integer,          intent(inout) :: errcode   ! i/o number
 
@@ -893,7 +914,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   !---------------------------------------------------------------------------
   ! Mace Head ozone concentrations for backgroudn sectors
   ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
-  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2013
+  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2014
   real, dimension(12,MH_YEAR1:MH_YEAR2), parameter :: macehead_year=reshape(&
    [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
     36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
@@ -930,7 +951,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
     36.8,38.9,43.9,46.4,41.7,35.5,31.0,31.3,35.6,36.7,33.4,33.8,& !2010
     36.5,42.4,43.3,44.5,40.2,34.6,30.1,30.8,32.0,34.7,37.7,38.1,& !2011
     35.0,40.2,41.0,46.8,43.1,34.0,29.6,33.8,34.9,33.3,37.9,38.7,& !2012
-    38.8,42.8,45.1,46.7,43.3,31.8,31.0,33.3,32.8,39.0,39.5,42.7]& !2013
+    38.8,42.8,45.1,46.7,43.3,31.8,31.0,33.3,32.8,39.0,39.5,42.7,& !2013
+    41.4,42.9,43.5,46.4,42.4,35.1,28.6,32.6,33.8,37.1,38.1,41.1]& !2014
     ,[12,MH_YEAR2-MH_YEAR1+1])
   real, dimension(12), parameter :: macehead_default=&
   ! Defaults from 1998-2010 average
@@ -1066,7 +1088,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
     trend_voc= exp(-0.01*0.85*(1990-iyr_trend)) ! Zander,1975-1990
   endselect
   if (MasterProc.and.first_call) then
-    write(unit=txtmsg,fmt="(a,i5,3f8.3,3f9.4)") "BC:trends O3,CO,VOC,SOx,NOx,NH3: ", &
+    write(unit=txtmsg,fmt="(a,i5,3f8.3,13f9.4)") "BC:trends O3,CO,VOC,SOx,NOx,NH3: ", &
        iyr_trend, trend_o3, trend_co, trend_voc, SIAtrend%so2, SIAtrend%nox, SIAtrend%nh4
     call PrintLog(txtmsg)
   endif
@@ -1097,7 +1119,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   if ( first_call ) then
     ! Set up arrays to contain Logan's grid as lat/long
     !/ COnversions derived from emeplat2Logan etc.:
-     allocate(lat5(MAXLIMAX,MAXLJMAX))
+     allocate(lat5(LIMAX,LJMAX))
      allocate(p_kPa(KMAX_MID), h_km(KMAX_MID))
     twopi_yr = 2.0 * PI / 365.25
 
@@ -1200,8 +1222,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
   select case (ibc)
   case (IBC_O3)
      Nlevel_logan=30
-     if(.not.allocated(O3_logan))allocate(O3_logan(Nlevel_logan,MAXLIMAX,MAXLJMAX))
-     if(.not.allocated(O3_logan_emep))allocate(O3_logan_emep(MAXLIMAX,MAXLJMAX,KMAX_MID))
+     if(.not.allocated(O3_logan))allocate(O3_logan(Nlevel_logan,LIMAX,LJMAX))
+     if(.not.allocated(O3_logan_emep))allocate(O3_logan_emep(LIMAX,LJMAX,KMAX_MID))
      O3_logan=0.0
      O3_logan_emep=0.0
  
@@ -1237,10 +1259,11 @@ real :: trend_o3=1.0, trend_co, trend_voc
        enddo
        mpi_snd(1)=O3fix_loc
        mpi_snd(2)=count_loc
-       call MPI_ALLREDUCE(mpi_snd,mpi_rcv, 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, IERROR)
+       call MPI_ALLREDUCE(mpi_snd, mpi_rcv, 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
        O3fix=0.0
        if(mpi_rcv(2)>0.5)O3fix=mpi_rcv(1)/mpi_rcv(2) - macehead_O3(month)*PPB
-       if (me==0)write(*,"(a,4f8.3)")'Mace Head correction for O3, trend and Mace Head value',-O3fix/PPB,trend_o3,macehead_O3(month)
+       if (me==0)write(*,"(a,4f8.3)")'Mace Head correction for O3, trend and Mace Head value',&
+            -O3fix/PPB,trend_o3,macehead_O3(month)
        bc_data = max(15.0*PPB,bc_data-O3fix)
     endif
   case ( IBC_H2O2 )
@@ -1290,8 +1313,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
 
 !dust are read from the results of a Global run
          Nlevel_Dust=20
-         if(.not.allocated(Dust_3D))allocate(Dust_3D(Nlevel_Dust,MAXLIMAX,MAXLJMAX))
-         if(.not.allocated(Dust_3D_emep))allocate(Dust_3D_emep(MAXLIMAX,MAXLJMAX,KMAX_MID))
+         if(.not.allocated(Dust_3D))allocate(Dust_3D(Nlevel_Dust,LIMAX,LJMAX))
+         if(.not.allocated(Dust_3D_emep))allocate(Dust_3D_emep(LIMAX,LJMAX,KMAX_MID))
          Dust_3D=0.0
          Dust_3D_emep=0.0
  
