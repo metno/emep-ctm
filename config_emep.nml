@@ -168,6 +168,24 @@ OutputConcs=
 ! 'O3'                 ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
 ! 'CO'                 ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
 ! 'HCHO'               ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
+OutputVegO3=
+  'POD1_IAM_DF'    ,'POD', 1.0,'MM','IAM_DF',F,0,999,'YM',
+  'POD0_IAM_DF'    ,'POD', 0.0,'MM','IAM_DF',F,0,999,'YM',
+  'POD1_IAM_MF'    ,'POD', 1.0,'MM','IAM_MF',F,0,999,'YM',
+  'POD0_IAM_MF'    ,'POD', 0.0,'MM','IAM_DF',F,0,999,'YM',
+  'POD1_DF'        ,'POD', 1.0,'MM','DF    ',F,0,999,'YM',
+  'POD1_CF'        ,'POD', 1.0,'MM','CF    ',F,0,999,'YM',
+  'POD3_TC'        ,'POD', 3.0,'MM','TC    ',F,0,999,'YM',
+  'POD1_IAM_CR'    ,'POD', 1.0,'MM','IAM_CR',F,0,999,'YM',
+  'POD0_IAM_CR'    ,'POD', 0.0,'MM','IAM_CR',F,0,999,'YM',
+  'POD3_IAM_CR'    ,'POD', 3.0,'MM','IAM_CR',F,0,999,'YM',
+  'MMAOT40_TC'     ,'AOT',40.0,'MM','TC    ',F,0,999,'YM',
+  'MMAOT40_IAM_DF' ,'AOT',40.0,'MM','IAM_DF',F,0,999,'YM',
+  'MMAOT40_IAM_MF' ,'AOT',40.0,'MM','IAM_MF',F,0,999,'YM',
+  'MMAOT40_IAM_CR' ,'AOT',40.0,'MM','IAM_CR',F,0,999,'YM',
+  'EUAOT40_Crops'  ,'AOT',40.0,'EU','IAM_CR',F,0,999,'YM',
+  'EUAOT40_Forests','AOT',40.0,'EU','IAM_DF',F,0,999,'YM',
+  'MMAOT40_IAM_WH' ,'AOT',40.0,'MM','IAM_WH',F,0,999,'YM',
 &end
 &OutputDep_config
 DDEP_ECOS =
