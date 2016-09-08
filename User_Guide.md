@@ -9,7 +9,7 @@ rv4.10. It is intended primarily as a guide on how to run the model, and
 to help users wishing to understand or change the model in terms of
 domains, outputs, chemistry, etc.
 
-The main documentation for the EMEP/MSC-W model is an article pulished
+The main documentation for the EMEP/MSC-W model is an article published
 in Atmospheric Chemistry and Physics in 2012. This article will be
 referred to as Simpson et al. (2012) in this manual.
 
@@ -18,12 +18,12 @@ referred to as Simpson et al. (2012) in this manual.
     J.E., Jenkin, M.W., Nyíri, Á, Richter, C., Semeena, V.S, Tsyro, S.,
     Tuovinen, J.-P., Valdebenito, Á., and Wind, P.: The EMEP MSC-W
     chemical transport model – technical description. Atmospheric
-    Chemistry and Physics, 12, 7825-7865, 2012.\
+    Chemistry and Physics, 12, 7825-7865, 2012.</br>
     <http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html>
 
-The model source code is available from the EMEP/MSC-W Open Source
-website:\
-<https://wiki.met.no/emep/page1/emepmscw_opensource>
+The model source code is available from the Open Source EMEP/MSC-W model
+github page:</br>
+<https://github.com/metno/emep-ctm>
 
 ## Licenses and Caveats
 
@@ -241,16 +241,18 @@ acknowledge EMEP/MSC-W in any use of these data.
 
 | **Other Input files** | `input/` (netCDF)                       |
 |:----------------------|:----------------------------------------|
-| Global Ozone          | `GLOBAL_O3.nc`                          |
-| New Global Ozone      | `Logan_P.nc`                       $^*$ |
+| Global ozone          | `GLOBAL_O3.nc`                          |
+| New global ozone      | `Logan_P.nc`                       $^*$ |
 | BVOC emissions        | `EMEP_EuroBVOC.nc`                      |
 | Landuse               | `LanduseGLC.nc`                         |
 |                       | `Landuse_PS_5km_LC.nc`                  |
 | N depositions         | `annualNdep.nc`                         |
+| Global dust (BCs)     | `Dust.nc`                               |
 | Road dust             | `RoadMap.nc`                  $\dagger$ |
 |                       | `AVG_SMI_2005_2010.nc`        $\dagger$ |
 | Aircraft emissions    | `AircraftEmis_FL.nc`          $\dagger$ |
-| Surface Pressure      | `SurfacePressure.nc`          $\dagger$ |
+| Surface pressure      | `SurfacePressure.nc`          $\dagger$ |
+| Surface hight         | `topography.nc`               $\dagger$ |
 | Forest Fire           | `FINN_ForestFireEmis_YYYY.nc` $\dagger$ |
 | Dust files            | `Soil_Tegen.nc`               $\dagger$ |
 |                       | `SoilTypes_IFS.nc`            $\dagger$ |
@@ -270,7 +272,7 @@ acknowledge EMEP/MSC-W in any use of these data.
 |                       | `columnsource_location.csv`             |
 | Lightning emissions   | `lightningMM.dat` (12 files)            |
 | Emissions speciation  | `emissplit.defaults.POLL` (7 files)     |
-|                       | `emissplit.specials.POLL` (7 files)     |
+|                       | `emissplit.specials.POLL` (6 files)     |
 | Emission factors for scenario runs | `femis.dat`                |
 | Photo-dissociation rates           | `jclearSS.dat` (4 files)   |
 |                       | `jcl1kmSS.dat` (4 files) and `jcl1.jun` |
