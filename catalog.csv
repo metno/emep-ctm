@@ -125,6 +125,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201609,extra,,,{FTP}/{REL}/extra.tar.bz2,,211229,36b050fe6352d0ec89df4a6d72c54ad8
 201609,input,2014,rv4_10,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2130724710,afec8b9b490e393cb2ca727de282b75b
 201609,source,2016,rv4_10,{GIT}/archive/{MOD}.tar.gz,,959657,5cf6c27440b870a2a1f33bfba106489a
+201609,output,2014,rv4_10,{FTP}/{REL}/model_results_rv4_10_2014/Base_model_rv4_10_results.tar.bz2,,3954333584,e3a1bc45b0ad1ff5c18932547443d4a3
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201401.tar.bz2,,1923832453,a2d4b20f411395dfd4dd1ee7de3f774a
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201402.tar.bz2,,1728260551,7cd5ad29ef1473eb2e4f53462a9b5453
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201403.tar.bz2,,1912463607,17ad2e62796d25a126e853a6ed94b261
