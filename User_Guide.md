@@ -561,10 +561,10 @@ Since model version rv3.9 (November 2011), daily emissions from forest
 and vegetation fires are taken from the “Fire INventory from NCAR
 version 1.0” (FINNv1, Wiedinmyer et al. 2011). Data are available from
 2005, with daily resolution, on a fine 1 km&times;1 km grid. We store these
-data on a slightly coarser grid (0.2^&deg;&times;0.2^&deg$) globally for
+data on a slightly coarser grid (0.2&deg;&times;0.2&deg) globally for
 access by the EMEP/MSC-W model. To include forest fire emissions set
 `USE_FOREST_FIRES = .true.` in `config_emep.nml` and download the
-GEOS-chem daily data <http://bai.acd.ucar.edu/Data/fire/> for the corresponding year.
+GEOS-chem daily data <http://bai.acom.ucar.edu/Data/fire/> for the corresponding year.
 The data needs to be stored with units mole/day in a netCDF file called
 `FINN_ForestFireEmis_YYYY.nc` compatible with the `ForestFire_ml.f90` module,
 where `YYYY` stands for the year.
@@ -579,54 +579,53 @@ covers data for a global domain in 0.5&times;0.5 degree resolution.
 The variables ’sand’ and ’clay’ gives the fraction (in %) of sand an
 clay in the soil for each grid cell over land.
 
-The files are used by the module **DustProd\_ml.f90**, which calculates
+The files are used by the module `DustProd_ml.f90`, which calculates
 windblown dust emissions from soil erosion. Note that the
 parametrization is still in the development and testing phase, and is by
-default ’turned off’. To include it in the model calculations, set
-USE\_DUST = .true. in “config\_emep.nml”. The user is recommended to
+default 'turned off'. To include it in the model calculations, set
+`USE_DUST = .true.` in `config\_emep.nml`. The user is recommended to
 read carefully documentation and comments in the module
-**DustProd\_ml.f90**.
+`DustProd_ml.f90`.
 
 There is also a possibility to include boundary and initial conditions
 for dust from Sahara. The input file gives monthly dust mixing ratios
 (MM - month, e.g. 01, 02, 03,...) for fine and coarse dust from Sahara.
 The files are based on calculations from a global CTM at the University
-of Oslo for 2000. To include Saharan dust, set USE\_SAHARA = .true. in
-“config\_emep.nml”.
+of Oslo for 2000. To include Saharan dust, set `USE_SAHARA = .true.` in
+`config_emep.nml`.
 
-Another source for dust is an arid surface. This is accountet for by
-soilmosture calculations in **DustProd\_ml.f90 **. Together with Soil
+Another source for dust is an arid surface. This is accounted by
+soilmosture calculations in `DustProd_ml.f90`. Together with Soil
 Water Index from the meteorology files and permanent wilting point (pwp)
-from SoilTypes\_IFS.nc. This file is global and netcdf. See Simpson et
+from `SoilTypes_IFS.nc`. This file is global and netCDF. See Simpson et
 al. (2012) section 6.10.
 
-ASCII files
------------
+## ASCII files
 
-### Natural $SO_2$
+### Natural SO<sub>2</sub>
 
-Natural $SO_2$ emissions (dimethylsulfide (DMS) from sea) are provided
+Natural SO<sub>2</sub> emissions, dimethylsulfide (DMS) from sea, are provided
 as monthly gridded files. The values are given at the surface in
-$\mu$g/m$^2$ for each grid cell in the domain.
+&mu;g/m&sup2; for each grid cell in the domain.
 
 ### Volcanoes
 
-Emissions from volcanic passive degassing of $SO_2$ are included for the
-active Italian volcanoes, Etna and Stromboli, based upon the officially
+Emissions from volcanic passive degassing of SO<sub>2</sub> are included for the
+active Italian volcanoes, Etna, Vulcano and Stromboli, based upon the officially
 submitted data. To consider these volcanic emissions, we need to feed
 the locations and heights of volcanoes into the model. The input file
-"columnsource\_location.csv" contains the geographical coordinates
+`columnsource_location.csv` contains the geographical coordinates
 (latitudes and longitudes) and the heights (in meters) of the included
-volcanoes, while "columnsource\_emission.csv" contains the emission
+volcanoes, while `columnsource_emission.csv` contains the emission
 parameters.
 
 Since 2010 the EMEP model has also been used to model the transport of
-ash and $SO_2$ from volcanic eruptions. In addition to data for passive
-degassing of $SO_2$, the above two input files also contain locations
-and emission parameters for two recent eruptions of Icelandic volcanoes
+ash and SO<sub>2</sub> from volcanic eruptions. In addition to data for passive
+degassing of SO<sub>2</sub>, the above two input files also contain locations
+and emission parameters for recent eruptions of Icelandic volcanoes
 (Eyjafjallajökull in 2010 and Grimsvötn in 2011). In order to include
-emissions from these eruptions one needs to set ’USE\_ASH=T’ (F by
-default) in “config\_emep.nml”.
+ash emissions from these eruptions one needs to set `USE_ASH = .true.`
+in `config_emep.nml`.
 
 ### Gridded emissions
 
@@ -642,9 +641,9 @@ Since 2015 different formats of gridded emissions can be used and mixed
 The new emission system is described in section [emisnew]. Here we focus
 only on the "old style" ASCCI emission format.
 
-Seven gridded emission input files (“emislist.poll”) are available in
-**ASCII** format for the following compounds: CO, NH$_{3}$, NO$_{x}$,
-PM$_{2.5}$, PM$_{co}$, SO$_{x}$ and VOC.
+Seven gridded emission input files (`emislist.poll`) are available in
+ASCII format for the following compounds: CO, NH<sub>3</sub>, NO<sub>x</sub>,
+PM<sub>2.5</sub>, PM<sub>co</sub>, SO<sub>x</sub> and VOC.
 
 The gridded ASCII emission files contain 16 columns where the first
 column represents the country code
@@ -657,16 +656,15 @@ source-sector called“Other sources and sinks”, which include natural and
 biogenic emission sources. The data are given with the unit: $Mg$.
 
 **Acknowledgement:**
-
 EMEP
 
 ### Time factors for emissions
 
 Monthly and daily time factors for emission of the 7 compounds (CO,
-NH$_{3}$, NO$_{x}$, PM$_{2.5}$, PM$_{co}$, SO$_{x}$ and VOC). There is
-one file available per compound in **ASCII** format.
+NH<sub>3</sub>, NO<sub>x</sub>, PM<sub>2.5</sub>, PM<sub>co</sub>, SO<sub>x<sub> and VOC).
+There is one file available per compound in ASCII format.
 
-The first two columns in the files represent the country code\
+The first two columns in the files represent the country code
 (<http://www.emep.int/grid/country_numbers.txt>), the second column
 represents the sector (<http://webdab.emep.int/sectors.html>). In the
 monthly files, the 12 consecutive columns represent the time factors
@@ -674,109 +672,109 @@ corresponding to the months of the year. In the daily files there are 7
 consecutive columns representing the time factor for each day of the
 week.
 
-The file HOURLY-FACS includes factors for each of the eleven SNAP
+The file `HOURLY-FACS` includes factors for each of the eleven SNAP
 sectors for every hour (the columns) for each day of the week, see
 Simpson et al. (2012) section 6.1.2
 
 ### Emission heights
 
-A vertical distribution for the elleven SNAP sectors are given in the
-file EmisHeights.txt. The file has seven vertical levels, over the
-collumns and the SNAP sectors given in the first row. Read more in
+A vertical distribution for the eleven SNAP sectors are given in the
+file `EmisHeights.txt`. The file has seven vertical levels, over the
+columns and the SNAP sectors given in the first row. Read more in
 Simpson et al. (2012) section 6.1.1.
 
-### Emission factor for scenario runs
+### Emission factor for scenario runs [sec:femis]
 
-[sec:femis] Scenario run in the case of the EMEP/MSC-W model means a run
+Scenario run in the case of the EMEP/MSC-W model means a run
 to test the impact of one or more pollutants from a particular country.
 
 Emission factors are applied to specified countries and emission sectors
-and can be set by changing the **ASCII** file “femis.dat”. This file can
+and can be set by changing the ASCII file `femis.dat`. This file can
 be changed by the users according to their needs.
 
 The file contains several columns (the number is flexible). The first
 column represents the country code
 (<http://www.emep.int/grid/country_numbers.txt>), the second represents
 the sector (<http://reports.eea.eu.int/technical_report_2001_3/en>)
-where ‘0’ means all sectors, and then in the remaining columns one can
+where '0' means all sectors, and then in the remaining columns one can
 specify which emissions to reduce. Here 1.0 means no reduction of the
 given pollutant (sox/nox/voc/nh3/co/pm25/pmco) from sectors of specified
-country. The number following the first text (“Name”) in line 1 (number
+country. The number following the first text ("Name") in line 1 (number
 5 in the downloaded file) gives the number of pollutants treated in the
 file.
 
 ### Chemical speciation of emissions
 
 Many of the emission files give emissions of a group of compounds, e.g.
-NOx includes NO+NO$_2$, and VOC can include many compounds. The
-information needed to retreive emissions of individual compounds from
-these the gridded files is given in files labelled
-emissplit.defaults.$poll$ or emissplit.specials.$poll$, where $poll$ can
+NO<sub>x</sub> includes NO+NO<sub>2</sub>, and VOC can include many compounds.
+The information needed to retrieve emissions of individual compounds from
+these the gridded files is given in files labeled
+`emissplit.defaults.$poll` or `emissplit.specials.$poll`, where `$poll` can
 be nox, voc, etc.
 
-The defaults file give the emission split for each SNAP sector ( one per
+The defaults file give the emission split for each SNAP sector (one per
 row, with second index being the SNAP sector), which is applied to all
 countries by default. For VOC this split was derived from the UK
 inventory of Passant (2002), as part of the chemical comparison project
 of Hayman *et al.* (2011).
 
 The specials files are in general optional, and can be used to specify
-speciation for particular countries or SNAP sectors. The 1${^st}$ column
+speciation for particular countries or SNAP sectors. The 1<sup>st</sup> column
 specifies the country code of interest, the second the SNAP sector.
 
-If forest fires are used, then the file emissplit.specials.voc is
+If forest fires are used, then the file `emissplit.specials.voc` is
 required (not optional), and the country-code 101 used to specify the
 VOC speciation of forest fires in this file.
 
 ### Lightning emissions
 
-Emissions of NO$_{x}$ from lightning are included in the model as
-monthly averages on T21 ($5.65^&deg;&times;5.65^&deg;$) resolution
+Emissions of NO<sub>x</sub> from lightning are included in the model as
+monthly averages on T21 (5.65&deg;&times;5.65&deg;) resolution
 (Køhler *et al.*, 1995). The lightning emissions are defined on a
-$64&times;32$ grid with 17 vertical levels, with global coverage, and are
-provided as 12 **ASCII** files “lightningMM.dat”.
+64&times;32 grid with 17 vertical levels, with global coverage, and are
+provided as 12 ASCII files `lightningMM.dat`.
 
 ### Landuse definitions
 
 For the vegetative landuse categories where stomatal modeling is
 undertaken, the start and end of the growing season (SGS, EGS, in days)
 must be specified. The calculation of SGS and EGS with respect to
-latitude is done in the module **LandDefs\_ml.f90**. The parameters
+latitude is done in the module `LandDefs_ml.f90`. The parameters
 needed to specify the development of the leaf area index (LAI) within
-the growing season are given in the ASCII file “Inputs\_LandDefs.csv”.
+the growing season are given in the ASCII file `Inputs_LandDefs.csv`.
 For more information, see chapter 5 of the EMEP Status Report 1/2003
 Part I (Simpson *et al.*, 2003).
 
 The file, designed to be opened with excel or gnumeric, contains a
 header briefly explaining the contents of the 14 columns. The first
 three columns are representing the landuse name, code (which are
-consistent with those in “Landuse.Input” file) and type (grouping of the
+consistent with those in `Landuse.Input` file) and type (grouping of the
 landuse classes). The fourth column (PFT) gives a plant-functional type
 code (for future use), the fifth gives the maximum height of vegetation
-($m$), the sixth indicates albedo (%) and the seventh indicates possible
-source of NH$_{x}$ (0 off/1 on, curently not used). Columns 8 to 11
+(m), the sixth indicates albedo (%) and the seventh indicates possible
+source of NH<sub>x</sub> (0 off/1 on, currently not used). Columns 8 to 11
 define the growing season (day number), column 12 and 13 lists the LAI
-minimum and maximum ($m^{2}/m^{2}$) and columns 14 and 15 defines the
+minimum and maximum (m&sup2;/m&sup2;) and columns 14 and 15 defines the
 length of the LAI increase and decline periods (no. of days). Finally,
 the last four columns give default values of foliar biomass and biogenic
 VOC emission potentials. See Simpson et al., (2012) for details.
 
 ### Stomatal conductance
 
-Parameters for the stomatal conductance model, deposition of O$_{3}$ and
+Parameters for the stomatal conductance model, deposition of O<sub>3</sub> and
 stomatal exchange (DO3SE) must be specified. That are based upon the
 ideas in Emberson *et al.*, 2000, and are discussed in Simpson and
 Emberson, 2006 and Tuovinen et al. 2004.
 
-The ASCII file “Inputs\_DO3SE.csv” provides land-phenology data of each
+The ASCII file `Inputs_DO3SE.csv` provides land-phenology data of each
 landuse type for stomatal conductance calculations. The data are
-summarised in Table 5.1 in Chapter 5 of the EMEP Status Report 1/2003
+summarized in Table 5.1 in Chapter 5 of the EMEP Status Report 1/2003
 Part I (Simpson *et al.*, 2003).
 
-The file contains a **header** with the contents of the file, with
+The file contains a header with the contents of the file, with
 different factors needed for each of the landuse classes used in the
 EMEP/MSC-W model. The first two columns represent the landuse code
-(which are consistent with those in “Landuse.Input” file) and name. The
+(which are consistent with those in `Landuse.Input` file) and name. The
 next 22 values are different phenology factors.
 
 ### Photo-dissociation rates
@@ -789,42 +787,43 @@ meteorological input data. In the lookup tables data are listed for
 every 10 degree latitude at an interval of 1 degree zenith angle at
 every model height.
 
-For the two types of cloud conditions there are one **ASCII** file
-averaged for each season (SS); 01, 02, 03 and 04. For light cloud the
-four seasonal files are called “jcl1kmSS.dat”, for dense cloud
-conditions the four seasonal files are called “jcl3kmSS.dat”, and then
-for clear sky four files called “jclearSS.dat”. In addittion there are
-two files for june called jcl1.jun and jcl3.jun.
+For the two types of cloud conditions there are one ASCII file
+averaged for each season (`SS`); 01, 02, 03 and 04. For light cloud the
+four seasonal files are called `jcl1kmSS.dat`, for dense cloud
+conditions the four seasonal files are called `jcl3kmSS.dat`, and then
+for clear sky four files called `jclearSS.dat`. In addition there are
+two files for June called `jcl1.jun` and `jcl3.jun`.
 
 Each file contains 18 columns. The first column is latitude of zenith
 angle and then the next 17 are the values for the model levels with the
-unit: $1/s$. For more details about these rates, please read Chapter 7.2
+unit: 1/s. For more details about these rates, please read Chapter 7.2
 of the EMEP Status Report 1/2003 Part I (Simpson *et al.*, 2003).
 
-### Site and Sonde locations for output
+### Site and Sonde locations for output [sec:sitessondes~i~nput]
 
-[sec:sitessondes~i~nput] The model provides a possibility for extra
+The model provides a possibility for extra
 output data of surface concentration for a set of specified measurement
 site locations and concentrations for the vertical column above a set of
 specified locations. These site and sonde locations are listed in the
-**ASCII** files \`\`sites.dat\`\` and \`\`sondes.dat\`\` files. These
+ASCII files `sites.dat` and `sondes.dat` files. These
 files can be changed by the user, this is described in section
 [sec:sitesonde].
 
-Output files
-============
-
-[ch:output]
+## Output files [ch:output]
 
 Output files from a model run are written out in either ASCII, or (for
 most data outputs) in netCDF format. The different netCDF files are
-named after the runlabel1 parameter set in modrun.sh. The model output
+named after the `runlabel1` parameter set in `modrun.sh`. The model output
 is written to the same directory as where the runscript where submitted,
 as described in Chapter [ch:SubmitARun].
 
 To check your model run, already prepared model result files can be
-downloaded from the EMEP/MSC-W Open Source website under “Download”
-section: “Model Results”. Unpacked files are placed in an output
+downloaded using the [catalog tool][catalog] as follows:
+```bash
+# download the output
+catalog.py -R 4_10 --output
+```
+Unpacked files are placed in an output
 directory with model run results for a whole year and sometimes with a
 smaller test run for i.e. April.
 
@@ -853,10 +852,7 @@ working directory after a model run. Note: YYYY: year.[tab:output]
 
 [Tab:outputs]
 
-Output parameters netcdf files
-------------------------------
-
-[sec:OutputParam]
+### Output parameters netCDF files [sec:OutputParam]
 
 Parameters to be written out Base\_day.nc, Base\_month.nc and
 Base\_year.nc are defined in My\_Derived\_ml.f90 and Derived\_ml.f90. In
