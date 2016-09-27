@@ -118,8 +118,8 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201510,meteo,2013,,{FTP}/{REL}/input_data/meteo/meteo201312.tar.bz2,,1993915801,a327bcb8ea7760b94d8156f28943c20a
 201510,input,2013,rv4_8,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2184552411,5c68e82bb2e5bc86f19d732678b51350
 201510,source,2015,rv4_8,{GIT}/archive/{MOD}.tar.gz,,947315,2169d7925aa2780a410cd369934a631c
-201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/Base_model_rv4_8_results_NoFF.tar.bz2,,1951285242,1396049cea1d9ece2ae2137db3372dc9
-201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/Base_model_rv4_8_results_withFF.tar.bz2,,385662970,eaf51f73b1a0aa2e7992ef1b901aecab
+201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/Base_model_rv4_8_results_NoFF.tar.bz2,,3122049884,1ed3b6413853132509abfcb16d75fe88
+201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/Base_model_rv4_8_results_withFF.tar.bz2,,3122061808,164d458b85e162efd2e4dc0bc61082a2
 201510,output,2013,rv4_8,{FTP}/{REL}/model_results_rv4_8_2013/README,,226,e4301f9b708fe448162962bb23f37baf
 201510,docs,,rv4_8,{GIT}/releases/download/{MOD}/User_Guide.pdf,,359164,ff89ea1b9b16a909b2fa1069b1bd1c7c
 201609,extra,,,{FTP}/{REL}/extra.tar.bz2,,211229,36b050fe6352d0ec89df4a6d72c54ad8
