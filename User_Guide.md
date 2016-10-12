@@ -13,13 +13,13 @@ The main documentation for the EMEP/MSC-W model is an article published
 in Atmospheric Chemistry and Physics in 2012. This article will be
 referred to as Simpson et al. (2012) in this manual.
 
--   Simpson, D., Benedictow, A., Berge, H., Bergström, R., Emberson,
-    L.D., Fagerli, H., Flechard, C.R., Hayman, G.D., Gauss, M., Jonson,
-    J.E., Jenkin, M.W., Nyíri, Á, Richter, C., Semeena, V.S, Tsyro, S.,
-    Tuovinen, J.-P., Valdebenito, Á., and Wind, P.: The EMEP MSC-W
-    chemical transport model – technical description. Atmospheric
-    Chemistry and Physics, 12, 7825-7865, 2012.</br>
-    <http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html>
+- Simpson, D., Benedictow, A., Berge, H., Bergström, R., Emberson,
+  L.D., Fagerli, H., Flechard, C.R., Hayman, G.D., Gauss, M., Jonson,
+  J.E., Jenkin, M.W., Nyíri, Á, Richter, C., Semeena, V.S, Tsyro, S.,
+  Tuovinen, J.-P., Valdebenito, Á., and Wind, P.: The EMEP MSC-W
+  chemical transport model – technical description. Atmospheric
+  Chemistry and Physics, 12, 7825-7865, 2012.</br>
+  <http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html>
 
 The model source code is available from the Open Source EMEP/MSC-W model
 github page:</br>
@@ -70,16 +70,16 @@ code.
 ## Computer Information [sec:compinf]
 
 To compile the EMEP/MSC-W model you need:
-* Fortran 95 compiler
-* NetCDF Library (>4.1.3)
-* MPI Library (>1.0)
+- Fortran 95 compiler
+- NetCDF Library (>4.1.3)
+- MPI Library (>1.0)
 
 It is necessary to compile with double precision reals (8 bytes reals).
 The program has been used on computers ranging from a Linux laptop to
 supercomputers (Itanium2 cluster, Intel Xeon cluster, Cray XT4, IBM
 power5+). It is compatible with all compilers tested so far: Intel, PGI,
-gfortran, XL fortran. A Makefile is included, the path to netcdf (INCL
-and LLIB) have to be adapted to your machine, and the fortran compiler
+gfortran, XL Fortran. A Makefile is included, the path to NetCDF (INCL
+and LLIB) have to be adapted to your machine, and the Fortran compiler
 (F90) and flags (F90FLAGS) to the compiler you are using.
 
 The code has been tested with 1 to 1024 CPUs, and scales well (for large
@@ -87,7 +87,7 @@ grids). If only one CPU is used 1-2 GB memory is required. If more than
 one, for example 64 CPUs are used, 200 MB of memory per CPU is enough
 (in the case of a 132 X 159 grid size). For runs on more than 32 CPUs, a
 fast interconnect is recommended (infiniband for example), for smaller
-runs, gigabit ethernet is sufficient. It takes $\sim$ 5 hrs on 64\*Xeon
+runs, gigabit Ethernet is sufficient. It takes &sim;5 hrs on 64\*Xeon
 X5355 (2.66GHz) for 1 year simulation.
 
 When downloading input data in order to do a “base run” please make sure
@@ -104,19 +104,19 @@ Source website.
 
 This is what you need to do before you can do a “base run” with the
 EMEP/MSC-W model:
--   Read the EMEP/MSC-W model User Guide
--   Download input data (description in Chapter [ch:InputFiles] and data
-    available from the EMEP/MSC-W Open Source website under “Download”
-    section: “Input Data”)
--   Download the EMEP/MSC-W model source code (description in
-    section [sec:ModelCode] and the files are available from the
-    EMEP/MSC-W Open Source website under “Download” section: “Model
-    Code”)
--   Follow the instructions for “Submitting a Run” description in
-    Chapter [ch:SubmitARun].
--   Download some model results for comparison, description in
-    Chapter [ch:output] and the files are available from the EMEP/MSC-W
-    Open Source website under “Download” section: “Model Results”.
+- Read the EMEP/MSC-W model User Guide
+- Download input data (description in Chapter [ch:InputFiles] and data
+  available from the EMEP/MSC-W Open Source website under “Download”
+  section: “Input Data”)
+- Download the EMEP/MSC-W model source code (description in
+  section [sec:ModelCode] and the files are available from the
+  EMEP/MSC-W Open Source website under “Download” section: “Model
+  Code”)
+- Follow the instructions for “Submitting a Run” description in
+  Chapter [ch:SubmitARun].
+- Download some model results for comparison, description in
+  Chapter [ch:output] and the files are available from the EMEP/MSC-W
+  Open Source website under “Download” section: “Model Results”.
 
 ## Model code
 [sec:ModelCode]: #sec:ModelCode
@@ -189,7 +189,7 @@ EECCA in this text and in the `config_emep.nml`.
 <a name=fig:EECCA></a>
 ![fig:EECCA](EECCA.png)
 *Figure 1: The extended EMEP grid covering EECCA area with
-$132&times;159$ gridpoints on $50&times;50$ km$^2$ resolution defined on a
+132&times;159 gridpoints on 50&times;50 km&sup2; resolution defined on a
 polar stereographic projection*
 
 # Input files
@@ -285,9 +285,9 @@ acknowledge EMEP/MSC-W in any use of these data.
 | Notes: |
 |:-------|
 | `YYYY`: year, `MM`: month, `DD: day, `SS`: seasons, |
-| `POLL`: pollutant type (NH$_3$, CO,NO$_x$, SO$_x$, NMVOC, PM$_{2.5}$ and PM$_{co}$)|
+| `POLL`: pollutant type (NH<sub>3</sub>, CO,NO<sub>x</sub>, SO<sub>x</sub>, NMVOC, PM<sub>2.5</sub> and PM<sub>co</sub>)|
 | $\dagger$: optional (in most cases) |
-| $^*$ New O3 boundary condition data in 30 levels. Can be used with `NewLogan=.true.` in `BoundaryConditions\_ml.f90`.|
+| $^*$ New O3 boundary condition data in 30 levels. Can be used with `NewLogan=.true.` in `BoundaryConditions_ml.f90`.|
 
 *Table 2: List of input data files.*
 
@@ -305,15 +305,15 @@ The IFS forecasts has been run by MSC-W as independent experiments on
 the HPCs at ECMWF with special requests on some output parameters.
 The meteorological fields are retrieved on a
 0.1^&deg;&times;0.1^&deg; longitude latitude coordinates and
-interpolated to 50&times;50 km$^2$ polar-stereographic grid projection.
+interpolated to 50&times;50 km&sup2; polar-stereographic grid projection.
 Vertically, the fields on 60 eta levels from the IFS model are
 interpolated onto the 37 EMEP sigma levels. The meteorology is prepared
 into 37 sigma levels since the model is under test for a finer vertical
 resolution.
 
-The Opensource code is released with 20 sigma levels and
+The open source code is released with 20 sigma levels and
 to make the model read the meteorology properly, a description of the 20
-vertical sigma levels is needed. This is provided in an ascii file
+vertical sigma levels is needed. This is provided in an ASCII file
 called `Vertical_levels.txt` together with the [other input data][Tab:inputdata].
 The version of the IFS model used for preparing these fields, Cycle 38r2, is
 documented in <http://www.ecmwf.int/research/ifsdocs/index.html>.
@@ -371,7 +371,7 @@ different formats that are presently supported are:
 * "Old style" ASCII emissions format. Total yearly emissions.
   : The gridded emission files contain 16 columns where the first column
     represents the country code <http://www.emep.int/grid/country_numbers.txt>),
-    the second and the third columns are the 'i' and 'j' indices of the
+    the second and the third columns are the `i` and `j` indices of the
     EMEP grid, the fourth and fifth columns are the total emissions from
     low and high sources, and the last 11 columns contain emissions from
     10 anthropogenic SNAP sectors.
@@ -410,7 +410,7 @@ different formats that are presently supported are:
     country to the file. Total emissions and coverage of countries can
     easily be visualized, but not emissions from one single country.
 
-[Tab:Emisdata]: #Tab-Emisdata
+[Tab:Emisdata]: #Tab:Emisdata
 <a name=Tab:Emisdata></a>
 
 | **Variable name**     | **Description**                                |
@@ -475,7 +475,7 @@ and Fagerli *et al.*, 2004).
 
 Biogenic emissions of isoprene and monoterpene are calculated in the
 model as a function of temperature and solar radiation, using the
-landuse datasets. The light and temperature depencies are similar to
+landuse datasets. The light and temperature decencies are similar to
 those used in the original open source model, see Chapter 4.2 of the
 EMEP Status Report 1/2003 Part I (Simpson *et al.*, 2003).
 
@@ -491,7 +491,7 @@ new approach is documented in Simpson *et al.*, 2012.
 
 ### Landuse
 
-Landuse data are required for modeling boundary layer processes (i.e.
+Landuse data are required for modelling boundary layer processes (i.e.
 dry deposition, turbulent diffusion). The EMEP/MSC-W model can accept
 landuse data from any data set covering the whole of the domain,
 providing reasonable resolution of the vegetation categories. Gridded
@@ -500,12 +500,12 @@ been created based on the data from the Stockholm Environment Institute
 at York (SEI-Y) and from the Coordinating Center for Effects (CCE). 16
 basic landuse classes have been identified for use in the deposition
 module in the model, and three additional “fake” landuse classes are
-used for providing results for integrated assessment modeling and
+used for providing results for integrated assessment modelling and
 effects work.
 
-There are two netCDF files included, one file
+There are two NetCDF files included, one file
 `Landuse_PS_5km_LC.nc` on 5 km resolution over the EMEP domain,
-and a global `LanduseGLC.nc`. The different landuse types are desribed
+and a global `LanduseGLC.nc`. The different landuse types are described
 in Simpson et al (2012).
 
 ### Degree-day factor
@@ -519,7 +519,7 @@ section 6.1.2.
 ### NO<sub>x</sub> depositions
 
 Areas with high NO deposition loads have greater soil-NO emissions. To
-include this in the model, a netCDF file where pre-calculated
+include this in the model, a NetCDF file where pre-calculated
 N-depositions are included. The file made by the results from the
 EMEP/MSC-W model runs over a 5-year period.
 
@@ -529,7 +529,7 @@ Road traffic produces dust.
 These emissions are handled in the EMEP/MSC-W model in the `Emissions_ml.f90` module.
 To include road dust, set `USE_ROADDUST = .true.` in `config_emep.nml`.
 There are two files included in input data, `RoadMap.nc` and  `AVG_SMI_2005-2010.nc`.
-`RoadMap.nc` include gridded roads and PM emissions over Europe, AVG_SMI_2005-2010.nc` are global.
+`RoadMap.nc` include gridded roads and PM emissions over Europe, `AVG_SMI_2005-2010.nc` are global.
 
 ### Aircraft emissions [emisair]
 
@@ -583,7 +583,7 @@ The files are used by the module `DustProd_ml.f90`, which calculates
 windblown dust emissions from soil erosion. Note that the
 parametrization is still in the development and testing phase, and is by
 default 'turned off'. To include it in the model calculations, set
-`USE_DUST = .true.` in `config\_emep.nml`. The user is recommended to
+`USE_DUST = .true.` in `config_emep.nml`. The user is recommended to
 read carefully documentation and comments in the module
 `DustProd_ml.f90`.
 
@@ -827,36 +827,38 @@ Unpacked files are placed in an output
 directory with model run results for a whole year and sometimes with a
 smaller test run for i.e. April.
 
-[h!] [List of model output files]List of output files written in the
-working directory after a model run. Note: YYYY: year.[tab:output]
+[Tab:outputs]: #Tab:outputs
+<a name=Tab:outputs></a>
+|**Output data files** |**Short description**                           |**Format**|
+|----------------------|------------------------------------------------|----------|
+|`Base_hour.nc`        | Gridded hourly  values of a                    | NetCDF   |
+|                      | selection of compounds                         |          |
+|`Base_day.nc`         | Gridded daily   values of a                    | NetCDF   |
+|                      | selection of compounds                         |          |
+|`Base_month.nc`       | Gridded monthly values of a                    | NetCDF   |
+|                      | selection of compounds                         |          |
+|`Base_fullrun.nc`     | Gridded yearly  values of a                    | NetCDF   |
+|                      | selection of compounds                         |          |
+|`sites_YYYY.nc`       | Surface daily   values of a                    | NetCDF   |
+|                      | selection of stations and compounds            |          |
+|`sondes_YYYY.nc`      | Vertical daily  values of a                    | NetCDF   |
+|                      | selection of stations and compounds            |          |
+|`sites_YYYY.cvs`      | ASCII version of `sites_YYYY.nc`               | ASCII    |
+|`sondes_YYYY.csv`     | ASCII version of `sondes_YYYY.nc`              | ASCII    |
 
-  **Output data files**   **Short description**                            **Format**
-  ----------------------- ------------------------------------------------ ------------
-  Base\_day.nc            Gridded daily values of a selection              netCDF
-                          of compounds.                                    
-  Base\_hour.nc           Gridded hourly values of a selection             netCDF
-                          of compounds.                                    
-  Base\_month.nc          Gridded monthly values of a selection            netCDF
-                          of compounds.                                    
-  Base\_fullrun.nc        Gridded yearly values of a selection             netCDF
-                          of compounds.                                    
-  sites\_YYYY.cvs         Surface daily values of a selection              ASCII
-                          of stations and compounds.                       
-  sondes\_YYYY.csv        Vertical daily values of a selection             ASCII
-                          of stations and compounds.                       
+|**Additional files**  |**Short description**                           |**Format**|
+|----------------------|------------------------------------------------|----------|
+|`RunLog.out`          | Summary log of runs, including total emissions | ASCII    |
+|                      | of different air pollutants per country        |          |
+| Timing.out           | Timing log file                                | ASCII    |
+*Table 5: List of model output files]List of output files written in the
+working directory after a model run. Note: YYYY: year.*
 
-  **Additional files**    **Short description**                            **Format**
-  RunLog.out              Summary log of runs, including total emissions   ASCII
-                          of different air pollutants per country          
-  Timing.out              Timing log file                                  ASCII
+### Output parameters NetCDF files [sec:OutputParam]
 
-[Tab:outputs]
-
-### Output parameters netCDF files [sec:OutputParam]
-
-Parameters to be written out Base\_day.nc, Base\_month.nc and
-Base\_year.nc are defined in My\_Derived\_ml.f90 and Derived\_ml.f90. In
-My\_Derived\_ml.f90, the use can specify the output species (air
+Parameters to be written out `Base_day.nc`, `Base_month.nc` and
+`Base_year.nc` are defined in `My_Derived_ml.f90` and `Derived_ml.f90`.
+In `My_Derived_ml.f90`, the use can specify the output species (air
 concentrations, depositions, column values), units and temporal
 resolution of the outputs (daily, monthly, yearly).
 
@@ -865,22 +867,30 @@ names start with TYPE of the parameter, namely SURF (surface air
 concentrations), DDEP (Dry deposition), WDEP (Wet deposition), COLUMN
 (Vertically integrated parameters), Area (Surface area) etc.
 
-For suface air concentrations, the general name pattern is
-SURF\_UNITS\_COMPONENT. Here, UNITS can e.g. be ug (), ugS (), ugN (),
-or ppb. The user can change units in My\_Derived\_ml.f90 (in array
-OutputConcs). Note that the components are classified either as SPEC
-(species) or GROUP. The content of complex GROUP components can be found
-in CM\_ChemGroups\_ml.f90.
+For surface air concentrations, the general name pattern is
+`SURF_UNITS_COMPONENT`. Here, `UNITS` can e.g. be "ug" (&mu;g/m&sup3;),
+"ugS" (&mu;g(S)/m&sup3;), "ugN" (&mu;g(N)/m&sup3;), or "ppb".
+Note that the components are classified either as "SPEC"
+(species) or "GROUP". The content of complex GROUP components can be found
+in `CM_ChemGroups_ml.f90`.
 
-For dry depositions, given per 1m$^{2}$ of specified landuse, the names
-look like DDEP\_COMPONENT\_m2LANDUSE, where LANDUSE can be either a
-specific landuse type or a cell average. The units are or . For wet
-depositions, the names are DDEP\_COMPONENT, and the units are or .
+For column integrated parameters, the names are `COLUMN_COMPONENT_kNLAYERS`,
+where `NLAYERS` is the number of layers from model top included in the integration.
+The units for column outputs are "ugm2" (&mu;g/m&sup2;), "mcm2" (molec/m&sup2;)
+or "e15mcm2" (10<sup>15</sup>molec/m&sup2;).
 
-For column integrated parameters, the names are
-COLUMN\_COMPONENT\_NLAYERS, where NLAYERS is the number of layers
-included in the integration. The units are molec/m$^2$, but can easily
-be changed in My\_Derived\_ml.f90 and Derived\_ml.f90.
+For dry depositions, given per 1m&sup2; of specified landuse, the names
+look like `DDEP_COMPONENT_m2LANDUSE`, where `LANDUSE` can be either a
+specific landuse type or a cell average.
+For wet depositions, the names are `WDEP_COMPONENT`.
+The units for dry and wet depositions are mg/m&sup2;, mg(S)/m&sup2; or mg(N)/m&sup2.
+
+Surface concentrations, column integrated, wet and dry deposition outputs
+are defined by the user in `config_emep.nml` file.
+Surface concentrations and column integrated outputs
+are described in `OutputConcs_config` namelist,
+Dry and wet deposition outputs
+are described in `OutputDep_config` namelist.
 
 VG\_COMPONENT\_LANDUSE are the dry deposition velocities on various
 landuse types, typically in cm/s.
@@ -943,20 +953,20 @@ SURF\_ug\_DUST & Mineral dust []& From all sources\
 SURF\_ug\_PM10 & PM$_{10}$ dry mass[]&\
 SURF\_ug\_PM10\_rh50 & PM$_{10}$ wet []&PM$_{10}$ +\
 & & particle water at Rh=50%\
-SURF\_ug\_PM25 & PM$_{2.5}$ dry []& Includes fine PM and\
+SURF\_ug\_PM25 & PM<sub>2.5</sub> dry []& Includes fine PM and\
 & & 27% of coarse $NO_{3}$\
-SURF\_ug\_PM25\_rh50 & PM$_{2.5}$ wet []& PM$_{2.5}$ +\
+SURF\_ug\_PM25\_rh50 & PM<sub>2.5</sub> wet []& PM<sub>2.5</sub> +\
 & & particle water at Rh=50%\
-SURF\_ug\_PM25X & PM$_{2.5}$ dry []& Includes fine PM and 27% of\
+SURF\_ug\_PM25X & PM<sub>2.5</sub> dry []& Includes fine PM and 27% of\
 & & coarse $NO_{3}$, EC and OM\
-SURF\_ug\_PM25X\_rh50 & PM$_{2.5}$ []& As PM$_{2.5}$X +\
+SURF\_ug\_PM25X\_rh50 & PM<sub>2.5</sub> []& As PM<sub>2.5</sub>X +\
 && particle water at Rh=50%\
 
 SURF\_ug\_PMFINE & Fine PM []& Sum of all fine aerosols\
-SURF\_ug\_PPM25 & Primary PPM$_{2.5}$ []& Anthropogenic emissions\
+SURF\_ug\_PPM25 & Primary PPM<sub>2.5</sub> []& Anthropogenic emissions\
 SURF\_ug\_PPM\_C & Primary coarse PM []& Anthropogenic emissions\
-SURF\_ug\_PM25\_FIRE & PM$_{2.5}$ from forest fires []& Sum of BC, OC\
-& & and rest PM$_{2.5}$\
+SURF\_ug\_PM25\_FIRE & PM<sub>2.5</sub> from forest fires []& Sum of BC, OC\
+& & and rest PM<sub>2.5</sub>\
 etc.& &\
 
 & **Dry Depositions** &\
@@ -1426,8 +1436,8 @@ An example of the “femis.dat” file for a base run is shown below:
 >     ------------------------------------------
 
 This base run example means that there are (1.0), no emission reductions
-of sox (SO$_x$), nox (NO$_x$), voc (VOC), nh3 (NH$_3$) and pm25
-(PM$_{2.5}$) from all sectors in the UK.
+of sox (SO<sub>x</sub>), nox (NO<sub>x</sub>), voc (VOC), nh3 (NH<sub>3</sub>) and pm25
+(PM<sub>2.5</sub>) from all sectors in the UK.
 
 -   The first column of the second line represents the country code. (27
     is the code for UK.) The codes for all countries can be found in
@@ -1492,7 +1502,7 @@ Gardner *et al.*, 1997
   ~ R.M. Gardner, K. Adams, T. Cook, F. Deidewig, S. Ernedal, R. Falk,
     E. Fleuti, E. Herms, C.E. Johnson, M. Lecht, D.S. Lee, M. Leech, D.
     Lister, B. Masse, M. Metcalfe, P. Newton, A. Schmitt, C. Vandenbergh
-    and R. Van Drimmelen. The ANCAT/EC global inventory of NO$_x$
+    and R. Van Drimmelen. The ANCAT/EC global inventory of NO<sub>x</sub>
     emissions from aircraft. *Atmos. Environ.*, 31 (12): 1751-1766 ,
     1997.
 
@@ -1502,8 +1512,8 @@ Jonson *et al.*, 2001
     global and a regional model. *Atmos. Environ.*, 35: 525-537, 2001.
 
 Köhler *et al.*, 1995
-  ~ I. Köhler, R. Sausen and G. Klenner. NO$_x$ production from
-    lightning. The impact of NO$_x$ emissions from aircraft upon the
+  ~ I. Köhler, R. Sausen and G. Klenner. NO<sub>x</sub> production from
+    lightning. The impact of NO<sub>x</sub> emissions from aircraft upon the
     atmosphere at flight altitudes 8-15 km (AERONOX), edited by U.
     Schumann, final report to the Commission of the European
     Communities, Deutch Luft und Raumfart, Oberpfaffenhofen, Germany,
