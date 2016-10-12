@@ -1105,82 +1105,82 @@ linked directly in the ’config\_emep.nml’ file. You need to set the
 right paths for the input directories. All the input files in the input
 directories are linked to the directory you are working from.
 
-### Config\_emep.nml
+### Configuration file
 
 The model has a namelist system. It is possible to set different
 constants and flags for running the model. The constants and flags
-itself is defined in ’ModelConstants\_ml.f90’, while they are set in the
-namelist file under ’ModelConstants\_config’ parameter. Some of these
+itself is defined in `ModelConstants_ml.f90`, while they are set in the
+namelist file under `ModelConstants_config` parameter. Some of these
 are briefly explained in Chapter [ch:InputFiles]. Model gets information
 about running for special cases from this file. The datasets provided
 are for the EMEP grid EECCA.
 
 The different parameters for the model run are set in the
-’config\_emep.nml’ file. In the very beginning of this, the section
-’INPUT\_PARA’ has all these variables including the link to the
-meteorology data. The trendyear can be set to change the boundary
+`config_emep.nml` file. In the very beginning of this, the section
+`INPUT_PARA` contains the basic run configuration.
+The `iyr_trend` variable can be set to change the boundary
 emissions for earlier and future years, see the modules
-**BoundaryConditions\_ml.f90 ** and **GlobalBCs\_ml.f90 ** to understand
-better what the trendyear setting does. The default setting is the
-meteorological year you are running for, in this case 2012. The
-runlabel1 option sets the name of the different output netCDF files, see
-Table [ch:output]. The startdate and enddate parameters are set for the
-timeperiod you want the model to run (YYYY MM DD), and you need
-meteorology data for the period.
+`BoundaryConditions_ml.f90` and `GlobalBCs_ml.f90` to understand
+better what the `iyr_trend` setting does. The default setting is the
+meteorological year you are running for, in this case 2014. The
+`runlabel1` option sets the name of the different output netCDF files, see
+Table [ch:output]. The `startdate` and `enddate` parameters are set for the
+time period you want the model to run (`YYYY,MM,DD`). The variable `GRID`
+states the name of the model domain grid.
 
-The following is an example of ’INPUT\_PARA’ in namelist:
+The following is an example of `INPUT_PARA` namelist:
 
->
->     &INPUT_PARA
->       iyr_trend = 2012,
->       runlabel1 = 'Base',
->       runlabel2 = 'Opensource_Setup_2014',
->       startdate = 2012,01,01,000000,
->       enddate   = 2012,01,10,000000,
->       meteo     = 'met/meteoYYYYMMDD.nc',
->     &end
+```
+&INPUT_PARA
+  GRID      = 'EECCA',
+  iyr_trend = 2014,
+  runlabel1 = 'Base',
+  runlabel2 = 'Opensource_Setup_2016',
+  startdate = 2014,01,01,000000,
+  enddate   = 2014,01,10,000000,
+&end
+```
 
 This means, that the model is run for the period 1 January to 10 Januray
-2012 and the trend year used is 2012. Output files will be stored with
-the name ’Base’ and the meteorological files are stored under the
-directory ’met’ and are linked to the working directory.
+2014 and the trend year used is 2014. Output files will be stored with
+the name 'Base' and the meteorological correspond to the 'EECCA' grid.
 
 It is possible to run the model on a smaller domain than the full
 regional model domain, as defined by x coordinates ranging from 1 to 132
 and y coordinates ranging from 1 to 159.
 
 To set a smaller domain, one needs only to specify the coordinates of
-the new domain in **RUNDOMAIN** in the namelist file,
-“config\_emep.nml”. For example:
-
->     ! --------Sub domain x0   x1  y0   y1
->             RUNDOMAIN =  36, 100, 50, 150   ! smaller EECCA domain
-
-tells the model to run in the domain with x coordinates ranging from 36
-to 100 and y coordinates from 50 to 150.\
+the sub-domain with the `RUNDOMAIN` variable on `ModelConstants_config` namelist
+in `config_emep.nml`. For example:
+```
+!-------- Sub domain (x0,x1,y0,y1)
+  RUNDOMAIN =  36, 100, 50, 150   ! smaller EECCA domain
+```
+tells the model to run in the domain with `x` coordinates ranging from 36
+to 100 and `y` coordinates from 50 to 150.
 
 To run the model, the correct path to the EMEP/MSC-W model code has to
-be set (mpirun path\_to\_the\_modelcode/Unimod).
+be set (`mpirun path/to/the/model/code/Unimod`).
 
 It is recommended to submit the script as a batch job. Please check the
 submission routine on the computer system you are running on. In the
 newer model versions (since 4.0) the number of nodes is set
 automatically from what is asked for when submitting a job. The
-approximate time and CPU usage is described in Section [sec:compinf]\
+approximate time and CPU usage is described in Section [sec:compinf]
 
 When the job is no longer running or in the queue, it is either finished
 or has crashed for some reason. If the model run crashed, an error
 message will give information on what was missing or wrong in the
 routine. If the run was successful, a message
-
->      ++++++++++++++++++++++++++++++++++++++++++++++++
->      programme is finished
-
+```
+++++++++++++++++++++++++++++++++++++++++++++++++
+programme is finished
+```
 will be stated at the end of the log file, before printing the
 Timing.out file. The model results will be written to this same
 directory. Please make sure there is enough disk place for the model
 results. For more information about the model result output files, see
-chapter [ch:output].\
+chapter [ch:output].
 
 If for some reason the model crashed, please check both the log and the
 error file for any clue of the crash. After fixing the problem the job
@@ -1189,84 +1189,54 @@ input data are not removed.
 
 The script can also be submitted interactively, and either have the
 output written to the screen or to named error and output log files. The
-variables wanted in the output are specified in the
-’OutputConcs\_config’, OutputDep\_config and in the ’OutputMisc\_config’
-parameters respectively for surface concentrations, depositions and some
-miscellaneous outputs.
+`OutputConcs_config`, `OutputDep_config` and `OutputMisc_config` namelists
+specify the variables wanted in the output for surface concentrations, depositions
+and some miscellaneous outputs, respectively.
 
-Nesting
--------
-
-[sec:nesting]
+## Nesting [sec:nesting]
 
 The boundary conditions needed for EMEP MSC-W model is provided with the
 input data. The model can read Boundary conditions data from other
 models as well. These data has to be in netCDF format. The boundary
 conditions needed for EMEP MSC-W model is provided with the input data.
-The model can read Boundary conditions data from other models as well.
-These data has to be in netCDF format.
+The model can read initial conditions (IC) and boundary conditions (BC) data
+from other models as well. These data has to be in netCDF format.
 
 Different Nesting modes are:
+- read the external BC data only,
+- produce EMEP BC data from the simulation,
+- read the external BC data and produce EMEP BC data,
+- using the default EMEP BC data from the input data directory and
+  write out EMEP BC at the end of the simulation,
+- read the external BC data only in the beginning of the simulation,
+- read external BC at the beginning of the simulation and write out
+  EMEP BC at the end of the simulation.
 
--   read the external BC data only,
+These options are controlled by the `MODE_READ` and `MODE_SAVE` variables
+in `Nest_config` namelist, in `config_emep.nml` file. The mode options are:
+- `MODE_READ=`
+  - ‘NONE’: do nothing (default).
+  - ‘START’: read at the start of run.
+  - ‘FORECAST’: read at the start of run, if the files are found.
+  - ‘NHOUR’: read at given `NHOURREAD` hourly intervals. `NHOURREAD` is set in
+    `Nest_config` and should be an integer fraction of 24.
+- `MODE_SAVE=`
+  - ‘NONE’: do nothing (default).
+  - ‘END’: write at end of run.
+  - ‘FORECAST’: write every `OUTDATE(1:FORECAST_NDUMP)`. `OUTDATE` and
+     `FORECAST_NDUMP` are set in `Nest_config`.
+  - ‘NHOUR’: write at given `NHOURSAVE` hourly intervals. `NHOURSAVE` is set in
+    `Nest_config` and should be an integer fraction of 24.
 
--   produce EMEP BC data from the simulation,
+If BC data are read at `NHOURREAD` intervals from the file defined by `template_read_BC`
+in `Nest_config`. The IC data (entire 3D domain) will
+be set at start of run from the file defined by `template_read_3D` in `Nest_config`.
 
--   read the external BC data and produce EMEP BC data,
-
--   using the default EMEP BC data from the input data directory and
-    write out EMEP BC at the end of the simulation,
-
--   read the external BC data only in the beginning of the simulation,
-
--   read external BC at the beginning of the simulation and write out
-    EMEP BC at the end of the simulation.
-
-These options are controlled by the MODE\_READ and MODE\_SAVE variables
-in the config\_emep.nml file. and the mode options are:
-
-MODE\_READ
-  ~ =
-
-    ‘NONE’
-      ~ do nothing (default).
-
-    ‘START’
-      ~ read at the start of run.
-
-    ‘FORECAST’
-      ~ read at the start of run, if the files are found.
-
-    ‘NHOUR’
-      ~ read at given NHOURREAD hourly intervals. NHOURREAD is set in
-        config\_emep.nml and should be an integer fraction of 24.
-
-MODE\_SAVE
-  ~ =
-
-    ‘NONE’
-      ~ do nothing (default).
-
-    ‘END’
-      ~ write at end of run.
-
-    ‘FORECAST’
-      ~ write every OUTDATE(1:FORECAST\_NDUMP). OUTDATE and
-        FORECAST\_NDUMP are set in config\_emep.nml.
-
-    ‘NHOUR’
-      ~ write at given NHOURSAVE hourly intervals. NHOURSAVE is set in
-        config\_emep.nml and should be an integer fraction of 24.
-
-If BC data are read at NHOURREAD intervals, IC (entire 3D domain) will
-be set at start of run if found using the name defined for
-template\_read\_3D.
-
-### How to use External BC data (MODE\_READ=‘NHOUR’)
+### How to use External BC data (`MODE_READ=‘NHOUR’`)
 
 Following is an example showing how to read ‘MyBC.nc’ as an external BC
-data. The model is reading in 3 variables – **O3**, **PAN**, and **CO**
-– from this data. See the section **&ExternalBICs\_bc** .
+data. The model is reading in 3 variables – `O3`, `PAN`, and `CO`
+– from this data. See the section `&ExternalBICs_bc`.
 
 Steps to follow:
 
