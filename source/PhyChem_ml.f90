@@ -45,7 +45,7 @@ use DerivedFields_ml, only: d_2d, f_2d
 use DryDep_ml,        only: init_drydep
 use EmisDef_ml,       only: loc_frac
 use Emissions_ml,     only: EmisSet,uemep_emis
-!use Gravset_ml,       only: gravset
+use Gravset_ml,       only: gravset
 use GridValues_ml,    only: debug_proc,debug_li,debug_lj,&
                             glon,glat,projection,i_local,j_local,i_fdom,j_fdom
 use ModelConstants_ml,only: MasterProc, KMAX_MID, nmax, nstep &
@@ -56,7 +56,7 @@ use ModelConstants_ml,only: MasterProc, KMAX_MID, nmax, nstep &
                            ,FORECAST       & ! use advecdiff_poles on FORECAST mode
                            ,ANALYSIS       & ! 3D-VAR Analysis
                            ,SOURCE_RECEPTOR&
-!                          ,USE_GRAVSET&
+                           ,USE_GRAVSET    &
                            ,FREQ_HOURLY    & ! hourly netcdf output frequency
                            ,USE_POLLEN, USE_EtaCOORDINATES,JUMPOVER29FEB&
                            ,USE_uEMEP, IOU_HOUR, IOU_HOUR_INST
@@ -185,7 +185,7 @@ subroutine phyche()
     call advecdiff_poles
   endif
 
-! if(USE_GRAVSET) call gravset
+  if(USE_GRAVSET) call gravset
 
   call Add_2timing(17,tim_after,tim_before,"phyche:advecdiff")
   !================

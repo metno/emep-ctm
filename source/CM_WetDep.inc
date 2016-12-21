@@ -1,51 +1,23 @@
-  integer, public, parameter ::  NWETDEP_ADV  = 55
+  integer, public, parameter ::  NWETDEP_ADV  = 26
   type(depmap), public, dimension(NWETDEP_ADV), parameter:: WDepMap= (/ &
         depmap( IXADV_HNO3, CWDEP_HNO3, -1) & 
-      , depmap( IXADV_HONO, CWDEP_HNO3, -1) & 
-      , depmap( IXADV_HCHO, CWDEP_HCHO, -1) & 
-      , depmap( IXADV_H2O2, CWDEP_H2O2, -1) & 
       , depmap( IXADV_SO2, CWDEP_SO2, -1) & 
       , depmap( IXADV_SO4, CWDEP_SO4, -1) & 
       , depmap( IXADV_NH3, CWDEP_NH3, -1) & 
       , depmap( IXADV_NO3_f, CWDEP_PMf, -1) & 
       , depmap( IXADV_NO3_c, CWDEP_PMc, -1) & 
       , depmap( IXADV_NH4_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASH_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASH_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_POM_f_WOOD, CWDEP_PMf, -1) & 
-      , depmap( IXADV_POM_f_FFUEL, CWDEP_PMf, -1) & 
-      , depmap( IXADV_POM_c_FFUEL, CWDEP_PMc, -1) & 
-      , depmap( IXADV_EC_f_WOOD_new, CWDEP_ECfn, -1) & 
-      , depmap( IXADV_EC_f_WOOD_age, CWDEP_PMf, -1) & 
-      , depmap( IXADV_EC_c_WOOD, CWDEP_PMc, -1) & 
-      , depmap( IXADV_EC_f_FFUEL_new, CWDEP_ECfn, -1) & 
-      , depmap( IXADV_EC_f_FFUEL_age, CWDEP_PMf, -1) & 
-      , depmap( IXADV_EC_c_FFUEL, CWDEP_PMc, -1) & 
-      , depmap( IXADV_REMPPM25, CWDEP_PMf, -1) & 
-      , depmap( IXADV_REMPPM_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_FFIRE_OM, CWDEP_PMf, -1) & 
-      , depmap( IXADV_FFIRE_BC, CWDEP_PMf, -1) & 
-      , depmap( IXADV_FFIRE_REMPPM25, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug1e3, CWDEP_PMf, -1) & 
+      , depmap( IXADV_HCHO, CWDEP_HCHO, -1) & 
+      , depmap( IXADV_PPM25_FIRE, CWDEP_PMf, -1) & 
+      , depmap( IXADV_V1702A02B_1, CWDEP_PMf, -1) & 
+      , depmap( IXADV_V1702A02B_2, CWDEP_PMf, -1) & 
+      , depmap( IXADV_V1702A02B_3, CWDEP_PMf, -1) & 
+      , depmap( IXADV_V1702A02B_4, CWDEP_PMf, -1) & 
+      , depmap( IXADV_V1702A02B_5, CWDEP_PMc, -1) & 
+      , depmap( IXADV_V1702A02B_6, CWDEP_PMc, -1) & 
+      , depmap( IXADV_V1702A02B_7, CWDEP_PMc, -1) & 
+      , depmap( IXADV_V1702A02B_8, CWDEP_PMc, -1) & 
+      , depmap( IXADV_V1702A02B_9, CWDEP_PMc, -1) & 
       , depmap( IXADV_SeaSalt_f, CWDEP_SSf, -1) & 
       , depmap( IXADV_SeaSalt_c, CWDEP_SSc, -1) & 
       , depmap( IXADV_DUST_ROAD_F, CWDEP_PMf, -1) & 
@@ -54,5 +26,4 @@
       , depmap( IXADV_Dust_wb_c, CWDEP_PMc, -1) & 
       , depmap( IXADV_Dust_sah_f, CWDEP_PMf, -1) & 
       , depmap( IXADV_Dust_sah_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_Pb210, CWDEP_PMf, -1) & 
   /)

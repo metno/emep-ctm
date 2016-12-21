@@ -8,7 +8,7 @@ FOBJ ?=	\
 	DefPhotolysis_ml.o Derived_ml.o DerivedFields_ml.o DO3SE_ml.o  DryDep_ml.o DustProd_ml.o \
 	EcoSystem_ml.o EmisDef_ml.o EmisGet_ml.o Emissions_ml.o ExternalBICs_ml.o \
 	FastJ_ml.o ForestFire_ml.o Functions_ml.o \
-	GridAllocate_ml.o GridValues_ml.o \
+	Gravset_ml.o GridAllocate_ml.o GridValues_ml.o \
 	InterpolationRoutines_ml.o \
 	Io_ml.o Io_Nums_ml.o Io_Progs_ml.o KeyValueTypes.o  LandDefs_ml.o Landuse_ml.o \
 	LandPFT_ml.o LocalVariables_ml.o MARS_ml.o MARS_Aero_water_ml.o \
