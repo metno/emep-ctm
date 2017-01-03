@@ -11,15 +11,21 @@ The EMEP/MSC-W Model Unofficial User's Guide
     :maxdepth: 2
     :caption: Contents:
 
-.. role:: math(raw)
-    :format: html latex
+.. Shorthands
+.. |O3|   replace:: O\ :sub:`3`
+.. |NHx|  replace:: NH\ :sub:`x`
+.. |NH3|  replace:: NH\ :sub:`3`
+.. |SOx|  replace:: SO\ :sub:`x`
+.. |SO2|  replace:: SO\ :sub:`2`
+.. |NOx|  replace:: NO\ :sub:`x`
+.. |NO2|  replace:: NO\ :sub:`2`
+.. |PM25| replace:: PM\ :sub:`2.5`
+.. |PMco| replace:: PM\ :sub:`co`
+.. |PM10| replace:: PM\ :sub:`10`
 
+.. Chapters
 .. include:: Intro.rst
-
-
-.. comented:
-  Since Pythagoras, we know that :math:`a^2 + b^2 = c^2`.
-  .. math:: (a + b)^2 = a^2 + 2ab + b^2
+.. include:: Input.rst
 
 
 .. comented:

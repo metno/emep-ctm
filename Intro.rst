@@ -111,9 +111,9 @@ of the EMEP/MSC-W Open Source `github page`__.
 .. __: https://github.com/metno/emep-ctm
 
 Although the source code is available for download as a single compressed file on
-the release page, the preferred retrieval method is via the `catalog tool`__ as follows:
+the release page, the preferred retrieval method is via the `catalog tool`_ as follows:
 
-.. __: https://github.com/metno/emep-ctm/tree/master/tools
+.. _`catalog tool`: https://github.com/metno/emep-ctm/tree/master/tools
 
 
 .. code-block:: bash
@@ -134,7 +134,7 @@ An overview of the files is given in :numref:`Tab-modelfiles`.
 
 .. csv-table:: Model source files
    :name: Tab-modelfiles
-   :header: Type, Filename
+   :header: **Type**, **Filename**
 
    modules files        , ``*.f90``
    include files        , ``*.inc``
@@ -155,8 +155,8 @@ Model grid
 ----------
 
 The current EMEP model version, and the provided gridded input data,
-have a horizontal resolution of 50:math:`\times`\ 50 km:math:`^2` (at
-60:math:`^\circ`\ N) and are defined on a polar stereographic projection
+have a horizontal resolution of :math:`50\times 50 km^2`
+(at :math:`60^\circ N`\ ) and are defined on a polar stereographic projection
 with 20 sigma levels vertically. The model is very flexible with regard
 to the horizontal resolution, in that it readily makes use of
 meteorological data provided with the model. The vertical resolution is
@@ -169,9 +169,11 @@ EECCA countries in the EMEP model grid, see :numref:`fig-EECCA`.
 To distinguish the new grid from the old EMEP grid, the new grid is called
 EECCA in this text and in the ``config_emep.nml``.
 
+
+.. _`fig-eecca`:
+
 .. figure:: EECCA.png
-    :name: fig-EECCA
 
     The extended EMEP grid covering EECCA area with
-    132:math:`\times` 159 gridpoints on 50:math:`\times` 50 km:math:`^2`
+    :math:`132\times 159` gridpoints on :math:`50\times 50 km^2`
     resolution defined on a polar stereographic projection.
