@@ -27,21 +27,26 @@ The EMEP/MSC-W Model Unofficial User's Guide
 .. |PMco|  replace:: PM\ :sub:`co`
 .. |PM10|  replace:: PM\ :sub:`10`
 .. |ugm3|  replace:: :math:`\mu g/m^3`
+.. |degC|  replace:: :math:`^\circ C`
 .. |ugSm3| replace:: :math:`\mu g(S)/m^3`
 .. |ugNm3| replace:: :math:`\mu g(N)/m^3`
+.. |ugCm3| replace:: :math:`\mu g(C)/m^3`
 .. |mgm2|  replace:: :math:`mg/m^2`
 .. |mgSm2| replace:: :math:`mg(S)/m^2`
 .. |mgNm2| replace:: :math:`mg(N)/m^2`
-.. |degC|  replace:: :math:`^\circ C`
+.. |mgCm2| replace:: :math:`mg(C)/m^2`
 
 
 .. Chapters
 .. include:: Intro.rst
 .. include:: Input.rst
 .. include:: Output.rst
+.. include:: Subrun.rst
+
 .. todo::
-    - Subrun.rst
+    - :numref:`ch-output`: sites and sondes NetCDF output
     - references.rst
+    - spellcheck
 
 
 .. comented:

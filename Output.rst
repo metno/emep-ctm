@@ -41,7 +41,7 @@ smaller test run for i.e. April.
                         & selection of stations and compounds  &
    ``sites_YYYY.cvs``   & ASCII version of ``sites_YYYY.nc``   & ASCII [#Old]_
    ``sondes_YYYY.csv``  & ASCII version of ``sondes_YYYY.nc``  & ASCII [#Old]_
-   **Additional files** & **Short description**                & **Format**
+   **Additional files**
    ``RunLog.out``       & Summary log of runs, including total emissions & ASCII
                         & of different air pollutants per country        &
     ``Timing.out``      & Timing log file                                & ASCII
@@ -105,7 +105,7 @@ selected output parameters, see provided output NetCDF files, or
     :header: **Parameter name**, **Short description**, **Comments**
     :delim: &
 
-    **Surface Soncentrations** &&
+    **Surface Concentrations**
     ``SURF_ppb_O3``         & |O3|   [ppb]                        &
     ``SURF_ugN_NO``         & NO     [|ugNm3|\ ]                  & Available also in ppb
     ``SURF_ugN_NO2``        & |NO2|  [|ugNm3|\ ]                  & Available also in ppb
@@ -145,14 +145,14 @@ selected output parameters, see provided output NetCDF files, or
     ``SURF_ug_PPM25``       & Primary P|PM25| [|ugm3|\ ]          & Anthropogenic emissions
     ``SURF_ug_PPM_C``       & Primary coarse PM [|ugm3|\ ]        & Anthropogenic emissions
     ``SURF_ug_PM25_FIRE``   & |PM25| from forest fires [|ugm3|\ ] & Sum of BC, OC and rest |PM25|
-     **Dry Depositions** &&
+     **Dry Depositions**
     ``DDEP_SOX_m2Grid``     & Oxidized sulphur  [|mgSm2|\ ]       & For a grid cell landuse area weighted
     ``DDEP_SOX_m2Conif``    & Oxidized sulphur  [|mgSm2|\ ]       & To coniferous forest
     ``DDEP_NOX_m2Grid``     & Oxidized nitrogen [|mgNm2|\ ]       & For a grid cell landuse area weighted
     ``DDEP_NOX_m2Decid``    & Oxidized nitrogen [|mgNm2|\ ]       & To decideous forest
     ``DDEP_RDN_m2Grid``     & Reduced nitrogen  [|mgNm2|\ ]       & For a grid cell landuse area weighted
     ``DDEP_RDN_m2Seminat``  & Reduced nitrogen  [|mgNm2|\ ]       & To semi-natural
-    **Wet Depositions** &&
+    **Wet Depositions**
     ``WDEP_PREC``           & Precipitation     [mm]              &
     ``WDEP_SOX``            & Oxidized sulphur  [|mgSm2|\ ]       &
     ``WDEP_SS``             & Sea salt          [|mgm2|\ ]        &
@@ -160,7 +160,7 @@ selected output parameters, see provided output NetCDF files, or
     ``AOD``                 & Aerosol Optical Depth at 550nm      & Experimental
     ``Area_Crops_Frac``     & Area fraction of crops              & Available for several landuses
     ``VG_NO3_F_Grid``       & Dry deposition velocity of fine |NO3| & Grid cell average
-    **Meteorological parameters** &&
+    **Meteorological parameters**
     ``USTAR_GRID``          & :math:`U^*` grid averaged           & Available for several landuses
     ``T2m``                 & Temperature at 2m [|degC|\ ]        &
     ``rh2m``                & Fractional relative humidity at 2m  &
@@ -175,14 +175,10 @@ Two main options are available for the output of ASCII files for
 comparison with measurements or detailed model analysis. These are
 
 sites
-    ..
-
     output of surface concentrations for a set of specified measurement
     site locations.
 
 sondes
-    ..
-
     output of concentrations for the vertical column above a set of
     specified locations.
 
@@ -203,19 +199,13 @@ belong, e.g. 'Northern Hemisphere'.
 Text after ``:`` is read in by the model:
 
 Units
-    ..
-
     Either 'deg' (degrees) or 'index' (model grid indices).
 
 Coords
-    ..
-
     Either 'LatLong' (latitudes/longitudes)
     or 'ModelCoords' (indices of the grid box in which the station is located).
 
 VertCoords
-    ..
-
     Vertical coordinate system that is used in the model (usually 'EMEPsigma').
 
 Both ``sites.dat`` and ``sondes.dat`` files are optional, but recommended.

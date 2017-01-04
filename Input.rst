@@ -225,16 +225,16 @@ Countrywise NetCDF emissions:
     .. _`tab-emisdata`:
 
     .. csv-table:: Description of main fields for "fraction type" NetCDF Emissions
-        |:header: **Variable name**, **Description**
-        |:delim: &
+        :header: **Variable name**, **Description**
+        :delim: &
 
-        |``Ncodes``               & Number of countries sharing the same grid cell
-        |``poll_secNN``           & Pollutant from each sector
-        |``Codes``                & Country code number
-        |``fractions_poll_secNN`` & Fraction of emissions to assign to one country
+        ``Ncodes``               & Number of countries sharing the same grid cell
+        ``poll_secNN``           & Pollutant from each sector
+        ``Codes``                & Country code number
+        ``fractions_poll_secNN`` & Fraction of emissions to assign to one country
 
 Monthly "fraction type" NetCDF emissions.
-    ..
+    \
 
     This is similar to the yearly "fraction type" NetCDF emissions, but
     there are 12 monthly values for each field. This format cannot be
