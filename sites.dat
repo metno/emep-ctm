@@ -1,0 +1,18 @@
+# "Sondes: names, locations, elevations"
+# "Area: EMEP-Europe"
+# "ix: x coordinate"
+# "iy: y coordinate"
+# "lev: vertical coordinate (20=ground)"
+: Units index
+: Coords LatLong
+: VertCoords EMEPsigma
+: DomainName NA
+#
+name lat long lev #HEADERS
+-    deg deg level #SKIP
+#DATA:
+Uccle             50.80    4.35  20  ! comment
+Lerwick           60.13   -1.18  20  ! comment
+Sodankyla         67.39   26.65  20  ! comment
+Ny_Alesund        78.93   11.88  20  ! comment
+Hohenpeissenberg  47.80   11.02  20  ! comment
