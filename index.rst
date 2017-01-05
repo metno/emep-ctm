@@ -42,17 +42,8 @@ The EMEP/MSC-W Model Unofficial User's Guide
 .. include:: Input.rst
 .. include:: Output.rst
 .. include:: Subrun.rst
+.. include:: references.rst
 
 .. todo::
     - :numref:`ch-output`: sites and sondes NetCDF output
-    - references.rst
     - spellcheck
-
-
-.. comented:
-    Indices and tables
-    ==================
-
-    * :ref:`genindex`
-    * :ref:`modindex`
-    * :ref:`search`
