@@ -6,12 +6,12 @@ Input files
 This chapter provides an overview on the necessary input files to run
 the EMEP/MSC-W model. A complete set of input files is provided in the
 EMEP/MSC-W Open Source web page to allow model runs for the meteorological
-year 2014. :numref:`Tab-inputdata` lists the input files.
+year 2014. :numref:`tab-inputdata` lists the input files.
 
 The input files can be downloaded directly from our
 ftp server (ftp://ftp.met.no/projects/emep/OpenSource/201609/),
-However, the preferred retrieval method is via the `catalog tool`_
-(see :numref:`sec-ModelCode`) as follows:
+However, the preferred retrieval method is via the catalog tool
+(:numref:`sec-ModelCode`) as follows:
 
 .. code-block:: bash
 
@@ -31,18 +31,16 @@ except the aircraft emissions (``AircraftEmis_FL.nc``),
 and forest fire emissions (``FINN_ForestFireEmis_2014.nc``).
 See sections :numref:`emisair` and :numref:`emisff`
 for details about these emissions data.
-.
 
-**IMPORTANT:**
+IMPORTANT:
+    The input data available in the EMEP/MSC-W Open Source Web site should
+    be appropriately acknowledged when used for model runs. If nothing else
+    is specified according to references further in this chapter, please
+    acknowledge EMEP/MSC-W in any use of these data.
 
-The input data available in the EMEP/MSC-W Open Source Web site should
-be appropriately acknowledged when used for model runs. If nothing else
-is specified according to references further in this chapter, please
-acknowledge EMEP/MSC-W in any use of these data.
-
-.. _`tab-inputdata`:
 
 .. csv-table:: List of input data files
+    :name: tab-inputdata
     :header: **Data**, **Name**, **Format**
     :delim: &
 
@@ -110,8 +108,8 @@ the HPCs at ECMWF with special requests on some output parameters.
 The meteorological fields are retrieved on a
 :math:`0.1^\circ\times 0.1^\circ` longitude latitude coordinates and
 interpolated to :math:`50\times 50 km^2` polar-stereographic grid projection.
-Vertically, the fields on 60 eta levels from the IFS model are
-interpolated onto the 37 EMEP sigma levels. The meteorology is prepared
+Vertically, the fields on 60 eta (\ :math:`\eta`\ ) levels from the IFS model are
+interpolated onto the 37 EMEP sigma (\ :math:`\sigma`\ ) levels. The meteorology is prepared
 into 37 sigma levels since the model is under test for a finer vertical resolution.
 
 The open source code is released with 20 sigma levels and
@@ -129,24 +127,25 @@ meteorological fields are given in Chapter 2 of the EMEP Status Report 1/2016.
 Acknowledgement:
     ECMWF, met.no
 
-.. _tab-metinput:
+
 .. csv-table:: Input meteorological data used in the EMEP/MSC-W Model
+    :name: tab-metinput
     :header: **Parameter**, **Unit**, **Description**
     :delim: &
 
-    \  & 3D fields -- for 37 :math:`\sigma`\  levels & \
+    **3D fields** && for 37 :math:`\sigma`
     :math:`u, v`       & :math:`m/s`       & Horizontal wind velocity components
     :math:`q`          & :math:`kg/kg`     & Specific humidity
     :math:`\theta`     & :math:`K`         & Potential temperature
     :math:`CW`         & :math:`kg/kg`     & Cloud water
-    :math:`CL`         & :math:`\%`         & 3D Cloud cover
+    :math:`CL`         & :math:`\%`        & 3D Cloud cover
     :math:`cnvuf`      & :math:`kg/sm^2`   & Convective updraft flux
     :math:`cnvdf`      & :math:`kg/sm^2`   & Convective downdraft flux
     :math:`PR`         & :math:`mm`        & Precipitation
-    \  & 2D fields -- for Surface & \
+    **2D fields** && for surface
     :math:`PS`         & :math:`hPa`       & Surface pressure
-    :math:`T2`         & :math:`K`         & Temperature at 2m height
-    :math:`Rh2`        & :math:`\%`         & Relative humidity at 2m height
+    :math:`T2`         & :math:`K`         & Temperature at :math:`2 m` height
+    :math:`Rh2`        & :math:`\%`        & Relative humidity at :math:`2 m` height
     :math:`SH`         & :math:`W/m^2`     & Surface flux of sensible heat
     :math:`LH`         & :math:`W/m^2`     & Surface flux of latent heat
     :math:`\tau`       & :math:`N/m^2`     & Surface stress
@@ -155,10 +154,10 @@ Acknowledgement:
     :math:`lspr`       & :math:`m`         & Large scale precipitation
     :math:`cpr`        & :math:`m`         & Convective precipitation
     :math:`sdepth`     & :math:`m`         & Snow depth
-    :math:`ice`        & :math:`\%`         & Fraction of ice
+    :math:`ice`        & :math:`\%`        & Fraction of ice
     :math:`SMI1`       &                   & Soil moisture index level 1
     :math:`SMI3`       &                   & Soil moisture index level 3
-    :math:`u10, v10`   & :math:`m/s`       & Wind at 10 m height
+    :math:`u10, v10`   & :math:`m/s`       & Wind at :math:`10 m` height
 
 .. _`emisnew`:
 
@@ -175,7 +174,7 @@ The different formats that are presently supported are:
     The gridded emission files contain 16 columns where the first column
     represents the country code
     (http://www.emep.int/grid/country_numbers.txt), the second and the
-    third columns are the ‘i' and ‘j' indices of the EMEP grid, the
+    third columns are the :math:`i` and :math:`j` indices of the EMEP grid, the
     fourth and fifth columns are the total emissions from low and high
     sources, and the last 11 columns contain emissions from 10
     anthropogenic SNAP sectors.
@@ -222,9 +221,8 @@ Countrywise NetCDF emissions:
     Description of main fields for "fraction type" NetCDF Emissions
     :numref:`tab-emisdata`
 
-    .. _`tab-emisdata`:
-
     .. csv-table:: Description of main fields for "fraction type" NetCDF Emissions
+        :name: tab-emisdata
         :header: **Variable name**, **Description**
         :delim: &
 
@@ -240,7 +238,7 @@ Monthly "fraction type" NetCDF emissions.
     there are 12 monthly values for each field. This format cannot be
     combined with other formats.
 
-Using and combining gridded Emissions
+Using and combining gridded emissions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 These gridded emission files are controlled via the ``config_emep.nml``
@@ -280,9 +278,9 @@ Initial concentration of ozone are required in order to initialize the
 model runs. Boundary conditions along the sides of the model domain and
 at the top of the domain are then required as the model is running.
 
-The ``Logan_P.nc`` file contains monthly averaged fields in netCDF format.
+The ``Logan_P.nc`` file contains monthly averaged fields in NetCDF format.
 The initial and background concentrations are based on the Logan (1998)
-climatology. The Logan climatology is scaled by Unimod according to the
+climatology. The Logan climatology is scaled on run time according to the
 Mace Head measurements as described in Simpson *et al.* (2003). For a
 number of other species, background/initial conditions are set within
 the model using functions based on observations (Simpson *et al.*, 2003
@@ -293,7 +291,7 @@ BVOC emissions
 
 Biogenic emissions of isoprene and monoterpene are calculated in the
 model as a function of temperature and solar radiation, using the
-landuse datasets. The light and temperature depencies are similar to
+landuse datasets. The light and temperature dependencies are similar to
 those used in the original open source model, see Chapter 4.2 of the
 EMEP Status Report 1/2003 Part I (Simpson *et al.*, 2003).
 
@@ -311,7 +309,7 @@ al.*, 2012.
 Landuse
 ~~~~~~~
 
-Landuse data are required for modeling boundary layer processes (i.e.
+Landuse data are required for modelling boundary layer processes (i.e.
 dry deposition, turbulent diffusion). The EMEP/MSC-W model can accept
 landuse data from any data set covering the whole of the domain,
 providing reasonable resolution of the vegetation categories. Gridded
@@ -323,7 +321,7 @@ module in the model, and three additional "fake" landuse classes are
 used for providing results for integrated assessment modeling and
 effects work.
 
-There are two netcdf files included, one file
+There are two NetCDF files included, one file
 ``Landuse_PS_5km_LC.nc`` on 5 km resolution over the EMEP domain,
 and a global ``LanduseGLC.nc``. The different landuse types are desribed
 in Simpson et al (2012).
@@ -341,7 +339,7 @@ section 6.1.2.
 ~~~~~~~~~~~~~~~~~
 
 Areas with high NO deposition loads have greater soil-NO emissions. To
-include this in the model, a netcdf file where pre-calculated
+include this in the model, a NetCDF file where pre-calculated
 N-depositions are included. The file made by the results from the
 EMEP/MSC-W model runs over a 5-year period.
 
@@ -373,8 +371,8 @@ use aircraft emissions go to http://www.pa.op.dlr.de/quantify, click on
 'Register'. That page will provide information about the registration
 process and the protocol that has to be signed. Once you are registered,
 click 'Login' and provide user name and password. On the new page,
-search for 'Emissions for EMEP', which links directly to the Readme file
-and the emission data file in netCDF format. Download the emission data
+search for 'Emissions for EMEP', which links directly to the ``Readme`` file
+and the emission data file in NetCDF format. Download the emission data
 file and place it in the input folder.
 
 Surface Pressure
@@ -407,7 +405,7 @@ compatible with the ``ForestFire_ml.f90`` module.
 Dust files
 ~~~~~~~~~~
 
-The annual ascii data for sand and clay frations as well as the monthly
+The annual ASCII data for sand and clay fractions as well as the monthly
 data for boundary and initial conditions for dust from Sahara are
 replaced with a single NetCDF file ``Soil_Tegen.nc`` since 2013. This
 covers data for a global domain in :math:`0.5\times 0.5` degree
@@ -430,10 +428,10 @@ The files are based on calculations from a global CTM at the University
 of Oslo for 2000. To include Saharan dust, set ``USE_SAHARA=.true.`` in
 ``config_emep.nml``.
 
-Another source for dust is an arid surface. This is accountet for by
+Another source for dust is an arid surface. This is accounted for by
 soilmosture calculations in ``DustProd_ml.f90``. Together with Soil
 Water Index from the meteorology files and permanent wilting point (pwp)
-from ``SoilTypes_IFS.nc``. This file is global and netcdf. See Simpson et
+from ``SoilTypes_IFS.nc``. This file is global and NetCDF. See Simpson et
 al. (2012) section 6.10.
 
 ASCII files
@@ -458,7 +456,7 @@ file ``columnsource_location.csv`` contains the geographical coordinates
 volcanoes, while ``columnsource_emission.csv`` contains the emission
 parameters.
 
-Since 2010 the EMEP model has also been used to model the transport of
+Since 2010 the EMEP/MSC-W  model has also been used to model the transport of
 ash and |SO2| from volcanic eruptions. In addition to data for
 passive degassing of |SO2|\ , the above two input files also
 contain locations and emission parameters for two recent eruptions of
@@ -479,7 +477,7 @@ al., 2003).
 Since 2015 different formats of gridded emissions can be used and mixed
 (with some restrictions) in the EMEP model under one common framework.
 The new emission system is described in :numref:`emisnew`. Here we focus
-only on the "old style" ASCCI emission format.
+only on the "old style" ASCII emission format.
 
 Seven gridded emission input files (``emislist.poll``) are available in
 ASCII format for the following compounds: CO, |NH3|\ ,
@@ -520,9 +518,9 @@ Simpson et al. (2012) section 6.1.2
 Emission heights
 ~~~~~~~~~~~~~~~~
 
-A vertical distribution for the elleven SNAP sectors are given in the
+A vertical distribution for the eleven SNAP sectors are given in the
 file ``EmisHeights.txt``. The file has seven vertical levels, over the
-collumns and the SNAP sectors given in the first row. Read more in
+columns and the SNAP sectors given in the first row. Read more in
 Simpson et al. (2012) section 6.1.1.
 
 .. _`sec-femis`:
@@ -553,7 +551,7 @@ Chemical speciation of emissions
 
 Many of the emission files give emissions of a group of compounds, e.g.
 |NOx| includes NO+|NO2|\ , and VOC can include many compounds. The
-information needed to retreive emissions of individual compounds from
+information needed to retrieve emissions of individual compounds from
 these the gridded files is given in files labelled
 ``emissplit.defaults.POLL`` or ``emissplit.specials.POLL``,
 where ``POLL`` can be |NOx|\ , VOC, etc.
@@ -585,7 +583,7 @@ coverage, and are provided as 12 ASCII files ``lightningMM.dat``.
 Landuse definitions
 ~~~~~~~~~~~~~~~~~~~
 
-For the vegetative landuse categories where stomatal modeling is
+For the vegetative landuse categories where stomatal modelling is
 undertaken, the start and end of the growing season (SGS, EGS, in days)
 must be specified. The calculation of SGS and EGS with respect to
 latitude is done in the module ``LandDefs_ml.f90``. The parameters
@@ -644,7 +642,7 @@ averaged for each season (``SS``); 01, 02, 03 and 04. For light cloud the
 four seasonal files are called ``jcl1kmSS.dat``, for dense cloud
 conditions the four seasonal files are called ``jcl3kmSS.dat``, and then
 for clear sky four files called ``jclearSS.dat``. In addittion
-there are two files for june called ``jcl1.jun`` and ``jcl3.jun``.
+there are two files for June called ``jcl1.jun`` and ``jcl3.jun``.
 
 Each file contains 18 columns. The first column is latitude of zenith
 angle and then the next 17 are the values for the model levels with the

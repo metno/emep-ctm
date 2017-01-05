@@ -1,4 +1,4 @@
-.. _`ch-submitarun`
+.. _`ch-submitarun`:
 
 Submitting a Run
 ================
@@ -28,6 +28,7 @@ This is an example of a minimum ``modrun.sh`` script to run the model.
 
 .. literalinclude:: modrun.sh
     :caption: Minimum ``modrun.sh`` example.
+    :language: bash
 
 This bash shell script is designed so that users can easily adapt it to
 fit their needs. It contain the minimum information required to run the
@@ -58,13 +59,12 @@ emissions for earlier and future years, see the modules
 better what the trendyear setting does. The default setting is the
 meteorological year you are running for, in this case 2014. The
 runlabel1 option sets the name of the different output NetCDF files, see
-:numref:`ch-output`. The startdate and enddate parameters are set for the
-timeperiod you want the model to run (YYYY,MM,DD), and you need
+:numref:`ch-output`. The ``startdate`` and ``enddate`` parameters are set for the
+time period you want the model to run (YYYY,MM,DD), and you need
 meteorology data for the period, as shown in :numref:`config-emep`.
 
-.. _`config-emep`:
-
 .. code-block:: text
+    :name: config-emep
     :caption: Basic namelist example.
 
     &INPUT_PARA
@@ -182,7 +182,7 @@ in ``Nest_config`` namelist, in ``config_emep.nml`` file. The mode options are:
         do nothing (default).
     'END'
         write at end of run.
-    'FORECAST
+    'FORECAST'
         write every ``OUTDATE(1:FORECAST_NDUMP)``.
         ``OUTDATE`` and ``FORECAST_NDUMP`` are set in ``Nest_config``.
     'NHOUR'
@@ -197,16 +197,15 @@ Write BCs from EMEP MSC-W model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :numref:`nest-write-config` shows an example to write every 3 hours into
-daily Nest/BC files. Output filename is defined by ``template_write`` ('BC_YYYYMMDD.nc'),
+daily Nest/BC files. Output file name is defined by ``template_write`` ('BC_YYYYMMDD.nc'),
 where ‘YYYYMMDD’ is replaced by corresponding date.
 
 All advected model variables will be written out for the sub-domain defined
 by ``out_DOMAIN`` (\ :math:`x=60,\ldots,107; y=11,\ldots,58`\ ).
 If no ``out_DOMAIN`` is given, the model inner domain will be written out.
 
-.. _`nest-write-config`:
-
 .. code-block:: text
+    :name: nest-write-config
     :caption: Write BCs configuration example.
 
     &Nest_config
@@ -228,9 +227,8 @@ the Nest/BC files created previously by running :numref:`nest-write-config`.
 Please note that the model sub-domain for a nested run is set by ``RUNDOMAIN``,
 as shown in :numref:`config-emep`.
 
-.. _`nest-read-config`:
-
 .. code-block:: text
+    :name: nest-read-config
     :caption: Read BCs configuration example.
 
     &Nest_config
@@ -243,7 +241,7 @@ as shown in :numref:`config-emep`.
 Read external BCs
 ~~~~~~~~~~~~~~~~~
 
-Reading BCs from a different model is more involved than the preivous example.
+Reading BCs from a different model is more involved than the previous example.
 The vertical axis and variables in the file need to be mapped to the
 corresponding model variables.
 
@@ -252,9 +250,8 @@ BC file. The model will read 3 variables from ``MyBC.nc``: |O3|, NO, and |NO2|.
 The maping between the ``MyBC.nc`` variables and the corresponding model variables
 is defined in the ``ExternalBICs_bc`` namelist.
 
-.. _`nest-mybc-config`:
-
 .. code-block:: text
+    :name: nest-mybc-config
     :caption: External BCs configuration example.
 
     &Nest_config
@@ -279,16 +276,17 @@ is defined in the ``ExternalBICs_bc`` namelist.
     &end
 
 
-**Vertical coordinate**
+Vertical coordinate
+^^^^^^^^^^^^^^^^^^^
 
 In ordet the determine the vertical levels on the external BC file
 ('MyBC.nc' in :numref:`nest-mybc-config`),
 the following checks will take place in the following order:
 
-#. :math:`\eta` coordinate:
+#. :math:`\eta` (eta) coordinate:
        If the variable :math:`hyam` (hybrid ``a`` coefficient at layer midpoint) is found,
        :math:`\eta` is calculated from :math:`hyam` and :math:`hyam` variables on the file.
-#. :math:`\sigma` coordinate:
+#. :math:`\sigma` (sigma) coordinate:
        If the vertical level is indexed by variable ``k``.
 #. :math:`\eta` coordinate:
        If the file defined by variable ``filename_eta`` exist
@@ -301,7 +299,7 @@ Independent of the coordinates of the BC file,
 the BC levels will be interpolated into EMEP model levels.
 If the BC file level structure is not recognized,
 and there is no ``filename_eta`` provided,
-the model will write an error message and stop excecution.
+the model will write an error message and stop execution.
 
 An example of the ``filename_eta`` for EMEP model levels is given below.
 Here the ``vct`` variable describes the model level boundaries in hybrid eta coordinate:
@@ -320,7 +318,8 @@ paramters at the layer interfaces in :math:`\eta` coordinate system
 In this file, the first 21 values in ``vct`` represent :math:`hyai`
 and the remaining 21 represent :math:`hybi` values in hPa.
 
-**Variable mapping**
+Variable mapping
+^^^^^^^^^^^^^^^^
 
 The variables to be used from the external boundary condition data are
 given in the ``ExternalBICS_bc`` namelist in the ``config_emep.nml`` file.
@@ -360,9 +359,8 @@ sectors and countries can be defined in the input file called
 ``femis.dat``, which can be found in the downloaded input data directory,
 see section :numref:`sec-femis`.
 
-.. _`base-femis`:
-
 .. code-block:: text
+    :name: base-femis
     :caption: ``femis.dat`` for a base run.
 
     Name  7  sox  nox  co   voc  nh3  pm25   pmco
@@ -396,9 +394,8 @@ An example of ``femis.dat`` file describing 50% reduced emission of |SOx|
 from sector 10 (the emission from agriculture) in the UK is shown in
 :numref:`reduction-femis`.
 
-.. _`reduction-femis`:
-
 .. code-block:: text
+    :name: reduction-femis
     :caption: ``femis.dat`` for 50% |SOx| reduction from sector 10 over UK.
 
     Name  7  sox  nox  co   voc  nh3  pm25   pmco

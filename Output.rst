@@ -1,7 +1,7 @@
 .. _`ch-output`:
 
-Output filesOutput files
-========================
+Output files
+============
 
 Output files from a model run are written out in either ASCII,
 or (for most data outputs) in NetCDF format.
@@ -10,20 +10,19 @@ The model output is written to the same directory as where the runscript
 where submitted, as described in :numref:`ch-submitarun`.
 
 To check your model run, already prepared model result files can be
-downloaded using the `catalog tool`_ (see :numref:`sec-ModelCode`) as follows:
+downloaded using the catalog tool (:numref:`sec-ModelCode`) as follows:
 
 .. code-block:: bash
 
     # download the output
     catalog.py -R rv4_10 --output
 
-Unpacked files are placed in an output
-directory with model run results for a whole year and sometimes with a
-smaller test run for i.e. April.
+Unpacked files are placed in an output directory with model run results
+for a whole year, and sometimes with a smaller test run for e.g. April.
 
-.. _`tab-outputs`:
 
 .. csv-table:: List of model output files
+   :name: tab-outputs
    :header: **Output data files**, **Short description**, **Format**
    :delim: &
 
@@ -99,9 +98,8 @@ explanation to the complex components. For a complete suit of currently
 selected output parameters, see provided output NetCDF files, or
 ``My_Derived_ml.f90`` module.
 
-.. _`tab-outpar`:
-
 .. csv-table:: List of output parameters
+    :name: tab-outpar
     :header: **Parameter name**, **Short description**, **Comments**
     :delim: &
 
@@ -209,7 +207,7 @@ VertCoords
     Vertical coordinate system that is used in the model (usually 'EMEPsigma').
 
 Both ``sites.dat`` and ``sondes.dat`` files are optional, but recommended.
-The species and meteorological data requested for site and sone output are
+The species and meteorological data requested for site and sonde output are
 specified in ``My_Outputs.f90`` by the use of arrays.
 Only a few met fields are defined so far but more can be added into
 ``Sites_ml.f90`` as required.
@@ -217,4 +215,4 @@ Only a few met fields are defined so far but more can be added into
 The output files ``sites_2014.csv`` and ``sondes_2010.csv`` are comma
 separated files that can be read by excel.
 If you include the whole year, or the 31\ :sup:`st` December,
-``sites_2015.csv`` and ``sondes_2015.csv`` are also incued in the output.
+``sites_2015.csv`` and ``sondes_2015.csv`` are also included in the output.

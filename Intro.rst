@@ -32,9 +32,7 @@ The EMEP code is provided under the GNU General Public License version 3
 
 Each code module is prefaced with something like:
 
-.. include:: header.f90
-    :literal:
-
+.. literalinclude:: header.f90
 
 And a copy of the license file, **gpl.txt**, is provided with the model
 code source files.
@@ -54,7 +52,7 @@ To compile the EMEP/MSC-W model you need:
 * NetCDF Library (\> 4.1.3)
 * MPI Library (\> 1.0)
 
-It is necessary to compile with double precision reals (8 bytes reals).
+It is necessary to compile with double precision real (8 bytes real).
 The program has been used on computers ranging from a Linux laptop to
 supercomputers (Itanium2 cluster, Intel Xeon cluster, Cray XT4, IBM
 power5+). It is compatible with all compilers tested so far: Intel, PGI,
@@ -74,7 +72,7 @@ When downloading input data in order to do a "base run" please make sure
 that there are 35 Gb disc space available, especially due to large
 meteorology input files. The model can be run for shorter periods, users
 can download meteorology for only the period they are interested in,
-pluss one day.
+plus one day.
 
 Getting Started
 ---------------
@@ -88,15 +86,15 @@ EMEP/MSC-W model:
 
 *  Read the EMEP/MSC-W model User Guide
 *  Download input data,
-   description and downloading instructions in :numref:`ch-InputFiles`.
+   description and downloading instructions in :numref:`ch-inputfiles`.
 *  Download the EMEP/MSC-W model source code,
-   description and downloading instructions :numref:`sec-ModelCode`.
+   description and downloading instructions :numref:`sec-modelcode`.
 *  Follow the instructions for "Submitting a Run" description in
-   :numref:`ch-SubmitARun`.
+   :numref:`ch-submitarun`.
 *  Download some model results for comparison,
    description in and downloading instructions :numref:`ch-output`.
 
-.. _`sec-ModelCode`:
+.. _`sec-modelcode`:
 
 Model code
 ----------
@@ -130,10 +128,10 @@ the release page, the preferred retrieval method is via the `catalog tool`_ as f
 
 The model source code, makefiles, and a copy of the license file
 will be placed under the directory ``EMEP_MSC-W_model.rv4.10.OpenSource/source/``.
-An overview of the files is given in :numref:`Tab-modelfiles`.
+An overview of the files is given in :numref:`tab-modelfiles`.
 
 .. csv-table:: Model source files
-   :name: Tab-modelfiles
+   :name: tab-modelfiles
    :header: **Type**, **Filename**
 
    modules files        , ``*.f90``
@@ -147,9 +145,9 @@ An overview of the files is given in :numref:`Tab-modelfiles`.
 In addition there is a run script called ``modrun.sh``, which will be
 placed in the ``EMEP_MSC-W_model.rv4.10.OpenSource`` directory. The run script,
 ``modrun.sh``, can easily be modified to work on your computer system.
-This script is described in detail in :numref:`ch-SubmitARun`.
+This script is described in detail in :numref:`ch-submitarun`.
 
-.. _`sec-ModelGrid`:
+.. _`sec-modelgrid`:
 
 Model grid
 ----------
