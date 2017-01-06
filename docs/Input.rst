@@ -266,10 +266,15 @@ Sets of countries can in principle be defined; for now only the set
     :linenos:
 
     emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
+    emis_inputlist(1)%PollName(1:2) = 'voc','sox',
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
     emis_inputlist(1)%incl(1:) = 'NO','SE','FI',
     emis_inputlist(2)%excl(1:) = 'NO','SE','FI',
 
+
+It is also possible to restrict the number of pollutants from each of the files.
+If not all pollutants from ``CM_EmisFiles.inc`` are to be read, one can specify a list of pollutants to be included using "PollName". For instance in the example above will include only VOC and SOx emissions from the file defined by emis_inputlist(1)%name. If PollName is not specified at all, all pollutants are included.
+The specified pollutants must already be defined in ``CM_EmisFiles.inc``
 
 Global Ozone
 ~~~~~~~~~~~~
