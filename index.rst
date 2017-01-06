@@ -10,19 +10,18 @@ The EMEP/MSC-W Model Unofficial User's Guide
     :maxdepth: 2
     :caption: Contents:
 
-    .. Chapters
     Intro.rst
     Input.rst
     Output.rst
     Subrun.rst
     references.rst
 
-.. todo::
-    - Un numbered chapter :numref:`ch-references`:
-    - ``:numref:``` does not work :numref:`ch-inputfiles`:
-    - Center in page :numref:`tab-metinput`, :numref:`tab-emisdata`, :numref:`tab-outputs`
-    - Wrap long lines in :numref:`tab-outpar`
-    - Next release
-        - :numref:`ch-output`: sites and sondes NetCDF output
-        - :numref:`ch-subitarun`: output namelist
-        - :numref:`ch-references`: `NatBib`/`BibTex` references
+.. commented ..todo::
+..     - Un numbered chapter :numref:`ch-references`:
+..     - ``:numref:``` does not work :numref:`ch-inputfiles`:
+..     - Center in page :numref:`tab-metinput`, :numref:`tab-emisdata`, :numref:`tab-outputs`
+..     - Wrap long lines in :numref:`tab-outpar`
+..     - Next release
+..         - :numref:`ch-output`: sites and sondes NetCDF output
+..         - :numref:`ch-subitarun`: output namelist
+..         - :numref:`ch-references`: `NatBib`/`BibTex` references
