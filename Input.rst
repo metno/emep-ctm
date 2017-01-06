@@ -1,4 +1,4 @@
-.. `ch-inputfiles`:
+.. _`ch-inputfiles`:
 
 Input files
 ===========
