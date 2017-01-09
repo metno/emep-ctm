@@ -170,7 +170,8 @@ EECCA in this text and in the ``config_emep.nml``.
 
 .. _`fig-eecca`:
 
-.. figure:: EECCA.png
+.. figure:: EECCA.pdf
+    :scale: 80 %
 
     The extended EMEP grid covering EECCA area with
     :math:`132\times 159` gridpoints on :math:`50\times 50 km^2`
