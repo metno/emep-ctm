@@ -63,33 +63,13 @@ runlabel1 option sets the name of the different output NetCDF files, see
 time period you want the model to run (YYYY,MM,DD), and you need
 meteorology data for the period, as shown in :numref:`config-emep`.
 
-.. code-block:: text
+.. literalinclude:: config_emep.nml
     :name: config-emep
-    :caption: Basic namelist example.
-
-    &INPUT_PARA
-      GRID      = 'EECCA',
-      iyr_trend = 2014,
-      runlabel1 = 'Base',
-      runlabel2 = 'Opensource_Setup_2016',
-      startdate = 2014,01,01,000000,
-      enddate   = 2014,01,10,000000,
-    &end
-    &Machine_config
-      DataPath(1) = '../input', ! define 'DataDir' keyword
-    &end
-    &ModelConstants_config
-      meteo                 = '../meteoYYYY/meteoYYYYMMDD.nc',
-      DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
-      !------------------------------
-    [...]
-      !------------------------------
-      EmisDir               = 'DataDir/EECCA',
-      emis_inputlist(1)%name= 'EmisDir/gridPOLL', ! ASCII
-    [...]
-      ! --------Sub domain x0   x1  y0   y1
-      RUNDOMAIN =  36, 100, 50, 150   ! EECCA sub-domain
-    &end
+    :caption: Basic namelist example; ``config_emep.nml`` extract.
+    :lines: 1-14,42-44,62-64
+.. comment:
+    :language: Fortran
+    :linenos:
 
 In :numref:`config-emep`, the model is run for the period 1 January to 10 Januray
 2014 and the trend year used is 2014. Output files will be stored with
