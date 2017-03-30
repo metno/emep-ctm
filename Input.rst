@@ -407,7 +407,7 @@ We store these data on a slightly coarser grid (\ :math:`0.2^\circ\times 0.2^\ci
 globally for access by the EMEP/MSC-W model. To include forest fire
 emissions set ``USE_FOREST_FIRES=.true.`` in ``config_emep.nml`` and
 download the 2012 GEOS-chem daily data
-http://bai.acd.ucar.edu/Data/fire/. The data needs to be stored with
+http://bai.acom.ucar.edu/Data/fire/. The data needs to be stored with
 units mole/day in a NetCDF file called ``FINN_ForestFireEmis_2014.nc``
 compatible with the ``ForestFire_ml.f90`` module.
 
