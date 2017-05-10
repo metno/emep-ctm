@@ -385,3 +385,21 @@ from sector 10 (the emission from agriculture) in the UK is shown in
 For a scenario run ``femis.dat`` file should be edited manually depending
 on the level of reduction one would like to test with any pollutant from
 any sector and/or any country. Several lines can be written in the file.
+
+Other less used options
+-----------------------
+
+There are many internal settings that are set to a default value by the model. These default values can often be overrided by setting specific values for keywords in config_emep.nml.
+
+The ``RUNDOMAIN`` is divided by the model into subdomains which are assigned to each processor. Normally this partioning is done such that the X and Y direction are divided into approximately equal number of parts. For runs in lat lon projection containing poles the Y division is done into one or two parts, so that each processor has the same share of pole regions.
+The default partitioning can be overrided using the ``DOMAIN_DECOM_MODE`` parameter in ``config_emep.nml``. Recognized values are:
+'X*Y', 'XY', 'X*1', 'Y=1', 'X', '1*Y', 'X=1', 'Y', '2*Y', 'X=2', 'X*2', 'Y=2'. See also in Par_ml.f90 for details.
+
+The main timestep parameter ``dt_advec`` can be set manually in config_emep.nml (in seconds, real number). It must be a factor of 3600.
+
+``JUMPOVER29FEB`` : if set to T , will not treat the 29th of February even for leap years. (Useful if that date is missing, for instance in Climate runs).
+
+``NETCDF_DEFLATE_LEVEL``: The level of compression used in the NetCDF output files (integer). Negative values means netcdf3 format.
+
+
+
