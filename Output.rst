@@ -166,6 +166,27 @@ selected output parameters, see provided output NetCDF files, or
 
 .. _`sec-sitesonde`:
 
+
+Add your own fields
+-------------------
+
+Most standard output can be outputted by adding lines and modifying the parameters in the ``config_emep.nml`` file.
+
+The meteorological fields defined in the ``met`` array in the ``MetFields_ml.f90`` file, can be retrieved by using the 'MET2D' or 'MET3D' keywords. If a 3D array is requested with the 'MET2D' keyword, only the lowest level is written out.
+
+If you want an array that does not fit in any category, or even make your own special field, you can get it in the output using the procedure shown below; this will however require that you write in the code and recompile.
+For 2D fields:
+
+- set a value for ``Nspecial2d``  in ``MetFields_ml.f90`` according to the number of new outputs
+- write in the code the values of the array special2d(i,j,N), where N is the output number (i.e. 1,2,... Nspecial2d). 
+  For instance ``special2d(i,j,1)=Grid%invL`` in ``CellMet_ml.f90``
+- include ``special2d`` array in the same routine by adding the line ``use MetFields_ml  , only : special2d``
+- In ``config_emep.nml`` include the corresponding line, for instance `` 'MyinvL','MET2D','special2d1', '-','MyUnit' ,-99,-99,F,1.0,T,'YMD',`` 
+(and 'special2d2', 'special2d3', ... for additional outputs)
+
+For 3D fields replace all the "2d" by "3d"
+
+
 ASCII outputs: sites and sondes
 -------------------------------
 
@@ -216,3 +237,6 @@ The output files ``sites_2014.csv`` and ``sondes_2010.csv`` are comma
 separated files that can be read by excel.
 If you include the whole year, or the 31\ :sup:`st` December,
 ``sites_2015.csv`` and ``sondes_2015.csv`` are also included in the output.
+
+
+
