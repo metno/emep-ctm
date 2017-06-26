@@ -181,13 +181,17 @@ For 2D fields:
 - write in the code the values of the array special2d(i,j,N), where N is the output number (i.e. 1,2,... Nspecial2d). 
   For instance ``special2d(i,j,1)=Grid%invL`` in ``CellMet_ml.f90``
 - include ``special2d`` array in the same routine by adding the line ``use MetFields_ml  , only : special2d``
-- In ``config_emep.nml`` include the corresponding line, for instance `` 'MyinvL','MET2D','special2d1', '-','MyUnit' ,-99,-99,F,1.0,T,'YMD', `` 
-(and 'special2d2', 'special2d3', ... for additional outputs)
+- In ``config_emep.nml`` include the corresponding line, for instance: 
 
-For 3D fields replace all the "2d" by "3d"
+``'MyinvL','MET2D','special2d1', '-','MyUnit' ,-99,-99,F,1.0,T,'YMD',`` 
 
-Detailed emissions by sectors can be obtained by adding the keyword ``SecEmisOuPoll``, and specify the pollutants required. For instance adding the line:
-`` SecEmisOuPoll(1:) = 'pm25', 'nox',  ``
+(and 'special2d2', 'special2d3', ... for additional outputs) 
+For 3D fields replace all the "2d" by "3d".
+
+Detailed emissions by sectors can be obtained by adding the keyword ``SecEmisOuPoll``, and specify the pollutants required. For example adding the line:
+
+``SecEmisOuPoll(1:) = 'pm25', 'nox',``
+
 will give you the value for all the 11 SNAP sectors for PM25 and NOx.
 
 To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=.true.`` must be set in ``My_Derived_ml.f90``, and the code recompiled. (This parameter cannot be set in ``config_emep.nml`` for now)
