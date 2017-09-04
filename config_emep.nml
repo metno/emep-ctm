@@ -1,20 +1,30 @@
 &INPUT_PARA
   GRID      = 'EECCA',
-  iyr_trend = 2014,
+  iyr_trend = 2015
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2016',
-  startdate = 2014,01,01,000000,
-  enddate   = 2014,12,31,000000,
+  runlabel2 = 'Opensource_Setup_2017',
+  startdate = 2015,01,01,000000,
+  enddate   = 2015,12,31,000024,
 &end
 &Machine_config
   DataPath(1) = '../input',
 &end
 &ModelConstants_config
-  meteo                 = '../meteoYYYY/meteoYYYYMMDD.nc',
+  meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
 !------------------------------
   EXP_NAME              = 'EMEPSTD',
   MY_OUTPUTS            = 'EMEPSTD',
+!------------------------------
+  EmBio%GlobBvocMethod  = 'GLC-CLM', ! default for GLOBAL runs, not used for Europe
+  EmBio%CLF             =  0.59,     ! 1/1.7 for CLM
+  LandCoverInputs%LandDefs  = 'DataDir/Inputs_LandDefs.csv',
+  LandCoverInputs%Do3seDefs = 'DataDir/Inputs_DO3SE.csv',
+  LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
+                              'DataDir/glc2000mCLM.nc',
+  YieldModifications    = 'VBS', 
+  PBL%ZiMIN             =  50.0,
+!------------------------------
   USES%testname         = 'EMEPSTD',
   USES%FOREST_FIRES     = F,
   USES%EMISSTACKS       = F,         ! Reads PointSources file
@@ -48,7 +58,9 @@
 ! One can either include or exclude, not both, as follows
 ! emis_inputlist(1)%incl(1:) = 'EU15', ! example take only countries from the 'EUMACC2' list
 ! emis_inputlist(2)%name     = 'EmisDir/Emis_GLOB_05.nc', !example of Fractions type
-  EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)!------------------------------
+  emis_inputlist(2)%name  = 'DataDir/OceanicEmissions_GEIA.nc',
+  emis_inputlist(2)%type  = 'DMS',
+  EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
 !------------------------------
   SELECT_LEVELS_HOURLY  = F,          ! hourly output flag for 3DPROFILES
   FORECAST              = F,
@@ -62,7 +74,7 @@
 &end
 &Fire_config
   need_poll = F,
-  FINN_PATTERN='input/FFire_YYYY.nc',
+  FINN_PATTERN='../input/FFire_YYYY.nc',
 &end
 &Nest_config
 !-------- Read/Write MODEs
@@ -92,13 +104,7 @@
 &end
 &OutputConcs_config
 OutputConcs=
-  'HMIX'               ,'m'    ,'2d','HMIX'     ,'MISC' ,'YMDI',
-  'SurfAreaPMF_um2cm3','um2/cm3','2d','SurfAreaPMF_um2cm3','MISC','YM',
-  'SurfAreaPM_um2cm3' ,'um2/cm3','2d','SurfAreaPM_um2cm3' ,'MISC','YM',
-  'SurfAreaSSF_um2cm3','um2/cm3','2d','SurfAreaSSF_um2cm3','MISC','YM',
-  'SurfAreaSSC_um2cm3','um2/cm3','2d','SurfAreaSSC_um2cm3','MISC','YM',
-  'SurfAreaDUF_um2cm3','um2/cm3','2d','SurfAreaDUF_um2cm3','MISC','YM',
-  'SurfAreaDUC_um2cm3','um2/cm3','2d','SurfAreaDUC_um2cm3','MISC','YM',
+  'HMIX'                ,'m'   ,'2d','HMIX'     ,'MISC' ,'YM',
   'T2m'                 ,'degC','2d','T2m'      ,'MISC' ,'YMD',
   'SURF_ppbC_VOC'       ,'ppb' ,'2d','VOC'      ,'MISC' ,'YMD',
   'SO2'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
@@ -141,27 +147,20 @@ OutputConcs=
   'DUST_NAT_F'          ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
   'DUST_NAT_C'          ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
   'DUST'                ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
-  'PPM25_FIRE'          ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
-  'OM25_SUM'            ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD', ! test OM25 in ug_PM
-  'OMCOARSE'            ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
   'ECFINE'              ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
   'ECCOARSE'            ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
-  'PART_ASOA_OC'        ,'ugC' ,'2d','AIR_CONCS','SPEC' ,'YM',
-  'PART_BSOA_OC'        ,'ugC' ,'2d','AIR_CONCS','SPEC' ,'YM',
-  'PMFINE'              ,'ug_PM','2d','AIR_CONCS','GROUP','YMD',
-  'OM25'                ,'ug_PM','2d','AIR_CONCS','GROUP','YMD',
-  'OM25'               ,'ugC_PM','2d','AIR_CONCS','GROUP','YMD',
-  'OMCOARSE'           ,'ugC_PM','2d','AIR_CONCS','GROUP','YMD',
-  'ASOA'                ,'ug_PM','2d','AIR_CONCS','GROUP','YMD',
-  'BSOA'                ,'ug_PM','2d','AIR_CONCS','GROUP','YMD',
-  'FFIRE_BC'            ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
-  'FFIRE_REMPPM25'      ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
-  'FFIRE_OM'            ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
-  'SURF_ug_PM25'        ,'ug'  ,'2d','PM25'      ,'MISC','YMD',
-  'SURF_ug_PM25X'       ,'ug'  ,'2d','PM25X'     ,'MISC','YMD',
-  'SURF_ug_PM25X_rh50'  ,'ug'  ,'2d','PM25X_rh50','MISC','YMD',
-  'SURF_ug_PM25_rh50'   ,'ug'  ,'2d','PM25_rh50' ,'MISC','YMD',
-  'SURF_ug_PM10_rh50'   ,'ug'  ,'2d','PM10_rh50' ,'MISC','YMD',
+  'PMFINE'            ,'ug_PM' ,'2d','AIR_CONCS','GROUP','YMD',
+  'OM25'              ,'ug_PM' ,'2d','AIR_CONCS','GROUP','YMD',
+  'OM25'              ,'ugC_PM','2d','AIR_CONCS','GROUP','YMD',
+  'OMCOARSE'          ,'ug_PM' ,'2d','AIR_CONCS','GROUP','YMD',
+  'OMCOARSE'          ,'ugC_PM','2d','AIR_CONCS','GROUP','YMD',
+  'ASOA'              ,'ug_PM' ,'2d','AIR_CONCS','GROUP','YMD',
+  'BSOA'              ,'ug_PM' ,'2d','AIR_CONCS','GROUP','YMD',
+  'BSOA'              ,'ug'    ,'2d','AIR_CONCS','GROUP','YMD',
+  'PPM25_FIRE'        ,'ug'    ,'2d','AIR_CONCS','GROUP','YMD',
+  'FFIRE_BC'          ,'ug'    ,'2d','AIR_CONCS','SPEC' ,'YMD',
+  'FFIRE_REMPPM25'    ,'ug'    ,'2d','AIR_CONCS','SPEC' ,'YMD',
+  'FFIRE_OM'          ,'ug'    ,'2d','AIR_CONCS','SPEC' ,'YMD',
   'AOD'                ,' '  ,'550nm','AOD:GROUP','MISC','YMD',
 ! 'EXT'                ,'1/m','550nm','EXT:GROUP','MISC','YM',
 ! 'NO2'                ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
@@ -200,12 +199,12 @@ DDEP_WANTED =
   'OXN'      ,'GROUP','mgN',
   'RDN'      ,'GROUP','mgN',
 WDEP_WANTED =
-  'PREC'     ,'PREC' ,'mm' ,
-  'SOX'      ,'GROUP','mgS',
-  'OXN'      ,'GROUP','mgN',
-  'RDN'      ,'GROUP','mgN',
-  'SO2'      ,'SPEC' ,'mgS',
-  'HNO3'     ,'SPEC' ,'mgN',
+  'PREC'     ,'PREC' ,'mm' ,'YMD',
+  'SOX'      ,'GROUP','mgS','YMD',
+  'OXN'      ,'GROUP','mgN','YMD',
+  'RDN'      ,'GROUP','mgN','YMD',
+  'SO2'      ,'SPEC' ,'mgS','YMD',
+  'HNO3'     ,'SPEC' ,'mgN','YMD',
 &end
 &OutputSize_config
 !restrict size of output files. (Sizes defined with respect to fulldomain)
