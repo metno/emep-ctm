@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -79,7 +79,7 @@ contains
 
     character*20 falc
     logical tra_exist
-    integer ii,info
+    integer ii
 
     if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
 
@@ -110,7 +110,7 @@ contains
              write(IO_AIRCR,*) 'month and day ',current_date%month&
                   ,current_date%day
              close(IO_AIRCR)
-          endif
+          end if
           iii = 1
 
 !    read on node 0
@@ -121,8 +121,8 @@ contains
           CALL MPI_BCAST( kfalc ,8*iimax,MPI_BYTE, 0,MPI_COMM_CALC,IERROR) 
           CALL MPI_BCAST( fapos ,4*2*iimax,MPI_BYTE, 0,MPI_COMM_CALC,IERROR) 
 !    all distributed
-       endif
-    endif
+       end if
+    end if
 
     return
   end subroutine trajectory_in
@@ -132,7 +132,7 @@ contains
   subroutine trajectory_out
 
     real ttt, dtmil
-    integer ii,jj,k,jjj,info
+    integer ii,jj,k,jjj
     integer :: i
 
 !    trajectory positions

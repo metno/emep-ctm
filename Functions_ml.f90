@@ -1,7 +1,7 @@
-! <Functions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Functions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -83,8 +83,8 @@ function Daily_cosine(mean, amp, dmax, ndays) result (daily)
 
   do d = 1, ndays
     daily(d) = mean + amp * cos ( twopi * (d - dmax)/ ndays )
-  enddo
-endfunction Daily_cosine
+  end do
+end function Daily_cosine
 !-------------------------------------------------------------------
 function Daily_sine(mean, amp, dmax, ndays) result (daily)
 !+
@@ -106,8 +106,8 @@ function Daily_sine(mean, amp, dmax, ndays) result (daily)
 
   do d = 1, ndays
     daily(d) = mean + amp * sin ( twopi * (d + shift - dmax)/ ndays )
-  enddo
-endfunction Daily_sine
+  end do
+end function Daily_sine
 !-------------------------------------------------------------------
 function Daily_halfsine(base, amp, ndays) result (daily)
 !+
@@ -125,7 +125,7 @@ function Daily_halfsine(base, amp, ndays) result (daily)
   do d = 1, ndays
     daily(d) = base + amp * sin ( pi * (ndays - d )/ ndays )
   end do
-endfunction Daily_halfsine
+end function Daily_halfsine
 !-------------------------------------------------------------------
 elemental function StandardAtmos_km_2_kPa(h_km) result (p_kPa)
 !-------------------------------------------------------------------
@@ -144,8 +144,8 @@ elemental function StandardAtmos_km_2_kPa(h_km) result (p_kPa)
     p_kPa = 101.325*exp(-5.255876*log(288.15/(288.15-6.5*h_km)))
   else
     p_kPa =  22.632*exp(-0.1576884*(h_km - 11.0)  )
-  endif
-endfunction StandardAtmos_km_2_kPa
+  end if
+end function StandardAtmos_km_2_kPa
 !-------------------------------------------------------------------
 elemental function StandardAtmos_kPa_2_km(p_kPa) result (h_km)
 !-------------------------------------------------------------------
@@ -166,8 +166,8 @@ elemental function StandardAtmos_kPa_2_km(p_kPa) result (h_km)
     h_km = (288.15-t)/6.5
   else
     h_km = 11.0 + log( p_kPa/22.632)/(-0.1576884)
-  endif
-endfunction StandardAtmos_kPa_2_km
+  end if
+end function StandardAtmos_kPa_2_km
 !=======================================================================
 !+
 !  Exner functions
@@ -198,8 +198,8 @@ subroutine Exner_tab()
     p = PBAS + i*PINC
     ! tpi(i) = CP*(p/1.0e+5)**KAPPA ! With CP!!!!
     tab_exf(i) = (p/1.0e+5)**KAPPA  ! Without CP
-  enddo
-endsubroutine Exner_tab
+  end do
+end subroutine Exner_tab
 !-------------------------------------------------------------------
 elemental function Exner_nd(p) result(exf)
   real, intent(in) :: p    ! Pressure, p
@@ -209,7 +209,7 @@ elemental function Exner_nd(p) result(exf)
   x1 = (p-PBAS)/PINC
   ix1 = floor(x1)
   exf =  tab_exf(ix1) + (x1-ix1)*(tab_exf(ix1+1) - tab_exf(ix1))
-endfunction Exner_nd
+end function Exner_nd
 !-------------------------------------------------------------------
 elemental function Tpot_2_T(p) result(fTpot)
 ! Identical to Exner_nd
@@ -222,7 +222,7 @@ elemental function Tpot_2_T(p) result(fTpot)
   x1 = (p-PBAS)/PINC
   ix1 = int( x1 )
   fTpot =  tab_exf(ix1) + (x1-ix1)*(tab_exf(ix1+1) - tab_exf(ix1))
-endfunction Tpot_2_T
+end function Tpot_2_T
 !-------------------------------------------------------------------
 elemental function T_2_Tpot(p) result(fT)
 ! Iinvese of Exner_nd
@@ -236,7 +236,7 @@ elemental function T_2_Tpot(p) result(fT)
   ix1 = int( x1 )
   exf =  tab_exf(ix1) + (x1-ix1)*(tab_exf(ix1+1) - tab_exf(ix1))
   fT = 1.0/exf
-endfunction T_2_Tpot
+end function T_2_Tpot
 !-------------------------------------------------------------------
 real function ERFfunc(x)
   implicit none
@@ -252,7 +252,7 @@ real function ERFfunc(x)
   call calerf(x,result,jint)
 
   ERFfunc=result
-endfunction ERFfunc
+end function ERFfunc
 !--------------------------------------------------------------------
 subroutine calerf(arg,result,jint)
 !--------------------------------------------------------------------
@@ -467,7 +467,7 @@ subroutine calerf(arg,result,jint)
      end if
   end if
 800 return
-endsubroutine calerf
+end subroutine calerf
 !-------------------------------------------------------------------
 PURE function great_circle_distance(fi1,lambda1,fi2,lambda2) result(dist)
 !compute the great circle distance between to points given in
@@ -482,7 +482,7 @@ PURE function great_circle_distance(fi1,lambda1,fi2,lambda2) result(dist)
   dist=2*asin(sqrt(sin(DEG2RAD*0.5*(lambda1-lambda2))**2+&
        cos(DEG2RAD*lambda1)*cos(DEG2RAD*lambda2)*&
          sin(DEG2RAD*0.5*(fi1-fi2))**2))
-endfunction great_circle_distance
+end function great_circle_distance
 !-----------------------------------------------------------------------
 ! The heaviside function, 0 for x<0 and 1 for x>0 (x==0?)
 ! For x=0, one could have 0.5, but numerically this is too tricky to code
@@ -495,8 +495,8 @@ function heaviside(x)
    heaviside = 0.0
  else
    heaviside = 1.0
- endif
-endfunction heaviside
+ end if
+end function heaviside
 !-----------------------------------------------------------------------
 !program Test_exn
 !  use Exner_ml

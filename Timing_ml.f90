@@ -1,7 +1,7 @@
-! <Timing_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Timing_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,7 +52,6 @@ real, public, dimension(:), allocatable, save :: &
   lastptim              ! for final CPU-s
 character(len=30), dimension(:), allocatable, public, save :: &
   timing                ! description
-real, private, save  :: rclksec      ! rate-of-clock
 
 !/--- MAKE CHANGE HERE TO SWAP FROM SYSTEM_CLOCK TO SYSTEM_TIME
 
@@ -60,7 +59,7 @@ logical, parameter, private ::  IS_CPU_TIME = .true.
 
 !SYS   integer, public, save :: &   !SYS
 real,    public, save :: &   !CPU
-  tim_before,tim_before0,tim_after,tim_after0,tim_before1
+  tim_before,tim_before0,tim_after,tim_after0,tim_before1,tim_before2
 
 contains
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -79,7 +78,7 @@ subroutine Init_timing(ntim)
   mytimm(:) = 0.0    !CPU and SYS
   lastptim(:)=0.0    !CPU and SYS
   timing(:)  = ""
-endsubroutine Init_timing
+end subroutine Init_timing
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine Add_2timing(n,after,before,txt)
 !+ calculates CPU time and resets "before" to "after"
@@ -98,26 +97,26 @@ subroutine Add_2timing(n,after,before,txt)
   if(present(txt)) timing(n) =  txt    ! Descriptive text if wanted
   if(after<before) mytimm(n) = -999    ! WARNING CODE
   before = after
-endsubroutine Add_2timing
+end subroutine Add_2timing
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-subroutine Output_timing(io, me,np,nt,nx,ny)
+subroutine Output_timing(io, me,np,nx,ny)
   integer, intent(in) :: io         !  i/o number
   integer, intent(in) :: me         ! number of this processor
-  integer, intent(in) :: np, nt     ! number of processors, time-steps
+  integer, intent(in) :: np     ! number of processors
   integer, intent(in) :: nx, ny     !  dimensions of grid
   integer :: n
 
   open(io,file='Timing.out')
-  write(io,"(a40,I7,2i5)") "Timing for No. grids, procs, time-steps",nx*ny,np,nt
-  write( 6,"(a40,I7,2i5)") "Timing for No. grids, procs, time-steps",nx*ny,np,nt
+  write(io,"(a40,I7,2i5)") "Timing for No. grids, procs",nx*ny,np
+  write( 6,"(a40,I7,2i5)") "Timing for No. grids, procs",nx*ny,np
 
   do n=1,NTIMING
     if((timing(n)=="").and.(mytimm(n)==0.0)) cycle
     write(6, fmt="(a3,i3,1x,a30,2f12.4)")'tim',n,timing(n),mytimm(n),lastptim(n)
     write(io,fmt="(a3,i3,1x,a30,2f12.4)")'tim',n,timing(n),mytimm(n),lastptim(n)
-  enddo
+  end do
   close(io)
-endsubroutine Output_timing
+end subroutine Output_timing
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine Code_timer(call_time)
 !SYS integer, intent(inout) :: call_time      !SYS
@@ -127,7 +126,7 @@ subroutine Code_timer(call_time)
 ! call cpu_time(call_time)                  !CPU
   call_time=MPI_WTIME()
 
-endsubroutine Code_timer
+end subroutine Code_timer
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 endmodule My_Timing_ml
 

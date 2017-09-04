@@ -1,7 +1,7 @@
-! <ColumnSource_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <ColumnSource_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,11 +39,12 @@ use ChemSpecs,            only: NSPEC_TOT, NSPEC_SHL, species
 use ChemGroups_ml,        only: chemgroups
 use EmisDef_ml,           only: VOLCANOES_LL
 use GridValues_ml,        only: xm2,sigma_bnd,GridArea_m2,&
+                                GRIDWIDTH_M,&
                                 coord_in_processor,coord_in_gridbox
 use Io_ml,                only: open_file,read_line,IO_TMP,PrintLog
-use MetFields_ml,         only: roa, z_bnd
-use ModelConstants_ml,    only: KCHEMTOP,KMAX_MID,MasterProc, &
-                                USE_ASH,DEBUG=>DEBUG_COLSRC,&
+use MetFields_ml,         only: roa, z_bnd, u_xmj, v_xmi
+use ModelConstants_ml,    only: KCHEMTOP,KMAX_MID,MasterProc,NPROC, &
+                                USE_ASH,DEBUG,USE_PreADV,&
                                 TXTLEN_NAME,dt_advec,dt_advec_inv,&
                                 startdate,enddate
 use NetCDF_ml,            only: GetCDF_modelgrid
@@ -60,14 +61,15 @@ private
 
 !** subroutines:
 public :: ColumnRate      ! Emission rate
+public :: getWinds        ! Wind speeds at locations
 
 logical, save ::      &
   source_found=.true.,&   ! Are sources found on this processor/subdomain?
   topo_found=.false.      ! topo_nc file found? (vent elevation-model surface height)
 
 integer, parameter :: &
-  NMAX_LOC = 24, &  ! Max number of locations on processor/subdomain
-  NMAX_EMS =10000   ! Max number of events def per location 
+  NMAX_LOC = 5, &  ! Max number of locations on processor/subdomain (increase to 24 for eEMEP)
+  NMAX_EMS = 300   ! Max number of events def per location (increase to 6000 for eEMEP)
 
 integer, save ::   &        ! No. of ... found on processor/subdomain
   nloc             = -1,&   ! Source locations
@@ -82,7 +84,7 @@ type :: loc
   real :: lat=-1.0,lon=-1.0,elev=-1.0 ! vent coords and elevation
   character(len=SLEN) :: etype=''     ! e.g. S0, 10kt
   integer :: grp=-1,iloc=-1,jloc=-1   ! Which (ash)goup,local i,j indes
-endtype loc
+end type loc
 type(loc), save, dimension(NMAX_LOC):: &
   locdef=loc('UNDEF','UNKNOWN',-999.0,-999.0,-999.0,"??",-99,-99,-99)
 
@@ -100,7 +102,7 @@ type :: ems
   integer :: loc=-1,spc=-1,grp=-1     ! Which loc,(adv)spc,(ash)goup
   logical :: edef=.true.,&            ! default setings?
              dsec=.false.             ! correct rate by 1/secs(send-sbeg)
-endtype ems
+end type ems
 type(ems), save,  allocatable ,dimension(:,:):: emsdef
 
 character(len=*),parameter :: &
@@ -120,6 +122,8 @@ character(len=3), parameter :: &  ! Expand variable name for multy sceario runs
   EXPAND_SCENARIO_NAME(1)=""                        ! do not expand
 
 real,save,allocatable,dimension(:,:) :: surf_height ! [m], read from topo_nc
+integer, public, save :: PROC_LOC(NMAX_LOC)=-1
+real, allocatable, public, save  :: Winds(:,:,:)
 
 contains
 !-----------------------------------------------------------------------!
@@ -136,14 +140,15 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
   real, intent(in), optional :: REDUCE_VOLCANO
   real, dimension(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID) :: emiss
   logical, save :: first_call=.true.
-  character(len=SLEN)::&! Time strings in SDATE_FMT format
-    sbeg=SDATE_FMT,&    ! Begin
-    snow=SDATE_FMT,&    ! Now (current date)
-    send=SDATE_FMT      ! End
-  integer :: v,e,itot,k1,k0
+  character(len=SLEN)::&  ! Time strings in SDATE_FMT format
+    sbeg=SDATE_FMT,&      ! Begin
+    snow=SDATE_FMT,&      ! Now (current date)
+    send=SDATE_FMT        ! End
+  integer :: v,e,itot,k1,k0,k
   real    :: uconv
   integer, save          :: iSO2=-1
   integer, pointer, save :: iASH(:)=>null()
+  real :: Ncells, frac
 !----------------------------!
 !
 !----------------------------!
@@ -157,27 +162,37 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
     first_call=.false.
     itot=find_index("SO2",species(:)%name)
     if(itot<1)then
-      call PrintLog("WARNING: "//mname//" SO2 not found",MasterProc)   
+      call PrintLog("WARNING: "//mname//" SO2 not found",MasterProc)
     else
       iSO2=itot
-    endif
+    end if
     itot=find_index("ASH",chemgroups(:)%name)
     if(itot<1)then
       call PrintLog("WARNING: "//mname//" ASH not found",MasterProc)
     else
-      iASH=>chemgroups(itot)%ptr
-    endif
-  endif
+      iASH=>chemgroups(itot)%specs
+    end if
+
+  end if
 !----------------------------!
 !
 !----------------------------!
   emiss(:,:)=0.0
   if(.not.source_found)return
   snow=date2string(SDATE_FMT,current_date)
-  doLOC: do v=1,nloc
-    if((i/=locdef(v)%iloc).or.(j/=locdef(v)%jloc) & ! Wrong gridbox
-       .or.(nems(v)<1)) cycle doLOC                 ! Not erupting
-    if(DEBUG) &
+  
+  doLOC: do v=1,nloc 
+  
+    if(USE_PreADV)then ! spread emissions in case of strong winds
+    !cannot use formula below directly, because location may be in another subdomain
+    !  Winds(:,1,l)=u_xmj(locdef(l)%iloc,locdef(l)%jloc,:,1)*xm2(locdef(l)%iloc,locdef(l)%jloc)*dt_advec/gridwidth_m
+    !  Winds(:,2,l)=v_xmi(locdef(l)%iloc,locdef(l)%jloc,:,1)*xm2(locdef(l)%iloc,locdef(l)%jloc)*dt_advec/gridwidth_m
+      if(nems(v)<1) cycle doLOC                       ! Not erupting
+    else
+      if((i/=locdef(v)%iloc).or.(j/=locdef(v)%jloc) & ! Wrong gridbox
+           .or.(nems(v)<1)) cycle doLOC               ! Not erupting
+    end if
+    if(DEBUG%COLSRC .and. .not. USE_PreADV) &
       write(*,MSG_FMT)snow//' Vent',me,'me',v,trim(locdef(v)%id),i,"i",j,"j"
     doEMS: do e=1,nems(v)
       sbeg=date2string(emsdef(v,e)%sbeg,current_date)
@@ -191,19 +206,51 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
       else
         k0=getModLev(i,j,emsdef(v,e)%base)
         k1=getModLev(i,j,emsdef(v,e)%top)
-      endif
+      end if
       uconv=1e-3                                          ! Kg/s --> ton/s=1e6 g/s
       if(emsdef(v,e)%dsec)uconv=1e6/max(dt_advec,&        ! Tg   --> ton/s=1e6 g/s
         tdif_secs(to_stamp(sbeg,SDATE_FMT),to_stamp(send,SDATE_FMT)))
       uconv=uconv/(GridArea_m2(i,j)*DIM(z_bnd(i,j,k1),z_bnd(i,j,k0+1))) ! --> g/s/cm3=1e-6 g/s/m3
       uconv=uconv*AVOG/species(itot)%molwt                              ! --> molecules/s/cm3
-      emiss(itot,k1:k0)=emiss(itot,k1:k0)+emsdef(v,e)%rate*uconv
-      if(DEBUG) &
+
+      if(USE_PreADV)then ! spread emissions in case of strong winds
+        do k=k1,k0
+          ! only a fraction of the emission is used in each reachable gridcell
+          ! test if in range. NB: Winds have sign
+          if(Winds(k,1,v)>=0.0 .and. ((i-locdef(v)%iloc)>floor(Winds(k,1,v)) .or. (i-locdef(v)%iloc)<0))cycle
+          if(Winds(k,1,v)<=0.0 .and. ((i-locdef(v)%iloc)<floor(Winds(k,1,v)) .or. (i-locdef(v)%iloc)>0))cycle
+          if(Winds(k,2,v)>=0.0 .and. ((j-locdef(v)%jloc)>floor(Winds(k,2,v)) .or. (j-locdef(v)%jloc)<0))cycle
+          if(Winds(k,2,v)<=0.0 .and. ((j-locdef(v)%jloc)<floor(Winds(k,2,v)) .or. (j-locdef(v)%jloc)>0))cycle
+
+          ! test if along the line of wind, i.e. i/j = Winds(:,1,v)/Winds(:,2,v)
+          if(abs(Winds(k,1,v))>1.E-6)then
+            if(nint((i-locdef(v)%iloc)*Winds(k,2,v)/Winds(k,1,v))/=j-locdef(v)%jloc) cycle
+          end if
+
+          if(DEBUG%COLSRC)write(*,MSG_FMT)snow//' Vent',me,'me',v,trim(locdef(v)%id),i,"i",j,"j"
+
+          Ncells=max(abs(Winds(k,1,v)),abs(Winds(k,2,v))) ! NB: not an integer
+          if(Ncells<=1.0)then
+            emiss(itot,k)=emiss(itot,k)+emsdef(v,e)%rate*uconv
+          else
+            frac=1.0/Ncells
+            if(abs(i-locdef(v)%iloc)-floor(abs(Winds(k,1,v)))==0 .and. &
+               abs(j-locdef(v)%jloc)-floor(abs(Winds(k,2,v)))==0)frac=frac*mod(Ncells,1.0) ! last cell take only what is left
+            if(DEBUG%COLSRC)write(*,*)'including fraction ',frac,' for ',i,j,k,v,locdef(v)%iloc,locdef(v)%jloc 
+
+            emiss(itot,k)=emiss(itot,k)+frac*emsdef(v,e)%rate*uconv        
+           end if
+        end do
+      else
+        emiss(itot,k1:k0)=emiss(itot,k1:k0)+emsdef(v,e)%rate*uconv
+      end if
+      
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)snow//' Erup.',me,'me',e,emsdef(v,e)%sbeg,&
           itot,trim(species(itot)%name),k1,'k1',k0,'k0',&
           emiss(itot,k1),'emiss',emsdef(v,e)%rate,'rate',uconv,'uconv'
-    enddo doEMS
-  enddo doLOC
+    end do doEMS
+  end do doLOC
 !----------------------------!
 ! Volcanic emission reduction for SR run
 !----------------------------!
@@ -212,7 +259,7 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
       emiss(iSO2,:)=emiss(iSO2,:)*REDUCE_VOLCANO
     if(associated(iASH))&
       emiss(iASH,:)=emiss(iASH,:)*REDUCE_VOLCANO
-  endif
+  end if
 !----------------------------!
 ! Disable Volcanic emissions
 !----------------------------!
@@ -233,8 +280,8 @@ function getModLev(i,j,height) result(k)
   if(height<=0.0)return
   do while(k>0.and.height>z_bnd(i,j,k))
     k=k-1
-  enddo
-endfunction getModLev
+  end do
+end function getModLev
 !----------------------------!
 ! Set Volcanic Eruption Param.
 !----------------------------!
@@ -257,29 +304,31 @@ subroutine setRate()
                         0.079647,0.060689,0.07127 ,0.069065],&
     NILU_1BIN_SPLIT(1)=[1.0]
   real, pointer, dimension(:) :: binsplit => NULL()
+
 !----------------------------!
 !
 !----------------------------!
+  if(first_call .and. USE_PreADV) allocate(Winds(KMAX_MID,2,NMAX_LOC))
   if(.not.first_call)then
-    if(MasterProc.and.DEBUG.and.second_call) &
+    if(MasterProc.and.DEBUG%COLSRC.and.second_call) &
       write(*,MSG_FMT)'No need for reset volc.def...'
     second_call=.false.
     return
-  endif
+  end if
   first_call=.false.
   if(.not.allocated(emsdef)) then
      allocate(emsdef(0:NMAX_LOC,NMAX_EMS))
      emsdef(:,:)=ems('UNDEF','UNKNOWN','??',-999.0,-999.0,-999.0,&
                      '??','??',-1,-1,-1,.true.,.false.)
-  endif
+  end if
 !----------------------------!
 ! Read Vent CVS
 !----------------------------!
-  if(DEBUG) CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
+  if(DEBUG%COLSRC) CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
   if(MasterProc)then
     call open_file(IO_TMP,"r",flocdef,needed=.true.,iostat=stat)
     call CheckStop(stat,ERR_LOC_CSV//' not found')
-  endif
+  end if
   nloc=0
   l = 1
   doLOC: do while (l<=NMAX_LOC)
@@ -289,141 +338,161 @@ subroutine setRate()
     if(txtline(1:1)=='#')cycle doLOC  ! Comment line
     dloc=getVent(txtline)
     if(coord_in_processor(dloc%lon,dloc%lat,iloc=dloc%iloc,jloc=dloc%jloc))then
+      PROC_LOC(l) = ME!The source is located on this proc 
       nloc=nloc+1
       call CheckStop(nloc>NMAX_LOC,ERR_LOC_MAX//" read")
       ! remove model surface height from vent elevation
       dloc%elev=dloc%elev-surf_height(dloc%iloc,dloc%jloc)
       locdef(nloc)=dloc
-      if(DEBUG) &
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Vent',me,'in',nloc,trim(dloc%id),&
           dloc%grp,trim(dloc%name),dloc%iloc,"i",dloc%jloc,"j",&
           dloc%lon,"lon",dloc%lat,"lat"
     elseif(MasterProc)then
-      if(DEBUG) &
+      PROC_LOC(l) = -1 ! The source is not located on this proc we use -1, so that we know
+                       ! that if the sum all PROC_LOC(l)<0, it is not in the rundomain
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Vent',me,'out',-1,trim(dloc%id),&
           dloc%grp,trim(dloc%name),dloc%iloc,"i",dloc%jloc,"j",&
           dloc%lon,"lon",dloc%lat,"lat"
-    endif
+    end if
     l = l+1
-  enddo doLOC
+  end do doLOC
   if(MasterProc) close(IO_TMP)
-  source_found=(nloc>0).or.(MasterProc.and.DEBUG)
+  source_found=(nloc>0).or.(MasterProc.and.DEBUG%COLSRC)
+
+  if(USE_PreADV)then ! spread emissions in case of strong winds
+    ! broadcast the PROC_LOC
+    CALL MPI_ALLREDUCE(MPI_IN_PLACE,PROC_LOC,NMAX_LOC,MPI_INTEGER, &
+         MPI_SUM,MPI_COMM_CALC,IERROR)
+    do l=1,NMAX_LOC
+      PROC_LOC(l) = PROC_LOC(l)+NPROC-1
+      if(MasterProc .and. PROC_LOC(l)>=0)&
+        write(*,*)'source ',l,' on PROC ',PROC_LOC(l)
+    enddo
+    ! Now PROC_LOC=ME, because
+    ! (ME) + (NPROC-1)*(-1) + NPROC-1= ME
+    ! if not in the rundomain, PROC_LOC = -1
+    call getWinds
+  endif
 !----------------------------!
 ! Read Eruption CVS
 !----------------------------!
-  if(DEBUG) CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
+  if(DEBUG%COLSRC) CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
   if(MasterProc)then
     call open_file(IO_TMP,"r",femsdef,needed=.true.,iostat=stat)
     call CheckStop(stat,ERR_EMS_CSV//' not found')
-  endif
+  end if
   nems(:)=0
   l = 1
   sbeg=date2string(SDATE_FMT,startdate)
-  send=date2string(SDATE_FMT,enddate)    
+  send=date2string(SDATE_FMT,enddate)
   doEMS: do while(l<=NMAX_EMS)
     call read_line(IO_TMP,txtline,stat)
     if(stat/=0) exit doEMS            ! End of file
-    if(.not.source_found)cycle doEMS  ! There is no vents on subdomain
+    if(.not.source_found)cycle doEMS  ! There is no vents on sub-domain
     txtline=ADJUSTL(txtline)          ! Remove leading spaces
     if(txtline(1:1)=='#')cycle doEMS  ! Comment line
     dems=getErup(txtline)
-    if(sbeg>date2string(dems%send,enddate  ).or.& ! starts after end of run
-       send<date2string(dems%sbeg,startdate).or.& ! ends before start of run
-       dems%rate<=0.0)then                        ! nothing to emit
-      if(DEBUG.and.dems%loc>0) &
+    if(sbeg>date2string(dems%send,enddate  ).or.&         ! starts after end of run
+       send<date2string(dems%sbeg,startdate).or.&         ! ends before start of run
+       dems%rate<=0.0)then                                ! nothing to emit
+      if(DEBUG%COLSRC.and.dems%loc>0) &
         write(*,MSG_FMT)'Erup.skip',me,'in',dems%loc,trim(dems%id),&
           0,trim(dems%sbeg),1,trim(dems%send)
+      if(DEBUG%COLSRC.and.dems%loc>0)write(*,*)'RATE',dems%rate
       cycle doEMS
     elseif(dems%edef)then                                 ! Default
       nems(0)=nems(0)+1
       call CheckStop(nems(0)>NMAX_EMS,ERR_EMS_MAX//" read")
       emsdef(0,nems(dems%loc))=dems
-      if(DEBUG) &
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Erup.Default',me,'in',nems(0),trim(dems%id)
     elseif(dems%loc>0.and.(dems%spc>0.or.dems%grp>0))then ! Specific
       nems(dems%loc)=nems(dems%loc)+1
       call CheckStop(nems(dems%loc)>NMAX_EMS,ERR_EMS_MAX//" read")
       emsdef(dems%loc,nems(dems%loc))=dems
-      if(DEBUG) &
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Erup.Specific',me,'in',nems(dems%loc),trim(dems%id),&
           dems%spc,trim(dems%name),dems%grp,trim(dems%name)//"_GROUP"
-    elseif(MasterProc)then                         ! or Unknown Vent/SPC/GROUP
-      if(DEBUG) &
+      call CheckStop(dems%spc<1.and.dems%grp>0,"Erup.Specific unsupported group")
+    elseif(MasterProc)then                                ! in MasterProc or Unknown Vent/SPC/GROUP
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Erup.Specific',me,'out',-1,trim(dems%id),&
           dems%spc,trim(dems%name),dems%grp,trim(dems%name)//"_GROUP"
-    endif
+    end if
     l = l+1
-  enddo doEMS
+  end do doEMS
   if(MasterProc) close(IO_TMP)
   source_found=any(nems(1:nloc)>0)
 !----------------------------!
 ! Expand Eruption Defaults
 !----------------------------!
-  if(DEBUG) CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
+  if(DEBUG%COLSRC) CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
   if(nems(0)<1)then
-   !if(DEBUG) write(*,MSG_FMT)'Erup.Default',me,'not found'
+  ! if(DEBUG%COLSRC) write(*,MSG_FMT)'Erup.Default',me,'not found'
     return
-  endif
+  end if
   doLOCe: do v=1,nloc
     if(nems(v)>0)cycle doLOCe   ! Specific found --> no need for Default
-    e=nems(0)+1       ! A single defaul can have multiple lines, e.g.
-    do                ! each line with a difinition for a different specie
+    e=nems(0)+1       ! A single default can have multiple lines, e.g.
+    do                ! each line with a definition for a different specie
       e=find_index(locdef(v)%etype,emsdef(0,:e-1)%id)
-      if(e<1)       cycle doLOCe   ! No Default found
-      if(DEBUG) &
+      if(e<1)    cycle doLOCe   ! No Default found
+      if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Erup.Default',me,'Expand',&
           v,trim(locdef(v)%id),e,trim(emsdef(0,e)%id)
       dems=emsdef(0,e)
       if(dems%htype=='VENT')then
-!!      call CheckStop(.not.topo_found,ERR_TOPO_NC//' not found')     
+!!      call CheckStop(.not.topo_found,ERR_TOPO_NC//' not found')
         dems%base=dems%base+locdef(v)%elev
         dems%top =dems%top +locdef(v)%elev
-        if(DEBUG)&
+        if(DEBUG%COLSRC)&
           write(*,MSG_FMT)'Erup.Default',me,'Add loc%elev',&
             nint(dems%base),'ems%base',nint(dems%top),'ems%top'
-      endif
+      end if
       if(dems%spc<1.and.any(dems%name(1:3)==EXPAND_SCENARIO_NAME))then ! Expand variable name
         dems%name=trim(locdef(v)%id)//trim(dems%name(4:)) ! e.g. ASH_F --> V1702A02B_F
         dems%spc=find_index(dems%name,species(:)%name)    ! Specie (total)
-        if(DEBUG)&
+        if(DEBUG%COLSRC)&
           write(*,MSG_FMT)'Erup.Default',me,'Expand',&
             dems%spc,trim(dems%name)
-      endif
-      if(dems%spc>0)then           ! Expand single SPC
+      end if
+      if(dems%spc>0)then        ! Expand single SPC
         nems(v)=nems(v)+1
         call CheckStop(nems(v)>NMAX_EMS,ERR_EMS_MAX//" expand")
         emsdef(v,nems(v))=dems
-        if(DEBUG) &
+        if(DEBUG%COLSRC) &
           write(*,MSG_FMT)'Erup.Default',me,'Expand SPC',nems(v),trim(dems%id)
       elseif(dems%grp>0.or.locdef(v)%grp>0)then   ! Expand GROUP of SPC
-         if(dems%grp<1)dems%grp=locdef(v)%grp
-        select case (size(chemgroups(dems%grp)%ptr))
+        if(dems%grp<1)dems%grp=locdef(v)%grp
+        select case (size(chemgroups(dems%grp)%specs))
         case(2);binsplit=>VAAC_2BIN_SPLIT
         case(7);binsplit=>VAAC_7BIN_SPLIT
         case(9);binsplit=>NILU_9BIN_SPLIT
         case(1);binsplit=>NILU_1BIN_SPLIT
         case default
           call CheckStop(ERR_EMS_CSV//' can not expand '//trim(locdef(v)%id))
-        endselect
-        do g=1,size(chemgroups(dems%grp)%ptr)
-          dems%spc=chemgroups(dems%grp)%ptr(g)  ! Specie (total)
+        end select
+        do g=1,size(chemgroups(dems%grp)%specs)
+          dems%spc=chemgroups(dems%grp)%specs(g)  ! Specie (total)
           dems%name=species(dems%spc)%name
           dems%rate=emsdef(0,e)%rate*binsplit(g)
           nems(v)=nems(v)+1
           call CheckStop(nems(v)>NMAX_EMS,ERR_EMS_MAX//" expand")
           emsdef(v,nems(v))=dems
-          if(DEBUG) &
+          if(DEBUG%COLSRC) &
           write(*,MSG_FMT)'Erup.Default',me,'Expand GRP',nems(v),trim(dems%id),&
             dems%spc,trim(dems%name)
-        enddo
+        end do
       else
-        if(DEBUG) &
+        if(DEBUG%COLSRC) &
           write(*,MSG_FMT)'Erup.Default',me,'not found'
-      endif
-    enddo
-  enddo doLOCe
+      end if
+    end do
+  end do doLOCe
   source_found=any(nems(1:nloc)>0)
-endsubroutine setRate
+end subroutine setRate
 !----------------------------!
 ! Extract Vent info from CVS line
 !----------------------------!
@@ -444,18 +513,18 @@ function getVent(line) result(def)
   case("S","s","degS");lat=-lat   ! degS
   case default
     call CheckStop("EMERGENCY: Unknown degN/S "//trim(words(5)))
-  endselect
+  end select
   read(words(6),*)lon
   select case (words(7)) ! EW
   case("E","e","degE")            ! degE
   case("W","w","degW");lon=-lon   ! degW
   case default
     call CheckStop("EMERGENCY: Unknown degE/W "//trim(words(7)))
-  endselect
+  end select
   read(words(8),*)elev            ! [m]
   igrp=find_index(words(1),chemgroups(:)%name)
   def=loc(trim(words(1)),trim(words(2)),lat,lon,elev,trim(words(10)),igrp)
-endfunction getVent
+end function getVent
 !----------------------------!
 ! Extract Erup. info from CVS line
 !----------------------------!
@@ -491,9 +560,9 @@ function getErup(line) result(def)
 ! emiss default: vent%elev is added on expansion (doLOCe: in setRate)
     base=0.0
     if(iloc>0)then
-!!    call CheckStop(.not.topo_found,ERR_TOPO_NC//' not found')     
+!!    call CheckStop(.not.topo_found,ERR_TOPO_NC//' not found')
       base=locdef(iloc)%elev    ! [m]
-    endif
+    end if
     read(words(4),*)top         ! [km]
     top=top*1e3                 ! [m]
     top=top+base                ! [m]
@@ -507,29 +576,29 @@ function getErup(line) result(def)
     base=base*1e3               ! [m]
     read(words(4),*)top         ! [km]
     top=top*1e3                 ! [m]
-  endselect
+  end select
   read(words(6),*)rate
   select case (words(7))        ! m63 or effect.fraction
     case(" ")   ;frac=1.0
     case default;read(words(7),*)frac
-  endselect
+  end select
   select case (words(5))        ! dt[h]
   case("1dt","1DT","1adv","1ADV")
     dhh=dt_advec/3600           ! only one time step
     frac=frac*dt_advec_inv      ! assume rate=total emission in [Kg]
     dsec=.false.
-  case("total","TOTAL","event","EVENT")     
+  case("total","TOTAL","event","EVENT")
     dsec=.true.
   case default
     read(words(5),*)dhh         ! assume rate in [Kg/s]
     dhh=max(dhh,dt_advec/3600)  ! at least 1 time step
     dsec=.false.
-  endselect   
-  words(8)=getDate(words(8),words(8),words(9),dhh,debug=DEBUG) ! Start [date/code]
-  words(9)=getDate(words(9),words(8),words(9),dhh,debug=DEBUG) ! End   [date/code]
+  end select
+  words(8)=getDate(words(8),words(8),words(9),dhh,debug=DEBUG%COLSRC) ! Start [date/code]
+  words(9)=getDate(words(9),words(8),words(9),dhh,debug=DEBUG%COLSRC) ! End   [date/code]
   def=ems(trim(words(1)),trim(words(2)),trim(words(3)),base,top,rate*frac,&
     trim(words(8)),trim(words(9)),max(iloc,0),max(ispc,0),max(igrp,0),edef,dsec)
-endfunction getErup
+end function getErup
 !----------------------------!
 ! Time/Date CODE--> YYYY-MM-DD hh:mm:ss
 !----------------------------!
@@ -565,7 +634,23 @@ function getDate(code,se,ee,dh,debug) result(str)
     str=date2string(SDATE_FMT,enddate,debug=dbg)
   case default
     str=code
-  endselect
-endfunction getDate
-endfunction ColumnRate
-endmodule ColumnSource_ml
+  end select
+end function getDate
+end function ColumnRate
+
+subroutine getWinds
+  integer ::l
+  !broadcast wind speeds at emis locations
+  do l=1,NMAX_LOC
+     if(PROC_LOC(l)>=0)then
+        !exchange wind speed. Converted to Courant number
+        if(PROC_LOC(l) == ME)then
+           Winds(:,1,l)=u_xmj(locdef(l)%iloc,locdef(l)%jloc,:,1)*xm2(locdef(l)%iloc,locdef(l)%jloc)*dt_advec/gridwidth_m
+           Winds(:,2,l)=v_xmi(locdef(l)%iloc,locdef(l)%jloc,:,1)*xm2(locdef(l)%iloc,locdef(l)%jloc)*dt_advec/gridwidth_m
+        endif
+        CALL MPI_BCAST(Winds(1,1,l),2*8*KMAX_MID,MPI_BYTE,PROC_LOC(l),MPI_COMM_CALC,IERROR)
+     endif
+  enddo
+end subroutine getWinds
+
+end module ColumnSource_ml

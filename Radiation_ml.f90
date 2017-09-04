@@ -1,7 +1,7 @@
-! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -414,7 +414,7 @@ contains
               if (Scale <0.1 .or. Scale>10.0) then
                  print  "(a35,2f10.3)","Obs and Mod Radiation large diff", &
                      ObsRad,Idrctt+Idfuse
-              endif
+              end if
            end if
            Idrctt=Scale*Idrctt
            Idfuse=Scale*Idfuse

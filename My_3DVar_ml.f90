@@ -1,7 +1,7 @@
-! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

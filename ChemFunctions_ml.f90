@@ -1,7 +1,7 @@
-! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -322,7 +322,7 @@ module ChemFunctions_ml
               + VOLFACNH4 * x(NH4_f,k) )    !SIA aerosol surface
         else
           rate(k) = 0.0
-        endif
+        end if
     end do ! k
 
   end function RiemerN2O5
@@ -366,7 +366,7 @@ module ChemFunctions_ml
    real, dimension(K1:K2) :: rate
    real    :: rc
    real    :: f   ! Was f_Riemer
-   real    :: gam, S, Rwet  ! for newer methods
+   real    :: gam, S,  S_ss, S_du, Rwet  ! for newer methods
    real, save :: g1 = 0.02, g2=0.002 ! gammas for 100% SO4, 100% NO3, default
    real, save :: gFix  ! for Gamma:xxxx values
    real, parameter :: EPSIL = 1.0  ! One mol/cm3 to stop div by zero
@@ -407,10 +407,10 @@ module ChemFunctions_ml
               + VOLFACNH4 * x(NH4_f,k) )    !SIA aerosol surface
         else
           rate(k) = 0.0
-        endif
+        end if
       end do ! k
   !---------------------------------------
-   case ( "Smix", "SmixTen" )
+   case ( "Smix", "SmixTen", "SmixC" )
 
      do k = K1, K2
 
@@ -426,6 +426,15 @@ module ChemFunctions_ml
             if( method == "SmixTen") gam = 0.1 * gam ! cf Brown et al, 2009!
 
             rate(k) = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
+
+            if( method == "SmixC") then
+                 S_ss = S_m2m3(AERO%SS_C,k)
+                 gam=GammaN2O5_EJSS(rh(k))
+                 S_du = S_m2m3(AERO%DU_C,k)
+                 gam=0.01 ! for dust
+               ! same as UptakeRate(cN2O5,gam,S), but easier to code here:
+                 rate(k) = rate(k) + cN2O5(k)*(gam*S_ss+0.01*S_du)/4 
+            end if ! SmixC
        else
             gam = 0.0 ! just for export
             rate(k) = 0.0
@@ -492,7 +501,7 @@ module ChemFunctions_ml
 
       else
          rate(k) = 0.0
-      endif
+      end if
     end do ! k
     case ( "Gamma:0.002", "Gamma:0.05", "Gamma:0.005")  ! Inspired by Brown et al. 2009
      do k = K1, K2
@@ -569,7 +578,7 @@ module ChemFunctions_ml
        rate (K1   : K2-3) = 1.4e-4  !                ~ 2h
       else
        rate (K1 : K2 )    = 9.2e-6  !                ~ 30h
-    endif
+    end if
 
   end function ec_ageing_rate
 

@@ -1,7 +1,7 @@
-! <BoundaryConditions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <BoundaryConditions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -204,16 +204,13 @@ contains
     ! ---------------------------------------------------------------------------
     integer, intent(in) :: year         ! "meteorology" year
     integer, intent(in) :: month
-    integer :: ibc, iem, k, iem1, i, j ,n, nadv,ntot ! loop variables
+    integer :: ibc, iem, k, i, j ,n, ntot ! loop variables
     integer :: info                     ! used in rsend
-    integer :: alloc_err
     real    :: bc_fac      ! Set to 1.0, except sea-salt over land = 0.01
     logical :: bc_seaspec  ! if sea-salt species
 
-    integer  :: errcode, Nlevel_logan
+    integer  :: errcode
     integer, save :: idebug=0, itest=1, i_test=0, j_test=0
-    character(len = 100) ::fileName,varname
-    logical :: NewLogan=.true.! under testing
     real :: bc_data(LIMAX,LJMAX,KMAX_MID)
 
     if (first_call) then
@@ -231,7 +228,7 @@ contains
 
        bc_data=0.0
 
-    endif ! first call
+    end if ! first call
     if (DEBUG%BCS) write(*, "((A,I0,1X))")           &
          "CALL TO BOUNDARY CONDITIONS, me:", me, &
          "month ", month, "TREND2 YR ", iyr_trend, "me ", me
@@ -239,7 +236,7 @@ contains
     if (num_changed==0) then
        write(*,*) "BCs: No species requested"
        return
-    endif
+    end if
 
     errcode = 0
     if (DEBUG%BCS.and.debug_proc) then
@@ -248,10 +245,10 @@ contains
              if (i_fdom(i)==DEBUG%IJ(1).and.j_fdom(j)==DEBUG%IJ(2)) then
                 i_test = i
                 j_test = j
-             endif
-          enddo
-       enddo
-    endif
+             end if
+          end do
+       end do
+    end if
 
     if (first_call) then
        idebug = 1
@@ -261,9 +258,9 @@ contains
              do i = 1, limax
                 xn_adv(:,i,j,k)=0.0
                 xn_bgn(:,i,j,k)=0.0
-             enddo
-          enddo
-       enddo
+             end do
+          end do
+       end do
     else       
        if (DEBUG%BCS.and.MasterProc) write(*,*) "RESET LATERAL BOUNDARIES"
        do k = 2, KMAX_MID
@@ -272,38 +269,38 @@ contains
              do i = 1, li0-1
                 xn_adv(:,i,j,k)=0.0
                 xn_bgn(:,i,j,k)=0.0
-             enddo
+             end do
              !right
              do i = li1+1, limax
                 xn_adv(:,i,j,k)=0.0
                 xn_bgn(:,i,j,k)=0.0
-             enddo
-          enddo
+             end do
+          end do
           !lower
           do j = 1, lj0-1
              do i = 1, limax
                 xn_adv(:,i,j,k)=0.0
                 xn_bgn(:,i,j,k)=0.0
-             enddo
-          enddo
+             end do
+          end do
           !upper
           do j = lj1+1, ljmax
              do i = 1, limax
                 xn_adv(:,i,j,k)=0.0
                 xn_bgn(:,i,j,k)=0.0
-             enddo
-          enddo
-       enddo
+             end do
+          end do
+       end do
        !top
        do k = 1, 1
           do j = 1, ljmax
              do i = 1, limax
                 xn_adv(:,i,j,k)=0.0
                 xn_bgn(:,i,j,k)=0.0
-             enddo
-          enddo
-       enddo
-    endif
+             end do
+          end do
+       end do
+    end if
     !== BEGIN READ_IN OF GLOBAL DATA
 
     do ibc = 1, NGLOB_BC
@@ -365,7 +362,7 @@ contains
                    end do ! i
                 end do ! j
              end do ! k
-          enddo
+          end do
        else
 
           ! Set LATERAL (edge and top) arrays of new BCs
@@ -394,7 +391,7 @@ contains
                            bc_fac * &  ! used for sea-salt species 
                                 !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
-                   enddo
+                   end do
                    !right
                    do i = li1+1, limax
                       bc_fac     = 1.0
@@ -409,8 +406,8 @@ contains
                                 !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
-                   enddo
-                enddo
+                   end do
+                end do
                 !lower
                 do j = 1, lj0-1
                    do i = 1, limax
@@ -426,8 +423,8 @@ contains
                                 !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
-                   enddo
-                enddo
+                   end do
+                end do
                 !upper
                 do j = lj1+1, ljmax
                    do i = 1, limax
@@ -443,9 +440,9 @@ contains
                                 !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
-                   enddo
-                enddo
-             enddo
+                   end do
+                end do
+             end do
              !top
              do k = 1, 1
                 do j = 1, ljmax
@@ -462,9 +459,9 @@ contains
                                 !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
-                   enddo
-                enddo
-             enddo
+                   end do
+                end do
+             end do
 
           end do !n
 
@@ -479,31 +476,31 @@ contains
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
                                 !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
-                   enddo
+                   end do
                    !right
                    do i = li1+1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
                                 !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
-                   enddo
-                enddo
+                   end do
+                end do
                 !lower
                 do j = 1, lj0-1
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
                                 !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
-                   enddo
-                enddo
+                   end do
+                end do
                 !upper
                 do j = lj1+1, ljmax
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
                                 !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
-                   enddo
-                enddo
-             enddo
+                   end do
+                end do
+             end do
              !top
              do k = 1, 1
                 do j = 1, ljmax
@@ -511,12 +508,12 @@ contains
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
                                 !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
-                   enddo
-                enddo
-             enddo
-          enddo
-       endif
-    enddo  ! ibc
+                   end do
+                end do
+             end do
+          end do
+       end if
+    end do  ! ibc
     if (first_call) then
        !3D misc
        do ibc = NGLOB_BC+1, NTOT_BC
@@ -530,7 +527,7 @@ contains
                    end do ! i
                 end do ! j
              end do ! k
-          enddo
+          end do
           do n = 1,bc_used_adv(ibc)
              iem = spc_used_adv(ibc,n)
 
@@ -543,8 +540,8 @@ contains
                    end do ! i
                 end do ! j
              end do ! k
-          enddo!n
-       enddo!ibc
+          end do!n
+       end do!ibc
     else
        !LATERAL misc
        do ibc = NGLOB_BC+1, NTOT_BC
@@ -556,34 +553,34 @@ contains
                    !left
                    do i = 1, li0-1
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
-                   enddo
+                   end do
                    !right
                    do i = li1+1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
-                   enddo
-                enddo
+                   end do
+                end do
                 !lower
                 do j = 1, lj0-1
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
-                   enddo
-                enddo
+                   end do
+                end do
                 !upper
                 do j = lj1+1, ljmax
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
-                   enddo
-                enddo
-             enddo
+                   end do
+                end do
+             end do
              !top
              do k = 1, 1
                 do j = 1, ljmax
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) +misc_bc(ibc,k)
-                   enddo
-                enddo
-             enddo
-          enddo
+                   end do
+                end do
+             end do
+          end do
           !/- Advected misc species
           do n = 1,bc_used_adv(ibc)
              iem = spc_used_adv(ibc,n)
@@ -592,36 +589,36 @@ contains
                    !left
                    do i = 1, li0-1
                       xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
-                   enddo
+                   end do
                    !right
                    do i = li1+1, limax
                       xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
-                   enddo
-                enddo
+                   end do
+                end do
                 !lower
                 do j = 1, lj0-1
                    do i = 1, limax
                       xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
-                   enddo
-                enddo
+                   end do
+                end do
                 !upper
                 do j = lj1+1, ljmax
                    do i = 1, limax
                       xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
-                   enddo
-                enddo
-             enddo
+                   end do
+                end do
+             end do
              !top
              do k = 1, 1
                 do j = 1, ljmax
                    do i = 1, limax
                       xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
-                   enddo
-                enddo
-             enddo
-          enddo!n
-       enddo!ibc
-    endif
+                   end do
+                end do
+             end do
+          end do!n
+       end do!ibc
+    end if
 
 
     if (DEBUG%BCS.and.debug_proc.and.i_test>0) then
@@ -632,8 +629,8 @@ contains
        do k = 1, KMAX_MID
           print "(a20,i4,f8.2)","DEBUG O3  Debug-site ", k, &
                xn_adv(IXADV_O3,i_test,j_test,k)/PPB
-       enddo
-    endif ! DEBUG
+       end do
+    end if ! DEBUG
 
     if (DEBUG%BCS.and.debug_proc) then
        itest = 1
@@ -652,11 +649,11 @@ contains
        if (NSPEC_BGN>0) then
           do k = KMAX_MID, 1, -1
              print "(a23,i3,e14.4)","BCs NO :",k,xn_bgn(itest,i_test,j_test,k)/PPB
-          enddo
+          end do
        else
           print "(a)","No SET BACKGROUND BCs"
-       endif
-    endif !  DEBUG
+       end if
+    end if !  DEBUG
 
     if (first_call) first_call = .false.
 
@@ -705,7 +702,7 @@ subroutine My_bcmap(iyr_trend)
   else
     top_misc_bc(IBC_CH4) = 1780.0 * exp(-0.01*0.91*(1990-iyr_trend)) ! Zander,1975-1990
                                  !exp(-0.01*0.6633*(1975-iyr_trend)) ! Zander,1951-1975
-  endif
+  end if
 
 
   ! Reset with namelist values if set
@@ -738,8 +735,8 @@ subroutine My_bcmap(iyr_trend)
       misc_bc(ii,k) = top_misc_bc(ii)*(1.0-decrease_factor(ii)*B_mid(k))
       if (MasterProc.and.DEBUG_MYBC) print "(a20,2es12.4,i4)",&
         "height,misc_vert,k",B_mid(k),misc_bc(ii,k),k
-    enddo
-  enddo
+    end do
+  end do
 
   bc2xn_adv(IBC_H2,  IXADV_H2)    = 1.0
   bc2xn_adv(IBC_CH4, IXADV_CH4)   = 1.0
@@ -750,13 +747,13 @@ subroutine My_bcmap(iyr_trend)
     do i = NGLOB_BC+1 , NTOT_BC
       print *, "In My_bcmap, sum-adv", i, " is", sum(bc2xn_adv(i,:))
       print *, "In My_bcmap, sum-bgn", i, " is", sum(bc2xn_bgn(i,:))
-    enddo
-  endif ! DEBUG
+    end do
+  end if ! DEBUG
 
   do i = NGLOB_BC+1 , NTOT_BC
     call CheckStop(sum(bc2xn_adv(i,:))+sum(bc2xn_bgn(i,:))/=1.0,&
       "BCproblem - My_bcmap")
-  enddo
+  end do
 
   !/- mappings for species from Logan + obs model given with IBC index.
   include 'CM_BoundaryConditions.inc'
@@ -788,10 +785,10 @@ subroutine Set_bcmap()
         any(bc2xn_bgn(ibc,:)>0)) bc_used(ibc) = 1
     do iem = 1, NSPEC_ADV
       if(bc2xn_adv(ibc,iem)>0) bc_used_adv(ibc) = bc_used_adv(ibc)+1
-    enddo
+    end do
     do iem = 1, NSPEC_BGN
       if(bc2xn_bgn(ibc,iem)>0) bc_used_bgn(ibc) = bc_used_bgn(ibc)+1
-    enddo
+    end do
   end do ! ibc
   num_used_adv = maxval(bc_used_adv)
   num_used_bgn = maxval(bc_used_bgn)
@@ -806,15 +803,15 @@ subroutine Set_bcmap()
     if (any(bc2xn_adv(:,iem)>0)) then
       xn_adv_changed(iem) = .true.
       num_adv_changed = num_adv_changed + 1
-    endif
-  enddo ! iem
+    end if
+  end do ! iem
 
   do iem = 1, NSPEC_BGN
     if (any(bc2xn_bgn(:,iem)>0)) then
       xn_bgn_changed(iem) = .true.
       num_bgn_changed = num_bgn_changed + 1
-    endif
-  enddo ! iem
+    end if
+  end do ! iem
 
   if (DEBUG%BCS) write(*,*) "TEST SET_BCMAP bc_used: ",&
     (bc_used(ibc),ibc=1, NTOT_BC)
@@ -829,8 +826,8 @@ subroutine Set_bcmap()
       i = i+1
       spc_changed2adv(i) = iem
       spc_adv2changed(iem) = i
-    endif
-  enddo
+    end if
+  end do
   i = 0
   spc_bgn2changed = 0
   do iem = 1, NSPEC_BGN
@@ -838,8 +835,8 @@ subroutine Set_bcmap()
       i = i+1
       spc_changed2bgn(i) = iem
       spc_bgn2changed(iem) = i
-    endif
-  enddo
+    end if
+  end do
 
   allocate(spc_used_adv(NTOT_BC,num_used_adv))
   allocate(spc_used_bgn(NTOT_BC,num_used_bgn))
@@ -853,8 +850,8 @@ subroutine Set_bcmap()
         if (bc2xn_adv(ibc,iem)>0.0) then
           i = i+1
           spc_used_adv(ibc,i) = iem
-        endif
-      enddo
+        end if
+      end do
 
       ! - set bc_bgn: background (prescribed) species
       i = 0
@@ -862,9 +859,9 @@ subroutine Set_bcmap()
         if ( bc2xn_bgn(ibc,iem) > 0.0 ) then
           i = i+1
           spc_used_bgn(ibc,i) = iem
-        endif
-      enddo
-    endif    ! bc_used
+        end if
+      end do
+    end if    ! bc_used
   end do  ! ibc
 end subroutine Set_bcmap
 
@@ -888,7 +885,7 @@ type :: SIAfac ! trends in boundary conditions
   integer :: year
   real:: so2,nox,nh4
 end type SIAfac
-integer,parameter ::KMAX20=20
+
 !temporary used by BoundaryConditions
 real :: O3fix=0.0
 real :: trend_o3=1.0, trend_co, trend_voc
@@ -914,7 +911,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   !---------------------------------------------------------------------------
   ! Mace Head ozone concentrations for backgroudn sectors
   ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
-  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2014
+  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2015
   real, dimension(12,MH_YEAR1:MH_YEAR2), parameter :: macehead_year=reshape(&
    [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
     36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
@@ -952,26 +949,25 @@ real :: trend_o3=1.0, trend_co, trend_voc
     36.5,42.4,43.3,44.5,40.2,34.6,30.1,30.8,32.0,34.7,37.7,38.1,& !2011
     35.0,40.2,41.0,46.8,43.1,34.0,29.6,33.8,34.9,33.3,37.9,38.7,& !2012
     38.8,42.8,45.1,46.7,43.3,31.8,31.0,33.3,32.8,39.0,39.5,42.7,& !2013
-    41.4,42.9,43.5,46.4,42.4,35.1,28.6,32.6,33.8,37.1,38.1,41.1]& !2014
+    41.4,42.9,43.5,46.4,42.4,35.1,28.6,32.6,33.8,37.1,38.1,41.1,& !2014
+    41.0,43.3,43.8,42.5,39.4,33.6,31.5,35.3,35.8,42.1,40.4,41.0]& !2015
     ,[12,MH_YEAR2-MH_YEAR1+1])
   real, dimension(12), parameter :: macehead_default=&
   ! Defaults from 1998-2010 average
     (/39.8,41.9,45.4,46.5,43.2,36.2,30.5,30.1,34.1,37.0,39.0,38.5/)
   real, dimension(12):: macehead_O3=macehead_default
   !---------------------------------------------------------------------------
-  integer :: i, j, k, i0, i1, j1, icount, Nlevel_logan, Nlevel_Dust, ierror
+  integer :: i, j, k, i0, i1, Nlevel_logan, Nlevel_Dust, ierror
   real    :: f0, f1             ! interpolation factors
   character(len=30) :: fname    ! input filename
   character(len=99) :: txtmsg   ! error messages
-  character(len=30) :: BCpoll   ! pollutant name
   real,allocatable,save, dimension(:) :: p_kPa, h_km  !Use of standard atmosphere
 
-  real :: scale_old, scale_new,iMH,jMH
-  logical :: notfound !set true if NetCDF BIC are not found
+  real :: scale_old, scale_new
   real, parameter :: macehead_lat = 53.3 !latitude of Macehead station
   real, parameter :: macehead_lon = -9.9 !longitude of Macehead station
   character(len = 100) ::fileName,varname
-  real count,count_loc,O3fix_loc, mpi_rcv(2),mpi_snd(2)
+  real :: count_loc,O3fix_loc, mpi_rcv(2),mpi_snd(2)
   real :: conv_fac
 
 !----------------------------------------------------------
@@ -1075,7 +1071,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
     trend_co = 1.0
     trend_voc= 1.0
   case(1990:1999)
-	if( USES%MACEHEADFIX ) then
+  if( USES%MACEHEADFIX ) then
        trend_o3 = 1.0
     else
        trend_o3 = exp(-0.01*1.0 *(2000-iyr_trend))
@@ -1086,12 +1082,12 @@ real :: trend_o3=1.0, trend_co, trend_voc
     trend_o3 = exp(-0.01*1.0 *(2000-iyr_trend))
     trend_co = exp(-0.01*0.85*(1990-iyr_trend)) ! Zander:CO
     trend_voc= exp(-0.01*0.85*(1990-iyr_trend)) ! Zander,1975-1990
-  endselect
+  end select
   if (MasterProc.and.first_call) then
     write(unit=txtmsg,fmt="(a,i5,3f8.3,13f9.4)") "BC:trends O3,CO,VOC,SOx,NOx,NH3: ", &
        iyr_trend, trend_o3, trend_co, trend_voc, SIAtrend%so2, SIAtrend%nox, SIAtrend%nh4
     call PrintLog(txtmsg)
-  endif
+  end if
 
 !=========== BCs Generated from Mace Head Data ====================
 !
@@ -1105,10 +1101,10 @@ real :: trend_o3=1.0, trend_co, trend_voc
   else
     macehead_O3=macehead_default
     write(unit=txtmsg,fmt="(a)") "BC: O3 default Mace Head correction"
-  endif
+  end if
   if (MasterProc.and.first_call) then
     call PrintLog(txtmsg)
-  endif
+  end if
 !=========== Generated from Mace Head Data =======================
 
   errcode = 0
@@ -1186,8 +1182,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
       if( SpecBC(i)%hmin*SpecBC(i)%conv_fac < 1.0e-17) then
         write(unit=txtmsg,fmt="(A,I0)") "PECBC: Error: No SpecBC set for species ", i
         call CheckStop(txtmsg)
-      endif
-    enddo
+      end if
+    end do
 
     ! Latitude functions taken from Lagrangian model, see Simpson (1992)
     latfunc(:,6:14) = 1.0    ! default
@@ -1213,7 +1209,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
     h_km = StandardAtmos_kPa_2_km(p_kPa)
 
     first_call = .false.
-  endif ! first_call
+  end if ! first_call
 ! ========= end of first call ===================================
 !+
 !  Specifies concentrations for a fake set of Logan data.
@@ -1239,9 +1235,9 @@ real :: trend_o3=1.0, trend_co, trend_voc
               !                   bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)=O3_logan_emep(i,j,k)
               bc_data(i,j,k)=O3_logan_emep(i,j,k)
               
-           enddo
-        enddo
-     enddo
+           end do
+        end do
+     end do
     ! Mace Head adjustment: get mean ozone from Eastern sector
     O3fix_loc=0.0
     count_loc=0
@@ -1254,9 +1250,9 @@ real :: trend_o3=1.0, trend_co, trend_voc
                 glon(i,j)>macehead_lon-40.0)then
                 O3fix_loc=O3fix_loc+bc_data(i,j,KMAX_MID)
                 count_loc=count_loc+1
-             endif
-          enddo
-       enddo
+             end if
+          end do
+       end do
        mpi_snd(1)=O3fix_loc
        mpi_snd(2)=count_loc
        call MPI_ALLREDUCE(mpi_snd, mpi_rcv, 2, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
@@ -1265,7 +1261,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
        if (me==0)write(*,"(a,4f8.3)")'Mace Head correction for O3, trend and Mace Head value',&
             -O3fix/PPB,trend_o3,macehead_O3(month)
        bc_data = max(15.0*PPB,bc_data-O3fix)
-    endif
+    end if
   case ( IBC_H2O2 )
 
      bc_data=1.0E-25
@@ -1290,14 +1286,14 @@ real :: trend_o3=1.0, trend_co, trend_voc
         write(*,"(a8,2i3,2f8.3,i4,f8.2,f8.3,2f8.3)") &
          "SCALE-HZ ", month, ibc, SpecBC(ibc)%surf, SpecBC(ibc)%hz, k,&
           h_km(k), p_kPa(k), scale_old, scale_new
-      endif ! DEBUG_HZ
-    enddo
+      end if ! DEBUG_HZ
+    end do
 
     else    
        do k = 1, KMAX_MID-1
           bc_data(:,:,k) = bc_data(:,:,KMAX_MID)
-       enddo
-    endif
+       end do
+    end if
 
     !/ - min value after vertical factors, before latitude factor
     bc_data = max( bc_data, SpecBC(ibc)%vmin )
@@ -1327,7 +1323,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
             if(me==0)write(*,*)'fine DUST BIC read from climatological file'
          else
             call CheckStop('IBC dust case error')
-         endif
+         end if
          call  ReadField_CDF(fileName,varname,Dust_3D,nstart=month,kstart=1,kend=Nlevel_Dust,&
               interpol='zero_order', needed=.true.,debug_flag=.false.)
 
@@ -1340,12 +1336,12 @@ real :: trend_o3=1.0, trend_co, trend_voc
             do j = 1, ljmax
                do i = 1, limax
                   bc_data(i,j,k)=Dust_3D_emep(i,j,k)*conv_fac/roa(i,j,k,1)           
-               enddo
-            enddo
-         enddo
+               end do
+            end do
+         end do
          else
             bc_data=0.0
-         endif
+         end if
 
     case  default
       print *,"Error with specified BCs:", ibc
@@ -1360,8 +1356,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
                     " MIN ", minval ( bc_data )
     do k = KMAX_MID, 1, -1        ! print out a random column
       print "(i4,f12.3)", k, bc_data(5,5,k)
-    enddo
-  endif ! DEBUG
+    end do
+  end if ! DEBUG
 
 
   !/ - min value after latitude factors , but before trends

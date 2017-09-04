@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,7 +30,7 @@ module Rb_ml
 use ModelConstants_ml,    only :  DEBUG_RB
 use PhysicalConstants_ml, only :  KARMAN
                     
-use Wesely_ml,    only  :Wesely_tab2 &  ! Wesely Table 2 for 14 gases
+use GasParticleCoeffs_ml, only : DryDepDefs &  !  Table for 64 gases
                        ,Rb_cor          !
 implicit none
 private
@@ -48,7 +48,7 @@ contains
     logical, intent(in) :: water
     real, intent(in)    :: ustar, z0
     integer, dimension(:), intent(in) :: &
-         DRYDEP_GAS    ! Array with Wesely indices of gases wanted
+         DRYDEP_GAS    ! Array with DryDepDefs indices of gases wanted
 
 ! Output:
 
@@ -57,7 +57,7 @@ contains
 ! Working values:
    
     integer :: icmp             ! gaseous species
-    integer :: iwes             ! gaseous species, Wesely tables
+    integer :: iwes             ! gaseous species, DryDepDefs tables
 
     real, parameter :: D_H2O = 0.21e-4  ! Diffusivity of H2O, m2/s
     real            :: D_i              ! Diffusivity of gas species, m2/s
@@ -74,7 +74,7 @@ contains
 
      if   ( water ) then
 
-          D_i = D_H2O / Wesely_tab2(1,iwes)  ! CORR !
+          D_i = D_H2O / DryDepDefs(1,iwes)  ! CORR !
 
           Rb(icmp) = log( z0 * KARMAN * ustar/ D_i )
           Rb(icmp) = Rb(icmp)/(ustar*KARMAN)

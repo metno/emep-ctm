@@ -1,7 +1,7 @@
-! <DryDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <DryDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -99,8 +99,8 @@ use StoFlux_ml,  only:   unit_flux, &! = sto. flux per m2
                         Setup_StoFlux, Calc_StoFlux  ! subs
 use SubMet_ml,            only: Sub
 use TimeDate_ml,          only: daynumber, current_date
-use Wesely_ml         ! ... Init_GasCoeff, DRx, Rb_Cor, ...
-use ESX_ml,               only: Init_ESX, Run_ESX
+use GasParticleCoeffs_ml         ! ... Init_GasCoeff, DRx, Rb_Cor, ...
+!FUTURE use ESX_ml,               only: Init_ESX, Run_ESX
 
 implicit none
 private
@@ -131,7 +131,7 @@ integer, public, parameter :: pNH4  = NH4_f
 logical, public, parameter :: COMPENSATION_PT = .false. 
 
 !***************************************************************************
-!  Specifies which of the possible species (from Wesely's list)
+!  Specifies which of the possible species (from DryDepDefs list)
 !  are required in the current air pollution model   
 !***************************************************************************
 ! .... Define the mapping between the advected species and
@@ -164,11 +164,11 @@ contains
   if ( my_first_call ) then 
 
      call Init_DepMap()               ! Maps CDDEP to IXADV
-     call Init_GasCoeff()             ! Sets Wesely coeffs.
+     call Init_GasCoeff()             ! Sets DryDepDefs coeffs.
 
-     if (USES%ESX) then
-       call Init_ESX()
-     end if
+!FUTURE      if (USES%ESX) then
+!FUTURE        call Init_ESX()
+!FUTURE      end if
 
      nadv = 0
      do n = 1, NDRYDEP_ADV  
@@ -285,13 +285,13 @@ contains
     real :: no3nh4ratio      ! Crude NH4/NO3 for Vds ammonium 
 
     real :: c_hveg, Ra_diff, surf_ppb  ! for O3 fluxes and Fst where needed
-    real :: c_hveg3m, o3_45m  !TESTS ONLY
-    real :: tmpv0, tmpv1, tmpv2 ! testing 1-exp
+    real :: c_hveg3m, o3_45m  ! TESTS ONLY
+    real :: tmpv0             ! testing 1-exp
 ! temporary for POD/SPOD
     logical, parameter :: SPOD_OUT = .false.  ! MAKES HUGE FILES. Not for routine use!
     logical, save      :: first_spod = .true.
     character(len=20), save :: fname
-    integer :: nglob, itst
+    integer :: nglob
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! Extra outputs sometime used. Important that this 
 !! line is kept at the end of the variable definitions and the start of real
@@ -496,7 +496,7 @@ contains
 
             if ( n > NDRYDEP_GASES )  then    ! particles
 
-              nae = AERO_SIZE(n) ! See Wesely_ml
+              nae = AERO_SIZE(n) ! See GasParticleCoeffs_ml
 
 
               if ( LandType(iL)%is_forest  ) then 
@@ -566,7 +566,7 @@ contains
               Vg_3m (n) = 1. / ( L%Ra_3m + Rb(n) + Rsur(n) ) 
 
 
-            endif
+            end if
 
            ! Surrogate for NO2 compensation point approach, 
            ! assuming c.p.=4 ppb (ca. 1.0e11 #/cm3):        
@@ -600,7 +600,7 @@ contains
                 Sub(0)%Gsto(n)   =  Sub(0)%Gsto(n)  + L%coverage * Gsto(n)
                 if( dbghh.and.n==2 ) call datewrite("CmpSto", iL, &
                          (/ Sub(iL)%Gsto(n) / Sub(iL)%Gsur(n) /) )
-            endif
+            end if
          end do !species loop
 
          Sumcover = Sumcover + L%coverage
@@ -741,7 +741,7 @@ contains
             else
                DepLoss(nadv) =   vg_fac( ncalc )  * xn_2d( ntot,K2)
                cfac(nadv, i,j) = gradient_fac( ncalc )
-            endif
+            end if
          end if
 
          if ( DepLoss(nadv) < 0.0 .or. DepLoss(nadv)>xn_2d(ntot,K2) ) then
@@ -870,8 +870,8 @@ contains
          do n = 1, NDRYDEP_ADV
             nadv    = DDepMap(n)%ind
             totddep( nadv ) = totddep (nadv) + DepLoss(nadv)*convfac
-         enddo
-      endif
+         end do
+      end if
 
        convfac2 = convfac * xm2(i,j) * inv_gridarea
 
@@ -881,9 +881,9 @@ contains
            DepAdv2Calc, fluxfrac_adv, Deploss ) 
 
 
-      if (USES%ESX) then
-        call Run_ESX()
-      end if
+!FUTURE       if (USES%ESX) then
+!FUTURE         call Run_ESX()
+!FUTURE       end if
 
 
       !----------------------------------------------------------------

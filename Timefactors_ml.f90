@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -188,7 +188,7 @@ contains
       !Assume max change for august and february
       fac_cemm(mm)  = 1.0 + fracchange * cos ( 2 * PI * (mm - 8)/ 12.0 )
       write(unit=6,fmt="(a,i3,f8.3,a,f8.3)") "Change in fac_cemm ", mm,fac_cemm(mm)
-   enddo
+   end do
    write(*,"(a,f8.4)") "Mean fac_cemm ", sum( fac_cemm(:) )/12.0
 
    if( INERIS_SNAP1 ) fac_cemm(:) = 1.0
@@ -212,7 +212,7 @@ contains
            if(ic<1.or.ic>NLAND)then
               if(me==0.and.insec==1.and.iemis==1)write(*,*)"Monthlyfac code not used",inland
               cycle
-           endif
+           end if
            fac_emm(ic,1:12,insec,iemis)=buff(1:12)
            !defined after renormalization and send to al processors:
            ! fac_min(inland,insec,iemis) = minval( fac_emm(inland,:,insec,iemis) )
@@ -225,7 +225,7 @@ contains
            call CheckStop( ios, "Timefactors: Read error in Monthlyfac")
 
            n = n + 1
-       enddo
+       end do
 
        close(IO_TIMEFACS)
 
@@ -235,16 +235,16 @@ contains
           do mm=1,12
                fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*fac_cemm(mm)
                sumfac=sumfac+fac_emm(ic,mm,1,iemis)
-          enddo
+          end do
           ! normalize
           do mm=1,12
              fac_emm(ic,mm,1,iemis)=fac_emm(ic,mm,1,iemis)*12./sumfac
-          enddo
-       enddo
+          end do
+       end do
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2 
-   enddo  ! iemis
+   end do  ! iemis
 
-   endif
+   end if
 
 ! #################################
 ! 2) Read in Daily factors
@@ -268,7 +268,7 @@ contains
            if(ic<1.or.ic>NLAND)then
               if(me==0.and.insec==1.and.iemis==1)write(*,*)"Dailyfac code not used",inland
               cycle
-           endif
+           end if
            fac_edd(ic,1:7,insec,iemis)=buff(1:7)
            call CheckStop( ios, "Timefactors: Read error in Dailyfac")
 
@@ -280,12 +280,12 @@ contains
            call CheckStop( xday > 1.001 .or. xday < 0.999, &
                 "Timefactors: ERROR: Dailyfac - not normalised")
 
-       enddo
+       end do
 
        close(IO_TIMEFACS)
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2
 
-  enddo  ! NEMIS_FILE
+  end do  ! NEMIS_FILE
 
 !  #################################
 !  3) Read in hourly (24x7) factors, options set in run script.
@@ -384,11 +384,11 @@ contains
                end do ! mm
                
             end do ! ic
-       enddo ! isec
+       end do ! isec
 
-      enddo ! iemis
+      end do ! iemis
 
-   endif
+   end if
 
 ! normalize the factors over the year 
    do iemis = 1, NEMIS_FILE
@@ -433,7 +433,7 @@ contains
                  call CheckStop(errmsg)
               end if
                
-             endif
+             end if
               if ( sumfac < 0.99 .or. sumfac > 1.01 )write(*,*)'sumfac: ',iemis,isec,ic,sumfac   
 
               if ( sumfac < 0.97 .or. sumfac > 1.03 ) then
@@ -453,10 +453,10 @@ contains
            "needed for country, isec, iemis, sumfac = " ,ic, isec, iemis, sumfac
 
           end do ! ic
-       enddo ! isec
+       end do ! isec
 
 
-      enddo ! iemis
+      end do ! iemis
 
 
 !#########################################################################
@@ -538,9 +538,9 @@ contains
             call Averageconserved_interpolate(Start,Endval,Average,nmdays(nmnd),dd,x)
             timefac(iland,isec,iemis) = x *  fac_edd(iland,weekday,isec,iemis) 
  
-         enddo ! iland  
-      enddo ! isec   
-   enddo ! iemis 
+         end do ! iland  
+      end do ! isec   
+   end do ! iemis 
 
  end subroutine NewDayFactors
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -560,7 +560,7 @@ contains
     integer,dimension(2)  :: ijloc   ! debug only 
     integer :: iii, jjj              ! debug only 
     real :: checkmax
-    character(len=80) :: errmsg, units, varname
+    character(len=80) :: errmsg
     real, dimension(IIFULLDOM,JJFULLDOM) :: var2d_global
     integer :: kmax=1, nfetch=1 ! for HDD
 
@@ -596,7 +596,7 @@ contains
 
     if(.not.allocated(gridfac_HDD))then
        allocate(gridfac_HDD(MAXLIMAX,MAXLJMAX))
-    endif
+    end if
 
     call global2local(var2d_global,gridfac_HDD,MSG_READ8,1,IIFULLDOM,JJFULLDOM,&
          kmax,IRUNBEG,JRUNBEG)
@@ -632,9 +632,8 @@ contains
 
      implicit none
      integer, intent(in) ::month
-     integer ::iemis,isec,i
+     integer ::iemis,isec
      character(len=20) ::sector_map(NSECTORS_SNAP,NEMIS_FILE),name
-     real :: x(12)
 ! sector_map(sector,emis) = name_in_netcdf_file
      sector_map(:,:)='default'
      sector_map(2,:)='dom'
@@ -642,7 +641,7 @@ contains
      sector_map(10,:)='agr'
      do iemis=1,NEMIS_FILE
         if(trim(EMIS_File(iemis))=='nh3')sector_map(10,iemis)='agr_NH3'
-     enddo
+     end do
      sector_map(3,:)='ind'
      sector_map(4,:)='ind'
      sector_map(7,:)='tra'
@@ -650,7 +649,7 @@ contains
      if(.not.allocated(GridTfac))then
         allocate(GridTfac(LIMAX,LJMAX,NSECTORS_SNAP,NEMIS_FILE))! only snap sectors defined for GridTfac!
         GridTfac=dble(nmdays(month))/nydays !default, multiplied by inverse later!!
-     endif
+     end if
 
      name='none'
      do isec=1,NSECTORS_SNAP! only snap sectors defined for GridTfac!
@@ -659,7 +658,7 @@ contains
            if(sector_map(isec,iemis)=='default')then
               GridTfac(:,:,isec,iemis)=dble(nmdays(month))/nydays!default, multiplied by inverse later!!
               cycle
-           endif
+           end if
            if(sector_map(isec,iemis)==name.and.iemis>1)then
               !has same values as before, no need to read again
               GridTfac(:,:,isec,iemis)=GridTfac(:,:,isec,iemis-1)
@@ -672,9 +671,9 @@ contains
                    known_projection='lon lat',needed=.true.,debug_flag=.false.,&
                    Undef=real(nmdays(month))/nydays )!default, multiplied by inverse later!!
 
-           endif
-        enddo
-     enddo
+           end if
+        end do
+     end do
 
 !normalizations:
 ! in ECLIPSEv5_monthly_patterns.nc the "default" timefactors are defines as

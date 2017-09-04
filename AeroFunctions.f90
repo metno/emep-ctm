@@ -1,7 +1,7 @@
-! <AeroFunctions.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <AeroFunctions.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -161,9 +161,9 @@ module AeroFunctions
         , 0.3926,3.101,4.190e-11,-1.404   &  ! urban
         , 0.4809,3.082,3.110e-11,-1.428 /)&  ! (NH4)2SO4
         ,(/4,4/) )
-   real, parameter :: THIRD = 1.0/3.0, um2m = 1.0e-6, cm2m = 1.0e-2
+   real, parameter :: THIRD = 1.0/3.0, cm2m = 1.0e-2
    real :: rd, mrh
-   integer :: ind  
+   integer :: ind
 
    ind = 1 ! default = rural
    if ( present(pmtype) ) ind = pmtype
@@ -384,11 +384,11 @@ module AeroFunctions
          ,rho_kgm3        !< density, kg/m3 
 
      real :: S            !< Surface area, m2 per m3 air
-     real :: dryvol, rho, rdry, rwet, sigFac, totvol, sig
+     real :: rho, rdry, rwet, sigFac, dryvol, totvol
      real :: rhod, fwetvol
 
      rho = 1600.0                                  !< kg/m3 default
-     rdry= 0.034*1.0e-6                            !< 0.0341 um default, in m
+     rdry= 0.034e-6                            !< 0.0341 um default, in m
 
 ! RDRY AND MASS AND RHO Should be self-consistent. No! Number!
 
@@ -397,9 +397,11 @@ module AeroFunctions
      if ( present(SigmaFac) ) then
         sigFac  = sigmaFac
      else
-        sig = 1.8                                  !< default
-        if ( present(sigma) ) sig = sigma
-        sigFac = exp( -2.5*log(sig)**2 )
+        if ( present(sigma) )then
+           sigFac = exp( -2.5*log(sigma)**2 )
+        else              
+           sigFac = 0.421585401578311!=exp( -2.5*log(1.8)**2 )
+        endif
      end if
 
      rhod =rho ! for print
@@ -611,7 +613,6 @@ module AeroFunctions
    real, intent(in) :: S                    !< Aerosol surface area, m2 per m3 air
    real, intent(in), optional :: rad        !< aerosol radius, m
    real, parameter :: Dg = 0.1 * 1.0e-4     ! 0.1 cm2/s -> m2/s
-   real, parameter :: toum2cm3 = 1.0e12*1.0e-6
    real :: k
    if( present(rad) )  then
       k = S / ( rad/Dg  + 4/(molSpeed * gam) )

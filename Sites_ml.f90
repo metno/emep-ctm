@@ -1,7 +1,7 @@
-! <Sites_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Sites_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -201,7 +201,7 @@ subroutine set_species(adv,shl,xtra,s)
   s(1:nadv)    = species( NSPEC_SHL + adv(:) )%name
   s(nadv+1:n2) = species( shl(:) )%name
   s(n2+1:nout) = xtra(:)
-endsubroutine set_species
+end subroutine set_species
 !==================================================================== >
 subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
         s_gindex, s_gx, s_gy, s_gz, s_x, s_y, s_z, s_n, s_name)
@@ -256,8 +256,8 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
     else
       call open_file(io_num,"r",infile,needed=.true.)
       call CheckStop(ios,"ios error on "//trim(infile))
-    endif
-  endif
+    end if
+  end if
 
   call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
   if(ios/=0)return
@@ -283,12 +283,12 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       lat=-999.0
       if ( ios /= 0 ) exit  ! End of file
       read(unit=txtinput,fmt=*) s,  ix,  iy, lev
-    endif
+    end if
 
     if (ioerr < 0) then
       write(6,*) sub//" end of file after ", nin-1, infile
       exit SITELOOP
-    endif ! ioerr
+    end if ! ioerr
 
 
     if ( ix<RUNDOMAIN(1) .or. ix>RUNDOMAIN(2) .or. &
@@ -310,18 +310,18 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       if(trim(fname)=="sites")then
          if(lon>-990)Sites_lon(n) = lon
          if(lat>-990)Sites_lat(n) = lat
-      endif
+      end if
       if(trim(fname)=="sondes")then
          if(lon>-990)Sondes_lon(n) = lon
          if(lat>-990)Sondes_lat(n) = lat
-      endif
+      end if
 
       s_name(n)  = s !!! remove comments// comment
       if (DEBUG%SITES.and.MasterProc) write(6,"(a,i4,a)") sub//" s_name : ",&
             n, trim(s_name(n))
-    endif
+    end if
 
-  enddo SITELOOP
+  end do SITELOOP
 
   nglobal = n
 
@@ -354,9 +354,9 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
         write(6,"(a,i3,a,2i3,4a)") Sub// trim(fname), me, &
          " Nos. ", n, nlocal, " ", trim(s_name(n)), " => ", trim(s_name(nlocal))
 
-     endif
+     end if
 
-  enddo ! nglobal
+  end do ! nglobal
 
   ! inform me=0 of local array indices:
   if(DEBUG%SITES) write(6,*) sub//trim(fname), " before gc NLOCAL_SITES", &
@@ -370,7 +370,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
     if(DEBUG%SITES) write(6,*) sub//" for me =0 LOCAL_SITES", me, nlocal
     do n = 1, nlocal
       s_gindex(me,n) = s_n(n)
-    enddo
+    end do
     do d = 1, NPROC-1
       call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 333, MPI_COMM_CALC,MPISTATUS, IERROR)
       if(nloc>0) call MPI_RECV(s_n_recv, 4*nloc, MPI_BYTE, d, 334, &
@@ -381,9 +381,9 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
         s_gindex(d,n) = s_n_recv(n)
         if(DEBUG%SITES) write(6,*) sub//" for d =", fname, d, &
           " nloc = ", nloc, " n: ",  n,  " gives nglob ", s_gindex(d,n)
-      enddo ! n
-    enddo ! d
-  endif ! MasterProc
+      end do ! n
+    end do ! d
+  end if ! MasterProc
 
   if ( DEBUG%SITES ) write(6,*) sub//' on me', me, ' = ', nlocal
 
@@ -416,7 +416,7 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
     do i = 1, nlocal_sites
       write(6,*) "sitesdef Into surf  x,y ",site_x(i),site_y(i),&
                   site_z(i)," me ", me
-    enddo
+    end do
 
     if ( MasterProc ) then
       write(6,*) "======= site_gindex ======== sitesdef ============"
@@ -424,10 +424,10 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
         !write(6,'(a12,i4,2x,80(i4,:))') "sitesdef ", n, &
         write(6,'(a12,i4,2x,200i4)') "sitesdef ", n, &
                 (site_gindex(d,n),d=0,NPROC-1)
-      enddo
+      end do
       write(6,*) "======= site_end    ======== sitesdef ============"
-    endif ! MasterProc
-  endif ! DEBUG
+    end if ! MasterProc
+  end if ! DEBUG
 
   ! assign local data to out
 
@@ -448,10 +448,10 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
                        cfac( SITE_ADV(ispec),ix,iy) * PPBINV
       else                      ! Mountain sites not corrected to surface
         out(ispec,i)  = xn_adv( SITE_ADV(ispec) ,ix,iy,iz ) * PPBINV
-      endif
+      end if
       i_Att=i_Att+1
       Spec_Att(i_Att,1)='units:C:ppb'
-    enddo
+    end do
 
 
     do ispec = 1, NSHL_SITE
@@ -479,7 +479,7 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
         case default
           call CheckStop("Error, Sites_ml/siteswrt_surf: SITE_XTRA_MISC:"&
                                // trim(SITE_XTRA_MISC(ispec)))
-        endselect
+        end select
         call CheckStop( abs(out(nn,i))>1.0e99, &
           "ABS(SITES OUT: '"//trim(SITE_XTRA_MISC(ispec))//"') TOO BIG" )
       end do
@@ -507,9 +507,9 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
             " "//trim(d2code), d2index, out(nn,i)
         call CheckStop( abs(out(nn,i))>1.0e99, &
           "ABS(SITES OUT: '"//trim(SITE_XTRA_D2D(ispec))//"') TOO BIG" )
-      enddo
-    endif
-  enddo
+      end do
+    end if
+  end do
 
   my_first_call = .false.
   ! collect data into gout on me=0 t
@@ -545,13 +545,15 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
     case("PM25","PMco","NOy","SH","RH","roa","dz","z_mid","p_mid","Kz_m2s","th","U","V")
       errmsg = "ok"
     case("T")
-      call CheckStop(all(SONDE_XTRA(1:ispec)/="RH"),"Error, Sites_ml/siteswrt_sondes SONDE_XTRA: '"//trim(SONDE_XTRA(ispec))//"' needs to be requested after 'RH'")
+      call CheckStop(all(SONDE_XTRA(1:ispec)/="RH"),&
+        "Error, Sites_ml/siteswrt_sondes SONDE_XTRA: '"//&
+        trim(SONDE_XTRA(ispec))//"' needs to be requested after 'RH'")
       errmsg = "ok"
     case default
       call CheckStop("Error, Sites_ml/siteswrt_sondes SONDE_XTRA: "//&
           trim(SONDE_XTRA(ispec)))
-    endselect
-  enddo
+    end select
+  end do
 
   i_Att=0
   NSpec_Att=1 !number of Spec attributes defined
@@ -571,7 +573,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
       nn = nn + NLEVELS_SONDE
       i_Att=i_Att+1
       Spec_Att(i_Att,1)='units:C:ppb'
-    enddo
+    end do
 
     do ispec = 1, NSHL_SONDE    !/ xn_shl  in molecules/cm3
       out(nn+1:nn+NLEVELS_SONDE,i) = xn_shl( SONDE_SHL(ispec) , &
@@ -579,7 +581,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
       nn = nn + NLEVELS_SONDE
       i_Att=i_Att+1
       Spec_Att(i_Att,1)='units:C:molecules/cm3'
-    enddo
+    end do
 
     ! then print out XTRA stuff first,
     ! usually the height or pressure
@@ -595,7 +597,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
                           dot_product(xn_adv(PMCO_GROUP-NSPEC_SHL,ix,iy,k),&
                                   to_ug_ADV(PMCO_GROUP-NSPEC_SHL)) &
                         ) * roa(ix,iy,k,1)
-          enddo !k
+          end do !k
 !bug?          out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
           out(nn+1:nn+NLEVELS_SONDE,i) = sum_PM(KMAX_MID:KTOP_SONDE:-1)
           i_Att=i_Att+1
@@ -607,7 +609,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
             sum_PM(k) = dot_product(xn_adv(PMCO_GROUP-NSPEC_SHL,ix,iy,k),&
                                   to_ug_ADV(PMCO_GROUP-NSPEC_SHL)) &
                       * roa(ix,iy,k,1)
-          enddo !k
+          end do !k
 !bug?          out(nn+1:nn+KMAX_MID,i) = sum_PM(KMAX_MID:1:-1)
           out(nn+1:nn+NLEVELS_SONDE,i) = sum_PM(KMAX_MID:KTOP_SONDE:-1)
           i_Att=i_Att+1
@@ -617,7 +619,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
           sum_NOy(:) = 0.
           do k = 1, KMAX_MID
             sum_NOy(k) = sum(xn_adv(OXN_GROUP-NSPEC_SHL,ix,iy,k))
-          enddo
+          end do
 !bug?          out(nn+1:nn+KMAX_MID,i) = PPBINV * sum_NOy(KMAX_MID:1:-1)
           out(nn+1:nn+NLEVELS_SONDE,i) = PPBINV * sum_NOy(KMAX_MID:KTOP_SONDE:-1)
           i_Att=i_Att+1
@@ -693,13 +695,13 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
 
         case("D3D")
           call StopAll("D3D Sites out not defined")
-      endselect
+      end select
 
       nn=nn+NLEVELS_SONDE
-    enddo ! ispec (NXTRA_SONDE)
+    end do ! ispec (NXTRA_SONDE)
     
     ps_sonde(i)=ps(ix,iy,1)!surface pressure always needed to define the vertical levels
-  enddo ! i (nlocal_sondes)
+  end do ! i (nlocal_sondes)
 
   ! collect data into gout on me=0 t
 
@@ -735,16 +737,13 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   character(len=4)   :: suffix
   integer, parameter :: NTYPES = 2      ! No. types, now 2 (sites, sondes)
   integer ::  type=-1                   ! = 1 for sites, 2 for sondes
-  integer, save, dimension(NTYPES):: prev_month = (/ -99, -99 /) ! Initialise
   integer, save, dimension(NTYPES):: prev_year = (/ -99, -99 /) ! Initialise
-  integer :: ii,nn
+  integer :: ii
 
   integer, parameter :: NattributesMAX=10
   character(len=200),allocatable  :: SpecName(:),SpecDef(:,:),MetaData(:,:)
   character(len=200)              :: fileName
-  real,allocatable  :: CoordValues(:,:)
   integer  :: Nlevels,ispec,NSPEC,NStations,NMetaData
-  real ::Values(KMAX_MID)
   integer ::i_Att_MPI
   logical :: debug_1d=.false.
 
@@ -754,7 +753,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   case default
     write(6,*) "non-possible type in siteswrt_out for ", fname
     return
-  endselect
+  end select
 
   write(suffix,fmt="(i4)") prev_year(type)
   fileName = fname // "_" // suffix // ".nc"!Name of the NetCDF file. Will overwrite any preexisting file
@@ -780,7 +779,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       write(io_num,"(i3,a)") f, " Hours between outputs"
       do n = 1, nglobal
         write(io_num,'(a50,3(",",i4))') s_name(n), s_gx(n), s_gy(n),s_gz(n)
-      enddo ! nglobal
+      end do ! nglobal
 
       write(io_num,'(i3,a)') size(s_species), " Variables units: ppb"
       !MV write(io_num,'(a9,<size(s_species)>(",",a))')"site,date",(trim(s_species(i)),i=1,size(s_species))
@@ -794,7 +793,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       case("sites")
         NLevels=1
         NSPEC=NSPC_SITE !number of species defined for sites
-      endselect
+      end select
       NStations = nglobal !number of sondes or sites defined
 
       allocate(SpecDef(NSPEC,0:NattributesMAX),MetaData(0:NStations,NattributesMAX))
@@ -846,23 +845,23 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
             write(MetaData(n,5),"(A,':D:',F10.3)")"longitude",sondes_lon(n)
           if(sondes_lat(n)>-990)&
             write(MetaData(n,6),"(A,':D:',F10.3)")"latitude" ,sondes_lat(n)
-        endselect
-      enddo
+        end select
+      end do
       
       !take Spec_Attributes from any processor with at least one site/sonde
       if(i_Att>0.and.i_Att/=NSPEC)then
         write(*,*)'MISSING species attribute? ',i_Att,NSPEC
-      endif
+      end if
       do d = 1, NPROC-1
         call MPI_RECV(i_Att_MPI, 4*1, MPI_BYTE, d, 746, MPI_COMM_CALC,MPISTATUS, IERROR)
         if(i_Att_MPI>0)then
           if(i_Att_MPI/=NSPEC)then
              write(*,*)'MISSING species attribute? ',i_Att_MPI,NSPEC
-          endif
+          end if
           call MPI_RECV(Spec_Att,Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, &
                MPI_BYTE, d, 747, MPI_COMM_CALC,MPISTATUS, IERROR)
-        endif
-      enddo
+        end if
+      end do
 
       call CheckStop(NattributesMAX<NSpec_Att+3,'Coords: NattributesMAX too small')
       do i=1,NSPEC
@@ -872,8 +871,8 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
         SpecDef(i,3)='_FillValue:F:missing'
         do n=1,NSpec_Att
           SpecDef(i,n+3)=trim(Spec_Att(i,n))  ! redefine long_name|units|_FillValue
-        enddo
-      enddo
+        end do
+      end do
       if(NStations>0)then
          call Create_CDF_sondes(fileName,&
               NSPEC,NSpec_Att+3,SpecDef(:,0:NSpec_Att+3),&
@@ -883,7 +882,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
          write(*,*)'Created ',trim(fileName)
       else
          write(*,*)'No Stations found! not creating ',trim(fileName)
-      endif
+      end if
 
       deallocate(SpecDef,MetaData)
 
@@ -894,10 +893,10 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       call MPI_SEND(i_Att_MPI, 4*1, MPI_BYTE, 0, 746, MPI_COMM_CALC, IERROR)
       if(i_Att>0)then
         call MPI_SEND(Spec_Att, Spec_Att_Size*N_Spec_Att_MAX*NSPECMAX, MPI_BYTE, 0, 747, MPI_COMM_CALC, IERROR)
-      endif
+      end if
       prev_year(type) = current_date%year
-    endif ! MasterProc 
-  endif ! current_date%year /= prev_year(type)
+    end if ! MasterProc 
+  end if ! current_date%year /= prev_year(type)
 
   if(.not.MasterProc) then   ! send data to me=0 (MasterProc)
     call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 346, MPI_COMM_CALC, IERROR)
@@ -912,7 +911,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       nglob = s_gindex(0,n)
       g_out(:,nglob) = out(:,n)
       if(trim(fname)=="sondes")g_ps(n) = ps_sonde(n)
-    enddo ! n
+    end do ! n
 
     do d = 1, NPROC-1
       call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 346, MPI_COMM_CALC,MPISTATUS, IERROR)
@@ -924,8 +923,8 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
          nglob = s_gindex(d,n)
          g_out(:,nglob) = out(:,n)
          if(trim(fname)=="sondes")g_ps(nglob) = ps_sonde(n)
-      enddo ! n
-    enddo ! d
+      end do ! n
+    end do ! d
 
     ! some computers print out e.g. "2.23-123" instead of "2.23e-123"
     ! when numbes get too small. Here we make a correction for this:
@@ -943,7 +942,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       ! (The ':' format control item will stop processing once the g_out
       !  is done, avoiding runtime warnings.)
 
-    enddo
+    end do
 
     if(trim(fname)=="sondes")then
       NLevels = NLEVELS_SONDE !number of vertical levels (counting from surface)
@@ -951,17 +950,17 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
     else
       NLevels=1
       NSPEC=NSPC_SITE!number of species defined for sites
-    endif
+    end if
     allocate(SpecName(NSPEC))
     do ispec=1,NSPEC
       SpecName(ispec)=trim(s_species(ispec))!name of the variable for one sites/sonde and species          
-    enddo ! n
+    end do ! n
     if(nglobal>0)then
        call Out_CDF_sondes(fileName,SpecName,NSPEC,g_out,NLevels,g_ps,debug=debug_1d)
-    endif
+    end if
 
     deallocate(SpecName)
-  endif ! MasterProc
-endsubroutine siteswrt_out
+  end if ! MasterProc
+end subroutine siteswrt_out
 !==================================================================== >
 endmodule Sites_ml

@@ -34,8 +34,7 @@
 !    the input array gloarr may be already restricted or not
 !
     use ModelConstants_ml, only : NPROC  ! Actual total number of processors
-    use MPI_Groups_ml    , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER&
-                                 ,MPI_SUM,MPI_COMM_CALC, MPISTATUS,IERROR
+    use MPI_Groups_ml    , only : MPI_BYTE, MPI_COMM_CALC, MPISTATUS,IERROR
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
              ,MAXLJMAX&    ! Maximum number of local points in latitude&
@@ -83,13 +82,13 @@
           do n0 = 1,dim0
             locarr(n0,i,j,nl) = gloarr(n0,tgi0(d)+ibeg-2+i&
                      ,tgj0(d)+jbeg-2+j,nl)
-          enddo
-        enddo
-          enddo
-        enddo
+          end do
+        end do
+          end do
+        end do
             CALL MPI_SEND(locarr,8*dim0*MAXLIMAX*MAXLJMAX*diml, MPI_BYTE, &
                  d, msnr, MPI_COMM_CALC, IERROR) 
-      enddo
+      end do
 !
 !    now assign processor 0 itself
 !
@@ -98,12 +97,12 @@
           do i = 1, tlimax(0)
         do n0 = 1,dim0
           locarr(n0,i,j,nl) = gloarr(n0,i+ibeg-1,j+jbeg-1,nl)
-        enddo
-          enddo
-        enddo
-      enddo
+        end do
+          end do
+        end do
+      end do
 !
-    endif    ! me=?
+    end if    ! me=?
 !
     return
     end
@@ -162,12 +161,12 @@
         do i = 1, tlimax(d)
           locarr(i,j,nl)=gloarr(tgi0(d)+ibeg-2+i&
                      ,tgj0(d)+jbeg-2+j,nl)
-        enddo
-          enddo
-        enddo
+        end do
+          end do
+        end do
           CALL MPI_SEND( locarr, 4*MAXLIMAX*MAXLJMAX*diml, &
               MPI_BYTE, d, msnr, MPI_COMM_CALC, IERROR) 
-      enddo
+      end do
 !
 !    now assign processor 0 itself
 !
@@ -175,11 +174,11 @@
         do j = 1, tljmax(0)
           do i = 1, tlimax(0)
         locarr(i,j,nl) = gloarr(i+ibeg-1,j+jbeg-1,nl)
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
 !
-    endif    ! me = ?
+    end if    ! me = ?
 !
     return
     end
@@ -194,8 +193,7 @@
 !
 
     use ModelConstants_ml, only : NPROC  ! Actual total number of processors
-    use MPI_Groups_ml    , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER,&
-                                  MPISTATUS, MPI_SUM,MPI_COMM_CALC, IERROR
+    use MPI_Groups_ml    , only : MPI_BYTE, MPISTATUS, MPI_COMM_CALC, IERROR
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
              ,MAXLJMAX&    ! Maximum number of local points in latitude&
@@ -240,14 +238,14 @@
         do i = 1, tlimax(d)
           locarr(i,j,nl)=gloarr(tgi0(d)+ibeg-2+i&
                      ,tgj0(d)+jbeg-2+j,nl)
-        enddo
-          enddo
-        enddo
+        end do
+          end do
+        end do
 
             CALL MPI_SEND(locarr, MAXLIMAX*MAXLJMAX*diml*2, MPI_BYTE, &
                  d, msnr,MPI_COMM_CALC, IERROR)
 
-      enddo
+      end do
 !
 !    now assign processor 0 itself
 !
@@ -255,12 +253,11 @@
         do j = 1, tljmax(0)
           do i = 1, tlimax(0)
         locarr(i,j,nl) = gloarr(i+ibeg-1,j+jbeg-1,nl)
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
 !
-    endif    ! me = ?
+    end if    ! me = ?
 !
     return
     end
-

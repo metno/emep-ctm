@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -237,25 +237,25 @@ w1=0.;w2=0.        ! init/reset
 
       if((TNa + TNH4 + TPo +2.*(TCa + TMg)) .le. (2.*TSO4)) then
           zflag=3.
-      endif
+      end if
 
 ! SULFATE VERY RICH CASE if (NH4+Na+K+2(Ca+Mg))/SO4 < 1
 
       if((TNa + TNH4 + TPo +2.*(TCa + TMg)) .le. TSO4) then
           zflag=4.
-      endif
+      end if
 
 ! SULFATE NEUTRAL CASE
 
       if((TNa + TNH4 + TPo +2.*(TCa + TMg)) .gt. (2.*TSO4)) then
           zflag=2.
-      endif
+      end if
 
 ! SULFATE POOR AND CATION POOR CASE
 
       if((TNa + TPo +2.*(TCa + TMg)) .gt. (2.*TSO4)) then       
           zflag=1.
-      endif
+      end if
 
       IF ( RH .LT. RHMIN ) RH=RHMIN
       IF ( RH .GT. RHMAX ) RH=RHMAX
@@ -289,7 +289,7 @@ w1=0.;w2=0.        ! init/reset
       w2(:)=1.
       do ii=1,8
          if(w1(ii).le.1.e-12) w2(ii)=0.    ! skip compound in RHD calculation if 
-                enddo                      ! concentration is zero or rather small
+                end do                      ! concentration is zero or rather small
 
 ! GET LOWEST RHD ACCORDING TO THE CONCENTRATION DOMAIN
 
@@ -632,7 +632,7 @@ w1=0.;w2=0.        ! init/reset
 
 !     KAN   = rks5/(r*temp)**2                      ! Keq of NH3(g)+HNO3(g)---> NH4NO3 (s) 
                                   ! [mol^2/kg]/(R[m^3*atm/deg/mole]*T[K])**2 = [m^3*atm/kg]
-  endif
+  end if
 !
 ! store aerosol species for diagnostic output:
 !______________________________________________________________
@@ -653,7 +653,7 @@ w1=0.;w2=0.        ! init/reset
 !//.. aerosol water
       aH2Oout(k) = WH2O                    ! aerosol Water  (aq)              [ug/m^3]
 
- enddo
+ end do
 !
  end subroutine eqsam_v03d
 

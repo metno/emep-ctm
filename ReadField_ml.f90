@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -53,7 +53,7 @@
   use Io_ml,         only : ios, open_file
   implicit none
 
-  integer,private  :: i, j, n,  INFO       ! Local variables
+  integer,private  :: i, j       ! Local variables
 
   interface ReadField 
      module procedure ReadField_r
@@ -107,10 +107,10 @@ contains
                   j < 1 .or. j > JJFULLDOM  ) then  
                   errmsg = "error in i,j index in IO_INFILE="  
                   exit READFIELD
-            endif
+            end if
             in_field(i,j) = in_field(i,j) + tmpin
             cell_set(i,j) = .true.
-         enddo READFIELD
+         end do READFIELD
 
        close(IO_INFILE)
        call CheckStop( errmsg ,"ReadField_r: errmsg in ReadField")
@@ -120,8 +120,8 @@ contains
        end if
 
        ios=0
-       endif
-    endif !me==0
+       end if
+    end if !me==0
 
     call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
 
@@ -131,7 +131,7 @@ contains
        if(present(needed_found))needed_found=.true.
        call global2local(in_field,local_field,MSG_READ7                 &
                        ,1,IIFULLDOM,JJFULLDOM,1,IRUNBEG,JRUNBEG)
-    endif
+    end if
   end subroutine ReadField_r
 
  !>=========================================================================<
@@ -173,10 +173,10 @@ contains
                  j < 1 .or. j > JJFULLDOM  ) then  
               errmsg = "error in i,j index in IO_INFILE=" // fname
               exit READFIELD
-           endif
+           end if
            in_field(i,j) =  in_field(i,j) + intmp
            cell_set(i,j) = .true.
-        enddo READFIELD
+        end do READFIELD
         close(IO_INFILE)
         call CheckStop( errmsg ,"ReadField: errmsg in ReadField")
         ios=0
@@ -185,9 +185,9 @@ contains
            call CheckStop( any( cell_set .eqv. .false. ) ,&
                    "ERROR: ReadField_i: cell_not_set "//trim(fname))
         end if
-       endif
+       end if
 
-    endif !me==0
+    end if !me==0
 
     call MPI_BCAST( ios, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
 
@@ -197,7 +197,7 @@ contains
        if(present(needed_found))needed_found=.true.
        call global2local_int(in_field,local_field,MSG_READ5               &
                ,IIFULLDOM,JJFULLDOM,1,IRUNBEG,JRUNBEG)
-    endif
+    end if
  
   end subroutine ReadField_i
  !>=========================================================================<
@@ -233,13 +233,13 @@ contains
                    j < 1 .or. j > JJFULLDOM  ) then
                   errmsg = "error in i,j index in IO_INFILE=" !!! ,fname, i,j
                   exit READFIELD
-             endif
+             end if
              in_field(i,j,:) = in_field(i,j,:) + tmpin(:)
-       enddo READFIELD
+       end do READFIELD
        close(IO_INFILE)
        call CheckStop(errmsg, "ReadField_r: error reading" // fname )
 
-    endif !me==0
+    end if !me==0
 
     call global2local(in_field,local_field,MSG_READ7                 &
                        ,1,IIFULLDOM,JJFULLDOM,DIM3,IRUNBEG,JRUNBEG)
@@ -272,13 +272,13 @@ contains
                  j < 1 .or. j > JJFULLDOM  ) then
               errmsg = "error in i,j index in IO_INFILE=" // fname
               exit READFIELD
-           endif
+           end if
           in_field(i,j,:) =  in_field(i,j,:) + intmp(:)
-      enddo READFIELD
+      end do READFIELD
       close(IO_INFILE)
       call CheckStop(errmsg," ReadField_3di: error reading" // fname)
 
-    endif !me==0
+    end if !me==0
 
     call global2local_int(in_field,local_field,MSG_READ5               &
                ,IIFULLDOM,JJFULLDOM,DIM3,IRUNBEG,JRUNBEG)

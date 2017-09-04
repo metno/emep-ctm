@@ -1,7 +1,7 @@
-! <DefPhotolysis_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <DefPhotolysis_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -102,7 +102,6 @@
 
       integer ::  k     &  ! help index
                  ,izn   &  ! integer zenith angle
-                 ,info  &  ! used for broadcast
                  ,nr    &  ! numbering of photolytic reactions
                  ,la       ! counting every 10 deg. latitude
         real myz
@@ -116,7 +115,7 @@
            allocate(dj(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON,NLAT))
            allocate(djcl1(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON))
            allocate(djcl3(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON))
-        endif
+        end if
 !    Open, read and broadcast clear sky rates
 !---------------
 
@@ -124,7 +123,7 @@
            write(fname1,fmt='(''jclear'',i2.2,''.dat'')') newseason
            call open_file(IO_DJ,"r",fname1,needed=.true.)
            call CheckStop(ios,"DefPhotolysis: ios error in jclear ")
-        endif
+        end if
 
 
 !       Format of input data from Phodis - careful with "17" and NPHODIS
@@ -141,8 +140,8 @@
                do k = 2,KMAX_MID-KMAX20+2
                   do nr=1,NPHODIS
                      dj(nr,k,izn,la)=dj(nr,KCHEMTOP,izn,la)
-                  enddo
-               enddo
+                  end do
+               end do
               do k = KMAX_MID-KMAX20+3,KMAX_MID
 !TEMPORARY FIX  do k = KCHEMTOP+1,KMAX_MID
                 read(IO_DJ,999) myz,(dj(nr,k,izn,la),nr=1,NPHODIS)
@@ -150,7 +149,7 @@
             end do    ! izn
           end do     ! la
           close(IO_DJ)
-        endif  ! me = 0
+        end if  ! me = 0
 
         CALL MPI_BCAST(dj  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON*NLAT,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
@@ -164,7 +163,7 @@
            write(fname2,fmt='(''jcl1km'',i2.2,''.dat'')') newseason
            call open_file(IO_DJ,"r",fname2,needed=.true.)
            call CheckStop(ios,"DefPhotolysis: ios error in jcl1km ")
-        endif
+        end if
 
 
         if(me == 0)then
@@ -176,8 +175,8 @@
                do k = 2,KMAX_MID-KMAX20+2
                   do nr=1,NPHODIS
                      djcl1(nr,K,izn)=djcl1(nr,KCHEMTOP,izn)
-                  enddo
-               enddo
+                  end do
+               end do
               do k = KMAX_MID-KMAX20+3,KMAX_MID
 !TEMPORARY FIX              do k = KCHEMTOP+1,KMAX_MID
               read(IO_DJ,999) myz,(djcl1(nr,k,izn),nr=1,NPHODIS)
@@ -188,11 +187,11 @@
             do k = KCHEMTOP,KMAX_MID
               do nr=1,NPHODIS
                 djcl1(nr,k,izn)=djcl1(nr,k,izn)/dj(nr,k,izn,3)-1.0
-              enddo ! nr
+              end do ! nr
             end do ! k
           end do  ! izn
           close(IO_DJ)
-        endif   ! me = 0
+        end if   ! me = 0
 
         CALL MPI_BCAST(djcl1  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
@@ -206,7 +205,7 @@
            write(fname3,fmt='(''jcl3km'',i2.2,''.dat'')') newseason
            call open_file(IO_DJ,"r",fname3,needed=.true.)
            call CheckStop(ios,"DefPhotolysis: ios error in jcl3km ")
-        endif
+        end if
 
 
         if(me == 0)then
@@ -218,8 +217,8 @@
                do k = 2,KMAX_MID-KMAX20+2
                   do nr=1,NPHODIS
                      djcl3(nr,K,izn)=djcl3(nr,KCHEMTOP,izn)
-                  enddo
-               enddo
+                  end do
+               end do
               do k = KMAX_MID-KMAX20+3,KMAX_MID
 !TEMPORARY FIX              do k = KCHEMTOP+1,KMAX_MID
               read(IO_DJ,999) myz,(djcl3(nr,k,izn),nr=1,NPHODIS)
@@ -230,10 +229,10 @@
             do k = KCHEMTOP,KMAX_MID
               do nr=1,NPHODIS
                 djcl3(nr,k,izn)=djcl3(nr,k,izn)/dj(nr,k,izn,3)-1.
-              enddo  ! nr
+              end do  ! nr
             end do  ! k
           end do   ! izn
-       endif      !  me = 0
+       end if      !  me = 0
 
         CALL MPI_BCAST(djcl3  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
@@ -306,7 +305,7 @@
                    print *,'top,base'
                    errcode = 17
                    return
-                 endif
+                 end if
                  iclcat = 1
 
                  if(z_bnd(i,j,top)-z_bnd(i,j,base) > 1.5e3) iclcat = 2
@@ -323,16 +322,16 @@
               do k = KCHEMTOP,KMAX_MID
                 do n=1,NRCPHOT
                   rcphot(n,k)  = dj(n,k,Grid%izen,la)
-                enddo
-              enddo
+                end do
+              end do
             else if(iclcat == 1)then
               clear = cc3dmax(i,j,KMAX_MID)
               do k = KCHEMTOP,KMAX_MID
                 do n=1,NRCPHOT
                   rcphot(n,k)  = (1. +          &
                                clear*djcl1(n,k,Grid%izen)) * dj(n,k,Grid%izen,la)
-                enddo  !  n
-              enddo   !  k
+                end do  !  n
+              end do   !  k
 
 
             else
@@ -341,9 +340,9 @@
                 do n=1,NRCPHOT
                   rcphot(n,k)  = (1. +            &
                                clear*djcl3(n,k,Grid%izen))*dj(n,k,Grid%izen,la)
-                 enddo
-              enddo
-            endif
+                 end do
+              end do
+            end if
   
             if ( DEBUG_DJ ) then
                 sum_rcphot = sum_rcphot + &

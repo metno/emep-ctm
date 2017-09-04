@@ -1,108 +1,69 @@
-# Open Source EMEP/MSC-W model
+# EMEP MSC-W OPEN SOURCE CODE - 2017
 
-The EMEP models have been instrumental to the development of
-air quality policies in Europe since the late 1970s,
-mainly through their support to the strategy work under the
-[Convention on Long-range Transboundary Air Pollution][CLRTAP].
-In the 1990s the EMEP models became also the reference tools for
-atmospheric dispersion calculations as input to the Integrated Assessment Modelling,
-which supports the development of air quality polices in the European Union.
+The source code in this 2017 release is essentially that used to model
+air pollution in the year 2015 (rv4.15), as reported in EMEP MSC-W Status
+Report 1/2017 (www.emep.int).  For basic documentation of the model see
+the file CITATION.txt which is released with the code.  A major difference
+in the model setup this year is a finer resolution, namely 0.1x0.1
+degree in the horizontal and 34 layers in the vertical.  Furthermore,
+this model version has had several major coding and data-input changes
+since the 2016 release, and in many ways should be seen as an interim
+version of the model. Here we just list some specific issues associated
+with the code and model usage.
 
-[CLRTAP]:   http://www.unece.org/env/lrtap/welcome.html
-[GPLv3]:    http://www.gnu.org/copyleft/gpl.html
-[publ2017]: http://emep.int/publ/emep2017_publications.html
-[rel415]:   http://github.com/metno/emep-ctm/releases/tag/rv4_15
-[rel410]:   http://github.com/metno/emep-ctm/releases/tag/rv4_10
-[rel48]:    http://github.com/metno/emep-ctm/releases/tag/rv4_8
-[rel45]:    http://github.com/metno/emep-ctm/releases/tag/rv4_5
-[rel44]:    http://github.com/metno/emep-ctm/releases/tag/rv4_4
-[rel43]:    http://github.com/metno/emep-ctm/releases/tag/rv4_3
-[readme43]: http://github.com/metno/emep-ctm/releases/download/rv4_3/README_rv4_3special.txt
-[rel40]:    http://github.com/metno/emep-ctm/releases/tag/rv4_0
-[rel201106]:http://github.com/metno/emep-ctm/releases/tag/v201106
-[rel30]:    http://github.com/metno/emep-ctm/releases/tag/rv3
 
-## Releases
-The latest Open Source EMEP/MSC-W model version ([rv4.15][rel415]),
-corresponds to the [EMEP status reporting of the year 2017][publ2017].
-The source code, together with a set of input data,
-an updated user guide and a full year model results for the year 2015,
-under [GPL license v3][GPLv3].
+## 34-layers
 
-#### Previous releases (YYYYMM - date of release)
-* [OpenSource rv4.10 (201609)][rel410].
-* [OpenSource rv4.8 (201510)][rel48].
-* [OpenSource rv4.5 (201409)][rel45].
-* [OpenSource rv4.4 (201309)][rel44].  
-* [OpenSource rv4.3 (201304)][rel43] *read the file [README_rv4_3special.txt][readme43]*.
-* [OpenSource rv4.0 (201209)][rel40].
-* [OpenSource v.2011-06 (201108)][rel201106].
-* [OpenSource rv3 (200802)][rel30].
+The use of 34 layers rather than 20 is very new to the EMEP model,
+and some aspects of the model formulation may need to be revised if we
+continue with this setup.  In particular the dry-deposition formulation
+was originally designed for thicker (ca. 90 m) lower-layers, and may
+need modification to cope with the new structure.
 
-## Documentation
-The EMEP/MSC-W model is a chemical transport model developed at the
-Meteorological Synthesizing Centre - West (MSC-W)
-at the Norwegian Meteorological Institute (met.no).
-The EMEP model is a limited-area, terrain following sigma coordinate model
-designed to calculate air concentration and deposition fields for
+The revised model still works however with the 20 layer meteorology as
+provided with previous releases, and indeed is still flexible in terms
+of allowing additional layers within the 20-layer structure (through
+interpolation) or for use with e.g. WRF meteorology.
 
-* acidifying and eutrophying compounds (S, N)
-* ground level ozone (O3)
-* particulate matter (PM2.5, PM10).
 
-as well as their long-range transport and fluxes across national boundaries
-(Transboundary air pollution).
-A history of the development of the EMEP model can be found at
-[http://www.emep.int/models][mscwmodels].
+## Shipping emissions
 
-[mscwmodels]: http://www.emep.int/mscw/models.html#mscwmodels
+The new IMO (International Maritime Organization) regulation on sulfur
+emissions from international shipping, which came into effect in January
+2015, has led to a significant reduction in sulfur emissions within
+the so-called Sulfur Emission Control Areas (SECAs) in Europe, i.e. the
+Baltic Sea and the North Sea.  The MACC-TNO-III data set for 2011, which
+was used for EMEP reporting until last year could thus not be used any
+longer, 2011 SOx emissions are significantly larger than those of 2015.
 
-### Model Description
+A new data set (see Status Report 1/2017) has been made available to us
+for 2015 by the Finnish Meteorological Institute (FMI). It is based on
+accurate ship position data from AIS (Automated Identification System)
+and also takes into account the new IMO regulations. As part of the
+Copernicus Atmospheric Monitoring Service (CAMS), ship emissions will
+be calculated by FMI also for years after 2015, and it is assumed that
+data for 2016 will arrive in time for next year's EMEP reporting.
 
-The EMEP MSC-W chemical transport model -- technical description
-D. Simpson, A. Benedictow, H. Berge, R. Bergstrõm, L. D. Emberson, H. Fagerli,
-C. R. Flechard, G. D. Hayman, M. Gauss, J. E. Jonson, M. E. Jenkin, A. Nyíri,
-C. Richter, V. S. Semeena, S. Tsyro, J.-P. Tuovinen, Á. Valdebenito, and P. Wind
-Atmos. Chem. Phys., 12, 7825-7865, 2012
-http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html
+Unfortunately, this situation results in an inconsistency in data-sources
+between the MACC-TNO-III data and the FMI data. Users should be aware of
+this and make appropriate choices when running years other than 2015.
 
-### Computer requirements
-To compile the EMEP model you need:
+Implementation of these new emissions into the EMEP model was rather
+hurried, with the new emissions in a special format, and with specific
+code changes to cope with this format. For future releases of the model
+we will re-format the emissions to comply with the usual EMEP formats,
+and eliminate special coding as far as possible.
 
-* Fortran 95 compiler
-* NetCDF Library (>4.1.3)
-* MPI Library (>1.0)
+## Code structure
 
-It is necessary to compile with double precision reals (8 bytes reals).
-The program has been used on computers ranging from a Linux laptop
-to supercomputers (Itanium2 cluster, Intel Xeon cluster, Cray XT4, IBM power5+).
-It is compatible with all compilers tested so far: Intel, PGI, gfortran, XL fortran.
-A Makefile is included, the path to netcdf (INCL and LLIB) has to be adapted
-to your machine, and to the fortran compiler (F90) and flags (F90FLAGS)
-to the compiler you are using.
+Some code from `ModelConstants_ml.f90` has been moved into a new
+`emep_Config_mod.f90` module. The aim is to restore `ModelConstants_ml.f90` to
+its original role as a place to store some model-specific variables, and
+to let `emep_Config_mod.f90` take over the operations of reading namelists
+and setting the configuration variables. This work has only just started,
+however, and so unfortunately the current release has configuration 
+variables in both modules. This will be rectified in future release.
 
-The code has been tested with 1 to 1024 CPUs, and scales well (for large grids).
-If only one CPU is used 1-2 GB memory is required.
-If more than one, for example 64 CPUs are used, 200 MB of memory per CPU is enough
-(in the case of a 132 X 159 grid size).
-For runs on more than 32 CPUs, a fast interconnect is recommended
-(infiniband for example), for smaller runs, gigabit ethernet is sufficient.
-It takes ~3.5 hrs on 64*Xeon X5355 (2.66GHz) for a 1-year simulation.
-
-When downloading input data in order to do a "base run" please make sure that there
-are 35 Gb disc space available, especially due to large meteorology input files.
-The model can be run for shorter periods, users can download meteorology for
-only the period they are interested in, plus one day.
-
-## Verification
-The EMEP/MSC-W model is validated and reported to the
-Cooperative Programme for Monitoring and Evaluation of the
-Long-range Transmission for Air Pollutants in Europe ([EMEP][]) each year
-by the EMEP/MSC-W group.
-The reports can be found under the following links:
-* [Status Reports][]
-* [Country Reports][]
-
-[EMEP]:           http://www.emep.int/
-[Status Reports]: http://www.emep.int/publ/common_publications.html
-[Country Reports]:http://www.emep.int/mscw/mscw_datanotes.html
+(The suffix `_mod` will also be used in future to represent module, rather
+than ml as used prevously, since `_mod` seems to be gaining ground among
+other fortran projects.)

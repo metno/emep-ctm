@@ -1,7 +1,7 @@
-! <MassBudget_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <MassBudget_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,8 +32,7 @@ module   MassBudget_ml
 use CheckStop_ml,       only: CheckStop
 use ChemSpecs,          only: NSPEC_ADV, NSPEC_SHL, species_adv
 use Chemfields_ml,      only: xn_adv        ! advected species
-use EmisDef_ml,       only: DMS_natso2_month, DMS_natso2_year&
-                            ,O_NH3, O_DMS
+use EmisDef_ml,         only: O_NH3, O_DMS
 use GridValues_ml,      only: xmd, &  
                               gridwidth_m,dA,dB,debug_proc,debug_li,debug_lj
 use Io_ml,              only: IO_LOG, PrintLog, datewrite
@@ -44,18 +43,19 @@ use ModelConstants_ml,  only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d fie
                               PT,               & ! Pressure at top
                               USE_OCEAN_NH3,USE_OCEAN_DMS,FOUND_OCEAN_DMS,&
                               DEBUG_MASS,EXTENDEDMASSBUDGET
-use MPI_Groups_ml   , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
-                              MPI_MIN, MPI_MAX, MPI_SUM, MPI_IN_PLACE, &
-                              MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
+! do not use "only", because MPI_IN_PLACE does not behave well on certain
+! versions of gfortran(?), and MPI stuff clearly inidcated anyway
+use MPI_Groups_ml !   , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, &
+                  !            MPI_INTEGER, MPI_LOGICAL, &
+                  !            MPI_MIN, MPI_MAX, MPI_SUM, MPI_IN_PLACE, &
+                  !            MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS,&
+                  ! IERROR, ME_MPI, NPROC_MPI
 use Par_ml,             only: &
-  li0,li1,& ! First/Last local index in longitude when outer boundary is excluded
-  lj0,lj1   ! First/Last local index in latitude  when outer boundary is excluded
+  li0,li1,& ! First/Last local index in long. when outer boundary is excluded
+  lj0,lj1   ! First/Last local index in lat.  when outer boundary is excluded
 use PhysicalConstants_ml,only: GRAV,ATWAIR! Mol. weight of air(Jones,1992)
 use Setup_1dfields_ml,  only: amk, rcemis ! Air concentrations , emissions
 use SmallUtils_ml,       only: find_index
-!use mpi,                only: MPI_COMM_CALC, MPI_IN_PLACE,&
-!                              MPI_DOUBLE_PRECISION, MPI_SUM, MPI_MIN, MPI_MAX
-! openMPI has no explicit interface for MPI_ALLREDUCE
 implicit none
 private
 
@@ -93,9 +93,7 @@ subroutine Init_massbudget()
 ! within 3-D grid, after boundary conditions
 !
 !----------------------------------------------------------------------
-  integer i, j, k, n, info    ! lon,lat,lev indexes
-                              ! n - No. of species
-                              ! info - printing info
+  integer i, j, k, n          ! lon,lat,lev indexes, n - No. of species
   real rwork,fac,wgt_fac
 
   fac = GRIDWIDTH_M*GRIDWIDTH_M/GRAV
@@ -104,9 +102,9 @@ subroutine Init_massbudget()
       do i=li0,li1
         rwork = fac*(dA(k)+dB(k)*ps(i,j,1))* xmd(i,j)
         sumini(:) = sumini(:) + xn_adv(:,i,j,k)*rwork  ! sumini in kg
-      enddo
-    enddo
-  enddo
+      end do
+    end do
+  end do
 
   CALL MPI_ALLREDUCE(MPI_IN_PLACE, sumini , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
@@ -117,10 +115,10 @@ subroutine Init_massbudget()
       wgt_fac=species_adv(n)%molwt/ATWAIR
       write(IO_LOG,"(a15,i4,4x,e10.3)") "Initial mass",n,sumini(n)*wgt_fac
       write(*,"(a15,i4,4x,e10.3)") "Initial mass",n,sumini(n)*wgt_fac
-    enddo
-  endif
+    end do
+  end if
 
- endsubroutine Init_massbudget
+ end subroutine Init_massbudget
 !----------------------------------------------------------------------------
 !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 subroutine emis_massbudget_1d(i,j)
@@ -139,23 +137,21 @@ subroutine emis_massbudget_1d(i,j)
   do k = KCHEMTOP,KMAX_MID
     scaling_k = scaling * (dA(k) + dB(k)*ps(i,j,1))/amk(k)
     if(all((/DEBUG_MASS,debug_proc,i==debug_li,j==debug_lj/)))&
-      call datewrite("MASSRC ",k,(/dB(k)*ps(i,j,1),xmd(i,j),ps(i,j,1),scaling_k/))
+      call datewrite("MASSRC ",k,(/dB(k)*ps(i,j,1),xmd(i,j),&
+          ps(i,j,1),scaling_k/))
 
     do iadv = 1, NSPEC_ADV
       itot = iadv + NSPEC_SHL
       totem(iadv) = totem(iadv) + rcemis( itot, k ) * scaling_k
-    enddo
-  enddo ! k loop
+    end do
+  end do ! k loop
 
-endsubroutine emis_massbudget_1d
+end subroutine emis_massbudget_1d
 !----------------------------------------------------------------------------
 subroutine massbudget()
 ! sums over all sulphur and nitrogen, so is model independant.
 
-  integer ::  i, j, k, n, nn, info  ! lon,lat,lev indexes
-                                    ! n - No. of species
-                                    ! nn - Total no. of short lived and advected species
-                                    ! info - printing info
+  integer ::  i, j, k, n            ! lon,lat,lev indexes, n - No. of species
   integer :: ix_o3, ifam            ! family index
   integer :: iomb                   ! for MassBugetSummary.txt Table
   real,  dimension(NSPEC_ADV,KMAX_MID) ::  sumk   ! total mass in each layer
@@ -178,7 +174,7 @@ subroutine massbudget()
   real, dimension(NSPEC_ADV) :: &
     xmax, xmin,         & ! min and max value for the individual species
     sum_mass,           & ! total mass of species
-    frac_mass,          & ! mass budget fraction (should=1) for groups of species
+    frac_mass,          & ! mass budget frac. (should=1) for groups of species
     gfluxin,gfluxout,   & ! flux in  and out
     gtotem,             & ! total emission
     gtotddep, gtotwdep, & ! total dry and wet deposition
@@ -211,9 +207,9 @@ subroutine massbudget()
         if(all((/DEBUG_MASS,debug_proc,i==debug_li,j==debug_lj/)))&
           call datewrite("MASSBUD",k,(/(dA(k)*dB(k)*ps(i,j,1))*xmd(i,j)/&
           GRAV*GRIDWIDTH_M*GRIDWIDTH_M,ps(i,j,1),PT,xmd(i,j)/))
-      enddo
-    enddo
-  enddo
+      end do
+    end do
+  end do
 
   CALL MPI_ALLREDUCE(MPI_IN_PLACE, xmax, NSPEC_ADV,&
     MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_CALC, IERROR)
@@ -249,7 +245,7 @@ subroutine massbudget()
   amin(:) = min( amin(:), xmin(:) )
   do k = 2,KMAX_MID
     sum_mass(:) = sum_mass(:)+sumk(:,k)
-  enddo
+  end do
 
 
 !O3 flux are also printed out
@@ -264,34 +260,35 @@ subroutine massbudget()
         33 FORMAT(5(A,es10.3))
         write(*,*)'Ozone fluxes (kg):'   
         write(*,33)'Net from top = ', fluxin_top(ix_o3)-fluxout_top(ix_o3),&
-                  '  in from top = ',fluxin_top(ix_o3),' out of top = ',fluxout_top(ix_o3)
+          '  in from top = ',fluxin_top(ix_o3),' out of top = ',fluxout_top(ix_o3)
         write(*,33)'Net lateral faces = ', fluxin(ix_o3)-fluxout(ix_o3),&
-             '  in lateral faces = '  ,fluxin(ix_o3), &
-             ' out lateral faces = ',  fluxout (ix_o3)
-        write(*,33)'O3 in atmosphere at start of run = ', sumini(ix_o3)*o3_fac,&
-             ' at end of run = ', sum_mass(ix_o3)*o3_fac
+          '  in lateral faces = '  ,fluxin(ix_o3), &
+          ' out lateral faces = ',  fluxout (ix_o3)
+        write(*,33)'O3 in atmosphere at start of run = ', &
+          sumini(ix_o3)*o3_fac, ' at end of run = ', sum_mass(ix_o3)*o3_fac
         write(*,33)'O3 dry deposited = ',&
              gtotddep(ix_o3)*species_adv(ix_o3)%molwt
      else
         write(*,*)'O3 index not found'
-     endif
-  endif
+     end if
+  end if
 
 
   do n = 1,NSPEC_ADV
     totdiv = sumini(n) + gtotem(n) + gfluxin(n)
     frac_mass(n) = sum_mass(n) + (gtotddep(n)+gtotwdep(n))*ATWAIR + gfluxout(n)
     if(totdiv>0.0) frac_mass(n) = frac_mass(n)/totdiv
-  enddo
+  end do
 
 
   if(MasterProc) then   ! printout from node 0
     if(EXTENDEDMASSBUDGET)then
       do n=1,NSPEC_ADV
-         wgt_fac=species_adv(n)%molwt/ATWAIR
-        if(gtotem(n)>0.0) write(*,*)'tot. emission of '//trim(species_adv(n)%name)//' ',gtotem(n)*wgt_fac
-      enddo
-    endif
+        wgt_fac=species_adv(n)%molwt/ATWAIR
+        if(gtotem(n)>0.0) write(*,*)'tot. emission of '//&
+               trim(species_adv(n)%name)//' ',gtotem(n)*wgt_fac
+      end do
+    end if
 
     call PrintLog('++++++++++++++++++++++++++++++++++++++++++++++++')
     do ifam = 1, 3
@@ -301,7 +298,7 @@ subroutine massbudget()
         case(1);natoms = real(species_adv(:)%sulphurs)
         case(2);natoms = real(species_adv(:)%nitrogens)
         case(3);natoms = real(species_adv(:)%carbons)
-      endselect
+      end select
 
       family_init(ifam)   = dot_product(sumini(:)  ,natoms(:))
       family_mass(ifam)   = dot_product(sum_mass(:),natoms(:))
@@ -311,12 +308,12 @@ subroutine massbudget()
       family_wdep(ifam)   = dot_product(gtotwdep(:),natoms(:))
       family_em(ifam)     = dot_product(gtotem(:)  ,natoms(:))
 
-!convert into kg
+    !convert into kg
       select case(ifam)
         case(1);wgt_fac=32/ATWAIR!sulphurs
         case(2);wgt_fac=14/ATWAIR!nitrogens
         case(3);wgt_fac=12/ATWAIR!carbons
-      endselect
+      end select
       family_init(ifam)=family_init(ifam)*wgt_fac
       family_inflow(ifam)=family_inflow(ifam)*wgt_fac
       family_em(ifam)=family_em(ifam)*wgt_fac
@@ -338,7 +335,8 @@ subroutine massbudget()
 
 
       call PrintLog('++++++++++++++++++++++++++++++++++++++++++++++++')
-      write(logtxt,"(a9,5a12)")" ","sumini","summas","fluxout","fluxin","fracmass"
+      write(logtxt,"(a9,5a12)")" ","sumini","summas","fluxout","fluxin",&
+        "fracmass"
       call PrintLog(logtxt)
 
       write(logtxt,"(a9,5es12.4)") family_name(ifam), &
@@ -352,8 +350,8 @@ subroutine massbudget()
         family_ddep(ifam), family_wdep(ifam), family_em(ifam)
       call PrintLog(logtxt)
       call PrintLog('++++++++++++++++++++++++++++++++++++++++++++++++')
-    enddo  ! ifam = 1,3
-  endif
+    end do  ! ifam = 1,3
+  end if
 
   if(MasterProc) then     ! printout from node 0
 
@@ -368,11 +366,11 @@ subroutine massbudget()
             n,species_adv(n)%name, k,sumk(n,k)*wgt_fac
           write(*     ,"(' Spec ',i3,2x,a12,5x,'k= ',i2,5x,es12.5)")&
             n,species_adv(n)%name, k,sumk(n,k)*wgt_fac
-        enddo
-      enddo
+        end do
+      end do
      end if ! EXTENDED
 
-    !2016 NEW: SUMMARY TABLE:
+    ! SUMMARY TABLE:
      open(newunit=iomb,file="MassBudgetSummary.txt")
      write(iomb,'(a)') ' # Mass Budget. Units are kg with MW used here. ADJUST! if needed' 
      write(iomb,'(a3,1x,a14,a7,99a12)') '#n', 'Spec       ', &
@@ -390,7 +388,8 @@ subroutine massbudget()
              write(*,"(a3,6a12)")" n ", "Spec", &
                "sumini", "summas", "fluxout", "fluxin", "fracmass"
              write(*,"(i3,1x,a11,5es12.4)") n,species_adv(n)%name, &
-               sumini(n)*wgt_fac, sum_mass(n)*wgt_fac, gfluxout(n)*wgt_fac, gfluxin(n)*wgt_fac, frac_mass(n)
+               sumini(n)*wgt_fac, sum_mass(n)*wgt_fac, gfluxout(n)*wgt_fac, &
+                 gfluxin(n)*wgt_fac, frac_mass(n)
              write(*,*)
              write(*,"(a3,6a12)") "n ", "species", "totddep", "totwdep", "totem"
              write(*,"(i3,1x,a11,5es12.4)") n, species_adv(n)%name, &
@@ -406,12 +405,11 @@ subroutine massbudget()
           gtotwdep(n)*wgt_fac*ATWAIR, sumini(n)*wgt_fac, sum_mass(n)*wgt_fac,&
           gfluxout(n)*wgt_fac, gfluxin(n)*wgt_fac, frac_mass(n)
 
-     enddo
+     end do
      close(iomb)
-  endif  ! MasterProc
+  end if  ! MasterProc
 
   if(FOUND_OCEAN_DMS)then
-     !DMS emissions
      ! update dms budgets
      CALL MPI_ALLREDUCE(MPI_IN_PLACE, O_DMS%sum_month, 1,&
           MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
@@ -421,27 +419,20 @@ subroutine massbudget()
      
      if(MasterProc)then
         write(*,59)'SO2 from ocean DMS cdf file last month ',O_DMS%sum_month
-        write(*,59)'SO2 from natso2.dat last month',DMS_natso2_month
         
-        DMS_natso2_year=DMS_natso2_year+DMS_natso2_month
-        DMS_natso2_month=0.0
         O_DMS%sum_year=O_DMS%sum_year+O_DMS%sum_month
         O_DMS%sum_month=0.0
         
 59      format(A,6F14.5)
-        write(*,*)'DMS OCEAN emissions '
         write(*,59)'SO2 from ocean DMS cdf file ',O_DMS%sum_year
-        write(*,59)'SO2 from natso2.dat ',DMS_natso2_year
-!        write(*,59)'fraction new/old method',O_DMS%sum_year/DMS_natso2_year
-     endif
-  endif
+     end if
+  end if
   if(MasterProc)then
      if(USE_OCEAN_NH3)then
-        write(*,*)'NH3 OCEAN emissions '
         write(*,59)'NH3 emisions from ocean cdf file (Gg)',O_NH3%sum_year
-     endif
-  endif
-endsubroutine massbudget
+     end if
+  end if
+end subroutine massbudget
 !--------------------------------------------------------------------------
  end module MassBudget_ml
 !--------------------------------------------------------------------------

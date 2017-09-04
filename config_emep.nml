@@ -1,5 +1,5 @@
 &INPUT_PARA
-  GRID      = 'EECCA',
+  GRID      = 'EMEP01',
   iyr_trend = 2015
   runlabel1 = 'Base',
   runlabel2 = 'Opensource_Setup_2017',
@@ -50,16 +50,14 @@
   INERIS_SNAP1          = F,
   INERIS_SNAP2          = F,
 !------------------------------
-  EmisDir               = 'DataDir/EECCA',
-  emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
-! IMPORTANT: Specify the keyword "POLL" rather than sox, nox, etc. and the code
-!   will check against emissions names listed in CM_EmisFiles.inc
-!   NB: CM_EmisFiles uses lowercase. Renames or link if they are in capital letters.
+  EmisDir               = 'DataDir/EMEP01',
+  emis_inputlist(1)%name= 'EmisDir/GNFRemis_EMEP01_YYYY.nc', ! fractions emiss format
 ! One can either include or exclude, not both, as follows
 ! emis_inputlist(1)%incl(1:) = 'EU15', ! example take only countries from the 'EUMACC2' list
-! emis_inputlist(2)%name     = 'EmisDir/Emis_GLOB_05.nc', !example of Fractions type
-  emis_inputlist(2)%name  = 'DataDir/OceanicEmissions_GEIA.nc',
-  emis_inputlist(2)%type  = 'DMS',
+  emis_inputlist(2)%name= 'DataDir/OceanicEmissions_GEIA.nc',
+  emis_inputlist(2)%type= 'DMS',
+  emis_inputlist(3)%name= 'DataDir/FMIGlobShip2015mon.nc',
+  emis_inputlist(3)%type= 'Special_ShipEmis',
   EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
 !------------------------------
   SELECT_LEVELS_HOURLY  = F,          ! hourly output flag for 3DPROFILES
@@ -71,6 +69,7 @@
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
 !--- 'fake' vegetation for ozone POD calculations
   FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF',
+  FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE'   ! Ignore these for FLUX calcs.
 &end
 &Fire_config
   need_poll = F,

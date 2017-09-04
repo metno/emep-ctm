@@ -1,6 +1,7 @@
-  integer, public, parameter ::  NWETDEP_ADV  = 55
+  integer, public, parameter ::  NWETDEP_ADV  = 57
   type(depmap), public, dimension(NWETDEP_ADV), parameter:: WDepMap= (/ &
-        depmap( IXADV_HNO3, CWDEP_HNO3, -1) & 
+        depmap( IXADV_HO2NO2, CWDEP_HNO3, -1) & 
+      , depmap( IXADV_HNO3, CWDEP_HNO3, -1) & 
       , depmap( IXADV_HONO, CWDEP_HNO3, -1) & 
       , depmap( IXADV_HCHO, CWDEP_HCHO, -1) & 
       , depmap( IXADV_H2O2, CWDEP_H2O2, -1) & 
@@ -26,6 +27,7 @@
       , depmap( IXADV_FFIRE_OM, CWDEP_PMf, -1) & 
       , depmap( IXADV_FFIRE_BC, CWDEP_PMf, -1) & 
       , depmap( IXADV_FFIRE_REMPPM25, CWDEP_PMf, -1) & 
+      , depmap( IXADV_SQT_SOA_NV, CWDEP_PMf, -1) & 
       , depmap( IXADV_ASOC_ng100, CWDEP_PMf, -1) & 
       , depmap( IXADV_ASOC_ug1, CWDEP_PMf, -1) & 
       , depmap( IXADV_ASOC_ug10, CWDEP_PMf, -1) & 

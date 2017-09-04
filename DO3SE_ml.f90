@@ -1,7 +1,7 @@
-! <DO3SE_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <DO3SE_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -62,8 +62,8 @@ module DO3SE_ml
  !******   Data to be read from Phenology_inputs.dat:
 
   type, public :: do3se_type
-     character(len=15) :: code
-     character(len=15) :: name
+     character(len=30) :: code
+     character(len=30) :: name
      real:: g_max           ! max. value conductance g_s
      real:: f_min           ! min. value Conductance, factor
      real:: f_phen_a        ! f_phen a  (very start of season

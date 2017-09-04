@@ -1,7 +1,7 @@
-! <TimeDate_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <TimeDate_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -96,7 +96,6 @@ REAL,private,PARAMETER    :: spd = 86400.0
 REAL,private,PARAMETER    :: sph =  3600.0
 REAL,private,PARAMETER    :: spm =    60.0
 
-TYPE(timestamp),private,PARAMETER  :: ts_null = timestamp(0, 0.0)
 TYPE(timestamp),public, save       :: ts_now    ! current local time
 TYPE(timestamp),public, save       :: ts_next   ! next inp
 
@@ -382,14 +381,16 @@ SUBROUTINE get_hms (secs,hour,minute,second)
   second = INT(secs - sph*REAL(hour) - spm*REAL(minute))
 END SUBROUTINE get_hms
 
-SUBROUTINE Init_nmdays (indate)
+SUBROUTINE Init_nmdays (indate,JUMPOVER29FEB)
   TYPE(date),INTENT(IN)              :: indate
+  LOGICAL , INTENT(IN)               :: JUMPOVER29FEB
   INTEGER,DIMENSION(12),PARAMETER    :: daycount =  &
     (/31,28,31,30,31,30,31,31,30,31,30,31/) ! table lookup for most months
 
   nmdays(:)=daycount(:)
-  IF (leapyear(indate%year)) nmdays(2) = nmdays(2)+1
+  IF (leapyear(indate%year) .and. .not. JUMPOVER29FEB) nmdays(2) = nmdays(2)+1
   nydays=sum(nmdays)
+  if(JUMPOVER29FEB .and. leapyear(indate%year))write(*,*)'WARNING: assuming not leap year, even if it is! nydays = ',nydays 
 END SUBROUTINE Init_nmdays
 
 END MODULE TimeDate_ml

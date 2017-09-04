@@ -1,7 +1,7 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,9 +39,6 @@ module AerosolCalls
  use CheckStop_ml,         only : StopAll, CheckStop
  use ChemGroups_ml,         only : SS_GROUP, RDN_GROUP
  use ChemSpecs
-! use ChemSpecs,            only :  SO4, NH3, HNO3, NO3_f, NH4_f, &
-!                                     SEASALT_F, & ! ISORROPIA
-!                                     NSPEC_SHL, species
  use Chemfields_ml,        only :  PM25_water, PM25_water_rh50,  & !PMwater 
                                    cfac
  use EQSAM_v03d_ml,        only :  eqsam_v03d
@@ -56,7 +53,6 @@ module AerosolCalls
 
  public :: AerosolEquilib
  public :: emep2MARS, emep2EQSAM, Aero_Water, Aero_Water_MARS
- private :: emep2isorropia
                     
 !    logical, public, parameter :: AERO_DYNAMICS     = .false.  &  
 !                                , EQUILIB_EMEP      = .false.  & !old Ammonium stuff
@@ -86,7 +82,8 @@ contains
       case ( 'EQSAM' )
         call emep2EQSAM(debug_flag)
       case ( 'ISORROPIA' )
-        call emep2Isorropia(debug_flag)
+        call StopAll('Isorropia problems found. Removed for now')
+        !call emep2Isorropia(debug_flag)
       case default
         if( my_first_call .and. MasterProc ) then
           write(*,*) 'WARNING: AerosolEquilib: nothing chosen:'
@@ -100,67 +97,6 @@ contains
 
  ! Adapted from List 10, p130, Isoropia manual
 
- subroutine emep2isorropia(debug_flag)
-   logical, intent(in) :: debug_flag
-
-   real, dimension(8) :: wi = 0.0, wt
-   real, dimension(3) :: gas
-   real, dimension(15) :: aerliq
-   real, dimension(19) :: aersld
-   real, parameter, dimension(2) :: CNTRL =  (/ 0, 0 /)
-   real, dimension(9) :: other
-   !real :: rhi, tempi
-   character(len=15) :: scase
-
-  ! DS added
-   real, parameter :: Ncm3_to_molesm3 = 1.0e6/AVOG    ! #/cm3 to moles/m3
-   real, parameter :: molesm3_to_Ncm3 = 1.0/Ncm3_to_molesm3
-   real :: FLOOR = 1.0e-30               !
-   integer :: i, ispec, k
-   real :: atwNa =  22.989770, atwCl = 35.453   ! g/mole !DOCS had 36.5?
-   real :: tmpno3, tmpnh4
-
-   ! WI(1)  = max(FLOOR2, xn_2d(Na,k))  / species(Na)%molwt  * Ncm3_to_molesm3
-   ! 5=Cl, 6=Ca, 7=K, 8=Mg
-
-   do k = KMAX_MID, KMAX_MID  ! TESTING KCHEMTOP, KMAX_MID
-
-     WI(1)  = 0.0 !FINE sum( xn_2d(SS_GROUP,k) ) * Ncm3_to_molesm3
-     WI(2)  = xn_2d(SO4,k)             * Ncm3_to_molesm3
-     WI(3)  = sum( xn_2d(RDN_GROUP,k) ) * Ncm3_to_molesm3  !NH3, NH4
-     !FINE WI(4)  = ( xn_2d(NO3_F,k) + xn_2d(NO3_C,k) + xn_2d(HNO3,k) )&
-     WI(4)  = ( xn_2d(NO3_F,k) + xn_2d(HNO3,k) )&
-                * Ncm3_to_molesm3
-     WI(5)  =0.0 !FINE  WI(1)  ! Cl only from sea-salt. Needs consideration!
-
-     call isoropia ( wi, rh(k), temp(k), CNTRL,&
-                     wt, gas, aerliq, aersld, scase, other)
-
-    ! gas outputs are in moles/m3(air)
-
-     xn_2d(NH3,k)  = gas(1) * molesm3_to_Ncm3
-     xn_2d(HNO3,k) = gas(2) * molesm3_to_Ncm3
-     !xn_2d(HCl,k) = gas(3) * molesm3_to_Ncm3
-
-    ! aerosol outputs are in moles/m3(air)
-    ! 1=H+, 2=Na+, 3=NH4+, 4=Cl-, 5=SO42-, 6=HSO4-, 7=NO3-, 8=Ca2+
-    ! 9=K+, 10=Mg2+
-     !xn_2d(NH4_F,k) = MOLAL(3)
-
-    ! Just use those needed:
-    ! QUERY: Is NaNO3 always solid? Ans = No!
-
-      !xn_2d(NO3_c,k ) = aeroHCl * molesm3_to_Ncm3 ! assume all HCl from NaNO3 formation?
-      !FINE xn_2d(NO3_f,k ) = tmpno3 - xn_2d(NO3_c,k ) - xn_2d(HNO3,k)
-      xn_2d(NO3_f,k ) = tmpno3 - xn_2d(HNO3,k)
-
-     if( debug_flag ) then 
-       write(*, "(a,2f8.3,99g12.3)") "ISORROPIA ", rh(k), temp(k), gas
-     end if
-     !call StopAll("ISOR")
-     
-   end do
- end subroutine emep2isorropia
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
       subroutine emep2MARS(debug_flag)
@@ -179,7 +115,6 @@ contains
              aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out,   &
              coef
   integer :: k, errmark
-  logical,save  :: firstcall=.true.
  !-----------------------------------
 
    coef = 1.e12 / AVOG
@@ -188,7 +123,7 @@ contains
   
 
 !//.... molec/cm3 -> ug/m3
-!DEC2014. Use FLOOR2 = 1.0e-8 molec/cm3 for input. Too many problems
+! Use FLOOR2 = 1.0e-8 molec/cm3 for input. Too many problems
       so4in  = max(FLOOR2, xn_2d(SO4,k)) * species(SO4)%molwt  *coef
       hno3in = max(FLOOR2, xn_2d(HNO3,k))* species(HNO3)%molwt *coef 
       nh3in  = max(FLOOR2, xn_2d(NH3,k)) * species(NH3)%molwt  *coef
@@ -208,7 +143,7 @@ contains
          call DO_RPMARES_new (so4in, hno3in,no3in ,nh3in, nh4in , rh(k), temp(k),   &
               aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out, &
               ERRMARK,debug_flag)
-      endif
+      end if
 
  !--------------------------------------------------------------------------
 
@@ -224,7 +159,7 @@ contains
       xn_2d(NO3_f,k)  = max (FLOOR, aNO3out / (species(NO3_f)%molwt  *coef) )
       xn_2d(NH4_f,k)  = max (FLOOR, aNH4out / (species(NH4_f)%molwt  *coef) )
 
-   enddo  ! K-levels
+   end do  ! K-levels
 
  end subroutine emep2MARS
 
@@ -274,7 +209,7 @@ contains
   if ( debug_flag  ) then ! Selected debug cell
     write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
                xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
-  endif
+  end if
 
 !//.... molec/cm3 -> micromoles/m**3
     so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)*1.e12/AVOG
@@ -306,7 +241,7 @@ contains
  if ( debug_flag ) then ! Selected debug cell
     write(*,*)'After EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
                xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
-  endif
+  end if
 
  end subroutine emep2EQSAM
 
@@ -354,14 +289,13 @@ contains
              gSO4out(KCHEMTOP:KMAX_MID), &
              rlhum(KCHEMTOP:KMAX_MID),tmpr(KCHEMTOP:KMAX_MID)
 
-  real, parameter ::    FLOOR = 1.0E-30         ! minimum concentration  
  !-----------------------------------
 
 
   if ( debug_flag ) then ! Selected debug cell
     write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
                xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
-  endif
+  end if
 
 !//.... molec/cm3 -> micromoles/m**3
       so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)*1.e12/AVOG
@@ -382,7 +316,7 @@ contains
       else                              ! for gravimetric mass
                   rlhum(:) = 0.5
                   tmpr(:)  = 293.15
-      endif
+      end if
 
  !--------------------------------------------------------------------------                
   
@@ -397,12 +331,12 @@ contains
       PM25_water(i,j,KCHEMTOP:KMAX_MID) = max(0., aH2Oout(KCHEMTOP:KMAX_MID) )
  else                    ! In gravimetric PM (Rh=50% and t=20C)
       PM25_water_rh50 (i,j)             = max(0., aH2Oout(KMAX_MID) )
- endif
+ end if
 
  if ( debug_flag ) then ! Selected debug cell
     write(*,*)'After EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
                xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
-  endif
+  end if
 
  end subroutine  Aero_water
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -418,7 +352,6 @@ contains
 
  integer, intent(in)  :: i, j
  logical, intent(in)  :: debug_flag
- real, parameter      :: FLOOR = 1.0E-30  ! minimum concentration  
 
  !.. local
   real    :: rlhum(KCHEMTOP:KMAX_MID), tmpr(KCHEMTOP:KMAX_MID)
@@ -457,13 +390,13 @@ contains
          call DO_RPMARES_new (so4in, hno3in,no3in ,nh3in, nh4in , rlhum(k), tmpr(k),   &
               aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out, &
               ERRMARK,debug_flag) 
-      endif
+      end if
       !--------------------------------------------------------------------------
 
 !//....aerosol water (ug/m**3) 
       PM25_water(i,j,k) = max (0., aH2Oout )
 
-    enddo  ! k-loop
+    end do  ! k-loop
 
 !.. PM2.5 water at equilibration conditions for gravimetric PM (Rh=50% and t=20C)
                             
@@ -489,7 +422,7 @@ contains
          call DO_RPMARES_new (so4in, hno3in,no3in ,nh3in, nh4in , rlhum(k), tmpr(k),   &
               aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out, &
               ERRMARK,debug_flag) 
-      endif
+      end if
   !--------------------------------------------------------------------------
 
       PM25_water_rh50 (i,j) = max (0., aH2Oout )
@@ -499,5 +432,3 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 end module AerosolCalls
-
-

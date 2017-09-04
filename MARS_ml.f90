@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -636,7 +636,7 @@ module MARS_ml
       else
          DO_RATIO_Low_2=.true.
          High_Factor=0.0
-      endif
+      end if
 
       IF ( RATIO >RATIO_Low  .and.  RATIO < RATIO_High .and. MARS_RATIO_SMOOTH)then
          DO_RATIO_High_2=.true.
@@ -645,7 +645,7 @@ module MARS_ml
          TSO4_LowA=TSO4*Ratio/RATIO_Low
 !         High_Factor=(RATIO-RATIO_Low)/(RATIO_High-RATIO_Low)
          High_Factor=(RATIO*RATIO_High-RATIO_Low*RATIO_High)/(RATIO*RATIO_High-RATIO*RATIO_Low)
-      endif
+      end if
 
 !....................................
 !......... High Ammonia Case ........
@@ -876,7 +876,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
       MNH4 = 1.e-30
       MAS  = 1.e-30
       MAN  = 1.e-30
-   endif
+   end if
 
 !...MAS, MAN and MNH4 are the aqueous concentrations of sulfate, nitrate,
 !...  and ammonium in molal units (moles/(kg water) ).
@@ -1103,7 +1103,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
           !http://wiki.seas.harvard.edu/geos-chem/index.php?title=Aerosol_thermodynamical_equilibrium&redirect=no#RPMARES
           if ( ( abs( GAMANA ) < FLOOR ) .or. ( abs( GAMAS1 ) < FLOOR ) ) THEN
              goto 1601
-          endif
+          end if
           GAMAHAT = ( GAMAS2 * GAMAS2 / ( GAMAAB * GAMAAB ) )
           BHAT = KHAT * GAMAHAT 
 !!!          EROR = ABS ( ( PHIOLD - PHIBAR ) / PHIOLD )
@@ -1455,7 +1455,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
         WRITE(6,*) 'GAMA=', GAMA
         WRITE(6,*) 'MOLNU=',MOLNU
         WRITE(6,*) 'PHIMULT=',PHIMULT
-   endif
+   end if
  !!       CALL M3EXIT( PNAME, 0, 0, XMSG, XSTAT2 )
  !emep1.2      call stop_test(.true.,me,NPROC,ios,'##MARS-negat.con')
      END IF
@@ -3428,7 +3428,7 @@ real  AHSO4 ! Aerosol phase in bisulfate in MICROGRAMS/M**3
       else
          DO_RATIO_Low_2=.true.
          High_Factor=0.0
-      endif
+      end if
 
       IF ( RATIO >RATIO_Low  .and.  RATIO < RATIO_High .and. MARS_RATIO_SMOOTH)then
          DO_RATIO_High_2=.true.
@@ -3437,7 +3437,7 @@ real  AHSO4 ! Aerosol phase in bisulfate in MICROGRAMS/M**3
          TSO4_LowA=TSO4*Ratio/RATIO_Low
 !         High_Factor=(RATIO-RATIO_Low)/(RATIO_High-RATIO_Low)
          High_Factor=(RATIO*RATIO_High-RATIO_Low*RATIO_High)/(RATIO*RATIO_High-RATIO*RATIO_Low)
-      endif
+      end if
 
 !....................................
 !......... High Ammonia Case ........
@@ -3668,7 +3668,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
       MNH4 = 1.e-30
       MAS  = 1.e-30
       MAN  = 1.e-30
-   endif
+   end if
 
 !...MAS, MAN and MNH4 are the aqueous concentrations of sulfate, nitrate,
 !...  and ammonium in molal units (moles/(kg water) ).

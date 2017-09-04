@@ -1,7 +1,7 @@
-! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,9 +29,9 @@
 !==============================================================================
   use PhysicalConstants_ml, only : FREEPATH, VISCO, BOLTZMANN, PI, GRAV, ROWATER
   use ModelConstants_ml,    only : DEBUG_VDS, MasterProc
- 
+
   ! DESCRIPTION
-  ! Calculates laminar sub-layer resistance (rb) and gravitational settling 
+  ! Calculates laminar sub-layer resistance (rb) and gravitational settling
   ! velocity (vs) for particles
   ! In DryDep_ml: Vd= Vs/(1.0 - exp ( -(Ra + Rb)*Vs ),   where
   ! Vs - gravitational settling velocity,
@@ -46,9 +46,9 @@
      ! A variety of equations are presented. Two types of
      ! stability corrections are used in the literature,
      ! those based upon 1/L only, and those based upon
-     ! zi/L, where zi is the PBL height. 
+     ! zi/L, where zi is the PBL height.
      !
-     ! Using zi form gives max stab-fac of ca. 10 
+     ! Using zi form gives max stab-fac of ca. 10
      ! (range max 2.8 to 10.7 for zi = 200 - 2500)
      ! Using 300 form gives max stab-fac of ca. 6
 
@@ -84,7 +84,6 @@ contains
 
      real             :: Vs ! (NSIZE)
 
-     real, parameter :: one2three = 1.0/3.0
      real    :: lnsig2, dg, & 
                 knut, Di,   & ! Knudsen number, Diffusion coefficient
                 Di_help, vs_help
@@ -93,7 +92,7 @@ contains
 
         lnsig2 = log(sigma)**2
 
-       !... mass median diameter -> geometric diameter 
+       !... mass median diameter -> geometric diameter
 
         dg = exp (log(diam) - 3.* lnsig2 )
 
@@ -102,9 +101,9 @@ contains
         Di_help =BOLTZMANN*tsK/(3*PI*dg *VISCO *roa)              ! A30, dpg
         vs_help= dg*dg * PMdens * GRAV / (18.0* VISCO*roa)        ! A32
 
-       !... Diffusion coefficient for poly-disperse 
-        Di = Di_help*(exp(-2.5*lnsig2)+1.246*knut*exp(-4.*lnsig2)) ! A29, dpk 
-       !... Settling velocity for poly-disperse 
+       !... Diffusion coefficient for poly-disperse
+        Di = Di_help*(exp(-2.5*lnsig2)+1.246*knut*exp(-4.*lnsig2)) ! A29, dpk
+       !... Settling velocity for poly-disperse
         Vs = vs_help*(exp(8.0*lnsig2)+1.246*knut*exp(3.5*lnsig2))  ! A31, k=3
 
 ! Can't have output from elemental
@@ -132,7 +131,7 @@ contains
      real, intent(in) :: ustar, invL,SAI
      real :: Vds
 
-        Vds   = 0.007 * ustar * 0.1*max(SAI, 3.0) 
+        Vds   = 0.007 * ustar * 0.1*max(SAI, 3.0)
 
        if ( invL <  0.0 ) then
          Vds = Vds * (1.0+(-300.0 * max(-0.04,invL))**0.6667)
@@ -141,9 +140,9 @@ contains
    !------------------------------------------------------------------------
    ! GallagherPetrof fits
    ! Two functions here, for different stability methods
-     ! "Simple" fitting of Gallagher et al. (1997) and Petroff et al., which 
+     ! "Simple" fitting of Gallagher et al. (1997) and Petroff et al., which
      ! roughly captures the differences between Speulderbos-type and typical
-     ! forests, because of LAI. 
+     ! forests, because of LAI.
      ! Gallagher et al. had   Vds/u* = 0.0135 * Dp * stab function
      ! which gives 0.3 cm/s for neutral conditions, Dp=0.5
      !
@@ -153,7 +152,7 @@ contains
      ! We use SAI to keep some winter dep in decid forests
      ! As Petroff started with a total LAI of 22, which is ca.
      ! 1-sided LAI=10, SAI=11, so we scale with SAI/11 = 0.09
-     ! 
+     !
      ! We also limit the lowest Vds/u* to be 0.002, consistent with
      ! Wesely.
 
@@ -242,18 +241,18 @@ contains
      real, intent(in) :: dp, ustar, invL
      real :: Vds
 
-        Vds = 0.001*ustar 
+        Vds = 0.001*ustar
 
         if ( invL < 0.0 ) then
            Vds = Vds *( 1+( -(960*dp-88.0)*invL )**0.6667)
         end if
-   end function Nemitz2004 
+   end function Nemitz2004
    !------------------------------------------------------------------------
    function Gallagher1997(dp,ustar,invL) result(Vds)
      real, intent(in) :: dp, ustar, invL
      real :: Vds
 
-        Vds = 0.0135 * ustar * dp 
+        Vds = 0.0135 * ustar * dp
 
         if ( invL < 0.0 ) then
            Vds = Vds * (1.0+(-300*invL)**0.6667 )
@@ -267,7 +266,7 @@ contains
 
      !if( log(z0) > 0.0 ) then ! z0 > ~0.04 m
      !if( log10(z0) > 0.0 ) then ! z0 > ~0.04 m
-       !k1 = 0.001222 * log(z0) + 0.003906 
+       !k1 = 0.001222 * log(z0) + 0.003906
        k1 = 0.001222 * log10(z0) + 0.003906  ! Eqn (13)
 
      ! This equation has negative solutions. We set
@@ -293,7 +292,7 @@ contains
      real, intent(in) :: dp, ustar, invL,  zi
      real :: Vds
 
-        Vds = 0.0135 * ustar * dp 
+        Vds = 0.0135 * ustar * dp
 
         if ( invL < 0.0 ) then
           Vds = Vds * (1.0+(-0.3*zi*max(-0.04,invL))**0.6667)

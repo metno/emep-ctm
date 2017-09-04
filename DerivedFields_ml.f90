@@ -1,7 +1,7 @@
-! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <DerivedFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,8 +33,8 @@ module DerivedFields_ml
   private
 
   integer, public, parameter ::  &
-       MAXDEF_DERIV2D = 250 & ! Max. No. 2D derived fields to be defined
-      ,MAXDEF_DERIV3D = 17    ! Max. No. 3D derived fields to be defined
+       MAXDEF_DERIV2D = 488 & ! Max. No. 2D derived fields to be defined
+      ,MAXDEF_DERIV3D = 230    ! Max. No. 3D derived fields to be defined
 
 
   ! We put definitions of **all** possible variables in def_2d, def_3d

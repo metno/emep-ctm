@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -117,8 +117,8 @@ module GridAllocate_ml
                  " GridAlloc::Already listed ", me, i,j, nc , icc, code
               ic = icc
               return
-          endif
-       enddo
+          end if
+       end do
 
        ic = nc + 1
        if ( ic > ncmax ) then
@@ -185,8 +185,8 @@ module GridAllocate_ml
                if( gridc(i,j,icc) == code ) then
                    data(i,j,icc) = data(i,j,icc) + dat
                    cycle GRIDLOOP        ! Yep, go onto to next k
-               endif
-             enddo
+               end if
+             end do
   
            ! Nope, must be new. Add to ngridc and gridc:
             ngridc(i,j) = ngridc(i,j) + 1 
@@ -206,7 +206,7 @@ module GridAllocate_ml
                            (gridc(i,j,icc),icc=1,ncmaxfound)
                write(unit=*,fmt=*) "GridAlloc Data:  ", &
                            (data(i,j,icc),icc=1,ncmaxfound)
-            endif
+            end if
          end do GRIDLOOP 
        end do ! j
      end do ! i

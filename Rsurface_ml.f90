@@ -1,7 +1,7 @@
-! <Rsurface_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Rsurface_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,7 +39,7 @@ use LocalVariables_ml, only : iL, L, G => Grid
 use ModelConstants_ml, only: DEBUG, NO_CROPNH3DEP
 use Radiation_ml, only : CanopyPAR
 use TimeDate_ml,  only : current_date
-use Wesely_ml,    only : Wesely_tab2 &  ! Wesely Table 2 for 14 gases
+use GasParticleCoeffs_ml,    only : DryDepDefs &  ! Extension of Wesely Table 2
    ,WES_HNO3, WES_NH3,DRx,WES_SO2    ! Indices and Ratio of diffusivities to ozone
 use MetFields_ml, only : foundsdepth, foundice
 use Par_ml,only :me
@@ -48,8 +48,6 @@ private
 
 public   :: Rsurface
 INCLUDE 'mpif.h'
-INTEGER STATUS(MPI_STATUS_SIZE),INFO
-
 
 real, public, save :: Rinc, RigsO, GnsO, RgsS
 
@@ -121,7 +119,7 @@ contains
 ! Input:
     integer, intent(in) :: i,j
     integer, dimension(:), intent(in) :: &
-         DRYDEP_CALC   ! Array with Wesely indices of gases wanted
+         DRYDEP_CALC   ! Array with DryDepDefs indices of gases wanted
 
 ! Output:
 
@@ -154,11 +152,11 @@ contains
 ! Working values:
    
     integer :: icmp             ! gaseous species
-    integer :: iwes             ! gaseous species, Wesely tables
+    integer :: iwes             ! gaseous species, DryDepDefs tables
     logical :: canopy         & ! For SAI>0, .e.g grass, forest, also in winter
         ,leafy_canopy           ! For LAI>0, only when green
     real, parameter :: SMALLSAI= 0.05  ! arbitrary value but small enough
-    real :: Hstar, f0           ! Wesely tabulated Henry's coeff.'s, reactivity
+    real :: Hstar, f0           ! DryDepDefs tabulated Henry's coeff.'s, reactivity
     real :: Rgs    !  
     real :: GigsO
     real :: RsnowS, RsnowO !surface resistance for snow_flag, S and O3
@@ -343,8 +341,8 @@ contains
      !-------------------------------------------------------------------------
      ! Calculate the Wesely variables Hstar (solubility) and f0 (reactivity)
 
-        Hstar =Wesely_tab2(2,iwes)    !Extract H*'s 
-        f0    =Wesely_tab2(5,iwes)    !Extract f0's
+        Hstar =DryDepDefs(2,iwes)    !Extract H*'s 
+        f0    =DryDepDefs(5,iwes)    !Extract f0's
     
      !-------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
-! <Io_Progs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Io_Progs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -114,7 +114,6 @@ subroutine read_line(io_in,txt,status,label,printif)
   character(len=*), intent(inout) :: txt
   character(len=len(txt)+30) :: errmsg
   integer, intent(out) :: status
-  integer :: INFO
   character(len=*), intent(in), optional :: label
   logical, intent(in), optional :: printif   ! Can switch debug printouts
   logical :: ok2print
@@ -133,21 +132,21 @@ subroutine read_line(io_in,txt,status,label,printif)
       write(unit=errmsg,fmt=*) "ERROR? Increase MAXLINELEN for IO", &
         io_in, len_trim(txt), "txt = "
       call CheckStop ( errmsg // txt )
-    endif
+    end if
 
     if ( DEBUG%IOPROG ) then ! nb already MasterProc
       if( ok2print ) write(unit=*,fmt="(a,i3,2a,i5,a,a,i4)") &
         "IOREADLINE ", io_in, trim(label2), " Len ", len_trim(txt), &
         "TXT:" //  trim(txt), " Stat ", status
-    endif
-  endif
+    end if
+  end if
    
   call MPI_BCAST( txt, len(txt), MPI_CHARACTER, 0, MPI_COMM_CALC,IERROR)
   call MPI_BCAST( status, 1, MPI_INTEGER, 0, MPI_COMM_CALC,IERROR)
   if ( DEBUG%IOPROG .and. me==1 ) then
     write(unit=errmsg,fmt=*) "proc(me) ", me, " BCAST_LINE:" // trim(txt)
     write(unit=*,fmt=*) trim(errmsg)
-  endif
+  end if
   CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
 
 end subroutine read_line
@@ -207,9 +206,9 @@ subroutine open_file(io_num,mode,fname,needed,skip,iostat)
       if ( present( skip ) ) then ! Read (skip) some lines at start of file
         do i = 1, skip
           read(unit=io_num,fmt=*)
-        enddo
-      endif ! skip
-    endif
+        end do
+      end if ! skip
+    end if
   case ("w")
     if ( .not. fexist ) then  ! Super-fussy coding!
       open(unit=io_num,file=fname,action="write",&
@@ -217,7 +216,7 @@ subroutine open_file(io_num,mode,fname,needed,skip,iostat)
     else
       open(unit=io_num,file=fname,action="write",&
            status="replace",position="rewind",iostat=ios)
-    endif
+    end if
     write(unit=6,fmt=*) "File created: ", trim(fname)
   case default
     print *, "OPEN FILE: Incorrect mode: ", trim(mode)
@@ -288,15 +287,15 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
         if ( xHeaders(i)(1:1) /= "#" .and. len_trim(xHeaders(i)) > 0 ) then
           NHeaders = NHeaders + 1
           Headers(i) = xHeaders(i)
-        endif
-      enddo
+        end if
+      end do
       do i = NHeaders+1, size(Headers)
         Headers(i) = ""   ! Remove trailing txt
-      enddo
+      end do
       if ( DEBUG%IOPROG .and. MasterProc ) then
         write(*,*) "Read_Headers sizes: ", size(xHeaders) , NHeaders
         write(*,*) "New inputline ", trim( inputline )
-      endif
+      end if
       cycle
 
     elseif ( inputline(1:3) == ":: " ) then ! WILL DO LATER
@@ -311,13 +310,13 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
         do i = 1, ncheck
           call CheckStop( KeyValue(KeyValues,CheckValues(i)%key),&
             CheckValues(i)%value ,"Comparing Values: "//CheckValues(i)%key)
-        enddo
-      endif
+        end do
+      end if
 
       if ( MasterProc .and. DEBUG%IOPROG ) then
         write(*,*) "DATA LINE" // trim(inputline)
         write(*,*)("HEADER CHECK ", i, Headers(i), i = 1, NHeaders)
-      endif
+      end if
       return
 
     elseif ( index(inputline,"#SKIP") > 0 ) then ! Comments
@@ -331,8 +330,8 @@ subroutine Read_Headers(io_num,io_msg,NHeaders,NKeys,Headers,Keyvalues,&
     else
       call CheckStop( NHeaders < 1,&
              "GOT TO END - NO #HEADER or #DATA STATEMENT MAYBE?")
-    endif
-  enddo
+    end if
+  end do
   io_msg = "GOT TO END - NO #DATA STATEMENT MAYBE?"
 end subroutine Read_Headers
 !-------------------------------------------------------------------------
@@ -360,7 +359,7 @@ subroutine Read2D(fname,data2d,idata2d)
   if ( MasterProc ) then
     call open_file(IO_TMP,"r",fname,needed=.true.)
     call CheckStop(ios,"open_file error on " // fname )
-  endif
+  end if
 
 
   call Read_Headers(IO_TMP,errmsg,NHeaders,NKeys,Headers,Keyvalues)
@@ -378,7 +377,7 @@ subroutine Read2D(fname,data2d,idata2d)
   if ( DEBUG%IOPROG .and. MasterProc ) then
     write(*,*) "Read2D Headers" // fname, NHeaders, Headers(1)
 !   call WriteArray(Headers,NHeaders,"Read2D Headers")
-  endif
+  end if
 
   READLOOP: do
     call read_line(IO_TMP,txtinput,ios,"ReadLine for "//trim(fname))
@@ -391,7 +390,7 @@ subroutine Read2D(fname,data2d,idata2d)
       if( MasterProc ) write(*,*) "WARNING: Input Data in ",&
           trim(fname)," coords outside fulldomain: ", i_fdom, j_fdom
       cycle READLOOP
-    endif
+    end if
 
     i = i_local(i_fdom)   ! Convert to local coordinates
     j = j_local(j_fdom)
@@ -405,8 +404,8 @@ subroutine Read2D(fname,data2d,idata2d)
       else
         data2d(i,j) = tmp
       end if
-    endif ! i,j
-  enddo READLOOP
+    end if ! i,j
+  end do READLOOP
 
   if ( MasterProc ) then
     close(IO_TMP)
@@ -446,14 +445,14 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
   if ( present(HeadersRead) ) then   ! Headers have already been read
     Start_Needed  = .false.
     NHeaders = -1       ! not set in this case
-  endif
+  end if
 
   !======================================================================
   if ( Start_Needed ) then
     if ( MasterProc ) then
       call open_file(IO_TMP,"r",fname,needed=.true.)
       call CheckStop(ios,"ios error on Inputs.landuse")
-    endif
+    end if
 
     call Read_Headers(IO_TMP,errmsg,NHeaders,NKeys,Headers,Keyvalues)
 
@@ -469,21 +468,21 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
       do i = 1, ncheck
         call CheckStop( KeyValue(KeyValues,CheckValues(i)%key),&
           CheckValues(i)%value ,"Comparing Values: " // CheckValues(i)%key )
-      enddo
-    endif
+      end do
+    end if
 
     ! The first two columns are assumed for now to be ix,iy, hence:
     Headers(1:Ndata) = Headers(3:Ndata+2)
     NHeaders = NHeaders -2
 
-  endif ! Start_Needed
+  end if ! Start_Needed
   !======================================================================
    if ( DEBUG%IOPROG .and. MasterProc ) then
     write(*,*) "Read2DN for ", fname, "Start_Needed ", Start_Needed, " NHeader", NHeaders
     write(*,*)("Read2D Headers" // fname, i, " Len ", len_trim(Headers(i)), &
                " H: ", trim(Headers(i)),i = 1, NHeaders)
     !call WriteArray(Headers,NHeaders,"Read2D Headers")
-   endif
+   end if
 
    do
     call read_line(IO_TMP,txtinput,ios,"ReadLine for "//fname, &
@@ -498,7 +497,7 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
       if( MasterProc ) write(*,*) "WARNING: Input Data in ",&
           trim(fname)," coords outside fulldomain: ", i_fdom, j_fdom
       cycle
-    endif
+    end if
 
     i = i_local(i_fdom)   ! Convert to local coordinates
     j = j_local(j_fdom)
@@ -506,8 +505,8 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
       if ( DEBUG%IOPROG .and. i_fdom==DEBUG%IJ(1) .and. j_fdom == DEBUG%IJ(2) )&
         write(*,*)"READ TXTINPUT", me, i_fdom, j_fdom, " => ", i,j,tmp(1)
       data2d(i,j,1:Ndata) = tmp(1:Ndata)
-    endif ! i,j
-  enddo
+    end if ! i,j
+  end do
 
   if ( MasterProc ) then
     close(IO_TMP)
@@ -530,7 +529,7 @@ subroutine datewrite_ia (txt,ii,array,txt_pattern)
     write(*,"(a,3i3,i5,1x, i0, 20es14.5)") "dw:" // trim(txt), &
       current_date%month, current_date%day, current_date%hour, &
       current_date%seconds, ii, array
-  endif
+  end if
 end subroutine datewrite_ia
 subroutine datewrite_a (txt,array,txt_pattern)
   ! to write out date + supplied data array
@@ -546,7 +545,7 @@ subroutine datewrite_a (txt,array,txt_pattern)
     write(*,"(a,3i3,i5,1x, 20es11.3)") "dw:" // trim(txt), &
       current_date%month, current_date%day, current_date%hour, &
       current_date%seconds, array
-  endif
+  end if
 end subroutine datewrite_a
 subroutine datewrite_iia (txt,ii,array,txt_pattern)
   ! to write out date, integer + supplied data array
@@ -570,7 +569,7 @@ subroutine datewrite_iia (txt,ii,array,txt_pattern)
     write(*,"(a,3i3,i5,1x, 5i5, 20es11.2)") "dw:" // trim(txt), &
       current_date%month, current_date%day, current_date%hour, &
       current_date%seconds, iout, array
-  endif
+  end if
 end subroutine datewrite_iia
 !-------------------------------------------------------------------------
 subroutine Self_Test()
@@ -616,7 +615,7 @@ use ModelConstants_ml, only: NPROC
     close(IO_IN)
     print *, "PROCESSOR ", me, "OPENS FILE for TEST READS "
     call open_file(IO_IN,"r","Self_Test_INPUT.csv",needed=.true.)
-  endif ! MasterProc
+  end if ! MasterProc
   
   print "(/,a)", "Self-test - Read_Headers ========================"
   call Read_Headers(IO_IN,msg,NHeaders,NKeyValues, Headers, KeyValues)
@@ -632,7 +631,7 @@ use ModelConstants_ml, only: NPROC
     do i = 1, NHeaders
       print *, "Headers ", i, trim(Headers(i))
     end do
-  endif ! me
+  end if ! me
    
   print "(/,a,/,a,/)", "Self-test - Now read data =========================",&
       " REMINDER - WAS: mm yy dd v1 v2  #Total #HEADERS"
@@ -647,8 +646,8 @@ use ModelConstants_ml, only: NPROC
           test_data(1), test_data(2)
     else
       print *, "Read failed. Maybe wrong dimensions?"
-    endif
-  enddo
+    end if
+  end do
 end subroutine Self_Test
 !-------------------------------------------------------------------------
 end module Io_Progs_ml

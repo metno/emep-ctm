@@ -1,7 +1,7 @@
-! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,7 @@ module LocalVariables_ml
 ! e.g. for a measurement site or for a specific landuse within a grid square
 ! -----------------------------------------------------------------------
 
-use Wesely_ml,         only: NDRYDEP_CALC
+use GasParticleCoeffs_ml,         only: NDRYDEP_CALC
 
 implicit none
 private

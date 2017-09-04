@@ -1,7 +1,7 @@
-! <BLPhysics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <BLPhysics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,6 +30,7 @@ module BLPhysics_ml
  !  here in future. Try to keep 1-D or elemental to allow use in offline codes 
  ! (*No* routines in use, except for testing)
 
+ use emep_Config_mod,       only : PBL
  use Landuse_ml,           only : Landcover, water_fraction
  use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, KWINDTOP, PT
  use PhysicalConstants_ml, only : KARMAN, GRAV
@@ -38,8 +39,8 @@ module BLPhysics_ml
 
 ! minimum value now generally calculated as z_mid(19), but we
 !   keep a fixed value for smoothing. 
- real, parameter, public :: PBL_ZiMIN=100.   ! EMEP/TI and smooth(zi)
- real, parameter, public :: PBL_ZiMAX=3000.  ! EMEP/TI
+! real, parameter, public :: PBL_ZiMIN=100.   ! EMEP/TI and smooth(zi)
+! real, parameter, public :: PBL_ZiMAX=3000.  ! EMEP/TI
 
 ! Choose one Hmix method here (not needed for NWP?)
  character(len=4), parameter, public :: HmixMethod = &
@@ -218,8 +219,8 @@ subroutine SeibertRiB_Hmix (u,v, zm, theta, pzpbl)
       if(Rib >= Ric) then
              pzpbl = zm(k)
              exit
-      endif
-   enddo
+      end if
+   end do
 
 end subroutine SeibertRiB_Hmix
 
@@ -249,26 +250,24 @@ subroutine JericevicRiB_Hmix (u,v, zm, theta, zi)
        if(Rib >= Ric) then
               zi = zm(k)
               exit
-       endif
-    enddo
+       end if
+    end do
 
 end subroutine JericevicRiB_Hmix
 
  !----------------------------------------------------------------------------
-subroutine JericevicRiB_Hmix0 (u,v, zm, theta, zi, theta0, coastal)
+subroutine JericevicRiB_Hmix0 (u,v, zm, theta, zi)
  !- as above, but allow test for surface SBL
   real, dimension(KMAX_MID), intent(in) :: u,v ! winds
   real, dimension(KMAX_MID), intent(in) :: zm ! mid-cell height
   real, dimension(KMAX_MID), intent(in) :: theta !pot. temp
   real, intent(out) :: zi
-  real, intent(in) :: theta0  ! pot temp at ground (2m)
-  logical, intent(in) :: coastal ! or likely coastal, be careful
   integer :: k
   real, parameter :: Ric = 0.25  ! critical Ric
   real :: Rib  ! bulk Richardson number
   real :: Theta1, z1  ! pot temp  and height of lowest cell
 
-! Jericevic et al., ACP, 2009, pp1001-,  eqn (17): 
+! Jericevic et al., ACP, 2009, pp1001-,  eqn (17):
 
    Theta1 = theta(KMAX_MID)
    z1     = zm(KMAX_MID)
@@ -282,8 +281,8 @@ subroutine JericevicRiB_Hmix0 (u,v, zm, theta, zi, theta0, coastal)
        if(Rib >= Ric) then
               zi = zm(k)
               exit
-       endif
-    enddo
+       end if
+    end do
 
 end subroutine JericevicRiB_Hmix0
 
@@ -322,8 +321,8 @@ subroutine VogelezangHoltslag_Hmix (u,v, zm, theta, q, ustar, pzpbl)
       if(Rig >= Ric) then
              pzpbl = zm(k)
              exit
-      endif
-   enddo
+      end if
+   end do
 
 end subroutine VogelezangHoltslag_Hmix
  !----------------------------------------------------------------------------
@@ -422,7 +421,7 @@ subroutine PielkeBlackadarKz (u,v, zm, zb, th, Kz, Pielke_flag, debug_flag)
                 Kz(k)=xl2*dvdz*(1.-Ris(k)/Ric)
          else
                 Kz(k)=KZ_MINIMUM
-         endif
+         end if
       end if ! Pielke or Blackadar
 
    end do ! k
@@ -584,7 +583,7 @@ subroutine TI_Hmix (Kz, zm, zb, fh, th, exnm, pb, zi, debug_flag)
  !..The height of the stable BL is the lowest level for which:
  !..xksm .le. 1 m2/s (this limit may be changed):
  
-  zis = PBL_ZiMIN
+  zis = PBL%ZiMIN
   nh1 = KMAX_MID
   nh2 = 1
 
@@ -594,11 +593,11 @@ subroutine TI_Hmix (Kz, zm, zb, fh, th, exnm, pb, zi, debug_flag)
         nh1=k   ! Still unstable
      else
         nh2=0   ! Now stable
-     endif
+     end if
   end do
 
   k=nh1
-  if(zb(nh1) >=  PBL_ZiMIN) then
+  if(zb(nh1) >=  PBL%ZiMIN) then
 
       if( abs(xksm(k)-xksm(k-1)) > eps) then
 
@@ -606,10 +605,10 @@ subroutine TI_Hmix (Kz, zm, zb, fh, th, exnm, pb, zi, debug_flag)
                + (KZ_SBL_LIMIT -xksm(k-1))*zb(k))&
                      /(xksm(k)-xksm(k-1))
       else
-          zis= PBL_ZiMIN
-      endif
+          zis= PBL%ZiMIN
+      end if
 
-   endif
+   end if
 
 
    zi = zis
@@ -634,7 +633,7 @@ subroutine TI_Hmix (Kz, zm, zb, fh, th, exnm, pb, zi, debug_flag)
         ! if ( debug_flag ) write(6,"(a,i3,3es10.3)") "DEBUG THC ", 
         !  k, th(k), dthc, thc(k)
 
-  enddo
+  end do
 
   !..estimated as the height to which an hour's input
   !..of heat from the ground is vertically distributed,
@@ -681,7 +680,7 @@ subroutine TI_Hmix (Kz, zm, zb, fh, th, exnm, pb, zi, debug_flag)
           !  if ( debug_flag ) write(6,"(a,i3,2es10.3,i4)") "DEBUG PICTH ",&
           !      kabl, delq, pidth, trc 
 
-        endif
+        end if
 
 
         if ( debug_flag ) write(6,"(a,i3,es10.3,i5)") "DEBUG mid ", &
@@ -696,15 +695,15 @@ subroutine TI_Hmix (Kz, zm, zb, fh, th, exnm, pb, zi, debug_flag)
            !end if
            
 
-           ziu=PBL_ZiMAX
+           ziu=PBL%ZiMAX
 
            trc=0 
-        endif
+        end if
 
      end do ! while
 
   zi = max( ziu, zis)
-  zi = min( PBL_ZiMAX, zi)
+  zi = min( PBL%ZiMAX, zi)
 
 
 end subroutine TI_Hmix
@@ -792,9 +791,9 @@ end subroutine TI_Hmix
                     + 2.*(Kzhs-Kzzi)/zimhs))
                if ( debug_flag ) &
                    write(*,"(a,i3,es12.3)") "OBRIEN Kz(k) ", k,  Kz(k)
-            endif
+            end if
 
-         endif
+         end if
 
    end do
 

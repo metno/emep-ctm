@@ -1,7 +1,7 @@
-! <Output_hourly.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Output_hourly.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -67,7 +67,6 @@ use My_Outputs_ml,    only: NHOURLY_OUT,    & ! No. outputs
                             nmax6_hourly      ! 6 hourly maximum
 use CheckStop_ml,     only: CheckStop
 use Chemfields_ml,    only: xn_adv,xn_shl,cfac,PM25_water,PM25_water_rh50
-use ChemGroups_ml,    only: chemgroups
 use Derived_ml,       only: num_deriv2d,nav_2d,LENOUT2D,& ! D2D
                             num_deriv3d,nav_3d,LENOUT3D ! D3D
 use DerivedFields_ml, only: f_2d,d_2d,f_3d,d_3d       ! houtly output types
@@ -81,14 +80,12 @@ use ModelConstants_ml,only: KMAX_MID, MasterProc, MY_OUTPUTS, &
                             DEBUG => DEBUG_OUT_HOUR,runlabel1,HOURLYFILE_ending,&
                             FORECAST, hour_DOMAIN, SELECT_LEVELS_HOURLY !NML
 use MetFields_ml,     only: t2_nwp,th, q, roa, surface_precip, ws_10m ,rh2m,&
-                            pzpbl, ustar_nwp, Kz_m2s, &
                             Idirect, Idiffuse, z_bnd, z_mid,ps
 use NetCDF_ml,        only: Out_netCDF, CloseNetCDF, Init_new_netCDF, &
                             max_filename_length, fileName_iou, &
                             Int1, Int2, Int4, Real4, Real8  !Output data type to choose
 use OwnDataTypes_ml,  only: TXTLEN_DERIV,TXTLEN_SHORT
-use Par_ml,           only: LIMAX, LJMAX, GIMAX,GJMAX,        &
-                            me, IRUNBEG, JRUNBEG, limax, ljmax
+use Par_ml,           only: me, limax, ljmax
 use Pollen_ml,        only: heatsum, pollen_released=>R, AreaPOLL
 use Pollen_const_ml,  only: pollen_total=>N_TOT
 use SmallUtils_ml,    only: find_index
@@ -156,7 +153,7 @@ implicit none
       write(*,*)"DEBUG Hourly_out: nothing to output!"
     first_call=.false.
     return
-  endif
+  end if
 
   ! write(*,*) " START: nmax6_hourly ",nmax6_hourly,allocated(max6_hourly)
   if (nmax6_hourly > 0  .and. .not.allocated(max6_hourly)) then
@@ -165,7 +162,7 @@ implicit none
     max6_hourly(:,:,:,:) = 0.
     imax6_hourly(:) =typ_si("none",-99) 
     write(*,*) "allocate: ",  imax6_hourly,KMAX_MID
-  endif
+  end if
 
   ! only write at 12UTC for "TRENDS@12UTC", eg
   ! if(MY_OUTPUTS=="TRENDS@12UTC".and.current_date%hour/=12)return
@@ -173,14 +170,14 @@ implicit none
   if(i>0)then
     read(MY_OUTPUTS(i+1:i+2),*)ih
     if(current_date%hour/=ih)return
-  endif
+  end if
 
   if(first_call) then
     first_call = .false.
     debug_flag=(debug_proc.and.DEBUG)
     allocate(navg(NHOURLY_OUT)) ! allocate and initialize
     navg(:)=0                   ! D2D average counter
-  endif  ! first_call
+  end if  ! first_call
 
   filename=trim(runlabel1)//date2string(trim(HOURLYFILE_ending),current_date)
   if(filename/=filename_iou(IOU_HOUR_EXTRA))then
@@ -209,9 +206,9 @@ implicit none
         nj=hour_DOMAIN(4)-hour_DOMAIN(3)+1
         call Out_netCDF(IOU_HOUR_EXTRA,def1,3,1,hourly,scale,CDFtype,ik=1,&
           create_var_only=.true.,ncFileID_given=ncFileID,chunksizes=[ni,nj,1,1])
-      endselect
-    enddo
-  endif
+      end select
+    end do
+  end if
 !......... Uses concentration/met arrays from Chem_ml or Met_ml ..................
 !
 !        real xn_adv(NSPEC_ADV,LIMAX,LJMAX,KMAX_MID)
@@ -249,7 +246,7 @@ implicit none
           hr_out_type="D2D_mean"      !   output mean values
         else                          ! accumulated variables
           hr_out_type="D2D_accum"
-        endif
+        end if
       case("D3D")
         call CheckStop(SELECT_LEVELS_HOURLY,&
           "D3D hourly output does not support SELECT_LEVELS_HOURLY")
@@ -259,7 +256,7 @@ implicit none
           hr_out_type="D3D_mean"      !   output mean values
         else                          ! accumulated variables
           hr_out_type="D3D_accum"
-        endif
+        end if
       case("ADVppbv","ADVugXX","ADVugXXgroup","PMwaterSRF",&
            "D2D_inst","D2D_mean","D2D_accum")
         ik=KMAX_MID                   ! surface/lowermost level
@@ -283,10 +280,10 @@ implicit none
               hr_out_type(1:3)="ADV"
             case("PMwater")
               hr_out_type=trim(hr_out_type)//"SRF"
-            endselect
-          endselect
-        endif
-      endselect
+            end select
+          end select
+        end if
+      end select
 
 
       if(debug_flag) write(*,"(5a,i4)") "DEBUG Hourly MULTI ",&
@@ -328,7 +325,7 @@ implicit none
             endforall
           else
             call CheckStop("SHL Out3D option not coded yet")
-          endif
+          end if
         
         else  ! ADV:, original code
   
@@ -345,20 +342,20 @@ implicit none
             endforall
           else
             call CheckStop("ERROR: Output_hourly  unit problem"//trim(name) )
-          endif
-        endif ! ADV/SHL split 
+          end if
+        end if ! ADV/SHL split 
 
         if(surf_corrected.and.ik==KMAX_MID.and.itot>NSPEC_SHL) then
           forall(i=1:limax,j=1:ljmax)
             hourly(i,j) = hourly(i,j)*cfac(iadv,i,j) ! 50m->3m conversion
           endforall
-        endif
+        end if
 
         if(debug_flag) then
           i=debug_li; j=debug_lj
           write(*,'(A,2I4,1X,L2,2f10.4)')"Out3D K-level"//trim(name), ik,  &
             itot, surf_corrected, hourly(i,j), cfac(ispec-NSPEC_SHL,i,j)
-        endif
+        end if
 
       case("BCVppbv")
         call CheckStop(ENFORCE_HOURLY_DERIVED.and.MasterProc,&
@@ -449,7 +446,7 @@ implicit none
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = 3.0*unit_conv
         else
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = z_mid(i,j,ik)*unit_conv
-        endif
+        end if
 
       case("dZ","dZ_BND")  ! level thickness
         call CheckStop(ENFORCE_HOURLY_DERIVED.and.MasterProc,&
@@ -474,7 +471,7 @@ implicit none
                       * roa(i,j,iik,1)                    & ! density.
                       * (z_bnd(i,j,iik)-z_bnd(i,j,iik+1))   ! level thickness
           endforall
-        enddo
+        end do
 
       case("COLUMNgroup")! GROUP Column output in ug/m2, ugX/m2, molec/cm2
         call CheckStop(ENFORCE_HOURLY_DERIVED.and.MasterProc,&
@@ -489,7 +486,7 @@ implicit none
                       * roa(i,j,iik,1)                    & ! density.
                       * (z_bnd(i,j,iik)-z_bnd(i,j,iik+1))   ! level thickness
           endforall
-        enddo
+        end do
         if(DEBUG) &
           write(*,'(a10,i7,a10,i7)')"K-level", ik, trim(name), gspec+NSPEC_SHL
         deallocate(gspec,gunit_conv)
@@ -519,7 +516,7 @@ implicit none
           forall(i=1:limax,j=1:ljmax) hourly(i,j)=heatsum(i,j,ik)
         else
           hourly(:,:) = 0.0
-        endif
+        end if
 
       case("pollen_left")
         ik = hr_out(ih)%spec
@@ -529,7 +526,7 @@ implicit none
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = 1.0-pollen_released(i,j,ik)/pollen_total(ik)
         else
           hourly(:,:) = 0.0
-        endif
+        end if
 
       case("pollen_emiss")
         ik = hr_out(ih)%spec
@@ -539,7 +536,7 @@ implicit none
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = AreaPOLL(i,j,ik)
         else
           hourly(:,:) = 0.0
-        endif
+        end if
 
       case("theta")       ! No cfac for surf.variable; Skip Units conv.
         forall(i=1:limax,j=1:ljmax) hourly(i,j) = th(i,j,ik,1)
@@ -569,9 +566,9 @@ implicit none
               imax6_hourly(n)%ind = ih
               intmax = n
               exit
-            endif
-          enddo
-        endif
+            end if
+          end do
+        end if
         if(allocated(max6_hourly))then
           do i=1,limax
             do j=1,ljmax
@@ -580,7 +577,7 @@ implicit none
                 do k_flight = KMAX_MID,1,-1
 !if(me==23.and.i==3.and.j==10)write(*,*) "k_flight: ",k_flight,z_mid(i,j,k_flight) 
                   if (z_mid(i,j,k_flight) .gt. 6096.0) exit !0 - 20 000 feet
-                enddo
+                end do
                 flight_start = KMAX_MID
                 flight_end   = k_flight+1
 !if(me==23.and.i==3.and.j==10)write(*,*) "ik: 20 ",flight_start,flight_end,z_mid(i,j,flight_start),z_mid(i,j,flight_end)
@@ -591,11 +588,11 @@ implicit none
                      z_mid(i,j,flight_end).eq. z_mid(i,j,KMAX_MID)) then
                     flight_start = k_flight
                     flight_end   = k_flight
-                  endif
+                  end if
                   if(z_mid(i,j,k_flight) .gt. 6096.0 .and. &
                      z_mid(i,j,k_flight) .lt. 10668.0) flight_end = k_flight
                   if(z_mid(i,j,k_flight) .gt. 10668.0) exit
-                enddo
+                end do
               elseif (ik .eq. KMAX_MID-2) then
                 flight_end =  KMAX_MID
                 if (z_mid(i,j,1) .lt. 10668.0) then 
@@ -607,26 +604,26 @@ implicit none
                        z_mid(i,j,flight_end).eq. z_mid(i,j,KMAX_MID)) then
                       flight_start = k_flight
                       flight_end   = k_flight 
-                    endif
+                    end if
                     if(z_mid(i,j,k_flight) .gt. 10668.0 .and.  &
                        z_mid(i,j,k_flight) .lt. 15240.0) flight_end = k_flight
                     if(z_mid(i,j,k_flight) .gt. 15240.0) exit
-                  enddo
-                endif
-              endif
+                  end do
+                end if
+              end if
               do k_flight = flight_end,flight_start
                  temp = dot_product(xn_adv(gspec,i,j,k_flight),gunit_conv(:))&
                       * roa(i,j,k_flight,1)
                  if(flight_max .lt. temp) flight_max = temp
-              enddo
+              end do
               max6_hourly(intmax,i,j,ik)=max(max6_hourly(intmax,i,j,ik),flight_max)              
-            enddo
-          enddo
+            end do
+          end do
 
           forall(i=1:limax,j=1:ljmax) hourly(i,j) = max6_hourly(intmax,i,j,ik)
         else
            hourly(:,:) = 0.0
-        endif
+        end if
         if(mod(current_date%hour,6)==0) max6_hourly(:,:,:,ik) = 0.0
 
       case("D2D_inst")
@@ -644,7 +641,7 @@ implicit none
           write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR "//trim(hr_out_type),&
             trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
             d_2d(ispec,i,j,[IOU_INST,IOU_YEAR]),unit_conv
-        endif
+        end if
         forall(i=1:limax,j=1:ljmax)
           hourly(i,j) = d_2d(ispec,i,j,IOU_INST) * unit_conv
         endforall
@@ -667,7 +664,7 @@ implicit none
           write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR "//trim(hr_out_type),&
             trim(hr_out(ih)%name), ih, ispec,trim(f_3d(ispec)%name),&
             d_3d(ispec,i,j,ik,[IOU_INST,IOU_YEAR]),unit_conv
-        endif
+        end if
         forall(i=1:limax,j=1:ljmax)
           hourly(i,j) = d_3d(ispec,i,j,ik,IOU_INST) * unit_conv
         endforall
@@ -692,7 +689,7 @@ implicit none
           write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR "//trim(hr_out_type),&
             trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
             d_2d(ispec,i,j,[IOU_YEAR,IOU_YEAR_LASTHH]),unit_conv
-        endif
+        end if
         forall(i=1:limax,j=1:ljmax)
           hourly(i,j) = (d_2d(ispec,i,j,IOU_YEAR)&
                         -d_2d(ispec,i,j,IOU_YEAR_LASTHH)) * unit_conv
@@ -719,7 +716,7 @@ implicit none
           write(*,"(2a,2i4,a,3g12.3)") "OUTHOUR "//trim(hr_out_type),&
             trim(hr_out(ih)%name), ih, ispec,trim(f_3d(ispec)%name),&
             d_3d(ispec,i,j,ik,[IOU_YEAR,IOU_YEAR_LASTHH]),unit_conv
-        endif
+        end if
         forall(i=1:limax,j=1:ljmax)
           hourly(i,j) = (d_3d(ispec,i,j,ik,IOU_YEAR)&
                         -d_3d(ispec,i,j,ik,IOU_YEAR_LASTHH)) * unit_conv
@@ -747,13 +744,13 @@ implicit none
             write(*,"(a,1x)",advance='no') "OUTHOUR D2D_mean avg"
           else                              ! accumulated variables --> mean
             write(*,"(a,1x)",advance='no') "OUTHOUR D2D_mean acc"
-          endif
+          end if
           i=debug_li
           j=debug_lj
           write(*,"(a,2i4,a,3g12.3)")&
             trim(hr_out(ih)%name), ih, ispec,trim(f_2d(ispec)%name),&
             d_2d(ispec,i,j,[IOU_YEAR,IOU_YEAR_LASTHH]),unit_conv
-        endif
+        end if
         forall(i=1:limax,j=1:ljmax)
           hourly(i,j) = (d_2d(ispec,i,j,IOU_YEAR)&
                         -d_2d(ispec,i,j,IOU_YEAR_LASTHH)) * unit_conv
@@ -781,13 +778,13 @@ implicit none
             write(*,"(a,1x)",advance='no') "OUTHOUR D3D_mean avg"
           else                              ! accumulated variables --> mean
             write(*,"(a,1x)",advance='no') "OUTHOUR D3D_mean acc"
-          endif
+          end if
           i=debug_li
           j=debug_lj
           write(*,"(a,2i4,a,3g12.3)")&
             trim(hr_out(ih)%name), ih, ispec,trim(f_3d(ispec)%name),&
             d_3d(ispec,i,j,ik,[IOU_YEAR,IOU_YEAR_LASTHH]),unit_conv
-        endif
+        end if
         forall(i=1:limax,j=1:ljmax)
           hourly(i,j) = (d_3d(ispec,i,j,ik,IOU_YEAR)&
                         -d_3d(ispec,i,j,ik,IOU_YEAR_LASTHH)) * unit_conv
@@ -801,7 +798,7 @@ implicit none
         call CheckStop( "ERROR-DEF! Hourly_out: '"//trim(hr_out(ih)%type)//&
                         "' hourly type not found!")
 
-      endselect OPTIONS
+      end select OPTIONS
 
       if(debug_flag) &
         write(*,"(a,3i4,2g12.3)")"DEBUG-HOURLY-OUT:"//trim(hr_out(ih)%name),&
@@ -826,9 +823,9 @@ implicit none
         if(hr_out(ih)%type(1:3)=="ADV") then
           write(*,*) "xn_ADV is ", xn_adv(ispec,maxpos(1),maxpos(2),KMAX_MID)
           write(*,*) "cfac   is ",   cfac(ispec,maxpos(1),maxpos(2))
-        endif
+        end if
         errmsg="Error, Output_hourly/hourly_out: too big!"
-      endif
+      end if
 
       ! NetCDF hourly output
       def1%name=hr_out(ih)%name
@@ -849,9 +846,9 @@ implicit none
         call Out_netCDF(IOU_HOUR_EXTRA,def1,3,1,hourly,scale,CDFtype,ik=klevel,&
                         ncFileID_given=ncFileID)
       !case default   ! no output
-      endselect
-    enddo KVLOOP    
-  enddo HLOOP
+      end select
+    end do KVLOOP    
+  end do HLOOP
   ! CF convention: surface pressure to define vertical coordinates.
   if(Nhourly_out>0.and.NLEVELS_HOURLY>0.and.all(hr_out(:)%name/="PS"))then
     def1%name='PS'
@@ -861,7 +858,7 @@ implicit none
     scale=1.
     call Out_netCDF(IOU_HOUR_EXTRA,def1,2,1,ps(:,:,1)*0.01,scale,CDFtype,&
                     ncFileID_given=ncFileID)     
-  endif
+  end if
 
   ! Not closing seems to give a segmentation fault when opening the file
   ! Probably just a bug in the netcdf4/hdf5 library.
@@ -875,4 +872,4 @@ implicit none
   open(IO_TMP,file=filename(1:i)//'.msg',position='append')
   write(IO_TMP,*)date2string('FFFF: YYYY-MM-DD hh',current_date)
   close(IO_TMP)
-endsubroutine hourly_out
+end subroutine hourly_out

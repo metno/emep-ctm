@@ -1,7 +1,7 @@
-! <SmallUtils_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <SmallUtils_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -112,7 +112,7 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
   if(present(empty_words))then
     keep_empty=empty_words
     wasinword=keep_empty
-  endif
+  end if
 
   do i = 1, len_trim(text)
     c = text(i:i)
@@ -131,17 +131,17 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
          print *,"Too many words"
          iw=iw-1
          exit
-      endif
-    endif
-  enddo
+      end if
+    end if
+  end do
   nwords = iw
 
 ! Remove leading spaces
   if(keep_empty.or.present(strict_separator))then
     do iw=1,nwords
       wordarray(iw)=ADJUSTL(wordarray(iw))
-    enddo
-  endif
+    end do
+  end if
 end subroutine wordsplit
 
 !============================================================================
@@ -156,7 +156,7 @@ function LenArray(a,notset) result (N)
   do i = 1, size(a)
     if ( index(a(i),notset) > 0  ) exit
     N=N+1
-  enddo
+  end do
 end function LenArray
 !============================================================================
 !> AddArray adds elements from new array to old array
@@ -175,9 +175,9 @@ subroutine AddArray(new,old,notset,errmsg)
        55 format(A,I0,A)
        write(errmsg, 55)"ERROR: Max Array size (",size(old),") exceeded!"
       return
-    endif
+    end if
     old(N) = new(i)
-  enddo
+  end do
 end subroutine AddArray
 !============================================================================
 subroutine WriteArray(list,NList,txt,io_num)
@@ -194,10 +194,10 @@ subroutine WriteArray(list,NList,txt,io_num)
     write(unit=*,fmt=*) "WRITEARRAY PROBLEM Nlist, size(List) ", &
               Nlist, size(list), trim(txt)
     return
-  endif
+  end if
   do i = 1, Nlist
     write(unit=io,fmt=*) txt, i, list(i)
-  enddo
+  end do
 end subroutine WriteArray
 !>===========================================================================
 !! A series of find_index routines, for character (c) and integer (i) arrays:
@@ -230,14 +230,14 @@ function find_index_c(wanted, list, first_only, debug)  result(Index)
       print debug_fmt,n,n_match,trim(list(n)),"==",trim(wanted)
     elseif ( debug_print ) then
       print debug_fmt,n,n_match,trim(list(n)),"/=",trim(wanted)
-    endif
-  enddo
+    end if
+  end do
 
   if ( n_match >  1 ) then !! Too many!
     n_match = -1 * n_match
       if(debug_print) &
       print *, "debug find_index REVERSE", n_match
-  endif
+  end if
 end function find_index_c
 
 !============================================================================
@@ -266,12 +266,12 @@ function find_index_i(wanted, list, debug)  result(Index)
       print debug_fmt,n,list(n),"==",wanted
     elseif ( debug_print ) then
       print debug_fmt,n,list(n),"/=",wanted
-    endif
-  enddo
+    end if
+  end do
 
   if ( n_match >  1 ) then !! Too many!
     n_match = -1 * n_match
-  endif
+  end if
 end function find_index_i
 
 !=======================================================================
@@ -298,9 +298,9 @@ end function find_index_i
         print debug_fmt,n,trim(list(n)),"==",w,trim(wanted(w))
       elseif ( debug_print ) then
         print debug_fmt,n,trim(list(n)),"/=",w,trim(wanted(w))
-      endif
-    enddo
-  enddo
+      end if
+    end do
+  end do
 end function find_indices
 !=======================================================================
  function trims(str)  result(trimmed)
@@ -366,13 +366,13 @@ pure function skey2str(iname,key,val,xfmt) result(fname)
     write(aux,xfmt)trim(val)
   else                      ! keyword lenght same as key
     aux=trim(val)
-  endif
+  end if
   n=len_trim(key)
   do while (ind>0)
     fname=fname(1:ind-1)//trim(aux)//fname(ind+n:len_trim(fname))
     ind=index(fname,trim(key))
-  enddo
-endfunction skey2str
+  end do
+end function skey2str
 pure function ikey2str(iname,key,val,xfmt) result(fname)
   character(len=*), intent(in):: iname,key
   integer, intent(in)         :: val
@@ -384,7 +384,7 @@ pure function ikey2str(iname,key,val,xfmt) result(fname)
   if(index(iname,trim(key))==0)then
     fname=iname
     return
-  endif
+  end if
   if(present(xfmt))then     ! user supplied format
     write(sval,xfmt)val
     if(index(sval,'*')>0)&    ! problem with user format,
@@ -393,13 +393,13 @@ pure function ikey2str(iname,key,val,xfmt) result(fname)
     if(val<0)then             ! negative numbers would be printed as ****
       fname=iname             ! keep as it is
       return
-    endif
+    end if
     n=len_trim(key)
     write(ifmt,"('(I',I0,'.',I0,')')")n,n
     write(sval,ifmt)val
-  endif
+  end if
   fname=trim(skey2str(iname,key,sval))
-endfunction ikey2str
+end function ikey2str
 pure function rkey2str(iname,key,val,xfmt) result(fname)
   character(len=*), intent(in):: iname,key
   real, intent(in)            :: val
@@ -411,7 +411,7 @@ pure function rkey2str(iname,key,val,xfmt) result(fname)
   if(index(iname,trim(key))==0)then
     fname=iname
     return
-  endif
+  end if
   if(present(xfmt))then     ! user supplied format
     write(sval,xfmt)val
     if(index(sval,'*')>0)&      ! problem with user format,
@@ -420,7 +420,7 @@ pure function rkey2str(iname,key,val,xfmt) result(fname)
     if(val<0)then             ! negative numbers would be printed as ****
       fname=iname             ! keep as it is
       return
-    endif
+    end if
     n=len_trim(key)
     n1=index(key,".")
     if(n1>0)then
@@ -428,10 +428,10 @@ pure function rkey2str(iname,key,val,xfmt) result(fname)
       write(sval,ifmt)val
     else
       write(sval,"(I0)")int(val)
-    endif
-  endif
+    end if
+  end if
   fname=trim(skey2str(iname,key,sval))
-endfunction rkey2str
+end function rkey2str
 !============================================================================
 subroutine Self_test()
 

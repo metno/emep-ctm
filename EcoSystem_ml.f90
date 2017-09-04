@@ -1,7 +1,7 @@
-! <EcoSystem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <EcoSystem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -82,7 +82,7 @@ subroutine Init_EcoSystems()
     if(iEco==FULL_ECOGRID) then
       name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_km2"
       unit = "km2"
-    endif
+    end if
 
     ! Deriv(name, class,    subc,  txt,           unit
     ! Deriv index, f2d, dt_scale, scale, avg? Inst Yr Mn Day
@@ -92,7 +92,7 @@ subroutine Init_EcoSystems()
 
     if(DEBUG .and. MasterProc) &
       call print_deriv_type( DepEcoSystem(iEco) )
-  enddo
+  end do
 
 !  Define which landcovers belong to which ecosystem
   Is_EcoSystem(FULL_ECOGRID,:)    =  .true.
@@ -104,6 +104,6 @@ subroutine Init_EcoSystems()
 
   EcoSystemFrac(:,:,:) = 0.0
 
-endsubroutine Init_EcoSystems
+end subroutine Init_EcoSystems
 
 endmodule EcoSystem_ml

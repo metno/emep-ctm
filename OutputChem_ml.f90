@@ -1,7 +1,7 @@
-! <OutputChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <OutputChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -40,13 +40,13 @@ use ModelConstants_ml, only: END_OF_EMEPDAY, num_lev3d, MasterProc, &
                              DEBUG => DEBUG_OUTPUTCHEM, METSTEP, &
                              IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY,&
                              IOU_HOUR,IOU_HOUR_INST, IOU_MAX_MAX,&
-                             startdate, enddate 
+                             startdate, enddate, USE_uEMEP
 use NetCDF_ml,         only: CloseNetCDF, Out_netCDF, filename_iou
 use OwnDataTypes_ml,   only: Deriv, print_deriv_type
 use Par_ml,            only: LIMAX,LJMAX
 use TimeDate_ml,       only: tdif_secs,date,timestamp,make_timestamp,current_date, max_day ! days in month
 use TimeDate_ExtraUtil_ml,only: date2string
-
+use uEMEP_ml,          only: out_uEMEP
 
 implicit none
 
@@ -76,11 +76,10 @@ subroutine Wrtchem(ONLY_HOUR)
 !----------------------------------------------------------------------
   integer, intent(in), optional :: ONLY_HOUR  ! output hourly fields
 
-  integer :: i,j,n,k,msnr1
+  integer :: n
   integer :: nyear,nmonth,nday,nhour,nmonpr
   integer :: mm_out, dd_out
   logical :: Jan_1st, End_of_Run
-  character(len=30) :: outfilename
   logical,save :: first_call = .true.
   TYPE(timestamp)   :: ts1,ts2
 !---------------------------------------------------------------------
@@ -119,8 +118,8 @@ subroutine Wrtchem(ONLY_HOUR)
 
       if( MasterProc .and. DEBUG) write(6,"(a12,i5,4i4)") "DAILY FIX ", &
                        nmonth, mm_out, nday, dd_out
-    endif
-  endif      ! for END_OF_EMEPDAY <= 7
+    end if
+  end if      ! for END_OF_EMEPDAY <= 7
 
   !== Instantaneous results output ====
   !   Possible actual array output for specified days and hours
@@ -130,34 +129,34 @@ subroutine Wrtchem(ONLY_HOUR)
          wanted_dates_inst(n)%day   == nday   .and. &
          wanted_dates_inst(n)%hour  == nhour ) then
       call Output_fields(IOU_INST)
-    endif
-  enddo
+    end if
+  end do
 
   !== Hourly output ====
   if(modulo(current_date%hour,FREQ_HOURLY)==0) then
     call Output_fields(IOU_HOUR_INST)
     if(present(ONLY_HOUR))then
       if(ONLY_HOUR==IOU_HOUR_INST)return
-    endif
+    end if
     call Output_fields(IOU_HOUR)
     call ResetDerived(IOU_HOUR) 
     if(present(ONLY_HOUR))then
       if(ONLY_HOUR==IOU_HOUR)return
-    endif
-  endif
+    end if
+  end if
 
   !== Daily output ====
   if (nhour ==  END_OF_EMEPDAY ) then
     if (.not.first_call .and. .not.Jan_1st ) &   ! Doesn't write out 1 Jan. at start
       call Output_fields(IOU_DAY)
     call ResetDerived(IOU_DAY)            ! For daily averaging, reset also 1 Jan.
-  endif
+  end if
 
   !== Output at the end of the run
   if ( End_of_Run ) then
     if(nhour/=END_OF_EMEPDAY) call Output_fields(IOU_DAY)! Daily outputs
     call Output_fields(IOU_YEAR)  ! Yearly outputs
-  endif
+  end if
 
 
   !/ NEW MONTH
@@ -169,10 +168,10 @@ subroutine Wrtchem(ONLY_HOUR)
     call Output_fields(IOU_MON)
 
     call ResetDerived(IOU_MON)
-  endif              ! End of NEW MONTH
+  end if              ! End of NEW MONTH
 
   first_call=.false.
-endsubroutine Wrtchem
+end subroutine Wrtchem
 
 subroutine Output_fields(iotyp)
   integer, intent(in) :: iotyp
@@ -186,7 +185,7 @@ subroutine Output_fields(iotyp)
      if(num_deriv3d > 0) call Output_f3d(iotyp,num_deriv3d,nav_3d,f_3d,d_3d,Init_Only)
      myfirstcall(iotyp) = .false.
      IF(DEBUG.and.MasterProc)write(*,*)'2d and 3D OUTPUT INITIALIZED',iotyp
-  endif
+  end if
   Init_Only = .false.
   IF(DEBUG.and.MasterProc)write(*,*)'2d and 3D OUTPUT WRITING',iotyp
   !*** 2D fields, e.g. surface SO2, SO4, NO2, NO3 etc.; AOT, fluxes
@@ -200,6 +199,11 @@ subroutine Output_fields(iotyp)
 
   call CloseNetCDF
 
+  !uemep use own outputting for now, since it has several extra dimensions
+  if(USE_uEMEP)then
+    call out_uEMEP(iotyp)
+  endif
+
   ! Write text file to mark output is finished
   if(.not.all([FORECAST,MasterProc,wanted_iou(iotyp)]))return
   i=index(filename_iou(iotyp),'.nc')-1
@@ -207,7 +211,7 @@ subroutine Output_fields(iotyp)
   open(IO_TMP,file=filename_iou(iotyp)(1:i)//'.msg',position='append')
   write(IO_TMP,*)date2string('FFFF: YYYY-MM-DD hh',current_date)
   close(IO_TMP)
-endsubroutine Output_fields
+end subroutine Output_fields
 
 subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
 !---------------------------------------------------------------------
@@ -241,15 +245,15 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
           if( def(icmp)%name == "Emis_mgm2_co" ) then
             call print_deriv_type(def(icmp))
             call datewrite("SnapEmis-Output_f2d Emis", iotyp, (/ dat(icmp,debug_li,debug_lj,my_iotyp) /) )
-          endif
-        endif
+          end if
+        end if
 
       call Out_netCDF(iotyp,def(icmp),2,1,dat(icmp,:,:,my_iotyp),scale,&
                       create_var_only=Init_Only)
-    endif     ! wanted
-  enddo       ! component loop
+    end if     ! wanted
+  end do       ! component loop
 
-endsubroutine Output_f2d
+end subroutine Output_f2d
 
 subroutine Output_f3d (iotyp, dim, nav, def, dat, Init_Only)
 !---------------------------------------------------------------------
@@ -276,9 +280,9 @@ subroutine Output_f3d (iotyp, dim, nav, def, dat, Init_Only)
 
       call Out_netCDF(iotyp,def(icmp),3,num_lev3d,dat(icmp,:,:,:,my_iotyp),scale,&
                       create_var_only=Init_Only)
-    endif     ! wanted
-  enddo       ! component loop
+    end if     ! wanted
+  end do       ! component loop
 
-endsubroutine Output_f3d
+end subroutine Output_f3d
 
 endmodule OutputChem_ml

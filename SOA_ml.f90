@@ -1,7 +1,7 @@
-! <SOA_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <SOA_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -174,8 +174,8 @@ module OrganicAerosol_ml
 
       nonvolpcm = find_index( 'NONVOLPCM', chemgroups(:)%name ) 
       nvabsom   = find_index( 'NVABSOM',   chemgroups(:)%name ) 
-      if( nonvolpcm > 0 ) NUM_NONVOLPCM = size(chemgroups(nonvolpcm)%ptr)
-      if( nvabsom   > 0 ) NUM_NVABSOM   = size(chemgroups(nvabsom)%ptr)
+      if( nonvolpcm > 0 ) NUM_NONVOLPCM = size(chemgroups(nonvolpcm)%specs)
+      if( nvabsom   > 0 ) NUM_NVABSOM   = size(chemgroups(nvabsom)%specs)
 
       if( MasterProc ) then
          write(*,*) dtxt//"itot_bgnd, om25sum = ", itot_bgnd, itot_om25, igrp_om25
@@ -248,7 +248,7 @@ module OrganicAerosol_ml
        
 
         Fpart(:,:)         = 0.0
-        Fpart(chemgroups(nonvolpcm)%ptr,:)  = 1.0
+        Fpart(chemgroups(nonvolpcm)%specs,:)  = 1.0
         Fgas(:,:)         = max(0.0, 1.0 - Fpart(:,:) )
 
         !NOT needed Fgas3d(S1:S2,i,j,:)=Fgas(S1:S2,:)  ! J29
@@ -316,7 +316,7 @@ module OrganicAerosol_ml
  ! NVABSOM - Only include fine OM! That is no EC and no coarse OM!
 
   do i = 1, NUM_NVABSOM  ! OA/OC for POC about 1.333
-    ispec = chemgroups(nvabsom)%ptr(i)
+    ispec = chemgroups(nvabsom)%specs(i)
 
     ug_nonvol(i,:) = molcc2ugm3 * xn(ispec,:)*species(ispec)%molwt
 
@@ -364,7 +364,7 @@ module OrganicAerosol_ml
                "Ci* ", "Ki"," ", "Fpart", "ng"
 
            do i = 1, NUM_NONVOLPCM
-              ispec = chemgroups(nonvolpcm)%ptr(i)
+              ispec = chemgroups(nonvolpcm)%specs(i)
               write(unit=6,fmt="(a4,i3,a15,es10.2,2f10.3)")&
                 "NVOL", ispec,&
                 species(ispec)%name, xn(ispec,K2),-999.999, &
@@ -433,7 +433,7 @@ module OrganicAerosol_ml
    if ( first_call .and. debug_proc ) then
       J16tmp = xn(itot_bgnd,20)  ! just for printout
       write(*,*) "Into Reset Organic Aerosol?",&
-        itot_bgnd , first_call, size(chemgroups(igrp_om25)%ptr)
+        itot_bgnd , first_call, size(chemgroups(igrp_om25)%specs)
     end if
 
 
@@ -449,12 +449,12 @@ module OrganicAerosol_ml
    xn(itot_om25,:) = 0.0
 
    if(  dbg  ) write(*,*) 'OFSOA scaling ', xn2ug1MW, molcc2ugm3, &
-      size(chemgroups(igrp_om25)%ptr)
+      size(chemgroups(igrp_om25)%specs)
      !cf xn(itot_bgnd,:) = COA(:)/(molcc2ugm3*species(itot_bgnd)%molwt)  
 
-   do n = 1, size(chemgroups(igrp_om25)%ptr)
+   do n = 1, size(chemgroups(igrp_om25)%specs)
 
-        itot  = chemgroups(igrp_om25)%ptr(n)
+        itot  = chemgroups(igrp_om25)%specs(n)
 
        ! NOTE !  Assumes molwt is 1.0 for itot_om25
         xn(itot_om25,:) = xn(itot_om25,:) + &

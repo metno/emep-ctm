@@ -1,7 +1,7 @@
-! <AOTnPOD_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <AOTnPOD_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -250,7 +250,7 @@ contains
     logical, intent(in) :: debug_flag
     character(len=*), intent(in), optional :: debug_txt
     integer, intent(in) :: iO3cl,iLC
-    real, intent(out)    :: pod
+    real, intent(out)   :: pod
     character(len=*),parameter :: dtxt='CalcPOD:'
     character(len=10):: txt
 

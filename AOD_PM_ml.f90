@@ -1,7 +1,7 @@
-! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -94,7 +94,7 @@ integer, public, parameter :: &
                           ! assume rho_dry as SO4, Q and GF as SSc
 type :: ExtEffMap
   integer :: itot,cext
-endtype ExtEffMap
+end type ExtEffMap
 
 !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 include 'CM_AerExt.inc'
@@ -223,8 +223,8 @@ real, parameter, dimension(NUM_CEXT,NumRH,W340:W1020) :: &
     [NUM_CEXT,NumRH,W1020-W340+1],order=[2,1,3])
 
 real,parameter,dimension(NUM_CEXT) :: &
-  Qm_Dabs= & ! (dry) mass absorption efficiency [m?/g] at 550 nm
-          [0.0  ,0.0  ,0.0  ,0.0  ,8.5  ,11.5 ,0.0  ,0.0  ,0.0  ], & 
+! Qm_Dabs= & ! (dry) mass absorption efficiency [m?/g] at 550 nm
+!         [0.0  ,0.0  ,0.0  ,0.0  ,8.5  ,11.5 ,0.0  ,0.0  ,0.0  ], & 
   rho_dry=[2.6  ,2.6  ,2.2  ,2.2  ,1.0  ,1.0  ,1.8  ,1.6  ,1.6  ], &
   rad_eff=[0.80 ,4.5  ,0.80 ,5.73 ,0.039,0.039,0.087,0.156,5.73 ]
          ! 1:DDf 2:DDc 3:SSf 4:SSc 5:ECn 6:ECa 7:OC  8:SO4 9:NO3c
@@ -276,11 +276,11 @@ function Qm(mode,rh,wlen,debug) result(Qm_arr)
       ExtEff=MATMUL(Qm_ref(:,rh_n-1:rh_n,wlen),rh_w)  ! Extinction efficiencies
       if(debug) write(*,'((a15,9f10.3))') &
         '## GFs   =',gf(:),'## ExtEff=',ExtEff(:)
-    endif
+    end if
 
   case default
     call CheckStop("Unknown extinction mode: "//trim(mode))
-  endselect
+  end select
 
   !.. mass extinction efficiency [m2/g]
   !beta = 3/4 * ExtEff/rho_wet/rad_eff * Mwet/Mdry
@@ -311,8 +311,8 @@ function rho_wet(nc)
 ! rho_wet = Vfr_dry*rho_dry + (1-Vfr_dry)*RHO_H2O
 !         = (rho_dry-RHO_H2O)/GF**3 + RHO_H2O
   rho_wet = (rho_dry(nc)-RHO_H2O)/Gf(nc)**3 + RHO_H2O
-endfunction rho_wet
-endfunction Qm
+end function rho_wet
+end function Qm
 
 function Qm_grp(gtot,rh,debug) result(Qm_arr)
 !-----------------------------------------------------------------------!
@@ -337,14 +337,14 @@ function Qm_grp(gtot,rh,debug) result(Qm_arr)
     Qm_aux=Qm("WET",rh ,W550,my_debug)
   else
     Qm_aux=Qm("DRY",0.0,W550,my_debug)
-  endif
+  end if
 
   Qm_arr(:)=0
   do n=1,size(gtot)
     i=find_index(gtot(n),ExtMap(:)%itot,debug=my_debug)
     if(i>0)Qm_arr(n)=Qm_aux(i)
-  enddo
-endfunction Qm_grp
+  end do
+end function Qm_grp
 
 subroutine AOD_init(msg,wlen,out3d)
   character(len=*), intent(in) :: msg
@@ -359,22 +359,22 @@ subroutine AOD_init(msg,wlen,out3d)
     call CheckStop(n<1,&
       trim(msg)//" Unknown AOD/EXT wavelength "//trim(wlen))
     wanted_wlen(n)=.true.
-  endif
+  end if
   if(present(out3d))then
     wanted_ext3d=wanted_ext3d.or.out3d
-  endif
+  end if
 !-----------------------------------------------------------------------!
 ! Consistency checks for older model versions using AOD_GROUP
 !-----------------------------------------------------------------------!
   if(.not.associated(aod_grp))then
     igrp=find_index('AOD',chemgroups%name)
     if(igrp<1) return   ! AOD group no longer used... nothing to check
-    aod_grp=>chemgroups(igrp)%ptr
+    aod_grp=>chemgroups(igrp)%specs
     call CheckStop(size(aod_grp),NUM_EXT,&
       trim(msg)//" Incompatibe AOD_GROUP size")
     call CheckStop(any(aod_grp/=ExtMap%itot),&
       trim(msg)//" Incompatibe AOD_GROUP def.")
-  endif   
+  end if   
 !-----------------------------------------------------------------------!
 ! Consistency checks for Qm_ref array
 !-----------------------------------------------------------------------!
@@ -394,17 +394,17 @@ subroutine AOD_init(msg,wlen,out3d)
   if(any(wanted_wlen(:)).and..not.allocated(AOD))then
     allocate(AOD(NUM_EXT,LIMAX,LJMAX,W340:W1020))
     AOD=0.0
-  endif
+  end if
   if(wanted_ext3d.and..not.allocated(Extin_coeff))then
     allocate(Extin_coeff(NUM_EXT,LIMAX,LJMAX,KMAX_MID,W340:W1020))
     Extin_coeff=0.0
-  endif 
+  end if 
   if(ANALYSIS.and..not.associated(SpecExtCross))then
   !!wanted_wlen(W550)=.true.  ! calculate 550nm for AOD assimilation
     allocate(SpecExtCross(NUM_EXT,KMAX_MID,LIMAX,LJMAX,W340:W1020))
     SpecExtCross=0.0
-  endif
-endsubroutine AOD_init
+  end if
+end subroutine AOD_init
 
 subroutine AOD_Ext(i,j,debug)
 !-----------------------------------------------------------------------!
@@ -426,11 +426,11 @@ subroutine AOD_Ext(i,j,debug)
     call CheckStop(USE_AOD.and..not.any(wanted_wlen(:)),&
       "USE_AOR=T, but no AOD/EXT output. Check config_*.nml")
     first_call=.false.
-  endif
+  end if
   if(debug)then
     write(*,*) '#### in AOD module  ###'
     AOD_cext(:)=0.0
-  endif
+  end if
  
   !===========================================================================
   ! Extinction coefficients: 
@@ -464,19 +464,19 @@ subroutine AOD_Ext(i,j,debug)
         !.. Extinction coefficients for diferent optical groups/types
         do n = 1,NUM_CEXT
           kext_cext(n)=sum(kext(:),MASK=(ExtMap(:)%cext==n))
-        enddo
+        end do
         !.. Aerosol optical depth for individual components
         AOD_cext(:)=AOD_cext(:)+kext_cext(:)*(z_bnd(i,j,k)-z_bnd(i,j,k+1))
 
         if((k==KCHEMTOP+1).or.(k==KMAX_MID))&
           write(*,"(a8,'(',i3,')=',es10.3,'=',9(es10.3,:,'+'))") &
             'EXTINCs', k, sum(kext(:)),kext_cext(:)
-      endif
-    enddo
-  enddo
+      end if
+    end do
+  end do
 
   if(debug) write(*,"(a24,2i5,es10.3,'=',9(es10.3,:,'+'))") &
     '>>>  AOD / AODs  <<<', i_fdom(i), j_fdom(j), sum(AOD(:,i,j,W550)), AOD_cext(:)
-endsubroutine AOD_Ext
+end subroutine AOD_Ext
 endmodule AOD_PM_ml
 

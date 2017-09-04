@@ -1,10 +1,10 @@
-  integer, public, parameter ::  NDRYDEP_ADV  = 65
+  integer, public, parameter ::  NDRYDEP_ADV  = 71
   type(depmap), public, dimension(NDRYDEP_ADV), parameter:: DDepMap= (/ &
         depmap( IXADV_O3, CDDEP_O3, -1) & 
       , depmap( IXADV_NO2, CDDEP_NO2, -1) & 
+      , depmap( IXADV_HO2NO2, CDDEP_HNO3, -1) & 
       , depmap( IXADV_SHIPNOX, CDDEP_NO2, -1) & 
       , depmap( IXADV_PAN, CDDEP_PAN, -1) & 
-      , depmap( IXADV_MPAN, CDDEP_PAN, -1) & 
       , depmap( IXADV_HNO3, CDDEP_HNO3, -1) & 
       , depmap( IXADV_HONO, CDDEP_HNO2, -1) & 
       , depmap( IXADV_MAL, CDDEP_ALD, -1) & 
@@ -15,6 +15,11 @@
       , depmap( IXADV_H2O2, CDDEP_SO2, -1) & 
       , depmap( IXADV_ACETOL, CDDEP_ALD, -1) & 
       , depmap( IXADV_SO2, CDDEP_SO2, -1) & 
+      , depmap( IXADV_MPAN, CDDEP_PAN, -1) & 
+      , depmap( IXADV_NALD, CDDEP_ALD, -1) & 
+      , depmap( IXADV_HPALD, CDDEP_ALD, -1) & 
+      , depmap( IXADV_PACALD, CDDEP_ALD, -1) & 
+      , depmap( IXADV_TERPOOH, CDDEP_ALD, -1) & 
       , depmap( IXADV_SO4, CDDEP_PMfS, -1) & 
       , depmap( IXADV_NH3, CDDEP_NH3, -1) & 
       , depmap( IXADV_NO3_f, CDDEP_PMfN, -1) & 
@@ -36,6 +41,7 @@
       , depmap( IXADV_FFIRE_OM, CDDEP_PMfS, -1) & 
       , depmap( IXADV_FFIRE_BC, CDDEP_PMfS, -1) & 
       , depmap( IXADV_FFIRE_REMPPM25, CDDEP_PMfS, -1) & 
+      , depmap( IXADV_SQT_SOA_NV, CDDEP_PMfS, -1) & 
       , depmap( IXADV_ASOC_ng100, CDDEP_ALD, -1) & 
       , depmap( IXADV_ASOC_ug1, CDDEP_ALD, -1) & 
       , depmap( IXADV_ASOC_ug10, CDDEP_ALD, -1) & 

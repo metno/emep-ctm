@@ -1,7 +1,7 @@
-! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,7 +38,7 @@ module StoFlux_ml
   use PhysicalConstants_ml, only : AVOG, KARMAN
   use SmallUtils_ml, only : find_index
   use SubMet_ml, only : Sub
-  use Wesely_ml, only : WES_O3, Rb_cor
+  use GasParticleCoeffs_ml, only : WES_O3, Rb_cor
   implicit none
   private
 
@@ -58,7 +58,7 @@ module StoFlux_ml
   integer, private, save, dimension(NLANDUSEMAX) :: mapSumVPD
 
   real, private, save :: gext_leaf = 1.0/2500.0
-  real, private :: rc_leaf, rb_leaf, Fst
+  real, private :: rc_leaf, rb_leaf
 
 
 
@@ -158,7 +158,7 @@ contains
                  call datewrite("StoFlux SUMVPD ", iL, &
                     (/ real(ivpd), L%rh, L%t2C,  L%vpd, SumVPD(i,j,ivpd) /) ) 
               !       old_gsun(i,j), tmp_gsun, L%g_sun , L%g_sto
-              endif
+              end if
 
               old_gsun(i,j,ivpd) = L%g_sun
           end if

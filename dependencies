@@ -1,42 +1,45 @@
 
 AeroFunctions.o : AeroFunctions.f90 PhysicalConstants_ml.o 
 Aero_Vds_ml.o : Aero_Vds_ml.f90 ModelConstants_ml.o PhysicalConstants_ml.o 
-Ammonium_ml.o : Ammonium_ml.f90 CM_ChemSpecs_tmp.o Setup_1dfields_ml.o ModelConstants_ml.o 
-AOD_PM_ml.o : AOD_PM_ml.f90 CM_AerExt.inc SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o MetFields_ml.o GridValues_ml.o CheckStop_ml.o CM_ChemGroups_ml.o Chem_ml.o CM_ChemSpecs_tmp.o 
-Advection_ml.o : Advection_ml.f90 PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o Timing_ml.o MassBudget_ml.o MetFields_ml.o ModelConstants_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o Convection_ml.o CheckStop_ml.o CM_ChemSpecs_tmp.o Chem_ml.o 
+Ammonium_ml.o : Ammonium_ml.f90 ChemSpecs_wrapper.o Setup_1dfields_ml.o ModelConstants_ml.o 
+AOD_PM_ml.o : AOD_PM_ml.f90 CM_AerExt.inc SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o MetFields_ml.o GridValues_ml.o CheckStop_ml.o CM_ChemGroups_ml.o ChemFields_ml.o ChemSpecs_wrapper.o 
+Advection_ml.o : Advection_ml.f90 uEMEP_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o Timing_ml.o MassBudget_ml.o MetFields_ml.o ModelConstants_ml.o Io_Progs_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o Convection_ml.o CheckStop_ml.o ChemSpecs_wrapper.o ChemFields_ml.o 
 AirEmis_ml.o : AirEmis_ml.f90 TimeDate_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o GridValues_ml.o Io_ml.o 
 AllocInit.o : AllocInit.f90 CheckStop_ml.o 
-AOTnPOD_ml.o : AOTnPOD_ml.f90 TimeDate_ml.o Par_ml.o OwnDataTypes_ml.o NumberConstants.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o LandDefs_ml.o Io_Progs_ml.o GridValues_ml.o DO3SE_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o 
-Aqueous_n_WetDep_ml.o : Aqueous_n_WetDep_ml.f90 CM_WetDep.inc Units_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o SOA_ml.o MetFields_ml.o ModelConstants_ml.o MassBudget_ml.o Io_ml.o GridValues_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o My_Derived_ml.o 
-BLPhysics_ml.o : BLPhysics_ml.f90 PhysicalConstants_ml.o ModelConstants_ml.o Landuse_ml.o 
-Biogenics_ml.o : Biogenics_ml.f90 CM_EmisBioNat.inc TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o Radiation_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o LandPFT_ml.o LandDefs_ml.o KeyValueTypes.o Io_ml.o GridValues_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
-BoundaryConditions_ml.o : BoundaryConditions_ml.f90 CM_BoundaryConditions.inc TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o Io_Progs_ml.o GridValues_ml.o Functions_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o 
-CellMet_ml.o : CellMet_ml.f90 TimeDate_ml.o SubMet_ml.o SoilWater_ml.o PhysicalConstants_ml.o ModelConstants_ml.o MetFields_ml.o MicroMet_ml.o LocalVariables_ml.o Landuse_ml.o GridValues_ml.o CheckStop_ml.o 
+AOTnPOD_ml.o : AOTnPOD_ml.f90 TimeDate_ml.o Par_ml.o OwnDataTypes_ml.o NumberConstants.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o LandDefs_ml.o Io_Progs_ml.o GridValues_ml.o DO3SE_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o 
+Aqueous_n_WetDep_ml.o : Aqueous_n_WetDep_ml.f90 CM_WetDep.inc Units_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o SOA_ml.o MetFields_ml.o ModelConstants_ml.o MassBudget_ml.o Io_ml.o GridValues_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o CheckStop_ml.o My_Derived_ml.o 
+BLPhysics_ml.o : BLPhysics_ml.f90 PhysicalConstants_ml.o ModelConstants_ml.o Landuse_ml.o emep_Config_mod.o 
+Biogenics_ml.o : Biogenics_ml.f90 CM_EmisBioNat.inc TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o Radiation_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o LandPFT_ml.o LandDefs_ml.o KeyValueTypes.o Io_ml.o GridValues_ml.o emep_Config_mod.o ChemSpecs_wrapper.o CheckStop_ml.o 
+BoundaryConditions_ml.o : BoundaryConditions_ml.f90 CM_BoundaryConditions.inc TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o Io_Progs_ml.o GridValues_ml.o Functions_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o 
+CellMet_ml.o : CellMet_ml.f90 SubMet_ml.o SoilWater_ml.o PhysicalConstants_ml.o ModelConstants_ml.o MetFields_ml.o MicroMet_ml.o LocalVariables_ml.o Landuse_ml.o GridValues_ml.o CheckStop_ml.o 
 CheckStop_ml.o : CheckStop_ml.f90 MPI_Groups_ml.o 
-Chem_ml.o : Chem_ml.f90 Setup_1dfields_ml.o Par_ml.o NumberConstants.o ModelConstants_ml.o CM_ChemSpecs_tmp.o AllocInit.o 
-CoDep_ml.o : CoDep_ml.f90 Par_ml.o ModelConstants_ml.o GridValues_ml.o Chem_ml.o CheckStop_ml.o 
+ChemFields_ml.o : ChemFields_ml.f90 Setup_1dfields_ml.o Par_ml.o NumberConstants.o ModelConstants_ml.o ChemSpecs_wrapper.o AllocInit.o 
+ChemSpecs_wrapper.o : ChemSpecs_wrapper.f90 CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o 
+CoDep_ml.o : CoDep_ml.f90 Par_ml.o ModelConstants_ml.o GridValues_ml.o ChemFields_ml.o CheckStop_ml.o 
 Country_ml.o : Country_ml.f90 
-ChemFunctions_ml.o : ChemFunctions_ml.f90 Setup_1dfields_ml.o PhysicalConstants_ml.o ModelConstants_ml.o LocalVariables_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o AeroFunctions.o 
+ChemFunctions_ml.o : ChemFunctions_ml.f90 Setup_1dfields_ml.o PhysicalConstants_ml.o ModelConstants_ml.o LocalVariables_ml.o ChemSpecs_wrapper.o CheckStop_ml.o AeroFunctions.o 
 CM_ChemRates_ml.o : CM_ChemRates_ml.f90 ModelConstants_ml.o CM_ChemSpecs_ml.o Setup_1dfields_ml.o AeroFunctions.o ChemFunctions_ml.o 
-Convection_ml.o : Convection_ml.f90 PhysicalConstants_ml.o Par_ml.o GridValues_ml.o MetFields_ml.o ModelConstants_ml.o CM_ChemSpecs_tmp.o Chem_ml.o 
-ColumnSource_ml.o : ColumnSource_ml.f90 TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
+Convection_ml.o : Convection_ml.f90 PhysicalConstants_ml.o Par_ml.o GridValues_ml.o MetFields_ml.o ModelConstants_ml.o ChemSpecs_wrapper.o ChemFields_ml.o 
+ColumnSource_ml.o : ColumnSource_ml.f90 TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
 CM_ChemGroups_ml.o : CM_ChemGroups_ml.f90 OwnDataTypes_ml.o CM_ChemSpecs_ml.o 
 CM_ChemSpecs_ml.o : CM_ChemSpecs_ml.f90 
-CM_ChemSpecs_tmp.o : CM_ChemSpecs_tmp.f90 CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o 
 DefPhotolysis_ml.o : DefPhotolysis_ml.f90 LocalVariables_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o CheckStop_ml.o 
-Derived_ml.o : Derived_ml.f90 Units_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NumberConstants.o MosaicOutputs_ml.o AOD_PM_ml.o ModelConstants_ml.o MetFields_ml.o Io_Progs_ml.o GridValues_ml.o Emissions_ml.o EmisGet_ml.o EmisDef_ml.o EcoSystem_ml.o DerivedFields_ml.o CM_ChemSpecs_tmp.o CM_ChemGroups_ml.o Chem_ml.o CheckStop_ml.o Biogenics_ml.o AOTnPOD_ml.o My_Derived_ml.o 
+Derived_ml.o : Derived_ml.f90 Units_ml.o uEMEP_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NumberConstants.o MosaicOutputs_ml.o AOD_PM_ml.o ModelConstants_ml.o MetFields_ml.o Io_Progs_ml.o GridValues_ml.o EmisGet_ml.o EmisDef_ml.o EcoSystem_ml.o DerivedFields_ml.o ChemSpecs_wrapper.o CM_ChemGroups_ml.o ChemFields_ml.o CheckStop_ml.o Biogenics_ml.o AOTnPOD_ml.o My_Derived_ml.o 
 DerivedFields_ml.o : DerivedFields_ml.f90 OwnDataTypes_ml.o 
 DO3SE_ml.o : DO3SE_ml.f90 TimeDate_ml.o SmallUtils_ml.o ModelConstants_ml.o LocalVariables_ml.o LandDefs_ml.o CheckStop_ml.o 
-DryDep_ml.o : DryDep_ml.f90 CM_DryDep.inc My_ESX_ml.o Wesely_ml.o TimeDate_ml.o SubMet_ml.o StoFlux_ml.o SoilWater_ml.o Sites_ml.o Setup_1dfields_ml.o Rsurface_ml.o Rb_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o MosaicOutputs_ml.o ModelConstants_ml.o MicroMet_ml.o MetFields_ml.o MassBudget_ml.o LocalVariables_ml.o LandDefs_ml.o Landuse_ml.o Io_Progs_ml.o Io_Nums_ml.o GridValues_ml.o EcoSystem_ml.o DO3SE_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o Aero_Vds_ml.o 
-DustProd_ml.o : DustProd_ml.f90 TimeDate_ml.o SubMet_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o MicroMet_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o LandDefs_ml.o Landuse_ml.o Io_ml.o GridValues_ml.o CM_ChemSpecs_tmp.o Functions_ml.o CheckStop_ml.o Biogenics_ml.o 
+DryDep_ml.o : DryDep_ml.f90 CM_DryDep.inc GasParticleCoeffs_ml.o TimeDate_ml.o SubMet_ml.o StoFlux_ml.o SoilWater_ml.o Sites_ml.o Setup_1dfields_ml.o Rsurface_ml.o Rb_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o MosaicOutputs_ml.o ModelConstants_ml.o MicroMet_ml.o MetFields_ml.o MassBudget_ml.o LocalVariables_ml.o LandDefs_ml.o Landuse_ml.o Io_Progs_ml.o Io_Nums_ml.o GridValues_ml.o EcoSystem_ml.o DO3SE_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o Aero_Vds_ml.o 
+DustProd_ml.o : DustProd_ml.f90 TimeDate_ml.o SubMet_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o MicroMet_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o LandDefs_ml.o Landuse_ml.o Io_ml.o GridValues_ml.o ChemSpecs_wrapper.o Functions_ml.o CheckStop_ml.o Biogenics_ml.o 
 EcoSystem_ml.o : EcoSystem_ml.f90 Par_ml.o OwnDataTypes_ml.o ModelConstants_ml.o LandDefs_ml.o 
+emep_Config_mod.o : emep_Config_mod.f90 
 EmisDef_ml.o : EmisDef_ml.f90 CM_EmisFiles.inc 
-EmisGet_ml.o : EmisGet_ml.f90 CM_EmisSpecs.inc SmallUtils_ml.o Par_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o KeyValueTypes.o Io_ml.o GridValues_ml.o GridAllocate_ml.o EmisDef_ml.o Country_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
-Emissions_ml.o : Emissions_ml.f90 AirEmis_ml.o Timefactors_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o ReadField_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PointSource_ml.o PhysicalConstants_ml.o Par_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_Progs_ml.o Io_Nums_ml.o GridValues_ml.o EmisGet_ml.o EmisDef_ml.o Country_ml.o Chem_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o Biogenics_ml.o 
-ExternalBICs_ml.o : ExternalBICs_ml.f90 TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o ModelConstants_ml.o Io_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
+EmisGet_ml.o : EmisGet_ml.f90 CM_EmisSpecs.inc SmallUtils_ml.o Par_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o KeyValueTypes.o Io_ml.o GridValues_ml.o GridAllocate_ml.o EmisDef_ml.o Country_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
+Emissions_ml.o : Emissions_ml.f90 AirEmis_ml.o Timefactors_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o ReadField_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PointSource_ml.o PhysicalConstants_ml.o Par_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_Progs_ml.o Io_Nums_ml.o GridValues_ml.o EmisGet_ml.o EmisDef_ml.o Country_ml.o ChemFields_ml.o ChemSpecs_wrapper.o CheckStop_ml.o Biogenics_ml.o 
+ExternalBICs_ml.o : ExternalBICs_ml.f90 TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o ModelConstants_ml.o Io_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
 FastJ_ml.o : FastJ_ml.f90 TimeDate_ml.o Radiation_ml.o PhysicalConstants_ml.o Par_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o Landuse_ml.o LandDefs_ml.o GridValues_ml.o DefPhotolysis_ml.o 
-ForestFire_ml.o : ForestFire_ml.f90 BiomassBurningMapping.inc TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
+ForestFire_ml.o : ForestFire_ml.f90 BiomassBurningMapping.inc TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
 Functions_ml.o : Functions_ml.f90 PhysicalConstants_ml.o 
+GasParticleCoeffs_ml.o : GasParticleCoeffs_ml.f90 PhysicalConstants_ml.o 
+Gravset_ml.o : Gravset_ml.f90 SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o MetFields_ml.o GridValues_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o ChemFields_ml.o CheckStop_ml.o 
 GridAllocate_ml.o : GridAllocate_ml.f90 GridValues_ml.o Par_ml.o CheckStop_ml.o 
 GridValues_ml.o : GridValues_ml.f90 InterpolationRoutines_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_Nums_ml.o Functions_ml.o CheckStop_ml.o 
 InterpolationRoutines_ml.o : InterpolationRoutines_ml.f90 
@@ -45,62 +48,59 @@ Io_Nums_ml.o : Io_Nums_ml.f90
 Io_Progs_ml.o : Io_Progs_ml.f90 TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o Par_ml.o KeyValueTypes.o MPI_Groups_ml.o ModelConstants_ml.o Io_Nums_ml.o GridValues_ml.o CheckStop_ml.o 
 KeyValueTypes.o : KeyValueTypes.f90 
 LandDefs_ml.o : LandDefs_ml.f90 SmallUtils_ml.o ModelConstants_ml.o LandPFT_ml.o KeyValueTypes.o Io_ml.o CheckStop_ml.o 
-Landuse_ml.o : Landuse_ml.f90 NetCDF_ml.o TimeDate_ml.o SmallUtils_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o LandPFT_ml.o LandDefs_ml.o KeyValueTypes.o Io_ml.o GridValues_ml.o GridAllocate_ml.o DO3SE_ml.o CheckStop_ml.o 
+Landuse_ml.o : Landuse_ml.f90 NetCDF_ml.o TimeDate_ml.o SmallUtils_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o LandPFT_ml.o LandDefs_ml.o KeyValueTypes.o Io_ml.o GridValues_ml.o GridAllocate_ml.o emep_Config_mod.o DO3SE_ml.o CheckStop_ml.o 
 LandPFT_ml.o : LandPFT_ml.f90 SmallUtils_ml.o Par_ml.o NetCDF_ml.o ModelConstants_ml.o GridValues_ml.o CheckStop_ml.o 
-LocalVariables_ml.o : LocalVariables_ml.f90 Wesely_ml.o 
+LocalVariables_ml.o : LocalVariables_ml.f90 GasParticleCoeffs_ml.o 
 MARS_ml.o : MARS_ml.f90 Par_ml.o ModelConstants_ml.o MARS_Aero_water_ml.o Io_ml.o CheckStop_ml.o 
 MARS_Aero_water_ml.o : MARS_Aero_water_ml.f90 
-MassBudget_ml.o : MassBudget_ml.f90 SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o Chem_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
-Met_ml.o : Met_ml.f90 TimeDate_ExtraUtil_ml.o NetCDF_ml.o TimeDate_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MicroMet_ml.o MetFields_ml.o Landuse_ml.o Io_ml.o GridValues_ml.o Functions_ml.o FastJ_ml.o CheckStop_ml.o BLPhysics_ml.o OwnDataTypes_ml.o 
-MetFields_ml.o : MetFields_ml.f90 MPI_Groups_ml.o ModelConstants_ml.o 
+MassBudget_ml.o : MassBudget_ml.f90 SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o ChemFields_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
+Met_ml.o : Met_ml.f90 TimeDate_ExtraUtil_ml.o NetCDF_ml.o TimeDate_ml.o PhysicalConstants_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MicroMet_ml.o MetFields_ml.o Landuse_ml.o Io_ml.o GridValues_ml.o Functions_ml.o FastJ_ml.o CheckStop_ml.o BLPhysics_ml.o emep_Config_mod.o 
+MetFields_ml.o : MetFields_ml.f90 Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o 
 EQSAM_ml.o : EQSAM_ml.f90 ModelConstants_ml.o 
 MicroMet_ml.o : MicroMet_ml.f90 
-ModelConstants_ml.o : ModelConstants_ml.f90 SmallUtils_ml.o Precision_ml.o OwnDataTypes_ml.o Io_Nums_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o AeroFunctions.o 
-MosaicOutputs_ml.o : MosaicOutputs_ml.f90 Wesely_ml.o Units_ml.o TimeDate_ml.o SubMet_ml.o SmallUtils_ml.o OwnDataTypes_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o LandDefs_ml.o Io_Progs_ml.o EcoSystem_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o AOTnPOD_ml.o 
+ModelConstants_ml.o : ModelConstants_ml.f90 SmallUtils_ml.o Precision_ml.o OwnDataTypes_ml.o Io_Nums_ml.o emep_Config_mod.o ChemSpecs_wrapper.o CheckStop_ml.o AeroFunctions.o 
+MosaicOutputs_ml.o : MosaicOutputs_ml.f90 Units_ml.o TimeDate_ml.o SubMet_ml.o SmallUtils_ml.o OwnDataTypes_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o LandDefs_ml.o Io_Progs_ml.o GasParticleCoeffs_ml.o EcoSystem_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o CheckStop_ml.o AOTnPOD_ml.o 
 MPI_Groups_ml.o : MPI_Groups_ml.f90 
-AerosolCalls.o : AerosolCalls.f90 Setup_1dfields_ml.o PhysicalConstants_ml.o ModelConstants_ml.o MARS_ml.o EQSAM_ml.o Chem_ml.o CM_ChemSpecs_tmp.o CM_ChemGroups_ml.o CheckStop_ml.o Ammonium_ml.o 
-My_Derived_ml.o : My_Derived_ml.f90 SmallUtils_ml.o Par_ml.o OwnDataTypes_ml.o MosaicOutputs_ml.o ModelConstants_ml.o Io_Progs_ml.o Io_Nums_ml.o GridValues_ml.o EmisGet_ml.o EmisDef_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o AOTnPOD_ml.o 
-SOA_ml.o : SOA_ml.f90 TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o GridValues_ml.o Functions_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o Chem_ml.o CheckStop_ml.o 
-My_Outputs_ml.o : My_Outputs_ml.f90 Units_ml.o TimeDate_ml.o SmallUtils_ml.o My_Pollen_ml.o Par_ml.o OwnDataTypes_ml.o PhysicalConstants_ml.o ModelConstants_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
-NetCDF_ml.o : NetCDF_ml.f90 SmallUtils_ml.o Functions_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o MPI_Groups_ml.o ModelConstants_ml.o InterpolationRoutines_ml.o GridValues_ml.o Country_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o Chem_ml.o My_Outputs_ml.o 
-Nest_ml.o : Nest_ml.f90 CM_ChemGroups_ml.o SmallUtils_ml.o Units_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o My_Pollen_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o InterpolationRoutines_ml.o Io_ml.o GridValues_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o ExternalBICs_ml.o 
+AerosolCalls.o : AerosolCalls.f90 Setup_1dfields_ml.o PhysicalConstants_ml.o ModelConstants_ml.o MARS_ml.o EQSAM_ml.o ChemFields_ml.o ChemSpecs_wrapper.o CM_ChemGroups_ml.o CheckStop_ml.o Ammonium_ml.o 
+My_Derived_ml.o : My_Derived_ml.f90 SmallUtils_ml.o Par_ml.o OwnDataTypes_ml.o MosaicOutputs_ml.o ModelConstants_ml.o Io_Progs_ml.o Io_Nums_ml.o GridValues_ml.o EmisGet_ml.o EmisDef_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o AOTnPOD_ml.o 
+My_Outputs_ml.o : My_Outputs_ml.f90 Units_ml.o TimeDate_ml.o SmallUtils_ml.o My_Pollen_ml.o Par_ml.o OwnDataTypes_ml.o PhysicalConstants_ml.o ModelConstants_ml.o DerivedFields_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
+NetCDF_ml.o : NetCDF_ml.f90 SmallUtils_ml.o Functions_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o MPI_Groups_ml.o ModelConstants_ml.o InterpolationRoutines_ml.o GridValues_ml.o Country_ml.o ChemSpecs_wrapper.o CheckStop_ml.o ChemFields_ml.o My_Outputs_ml.o 
+Nest_ml.o : Nest_ml.f90 CM_ChemGroups_ml.o SmallUtils_ml.o Units_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o My_Pollen_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o InterpolationRoutines_ml.o Io_ml.o GridValues_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o ExternalBICs_ml.o 
 NumberConstants.o : NumberConstants.f90 
-Output_hourly.o : Output_hourly.f90 Units_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o My_Pollen_ml.o My_Pollen_ml.o Par_ml.o NetCDF_ml.o MetFields_ml.o ModelConstants_ml.o Io_ml.o GridValues_ml.o CM_ChemSpecs_tmp.o OwnDataTypes_ml.o DerivedFields_ml.o Derived_ml.o CM_ChemGroups_ml.o Chem_ml.o CheckStop_ml.o My_Outputs_ml.o 
-OutputChem_ml.o : OutputChem_ml.f90 TimeDate_ExtraUtil_ml.o TimeDate_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o Io_ml.o My_Outputs_ml.o GridValues_ml.o DerivedFields_ml.o Derived_ml.o CheckStop_ml.o 
+Output_hourly.o : Output_hourly.f90 Units_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o SmallUtils_ml.o My_Pollen_ml.o My_Pollen_ml.o Par_ml.o NetCDF_ml.o MetFields_ml.o ModelConstants_ml.o Io_ml.o GridValues_ml.o ChemSpecs_wrapper.o OwnDataTypes_ml.o DerivedFields_ml.o Derived_ml.o ChemFields_ml.o CheckStop_ml.o My_Outputs_ml.o 
+OutputChem_ml.o : OutputChem_ml.f90 uEMEP_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o Io_ml.o My_Outputs_ml.o GridValues_ml.o DerivedFields_ml.o Derived_ml.o CheckStop_ml.o 
 OwnDataTypes_ml.o : OwnDataTypes_ml.f90 NumberConstants.o 
 Par_ml.o : Par_ml.f90 MPI_Groups_ml.o ModelConstants_ml.o Io_Nums_ml.o CheckStop_ml.o 
 PhysicalConstants_ml.o : PhysicalConstants_ml.f90 
 PlumeRise_ml.o : PlumeRise_ml.f90 
-PointSource_ml.o : PointSource_ml.f90 PhysicalConstants_ml.o TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PlumeRise_ml.o Par_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Io_Progs_ml.o GridValues_ml.o Functions_ml.o CM_ChemSpecs_tmp.o CheckStop_ml.o 
+PointSource_ml.o : PointSource_ml.f90 PhysicalConstants_ml.o TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PlumeRise_ml.o Par_ml.o ModelConstants_ml.o MetFields_ml.o LocalVariables_ml.o Io_Progs_ml.o GridValues_ml.o Functions_ml.o ChemSpecs_wrapper.o CheckStop_ml.o 
 Precision_ml.o : Precision_ml.f90 
 Radiation_ml.o : Radiation_ml.f90 TimeDate_ml.o PhysicalConstants_ml.o 
-Rb_ml.o : Rb_ml.f90 Wesely_ml.o PhysicalConstants_ml.o ModelConstants_ml.o 
+Rb_ml.o : Rb_ml.f90 GasParticleCoeffs_ml.o PhysicalConstants_ml.o ModelConstants_ml.o 
 ReadField_ml.o : ReadField_ml.f90 Io_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o CheckStop_ml.o 
-Rsurface_ml.o : Rsurface_ml.f90 Par_ml.o MetFields_ml.o Wesely_ml.o TimeDate_ml.o Radiation_ml.o ModelConstants_ml.o LocalVariables_ml.o Io_Progs_ml.o DO3SE_ml.o CoDep_ml.o CheckStop_ml.o LandDefs_ml.o 
-Runchem_ml.o : Runchem_ml.f90 TimeDate_ml.o Setup_1dfields_ml.o Setup_1d_ml.o SeaSalt_ml.o PointSource_ml.o Par_ml.o My_Pollen_ml.o SOA_ml.o ModelConstants_ml.o MassBudget_ml.o Io_Progs_ml.o GridValues_ml.o FastJ_ml.o DustProd_ml.o DryDep_ml.o DefPhotolysis_ml.o CM_ChemSpecs_tmp.o Solver.o Chem_ml.o CheckStop_ml.o CellMet_ml.o Biogenics_ml.o Aqueous_n_WetDep_ml.o AOD_PM_ml.o Timing_ml.o AerosolCalls.o 
-Setup_1d_ml.o : Setup_1d_ml.f90 Units_ml.o TimeDate_ml.o Tabulations_ml.o SmallUtils_ml.o Setup_1dfields_ml.o Radiation_ml.o PhysicalConstants_ml.o Par_ml.o Landuse_ml.o My_Derived_ml.o ModelConstants_ml.o MetFields_ml.o MassBudget_ml.o LocalVariables_ml.o Io_Progs_ml.o GridValues_ml.o CM_ChemRates_ml.o CM_ChemSpecs_tmp.o Functions_ml.o ForestFire_ml.o Emissions_ml.o EmisGet_ml.o EmisDef_ml.o DerivedFields_ml.o ColumnSource_ml.o CheckStop_ml.o CM_ChemGroups_ml.o ChemFunctions_ml.o Chem_ml.o Biogenics_ml.o AirEmis_ml.o AeroFunctions.o 
+Rsurface_ml.o : Rsurface_ml.f90 Par_ml.o MetFields_ml.o GasParticleCoeffs_ml.o TimeDate_ml.o Radiation_ml.o ModelConstants_ml.o LocalVariables_ml.o Io_Progs_ml.o DO3SE_ml.o CoDep_ml.o CheckStop_ml.o LandDefs_ml.o 
+Runchem_ml.o : Runchem_ml.f90 TimeDate_ml.o Setup_1dfields_ml.o Setup_1d_ml.o SeaSalt_ml.o PointSource_ml.o Par_ml.o My_Pollen_ml.o SOA_ml.o ModelConstants_ml.o MassBudget_ml.o Io_Progs_ml.o GridValues_ml.o FastJ_ml.o DustProd_ml.o DryDep_ml.o DefPhotolysis_ml.o ColumnSource_ml.o ChemSpecs_wrapper.o Solver.o ChemFields_ml.o CheckStop_ml.o CellMet_ml.o Biogenics_ml.o Aqueous_n_WetDep_ml.o AOD_PM_ml.o Timing_ml.o AerosolCalls.o 
+Setup_1d_ml.o : Setup_1d_ml.f90 Units_ml.o TimeDate_ml.o Tabulations_ml.o SmallUtils_ml.o Setup_1dfields_ml.o Radiation_ml.o PhysicalConstants_ml.o Par_ml.o Landuse_ml.o My_Derived_ml.o ModelConstants_ml.o MetFields_ml.o MassBudget_ml.o LocalVariables_ml.o Io_Progs_ml.o GridValues_ml.o CM_ChemRates_ml.o ChemSpecs_wrapper.o Functions_ml.o ForestFire_ml.o EmisGet_ml.o EmisDef_ml.o DerivedFields_ml.o ColumnSource_ml.o CheckStop_ml.o CM_ChemGroups_ml.o ChemFunctions_ml.o ChemFields_ml.o Biogenics_ml.o AirEmis_ml.o AeroFunctions.o 
 Setup_1dfields_ml.o : Setup_1dfields_ml.f90 ModelConstants_ml.o 
-Sites_ml.o : Sites_ml.f90 KeyValueTypes.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o Tabulations_ml.o SmallUtils_ml.o Par_ml.o NetCDF_ml.o PhysicalConstants_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o Io_ml.o GridValues_ml.o Functions_ml.o DerivedFields_ml.o My_Outputs_ml.o CheckStop_ml.o 
+Sites_ml.o : Sites_ml.f90 KeyValueTypes.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o Tabulations_ml.o SmallUtils_ml.o Par_ml.o NetCDF_ml.o PhysicalConstants_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o Io_ml.o GridValues_ml.o Functions_ml.o DerivedFields_ml.o My_Outputs_ml.o CheckStop_ml.o 
 SmallUtils_ml.o : SmallUtils_ml.f90 
+SOA_ml.o : SOA_ml.f90 TimeDate_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o GridValues_ml.o Functions_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_ml.o CM_ChemSpecs_ml.o ChemFields_ml.o CheckStop_ml.o 
 SoilWater_ml.o : SoilWater_ml.f90 TimeDate_ml.o Par_ml.o ModelConstants_ml.o MetFields_ml.o Met_ml.o LocalVariables_ml.o Landuse_ml.o Io_Progs_ml.o GridValues_ml.o 
-Solver.o : Solver.f90 CM_Reactions2.inc CM_Reactions1.inc Setup_1dfields_ml.o Precision_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o Io_ml.o GridValues_ml.o CM_ChemRates_ml.o Chem_ml.o CM_ChemSpecs_tmp.o CM_ChemGroups_ml.o ChemFunctions_ml.o EmisDef_ml.o DefPhotolysis_ml.o CheckStop_ml.o Aqueous_n_WetDep_ml.o 
-SeaSalt_ml.o : SeaSalt_ml.f90 TimeDate_ml.o SubMet_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o ModelConstants_ml.o MicroMet_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o Io_Progs_ml.o GridValues_ml.o CM_ChemSpecs_tmp.o Biogenics_ml.o AeroFunctions.o 
-StoFlux_ml.o : StoFlux_ml.f90 Wesely_ml.o SubMet_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o MicroMet_ml.o LocalVariables_ml.o LandDefs_ml.o Io_Progs_ml.o DO3SE_ml.o CheckStop_ml.o 
+Solver.o : Solver.f90 CM_Reactions2.inc CM_Reactions1.inc YieldModifications_mod.o Setup_1dfields_ml.o Precision_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o Io_ml.o GridValues_ml.o EmisDef_ml.o emep_Config_mod.o DefPhotolysis_ml.o CM_ChemRates_ml.o ChemFields_ml.o ChemSpecs_wrapper.o CM_ChemGroups_ml.o ChemFunctions_ml.o CheckStop_ml.o Aqueous_n_WetDep_ml.o 
+SeaSalt_ml.o : SeaSalt_ml.f90 TimeDate_ml.o SubMet_ml.o SmallUtils_ml.o Setup_1dfields_ml.o PhysicalConstants_ml.o ModelConstants_ml.o MicroMet_ml.o MetFields_ml.o LocalVariables_ml.o Landuse_ml.o Io_Progs_ml.o GridValues_ml.o ChemSpecs_wrapper.o Biogenics_ml.o AeroFunctions.o 
+StoFlux_ml.o : StoFlux_ml.f90 GasParticleCoeffs_ml.o SubMet_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o ModelConstants_ml.o MicroMet_ml.o LocalVariables_ml.o LandDefs_ml.o Io_Progs_ml.o DO3SE_ml.o CheckStop_ml.o 
 SubMet_ml.o : SubMet_ml.f90 PhysicalConstants_ml.o ModelConstants_ml.o MicroMet_ml.o LocalVariables_ml.o Landuse_ml.o LandDefs_ml.o BLPhysics_ml.o MetFields_ml.o Functions_ml.o CheckStop_ml.o 
 Tabulations_ml.o : Tabulations_ml.f90 ModelConstants_ml.o PhysicalConstants_ml.o 
 TimeDate_ml.o : TimeDate_ml.f90 
 TimeDate_ExtraUtil_ml.o : TimeDate_ExtraUtil_ml.f90 TimeDate_ml.o CheckStop_ml.o SmallUtils_ml.o ModelConstants_ml.o Par_ml.o 
 Timefactors_ml.o : Timefactors_ml.f90 TimeDate_ml.o Io_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o NetCDF_ml.o ModelConstants_ml.o Met_ml.o InterpolationRoutines_ml.o GridValues_ml.o EmisDef_ml.o Country_ml.o CheckStop_ml.o 
 Timing_ml.o : Timing_ml.f90 
-Trajectory_ml.o : Trajectory_ml.f90 TimeDate_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o Chem_ml.o My_Outputs_ml.o 
-Units_ml.o : Units_ml.f90 My_Pollen_ml.o SmallUtils_ml.o OwnDataTypes_ml.o PhysicalConstants_ml.o ModelConstants_ml.o CM_ChemSpecs_tmp.o CM_ChemGroups_ml.o CheckStop_ml.o 
-Unimod.o : Unimod.f90 My_3DVar_ml.o Nest_ml.o Trajectory_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o Tabulations_ml.o SmallUtils_ml.o Sites_ml.o PhyChem_ml.o Par_ml.o OutputChem_ml.o NetCDF_ml.o MPI_Groups_ml.o ModelConstants_ml.o Met_ml.o MassBudget_ml.o Landuse_ml.o Io_Progs_ml.o Io_ml.o GridValues_ml.o ForestFire_ml.o Emissions_ml.o EcoSystem_ml.o DerivedFields_ml.o Derived_ml.o DefPhotolysis_ml.o Country_ml.o CM_ChemGroups_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o BoundaryConditions_ml.o Biogenics_ml.o AirEmis_ml.o Aqueous_n_WetDep_ml.o Advection_ml.o Timing_ml.o My_Outputs_ml.o 
-Wesely_ml.o : Wesely_ml.f90 PhysicalConstants_ml.o 
-isocom.o : isocom.f90 isrpia.inc 
-ISOFWD.o : ISOFWD.f90 isrpia.inc 
-isorev.o : isorev.f90 isrpia.inc 
+Trajectory_ml.o : Trajectory_ml.f90 TimeDate_ml.o Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o MetFields_ml.o Io_ml.o GridValues_ml.o ChemFields_ml.o My_Outputs_ml.o 
+uEMEP_ml.o : uEMEP_ml.f90 Timefactors_ml.o TimeDate_ml.o SmallUtils_ml.o PhysicalConstants_ml.o Par_ml.o OwnDataTypes_ml.o NetCDF_ml.o ModelConstants_ml.o MetFields_ml.o GridValues_ml.o EmisGet_ml.o EmisDef_ml.o Country_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o 
+Units_ml.o : Units_ml.f90 SmallUtils_ml.o OwnDataTypes_ml.o My_Pollen_ml.o PhysicalConstants_ml.o ModelConstants_ml.o ChemSpecs_wrapper.o CM_ChemGroups_ml.o CheckStop_ml.o 
+Unimod.o : Unimod.f90 uEMEP_ml.o Trajectory_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o Tabulations_ml.o SmallUtils_ml.o Sites_ml.o PhyChem_ml.o Par_ml.o OutputChem_ml.o NetCDF_ml.o Nest_ml.o MPI_Groups_ml.o ModelConstants_ml.o Met_ml.o MassBudget_ml.o Landuse_ml.o Io_Progs_ml.o Io_ml.o GridValues_ml.o ForestFire_ml.o Emissions_ml.o EcoSystem_ml.o Derived_ml.o DefPhotolysis_ml.o My_3DVar_ml.o Country_ml.o CM_ChemGroups_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o BoundaryConditions_ml.o Biogenics_ml.o AirEmis_ml.o Aqueous_n_WetDep_ml.o Advection_ml.o Timing_ml.o My_Outputs_ml.o 
+YieldModifications_mod.o : YieldModifications_mod.f90 SmallUtils_ml.o NumberConstants.o ModelConstants_ml.o emep_Config_mod.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o 
 global2local.o : global2local.f90 Par_ml.o MPI_Groups_ml.o ModelConstants_ml.o 
-PhyChem_ml.o : PhyChem_ml.f90 Timefactors_ml.o Sites_ml.o Runchem_ml.o Radiation_ml.o Trajectory_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o SoilWater_ml.o My_Pollen_ml.o Par_ml.o Nest_ml.o Timing_ml.o My_Outputs_ml.o OutputChem_ml.o MetFields_ml.o ModelConstants_ml.o GridValues_ml.o Emissions_ml.o EmisDef_ml.o DryDep_ml.o DerivedFields_ml.o Derived_ml.o My_3DVar_ml.o My_3DVar_ml.o CoDep_ml.o CM_ChemSpecs_tmp.o Chem_ml.o CheckStop_ml.o Biogenics_ml.o Advection_ml.o 
+PhyChem_ml.o : PhyChem_ml.f90 Timefactors_ml.o Sites_ml.o Runchem_ml.o Radiation_ml.o uEMEP_ml.o Trajectory_ml.o TimeDate_ExtraUtil_ml.o TimeDate_ml.o SoilWater_ml.o My_Pollen_ml.o PhysicalConstants_ml.o Par_ml.o Nest_ml.o Timing_ml.o My_Outputs_ml.o OutputChem_ml.o NetCDF_ml.o MetFields_ml.o ModelConstants_ml.o GridValues_ml.o Gravset_ml.o Emissions_ml.o EmisDef_ml.o DryDep_ml.o DerivedFields_ml.o Derived_ml.o My_3DVar_ml.o My_3DVar_ml.o CoDep_ml.o ChemSpecs_wrapper.o ChemFields_ml.o CheckStop_ml.o Biogenics_ml.o Advection_ml.o 
 My_3DVar_ml.o : My_3DVar_ml.f90 ModelConstants_ml.o CheckStop_ml.o 
-My_Pollen_ml.o : My_Pollen_ml.f90 CheckStop_ml.o CM_ChemSpecs_tmp.o ModelConstants_ml.o PhysicalConstants_ml.o 
-My_ESX_ml.o : My_ESX_ml.f90 
+My_Pollen_ml.o : My_Pollen_ml.f90 CheckStop_ml.o ChemSpecs_wrapper.o ModelConstants_ml.o 

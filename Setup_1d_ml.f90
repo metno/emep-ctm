@@ -1,7 +1,7 @@
-! <Setup_1d_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <Setup_1d_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,14 +43,16 @@ use CheckStop_ml,        only:  CheckStop, StopAll
 use ColumnSource_ml,     only: ColumnRate
 use DerivedFields_ml,    only: d_2d, f_2d
 use EmisDef_ml,          only: gridrcemis, gridrcroadd, KEMISTOP,Emis_4D,N_Emis_4D,Found_Emis_4D&
-                                , O_NH3, O_DMS
-use EmisGet_ml,          only:  nrcemis, iqrc2itot  !DSRC added nrcemis
-use Emissions_ml,        only:  SumSplitEmis
+                                , O_NH3, O_DMS, SumSplitEmis&
+                                ,AISco, AISnox, AISsox, AISso4, AISash, AISec , AISoc, FOUND_Special_ShipEmis&
+                                ,NO_ix,NO2_ix,SO2_ix,SO4_ix,CO_ix,REMPPM25_ix&
+                                ,EC_F_FFUEL_NEW_ix,EC_F_FFUEL_AGE_ix,POM_F_FFUEL_ix
+use EmisGet_ml,          only:  nrcemis, iqrc2itot  
 use ForestFire_ml,       only: Fire_rcemis, burning
 use Functions_ml,        only:  Tpot_2_T
 use ChemFields_ml,       only: SurfArea_um2cm3
 use ChemSpecs  !,           only:  SO4,C5H8,NO,NO2,SO2,CO,
-use ChemRates_rct_ml,    only:  set_rct_rates, rct
+use ChemRates_rct_ml,    only:  set_rct_rates, rct, NRCT
 use GridValues_ml,       only:  xmd, GridArea_m2, & 
                                  debug_proc, debug_li, debug_lj,&
                                  A_mid,B_mid,gridwidth_m,dA,dB,&
@@ -67,16 +69,16 @@ use ModelConstants_ml,   only:  &
   ,SKIP_RCT                     & ! kHet tests
   ,dt_advec                     & ! time-step
   ,IOU_INST                     & ! for OUTMISC
-  ,MasterProc                   &
-  ,PPB, PT                      & ! Pressure at top
-  ,USES                         & ! Forest fires so far
+  ,MasterProc                   & 
+  ,PPB, PT                      & ! PT-pressure at top
+  ,USES                         & ! forest fires, hydrolysis, dergee_days etc.
   ,USE_SEASALT                  &
   ,USE_LIGHTNING_EMIS, USE_AIRCRAFT_EMIS      &
   ,USE_GLOBAL_SOILNOX, USE_DUST, USE_ROADDUST &
   ,USE_OCEAN_NH3,USE_OCEAN_DMS,FOUND_OCEAN_DMS&
   ,VOLCANO_SR                   & ! Reduce Volcanic Emissions
   ,emis_inputlist               & ! Used in EEMEP
-  ,KMAX_MID ,KMAX_BND, KCHEMTOP   ! Start and upper k for 1d fields
+  ,KMAX_MID ,KMAX_BND, KCHEMTOP   ! Upper layer (k), upper level, and k for 1d fields
 use My_Derived_ml,       only: EmisSplit_OUT
 use Landuse_ml,          only: water_fraction, ice_landcover
 use Par_ml,              only: me, & 
@@ -84,14 +86,14 @@ use Par_ml,              only: me, &
 use PhysicalConstants_ml,only: ATWAIR, AVOG, PI, GRAV, T0
 use Radiation_ml,        only: PARfrac, Wm2_uE
 use Setup_1dfields_ml,   only: &
-   xn_2d                &  ! concentration terms
-  ,rcemis, deltaZcm     &  ! emission terms and layer thickness
+   xn_2d                &  ! concentration terms (molec/cm3)
+  ,rcemis, deltaZcm     &  ! emission terms and lowest layer thickness
   ,rh, temp, tinv, itemp,pp      &  !
   ,amk, o2, n2, h2o     &  ! Air concentrations
   ,cN2O5, cHO2, cO3, cHNO3 &  ! mol speeds, m/s
-  ,cNO2, cNO3              &  ! mol speeds, m/s, kHet tests
-  ,gamN2O5  & !kHet for printout
-  ,DpgNw,S_m2m3   &  ! for wet diameter and surf area
+  ,cNO2, cNO3              &  ! mol speeds, m/s, kHetero tests
+  ,gamN2O5                 &  ! kHetero test - for printout
+  ,DpgNw, S_m2m3           &  ! for wet diameter and surf area
   ,aero_fom, aero_fbc, aero_fss, aero_fdust
 use SmallUtils_ml,       only: find_index
 use Tabulations_ml,      only: tab_esat_Pa
@@ -104,24 +106,19 @@ implicit none
 private
 !-----------------------------------------------------------------------!
 
-public :: setup_1d   ! Extracts results for i,j column from 3-D fields
-public :: setup_rcemis ! Emissions  (formerly "poll")
-public :: reset_3d     ! Exports final results for i,j column to 3-D fields
+public :: setup_1d     ! Extracts results for i,j column from 3-D fields
+public :: setup_rcemis ! Emissions in i,j column
+public :: reset_3d     ! Exports final results from i,j column to 3-D fields
                        ! (and XNCOL outputs if asked for)
 
 ! Indices for the species defined in this routine. Only set if found
 ! Hard-coded for 2 specs just now. Could extend and allocate.
 integer, private, parameter :: NROADDUST = 2
 integer, private, parameter :: iROADF=1,  iROADC=2
-integer, private, save :: inat_RDF,  inat_RDC, inat_Rn222
+integer, private, save :: inat_RDF,  inat_RDC
 integer, private, save :: itot_RDF=-999,  itot_RDC=-999, itot_Rn222=-999
 
-! Minimum concentration allowed for advected species. Avoids some random
-! variations between debugged/normal runs with concs of e.g. 1.0e-23 ppb or
-! less. 1.0e-20 ppb is ca. 2.5e-10 molec/cm3 at sea-level, ca. 2.5e-11 at top
-! e.g.: MINCONC = 1.0e-29
 
-!DUST_ROAD_F
 
 contains
  !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -140,7 +137,7 @@ contains
     real :: ugtmp, ugSIApm, ugDustF, ugSSaltF, ugDustC, ugSSaltC
     real, save ::  ugBCf=0.0, ugBCc=0.0 !not always present
     real :: ugSO4, ugNO3f, ugNO3c, ugRemF, ugRemC, ugpmF, ugpmC, rho
-    logical :: is_finepm, is_ssalt, is_dust ,have_BC
+    logical :: is_finepm, is_ssalt, is_dust
     logical, dimension(size(PM10_GROUP)), save  :: is_BC 
     real, dimension(size(AERO%Inddry))  :: Ddry ! Dry diameter
     integer :: iw, ipm ! for wet rad
@@ -154,6 +151,9 @@ contains
     integer           :: k, n, ispec   ! loop variables
     real              :: qsat ! saturation water content
     integer, save :: nSKIP_RCT = 0
+    logical, save ::is_finepm_a(size( PM10_GROUP ))
+    logical, save ::is_ssalt_a(size( PM10_GROUP ))
+    logical, save ::is_dust_a(size( PM10_GROUP ))
 
     debug_flag =  ( DEBUG%SETUP_1DCHEM .and. debug_proc .and.  &
       i==debug_li .and. j==debug_lj .and. current_date%seconds == 0 )
@@ -165,26 +165,35 @@ contains
        do n = 1, size(SKIP_RCT)
           if ( SKIP_RCT(n) > 0 ) nSKIP_RCT = nSKIP_RCT  + 1
        end do
-       if( MasterProc ) write(*,"(a,10i4)") dtxt//"SKIP_RCT:", SKIP_RCT(1:nSKIP_RCT)
+       if( MasterProc ) write(*,"(a,10i4)") &
+          dtxt//"SKIP_RCT:", SKIP_RCT(1:nSKIP_RCT)
 
        is_BC(:) = .false.
 
 
        iBCf = find_index('ECFINE',chemgroups(:)%name)
-       if( MasterProc ) write(*,*) dtxt//"is_BCf check ", iBCf, trim(USES%n2o5HydrolysisMethod)
+       if( MasterProc ) write(*,*) dtxt//"is_BCf check ", iBCf, &
+           trim(USES%n2o5HydrolysisMethod)
        if ( iBCf > 0 ) then
           iBCc = find_index('ECCOARSE',chemgroups(:)%name)
           if( MasterProc ) write(*,*) dtxt//"is_BCc check ", iBCc
           do ipm = 1, size( PM10_GROUP )
               ispec = PM10_GROUP(ipm)
-              is_BC(ipm)  = ( find_index( ispec, chemgroups(iBCf)%ptr ) >0 )
+              is_BC(ipm)  = ( find_index( ispec, chemgroups(iBCf)%specs ) >0 )
               if( iBCc > 0 ) then ! have coarse BC too
-                 if( find_index( ispec, chemgroups(iBCc)%ptr ) >0) &
+                 if( find_index( ispec, chemgroups(iBCc)%specs ) >0) &
                     is_BC(ipm)  = .true.
               end if
-              if( MasterProc) write(*,*) dtxt//"is_BC ",species(ispec)%name, is_BC(ipm)
+              if( MasterProc) write(*,*) dtxt//"is_BC ",&
+                   species(ispec)%name, is_BC(ipm)
           end do
        end if
+       do ipm = 1, size( PM10_GROUP )
+          ispec = PM10_GROUP(ipm)
+          is_finepm_a(ipm) = ( find_index( ispec, PMFINE_GROUP) > 0 )
+          is_ssalt_a(ipm)  = ( find_index( ispec, SS_GROUP ) >0)
+          is_dust_a(ipm)   = ( find_index( ispec, DUST_GROUP )>0)
+       enddo
     end if ! first_call
 
     if( debug_flag ) write(*,*) dtxt//"=DBG=======  ", first_call, me
@@ -200,8 +209,8 @@ contains
        h2o(k) = max( 1.e-5*amk(k), &
                      q(i,j,k,1)*amk(k)*ATWAIR/18.0)
 
-      ! nb. max function for h2o  used as semi-lagrangian scheme used
-      ! in LAM50 (and HIRLAM) often gives negative H2O....   :-(
+      ! nb. max function for h2o used as some NWP numerics can give 
+      ! negative negative H2O....   :-(
 
        pp(k) = A_mid(k) + B_mid(k)*ps(i,j,1)
 
@@ -214,7 +223,7 @@ contains
        rh(k) = min( q(i,j,k,1)/qsat , 1.0)
        rh(k) = max( rh(k) , 0.001)
 
-        ! 1)/ Short-lived species - no need to scale with M
+        ! 1)/ Short-lived species - no need to convert units
 
          do n = 1, NSPEC_SHL
                xn_2d(n,k) = max(0.0,xn_shl(n,i,j,k))
@@ -226,7 +235,7 @@ contains
               xn_2d(ispec,k) = max(0.0,xn_adv(n,i,j,k)*amk(k))
         end do ! ispec
 
-        ! 3)/ Background species ( * CTM2 with units in mix. ratio)
+        ! 3)/ Background species (with units in mix. ratio)
         do n = 1, NSPEC_BGN
               xn_2d_bgn(n,k) = max(0.0,xn_bgn(n,i,j,k)*amk(k))
         end do ! ispec
@@ -241,8 +250,8 @@ contains
            ugRemC      = 0.0
            ugpmF       = 0.0
            ugpmC       = 0.0
-           ugNO3f      = 0.0 !  0.27*xn_2d(ispec,k)*species(ispec)%molwt*1.0e12/AVOG
-           ugNO3c      = 0.0 !  0.27*xn_2d(ispec,k)*species(ispec)%molwt*1.0e12/AVOG
+           ugNO3f      = 0.0 !  0.27*xn_2d(i,k)*species(i)%molwt*1.0e12/AVOG
+           ugNO3c      = 0.0 !  0.27*xn_2d(i,k)*species(i)%molwt*1.0e12/AVOG
            ugSIApm     = 0.0 
            ugBCf       = 0.0
            ugBCc       = 0.0
@@ -256,9 +265,9 @@ contains
              ispec = PM10_GROUP(ipm)
 
              ugtmp  = xn_2d(ispec,k)*species(ispec)%molwt*1.0e12/AVOG
-             is_finepm = ( find_index( ispec, PMFINE_GROUP) > 0 )
-             is_ssalt  = ( find_index( ispec, SS_GROUP ) >0)
-             is_dust   = ( find_index( ispec, DUST_GROUP )>0)
+             is_finepm = is_finepm_a(ipm)
+             is_ssalt  = is_ssalt_a(ipm)
+             is_dust   = is_dust_a(ipm)
              if( is_finepm ) then
                ugpmF  = ugpmF   + ugtmp
                if(is_ssalt) ugSSaltF = ugSSaltF  +  ugtmp
@@ -289,7 +298,7 @@ contains
            end do
 
          ! FRACTIONS used for N2O5 hydrolysis
-         ! We use mass fractions, since we anyway don't have MW for OM, dust,...
+         ! We use mass fractions, since we anyway don't have MW for OM, dust,
          !  ugRemF will include OM, EC, PPM, Treat as OM 
 
           ugRemF = ugpmf - ugSIApm -ugSSaltF -ugDustF
@@ -371,7 +380,8 @@ contains
 
            ! For total area, we simply sum. We ignore some non-SS or dust _C.
            iw= AERO%PM
-           S_m2m3(iw,k) = S_m2m3(AERO%PM_F,k) + S_m2m3(AERO%SS_C,k) + S_m2m3(AERO%DU_C,k) 
+           S_m2m3(iw,k) = S_m2m3(AERO%PM_F,k) + S_m2m3(AERO%SS_C,k) &
+                             + S_m2m3(AERO%DU_C,k) 
 
            iw= AERO%ORIG
            S_m2m3(iw,k) = S_RiemerN2O5(k)
@@ -406,8 +416,8 @@ contains
    cHNO3(:) = cMolSpeed(temp(:), 63.0)
    cHO2(:)  = cMolSpeed(temp(:), 33.0)
    cO3(:)   = cMolSpeed(temp(:), 48.0)
-   !cNO3(:)  = cMolSpeed(temp(:), 62.0)
-   !cNO2(:)  = cMolSpeed(temp(:), 46.0)
+   cNO3(:)  = cMolSpeed(temp(:), 62.0)
+   cNO2(:)  = cMolSpeed(temp(:), 46.0)
 
   ! 5 ) Rates  (!!!!!!!!!! NEEDS TO BE AFTER RH, XN, etc. !!!!!!!!!!)
 
@@ -434,6 +444,12 @@ contains
      nd2d = 0
      do itmp = 1, size(f_2d)
            if ( f_2d(itmp)%subclass == 'rct' ) then
+            !check if index of rate constant (config) possible
+             if ( f_2d(itmp)%index > NRCT ) then
+                if(MasterProc) write(*,*) 'RCT NOT AVAILABLE!', itmp, &
+                  f_2d(itmp)%index, NRCT
+                cycle
+             end if
              nd2d =  nd2d  + 1
              call CheckStop(nd2d>size(id2rct),dtxt//"Need bigger id2rct array")
              d2index(nd2d)= itmp
@@ -461,20 +477,19 @@ subroutine setup_rcemis(i,j)
 !-------------------------------------------------------------------
 !    DESCRIPTION:
 !    Extracts emissions in column from gridrcemis, for input to chemistry
-!    routines. Results in "rcemis" array
-!    units of rcemis are molecule/cm3/s
+!    routines. Results in "rcemis" array with unts: molecule/cm3/s
 !-------------------------------------------------------------------
   !-- arguments
   integer, intent(in) ::  i,j     ! coordinates of column
 
   !  local
-  integer ::  iqrc,k, itot
+  integer :: iqrc,k, itot
   real    :: Kw,fac, eland   ! for Pb210  - emissions from land
 
-  integer ::  i_help,j_help,i_l,j_l, i_Emis_4D,n
+  integer :: i_Emis_4D,n
   logical, save     :: first_call = .true. 
   character(len=13) :: dtxt="setup_rcemis:"
-  real :: SC_DMS,SC_DMS_m23,SC_DMS_msqrt,SST_C
+  real :: SC_DMS,SC_DMS_m23,SC_DMS_msqrt,SST_C,invDeltaZfac
   integer,save ::IC_NH3
 
   if(first_call)then
@@ -485,7 +500,7 @@ subroutine setup_rcemis(i,j)
     itot_Rn222=find_index( "RN222", species(:)%name    )
     IC_NH3=find_index( "NH3", species(:)%name    )
     first_call = .false.
-  endif 
+  end if 
 
 ! initilize ! initilize ! initilize ! initilize
   rcemis(:,:)=0.
@@ -500,60 +515,67 @@ subroutine setup_rcemis(i,j)
     rcemis(:,:)=rcemis(:,:)+ColumnRate(i,j,REDUCE_VOLCANO=0.85)
   else
     rcemis(:,:)=rcemis(:,:)+ColumnRate(i,j)
-  endif
+  end if
 
-  ! lightning and aircraft ... Airial NOx emissions if required:
+  ! lightning and aircraft ... Aerial NOx emissions if required:
   if(USE_LIGHTNING_EMIS)then
     do k=KCHEMTOP, KMAX_MID
       rcemis(NO ,k) = rcemis(NO ,k) + 0.95 * airlig(k,i,j)
       rcemis(NO2,k) = rcemis(NO2,k) + 0.05 * airlig(k,i,j)
-    enddo
-  endif
+    end do
+  end if
   if(USE_AIRCRAFT_EMIS) then
     do k=KCHEMTOP, KMAX_MID
       rcemis(NO ,k) = rcemis(NO ,k) + 0.95 * airn(k,i,j)
       rcemis(NO2,k) = rcemis(NO2,k) + 0.05 * airn(k,i,j)
-    enddo
+    end do
   end if ! AIRCRAFT NOX
   if(DEBUG%SETUP_1DCHEM.and.debug_proc.and.i==debug_li.and.j==debug_lj)&
     write(*,"(a,2L2,10es10.3)") &
       dtxt//"AIRNOX ", USE_LIGHTNING_EMIS, USE_AIRCRAFT_EMIS, &
       airn(KMAX_MID,i,j),airlig(KMAX_MID,i,j)
 
-  ! Add sea salt production
+  ! Road dust
   if(USE_ROADDUST.and.itot_RDF>0) then  ! Hard-code indices for now
     rcemis(itot_RDF,KMAX_MID) = gridrcroadd(1,i,j)
     rcemis(itot_RDC,KMAX_MID) = gridrcroadd(2,i,j)
-   endif
-
+   end if
+   
+  ! Forest fires
   if(USES%FOREST_FIRES) then
     if(burning(i,j))call Fire_rcemis(i,j)
-  endif
+  end if
 
-  !Soil NOx
+  ! Soil NOx
   if(USE_GLOBAL_SOILNOX)then !NEEDS CHECKING NOV2011
     rcemis(NO,KMAX_MID)=rcemis(NO,KMAX_MID)+SoilNOx(i,j)
-  endif
+  end if
 
-
+  ! Emissions from GEIA, was use for Aerocom NO3 experiment
   if(USE_OCEAN_NH3)then
-     !keep separated from snapemis/rcemis in order to be able to include more advanced processes
+     !keep separated from snapemis/rcemis in order to be able to include more
+     ! advanced processes
      k=KMAX_MID
      !convert from kg/m2/s into molecules/cm3/s . 
      !kg->g=1000 , /m3->/cm3=1e-6 , 1000*1e-6=0.001
      
-     rcemis(O_NH3%index,k)=rcemis(O_NH3%index,k)+O_NH3%emis(i,j)*0.001*AVOG/species(IC_NH3)%molwt&
+     rcemis(O_NH3%index,k)=rcemis(O_NH3%index,k)+ &
+       O_NH3%emis(i,j)*0.001*AVOG/species(IC_NH3)%molwt&
           *(GRAV*roa(i,j,k,1))/(dA(k)+dB(k)*ps(i,j,1))
+    !make map in mg/m2
+     O_NH3%map(i,j)=O_NH3%emis(i,j)*dt_advec*1.0E6!kg->mg = 1.0E6
 
-  endif
+  end if
 
+  ! Ocean DMS -> SO2
   if(FOUND_OCEAN_DMS)then!temporarily always compute budgets if file found
-     !keep separated from snapemis/rcemis in order to be able to include more advanced processes
+     !keep separated from snapemis/rcemis in order to be able to include more
+     ! advanced processes
      k=KMAX_MID
      !convert from mol/cm3 into molecules/cm3/s . 
      !Kw in cm/hour after Leonor Tarrason (1995), after Liss and Merlivat (1986)
      !assumes 20 degrees C
-!NB: misprint in gbc1385.pdf!
+    !NB: misprint in gbc1385.pdf!
      SST_C=max(0.0,min(30.0,(SST(i,j,1)-T0))) !the formula uses degrees C
      SC_DMS=2674 -147.12*SST_C + 3.726*SST_C*SST_C - 0.038 * SST_C*SST_C*SST_C
      SC_DMS=SC_DMS/600.0
@@ -565,37 +587,44 @@ subroutine setup_rcemis(i,j)
      elseif(ws_10m(i,j,1)<=13.0)then
         Kw=0.17*ws_10m(i,j,1)*SC_DMS_m23+2.68*(ws_10m(i,j,1)-3.6)*SC_DMS_msqrt
      else
-        Kw=0.17*ws_10m(i,j,1)*SC_DMS_m23+2.68*(ws_10m(i,j,1)-3.6)*SC_DMS_msqrt+3.05*(ws_10m(i,j,1)-13)*SC_DMS_msqrt
-     endif
+        Kw=0.17*ws_10m(i,j,1)*SC_DMS_m23+ &
+           2.68*(ws_10m(i,j,1)-3.6)*SC_DMS_msqrt+ &
+           3.05*(ws_10m(i,j,1)-13)*SC_DMS_msqrt
+     end if
      Kw=Kw/3600!cm/hour -> cm/s
+
 !66% of DMS turns into SO2, Leonor Tarrason (1995)
      if(USE_OCEAN_DMS)then
-      rcemis(O_DMS%index,k)=rcemis(O_DMS%index,k)+0.66*O_DMS%emis(i,j)*Kw*0.01*GRAV*roa(i,j,k,1)/(dA(k)+dB(k)*ps(i,j,1)) *AVOG 
-     endif
-     !in g . Multiply by dz(in cm)  * dx*dx (in cm2) * molwgt(SO2) /AVOG  . (dz/AVOG just removed from above) 
+      rcemis(O_DMS%index,k)=rcemis(O_DMS%index,k)+ &
+      0.66*O_DMS%emis(i,j)*Kw*0.01*GRAV*roa(i,j,k,1)/ &
+                           (dA(k)+dB(k)*ps(i,j,1)) *AVOG 
+     end if
+     !in g . Multiply by dz(in cm)  * dx*dx (in cm2) * ...
+     !... molwgt(SO2) /AVOG . (dz/AVOG just removed from above) 
      !g->Gg = 1.0E-9
      O_DMS%sum_month = O_DMS%sum_month+0.66*O_DMS%emis(i,j)*Kw *1.e4*xmd(i,j)*&
           gridwidth_m*gridwidth_m*dt_advec *64.0*1.0E-9
 
-!make map in mg/m2
-     O_DMS%map(i,j)=O_DMS%emis(i,j)*Kw *1.e4*62.13*1.0E3!g->mg = 1.0E3  ; /cm2 -> /m2 =1e4
+!make map in mg/m2,    g->mg = 1.0E3  ; /cm2 -> /m2 =1e4
+     O_DMS%map(i,j)=O_DMS%emis(i,j)*Kw *1.e4*62.13*1.0E3  
 
-  endif
+  end if
 
 
 
   if(Found_Emis_4D>0)then
      do i_Emis_4D=1,N_Emis_4D
         if(emis_inputlist(Found_Emis_4D)%pollemepName(i_Emis_4D)=='NOTSET')exit
-        n=find_index(emis_inputlist(Found_Emis_4D)%pollemepName(i_Emis_4D),species(:)%name)
+        n=find_index(emis_inputlist(Found_Emis_4D)%pollemepName(i_Emis_4D),&
+                      species(:)%name)
         if(n>0)then
            fac=1.0/1000000.0/3600.0 !convert from Bq/m3/hour into Bq/cm3/s
            do k=KCHEMTOP, KMAX_MID
               rcemis(n,k)=rcemis(n,k)+Emis_4D(i,j,k,i_Emis_4D)*fac
-           enddo
-        endif
-     enddo
-  endif
+           end do
+        end if
+     end do
+  end if
 
 
   do k=KCHEMTOP, KMAX_MID
@@ -611,6 +640,48 @@ subroutine setup_rcemis(i,j)
     end if
   end do
 
+  if(FOUND_Special_ShipEmis)then
+     !NB: the species indices (NO2, SO2...) may not be defined in some configurations:
+     ! this will make the model compilation crash *also* when no ship emis are used.
+     invDeltaZfac = 1.0/deltaZcm(KMAX_MID)
+     if(NO_ix>0) rcemis(NO_ix,KMAX_MID)  = rcemis(NO_ix,KMAX_MID) &
+                               + 0.95 * AISnox(i,j) *  invDeltaZfac
+     if(NO2_ix>0) rcemis(NO2_ix,KMAX_MID) = rcemis(NO2_ix,KMAX_MID) &
+                               + 0.05 * AISnox(i,j) * invDeltaZfac
+     if(SO2_ix>0)  rcemis(SO2_ix,KMAX_MID) = rcemis(SO2_ix,KMAX_MID) &
+          +  AISsox(i,j) * invDeltaZfac
+     if(SO4_ix>0)  rcemis(SO4_ix,KMAX_MID) = rcemis(SO4_ix,KMAX_MID) &
+          +  AISso4(i,j) * invDeltaZfac
+     if(CO_ix>0)  rcemis(CO_ix,KMAX_MID) = rcemis(CO_ix,KMAX_MID) &
+          +  AISco(i,j) * invDeltaZfac
+
+! Comments from Jukka-Pekka Jalkanen at FMI 
+
+!   The composition of Ash can be taken from Jana’s paper 
+!   (Moldanova et al, Atm Env 43 (2009) 2632-2641), Table 8. According to 
+!   that, the composition by weight is: C (11.1%), O (5.7%), S (4.9%), 
+!   V (30.7%), Ni (20.9%), Ca (26.7%). This composition was determined for 
+!   fuel with 1.9% sulphur and it will not be directly applicable to fuels 
+!   used in the Baltic Sea during 2015. However, that is the only reference 
+!   I could find which reports the elemental composition of Ash.
+
+! All primary PM emitted should be assigned to PM2.5 fraction since the PM 
+! size of fresh exhaust is less than 100 nm. Whether this grows fast enough 
+! to >2.5 microns in the timescale used by the regional models is not known 
+! to me at this point.        
+ 
+        if(REMPPM25_ix>0)  rcemis(REMPPM25_ix,KMAX_MID) = rcemis(REMPPM25_ix,KMAX_MID) &
+                                    +  1.0 * AISash(i,j) * invDeltaZfac
+      
+        if(EC_F_FFUEL_NEW_ix>0)  rcemis(EC_F_FFUEL_NEW_ix,KMAX_MID) = rcemis(EC_F_FFUEL_NEW_ix,KMAX_MID) &
+                                          +  0.8 * AISec(i,j) * invDeltaZfac
+        if(EC_F_FFUEL_AGE_ix>0)  rcemis(EC_F_FFUEL_AGE_ix,KMAX_MID) = rcemis(EC_F_FFUEL_AGE_ix,KMAX_MID) &
+                                          +  0.2 * AISec(i,j) * invDeltaZfac
+
+        if(POM_F_FFUEL_ix>0)  rcemis(POM_F_FFUEL_ix,KMAX_MID) = rcemis(POM_F_FFUEL_ix,KMAX_MID) &
+                                       +  AISoc(i,j) * invDeltaZfac
+
+  endif
 
 
 
@@ -624,9 +695,9 @@ subroutine setup_rcemis(i,j)
         SumSplitEmis(i,j,iqrc) = SumSplitEmis(i,j,iqrc)&
           +rcemis(itot,k)*species(itot)%molwt &
           *(dA(k)+dB(k)*ps(i,j,1))/(GRAV*amk(k)*ATWAIR)
-      enddo
-    enddo
-  endif
+      end do
+    end do
+  end if
 
 
   ! Soil Rn222 emissions from non-ice covered land, + water
@@ -643,7 +714,7 @@ subroutine setup_rcemis(i,j)
 !ESX     rc_Rnwater(KMAX_MID) = water_fraction(i,j)  / &
 !ESX            ((z_bnd(i,j,KMAX_BND-1) - z_bnd(i,j,KMAX_BND))*100.)
 
-endsubroutine setup_rcemis
+end subroutine setup_rcemis
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine reset_3d(i,j)
   integer, intent(in) :: i,j
@@ -651,8 +722,8 @@ subroutine reset_3d(i,j)
 ! ! XNCOL testing -- sets d_2d for column data from molec/cm3 concs.
  ! if variables are wanted for d_2d output (via USET), we use these indices:
   character(len=*),parameter :: dtxt='reset3dxncol:'
-  character(len=10) :: specname
-  integer, dimension(10), save :: d2index, id2col
+  character(len=20) :: specname
+  integer, dimension(20), save :: d2index, id2col
   logical, save :: first_call = .true.
   integer, save :: nd2d
 !XNCOL  end testing
@@ -662,14 +733,14 @@ subroutine reset_3d(i,j)
     ! 1)/ Short-lived species - no need to scale with M
     do n = 1, NSPEC_SHL
       xn_shl(n,i,j,k) = xn_2d(n,k)
-    enddo ! ispec
+    end do ! ispec
 
     ! 2)/ Advected species
     do n = 1, NSPEC_ADV
       ispec = NSPEC_SHL + n
       xn_adv(n,i,j,k) = xn_2d(ispec,k)/amk(k)
-    enddo ! ispec
-  enddo ! k
+    end do ! ispec
+  end do ! k
 
 !XNCOL !======================================================================
 !! If column totals are wanted, we can do those here also since xn_2d are
@@ -684,7 +755,7 @@ subroutine reset_3d(i,j)
              nd2d =  nd2d  + 1
              call CheckStop( nd2d > size(id2col), &
                  dtxt//"Need bigger id2col array" )
-             specname = f_2d(id)%name(7:)  ! Strip XNCOL_
+             specname = trim(f_2d(id)%name(7:))  ! Strip XNCOL_
              ispec = find_index( specname, species(:)%name )
              call CheckStop(ispec < 1, dtxt//"XNCOL not found"//specname )
              d2index(nd2d)= id
@@ -709,7 +780,7 @@ end if
 !!XNCOL
 
 
-endsubroutine reset_3d
+end subroutine reset_3d
 !---------------------------------------------------------------------------
 endmodule Setup_1d_ml
 !_____________________________________________________________________________!

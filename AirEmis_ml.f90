@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -116,7 +116,7 @@ module AirEmis_ml
       if(.not.allocated(airlig))then
          allocate(airlig(KCHEMTOP:KMAX_MID,LIMAX,LJMAX))
          airlig=0.0
-      endif
+      end if
 
 ! --- Read Emission data received from DLR 
 
@@ -150,7 +150,7 @@ module AirEmis_ml
 
          write(6,*) 'Sum of NOx emissions from lightning: ',sumnox
 
-      endif
+      end if
 
       call air_inter(ILON   ,IGL    ,GGL  ,1     ,      & 
                      flux   ,airlig              ,      &
@@ -167,7 +167,6 @@ module AirEmis_ml
                        rlon   ,area   ,secmonth  )
 
 
-      integer, parameter  :: KMAX_BND_AIR = 21 
       integer, intent(in) :: ILON,IGL,GGL,iktop
       real, intent(in)    :: area(IGL), ygrdum(IGL),DLON,RLON0,secmonth
 
@@ -179,7 +178,6 @@ module AirEmis_ml
       real, intent(out)   :: rlon(ILON+1)
 
       !    local
-      integer info
       integer lon,lat,i,j,ig,jg,kg,k, i_sh
       integer la_tst1, la_tst2, lo_tst1, lo_tst2   !  test area for sums
       real    height,     &  !  height of the emission levels
@@ -220,7 +218,7 @@ module AirEmis_ml
                 else
       ! -- area not defined for Southern Hemisphere
                    volcm = area(GGL-lat+1)*1.e4*height
-                endif
+                end if
         
                 do lon=1,ILON
                    sumnox = sumnox + flux(lon,lat,k)
@@ -231,7 +229,7 @@ module AirEmis_ml
          end do       !k
             
          if(MY_DEBUG)write(6,*) 'SUMNOX, ANCAT:',sumnox
-      endif        !me=0
+      end if        !me=0
 
 
       CALL MPI_BCAST(flux(1,1,iktop), 8*GGL*ILON*(ILEV+1-iktop), MPI_BYTE, 0,&
@@ -245,7 +243,7 @@ module AirEmis_ml
          i_sh = GGL + 1 - i
          ygrida(i) = (ygrdum(i-1)+ygrdum(i))*0.5
          ygrida(i_sh) = - ygrida(i)
-      enddo
+      end do
 
       ! -  E/W
       rlon(1) = RLON0
@@ -268,11 +266,11 @@ module AirEmis_ml
 
                do while(glat(i,j)<ygrida(jg+1))
                   jg = jg+1
-               enddo
+               end do
 
                do while(glat(i,j)>=ygrida(jg))
                   jg = jg-1
-               enddo
+               end do
  
                jxn(i,j) = jg
                glij = glon(i,j)
@@ -327,7 +325,7 @@ module AirEmis_ml
                  else
                     !zero emissions
                     airem(k,i,j) = 0.0
-                 endif
+                 end if
             end do
 
            ! surface emissions

@@ -1,0 +1,63 @@
+To Reference the EMEP MSC-W model, the usual reference for 2017 code would be
+Simpson et al., (2012, 2017, and refs therein).
+
+(The main documentation paper of the EMEP MSC-W model is Simpson et al.,
+2012. Many updates have been made since then, recorded in the annual
+EMEP status reports, from 2013-2017, which are listed below and
+are available at www.emep.int.)
+
+   Simpson, D., Benedictow, A., Berge, H., Bergström, R., Emberson,
+     L. D., Fagerli, H., Flechard, C. R., Hayman, G. D., Gauss, M.,
+     Jonson, J. E., Jenkin, M. E., Nyiri, A., Richter, C., Semeena, V. S.,
+     Tsyro, S., Tuovinen, J.-P., Valdebenito, Á. & Wind, P. The EMEP MSC-W
+     chemical transport model -- technical description Atmos. Chem. Physics,
+     2012, 12, 7825-7865
+
+   Simpson, D.; Bergström, R.; Imhof, H. & Wind, P. Updates to the
+     EMEP/MSC-W model, 2016--2017 Transboundary particulate matter,
+     photo-oxidants, acidifying and eutrophying components. Status
+     Report 1/2017, The Norwegian Meteorological Institute, Oslo, Norway,
+     www.emep.int, 2017, 115-122
+
+
+The performance of the model is also assessed annually in the EMEP reports, e.g.
+
+
+   Gauss, M.; Tsyro, S.; Benedictow, A.; Fagerli, H.; Hjellbrekke, A.-G.;
+     Aas, W. & Solberg, S. EMEP MSC-W model performance for acidifying and
+     eutrophying components, photo-oxidants and particulate matter in 2015,
+     Supplementary material to EMEP Status Report 1/2017,
+     The Norwegian Meteorological Institute, Oslo, Norway, The Norwegian
+     Meteorological Institute, Oslo, Norway, 2017, 116pp
+
+(and similar for 2016, 2015, etc.)
+
+------------------------------------------------------------
+A extensive list of EMEP reports and papers can be found at:
+
+  http://emep.int/emep_publications.html
+
+
+Earlier model update chapters can be found here:
+
+Simpson, D.; Bergström, R.; Imhof, H. & Wind, P. Updates to the
+ EMEP/MSC-W model, 2016--2017 Transboundary particulate matter,
+ photo-oxidants, acidifying and eutrophying components. Status
+ Report 1/2017, The Norwegian Meteorological Institute, Oslo, Norway,
+ www.emep.int, 2017, 115-122
+
+Simpson, D.; Tsyro, S. & Wind, P. Updates to the EMEP/MSC-W model
+ Transboundary particulate matter, photo-oxidants, acidifying and
+ eutrophying components. Status Report 1/2015, The Norwegian Meteorological
+ Institute, Oslo, Norway, 2015, 129-138
+
+Tsyro, S.; Karl, M.; Simpson, D.; Valdebenito, A. & Wind, P. Updates to
+ the EMEP/MSC-W model Transboundary particulate matter, photo-oxidants,
+ acidifying and eutrophying components. Status Report 1/2014, The Norwegian
+ Meteorological Institute, Oslo, Norway, 2014, 143-146
+
+Simpson, D.; Schulz, M.; Shamsudheen, V.; Tsyro, S.; Valdebenito, A.;
+ Wind, P. & Steensen, B. M. EMEP model development and performance changes
+ Transboundary acidification, eutrophication and ground level ozone in
+ Europe in 2011. EMEP Status Report 1/2013, The Norwegian Meteorological
+ Institute, Oslo, Norway, 2013, 45-59

@@ -21,9 +21,9 @@
            , "GLYOX         " &
            , "MGLYOX        " &
            , "C5H8          " &
-           , "APINENE       " &
            , "ASH_F         " &
            , "ASH_C         " &
+           , "BIOTERP       " &
            , "POM_F_FFUEL   " &
            , "POM_C_FFUEL   " &
            , "EC_F_FFUEL_NEW" &

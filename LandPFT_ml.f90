@@ -1,7 +1,7 @@
-! <LandPFT_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <LandPFT_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,9 +50,6 @@ private
 
 
  INCLUDE 'mpif.h'
- INTEGER STATUS(MPI_STATUS_SIZE),INFO
-
- character(len=80), private :: errmsg
 
  real, public, allocatable :: pft_lai(:,:,:) 
  real, public, allocatable :: pft_bvoc(:,:,:,:) 

@@ -1,7 +1,7 @@
-! <PlumeRise_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <PlumeRise_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -313,11 +313,11 @@ contains
           if (dhp  <  0.) then
               iwash = 1
               if (id  ==  1) dhp = 0.
-          endif
+          end if
           hf = hs + dhp
           if(debug) print *, "tsd: ", hf
 
-      endif
+      end if
 
 ! no downwash below ground
 
@@ -370,7 +370,7 @@ contains
               else
                   xf  = 0.119*f**(2./5.)
                   dhb = 38.71*f**(3./5.)/up
-              endif
+              end if
           if(debug) print *, "neutrl:  ", niter,f,  xf, up, dhb
 
           else
@@ -401,7 +401,7 @@ contains
               dhb = min(dhb1,dhb2)
           if(debug) print *, "stab:  ", niter, rs, s, xf, up, dhb1, dhb2
 
-          endif
+          end if
 
       else
 
@@ -423,9 +423,9 @@ contains
 
               dhm = 1.5*((w*w*d*d*ta)/(4.*tg*up))**(1./3.)*s**(-1./6.)
 
-          endif
+          end if
 
-      endif
+      end if
 
 ! no momentum rise if stack downwash
 
@@ -463,7 +463,7 @@ contains
           testhp  = hfl
           if (diffht <= testhfl) exit
       
-      endif
+      end if
 
 !      if (idh .ne. 3 .and. diffht  >  testhfl .and.   &
 !         niter .le. 100) goto 100
@@ -529,7 +529,7 @@ contains
           hnew = hs
           return
 
-      endif
+      end if
 
       if (idh  ==  3) then
 
@@ -539,7 +539,7 @@ contains
           hnew = hfl
           return
 
-      endif
+      end if
 
       dm = hmix - hs
       dp = hfl  - hs
@@ -554,7 +554,7 @@ contains
 
           rmp = dm/dp
 
-      endif
+      end if
 !print *, "rmp  ", hmix, hfl, rmp  
 
       if (rmp >= 1.5) then
@@ -581,7 +581,7 @@ contains
           hpen = hs + (0.62 + 0.38*ps)*dm
 !print *, "partial p", hnew, hpen
 
-      endif
+      end if
 
 ! choose the lowest of effective plume rise and rise due to penetration
 
@@ -646,7 +646,7 @@ contains
           if (iwash  ==  1) hp = hf
           return
 
-      endif
+      end if
 
       bt = bh + 1.5*bl
 
@@ -669,7 +669,7 @@ contains
               he = 2.*hf - (bh + 1.5*bl)
           else
               he = hf - 1.5*bl
-          endif
+          end if
 
           th = 0.5*bl
 
@@ -687,7 +687,7 @@ contains
 
                   hp = he
 
-              endif
+              end if
 
           else
 
@@ -696,9 +696,9 @@ contains
               idh = 3
               hp  = 0.0
 
-          endif
+          end if
 
-      endif
+      end if
 
       return
 

@@ -1,7 +1,7 @@
-! <My_Derived_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <My_Derived_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -48,7 +48,7 @@ module My_Derived_ml
 !   accessed here through subroutine calls - using just the (i,j) part
 !   of the bigger d_2d arrays
 !
-! NOTE (14/9/2015) - this routine will likely be deleted in future, as we are
+! NOTE - this routine will likely be deleted in future, as we are
 !  moving most definitions to the config namelist system.
 !---------------------------------------------------------------------------
 
@@ -58,13 +58,13 @@ use Chemfields_ml,    only: xn_adv, xn_shl, cfac
 use ChemSpecs             ! Use IXADV_ indices...
 use ChemGroups_ml         ! Allow all groups to ease compilation
                           !  eg. OXN_GROUP, DDEP_OXNGROUP, BVOC_GROUP
-use EmisDef_ml,       only: EMIS_FILE
+use EmisDef_ml,       only: NSECTORS, EMIS_FILE, NEMIS_FILE, SecEmisOut, Nneighbors
 use EmisGet_ml,       only: nrcemis, iqrc2itot
 use GridValues_ml,    only: RestrictDomain
 use Io_Nums_ml,       only: IO_NML
 use Io_Progs_ml,      only: PrintLog
 use ModelConstants_ml,only: MasterProc, SOURCE_RECEPTOR, DEBUG, & !! => DEBUG_MY_DERIVED &
-                            USE_AOD, USE_SOILNOX, USE_OCEAN_DMS, USE_uEMEP, &
+                            USE_AOD, USE_SOILNOX, USE_OCEAN_DMS, USE_OCEAN_NH3, &
                             IOU_KEY,      & !'Y'=>IOU_YEAR,..,'I'=>IOU_HOUR_INST
                             KMAX_MID,     & ! =>  z dimension
                             RUNDOMAIN,    &
@@ -75,7 +75,7 @@ use MosaicOutputs_ml, only: nMosaic, MAX_MOSAIC_OUTPUTS, MosaicOutput, & !
                             Add_NewMosaics, Add_MosaicVEGO3, Add_MosaicDDEP
 
 use OwnDataTypes_ml,only: Deriv, TXTLEN_DERIV, TXTLEN_SHORT,&
-                          typ_s3, typ_s5ind, typ_s1ind
+                          typ_s3, typ_s4, typ_s5ind, typ_s1ind
 use Par_ml,         only: limax,ljmax        ! => used x, y area
 use SmallUtils_ml,  only: AddArray,LenArray,NOT_SET_STRING,WriteArray,find_index
 implicit none
@@ -99,11 +99,14 @@ public  :: My_DerivFunc ! Miscelleaneous functions of xn_adv for output
 
 !============ parameters for concentration + dep outputs ==================!
 integer, public, parameter ::       &
-  MAX_NUM_DERIV2D = 250,            &
-  MAX_NUM_DERIV3D =  16,            &
+  MAX_NUM_DERIV2D = 343,            &
+  MAX_NUM_DERIV3D = 179,            &
   MAX_NUM_DDEP_ECOS = 6,            & ! Grid, Conif, etc.
   MAX_NUM_DDEP_WANTED = NSPEC_ADV,  & !plenty big
-  MAX_NUM_WDEP_WANTED = NSPEC_ADV     !plenty big
+  MAX_NUM_WDEP_WANTED = NSPEC_ADV,  & !plenty big
+  MAX_NUM_NEWMOS  = 10,           & !careful here, we multiply by next:
+  MAX_NUM_MOSCONCS  = 10,           & !careful here, we multiply by next:
+  MAX_NUM_MOSLCS    = 10              !careful here, we multiply bY prev:
 character(len=TXTLEN_DERIV), public, save :: &
   wanted_deriv2d(MAX_NUM_DERIV2D) = NOT_SET_STRING, &
   wanted_deriv3d(MAX_NUM_DERIV3D) = NOT_SET_STRING
@@ -136,13 +139,14 @@ type(typ_s1ind), public, save, dimension(MAX_NUM_DDEP_ECOS) :: &
 type(typ_s3), public, save, dimension(MAX_NUM_DDEP_WANTED) :: &
   DDEP_WANTED = typ_s3('-','-','-'), & ! e.g. typ_s3("SO2",SPEC,"mgS"),
   SDEP_WANTED = typ_s3('-','-','-')    ! Stomatal deposition (for HTAP)
-type(typ_s3), public, save, dimension(MAX_NUM_WDEP_WANTED) :: &
-  WDEP_WANTED = typ_s3('-','-','-')
+type(typ_s4), public, save, dimension(MAX_NUM_WDEP_WANTED) :: &
+  WDEP_WANTED = typ_s4('-','-','-','-')
 
 character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
   D2_SR = [character(len=TXTLEN_DERIV):: &
     ! all array members will have len=TXTLEN_DERIV
-    "SURF_MAXO3","SURF_PM25water","SOMO35","PSURF"] ! Surface pressure (for crosssection)
+    ! Surface pressure used for crosssection
+    "SURF_MAXO3","SURF_PM25water","SOMO35","PSURF"] 
 
 !============ Extra parameters for model evaluation: ===================!
 !character(len=TXTLEN_DERIV), public, parameter, dimension(13) :: &
@@ -162,26 +166,24 @@ integer, private, save :: nOutMET
 
 !- specify some species and land-covers we want to output
 ! dep. velocities for in netcdf files. Set in My_DryDep_ml.
-type(typ_s5ind), public, parameter, dimension(1) :: &
-  NewMosaic =[typ_s5ind('Mosaic','VG','O3','Grid','cms','YMD')]
+! NewMosaic seems to mean new-style, to avoid  needing all combinations
+! of MET & LC
+type(typ_s5ind), public, save, dimension(MAX_NUM_NEWMOS) :: &
+  NewMosaic = typ_s5ind('-','-','-','-','-','-')
+  !A17 =[typ_s5ind('Mosaic','VG','O3','Grid','cms','YM')]
+integer, private, save :: nOutputMosMet, nOutputMosLC, nOutputNewMos
+character(len=10), private, save ::  Mosaic_timefmt='YM'  ! eg 'YMD'
 
 ! For met-data and canopy concs/fluxes ...
-character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
-  MOSAIC_METCONCS = [character(len=TXTLEN_DERIV):: & 
-    ! all array members will have len=TXTLEN_DERIV
-    "USTAR","LAI","CanopyO3","FstO3"] ! SKIP CanopyO3
-!character(len=TXTLEN_DERIV), public, parameter, dimension(2) :: &
-! MOSAIC_METCONCS = (/ "USTAR", "LAI  " /) ! TFMM "VPD     "  &
-                     ! ,"CanopyO3" & !SKIP
-     !,"VPD","FstO3","EVAP","Gsto" & !SKIP
-!TFMM ,"USTAR","INVL"/)
+character(len=TXTLEN_DERIV), public, save, dimension(MAX_NUM_MOSCONCS) :: &
+  MOSAIC_METCONCS = '-' ! = [character(len=TXTLEN_DERIV):: & 
+     !,"VPD","FstO3","EVAP","Gsto" ,"USTAR","INVL"/)
+! "USTAR","LAI","CanopyO3","FstO3"] ! SKIP CanopyO3
 ! "g_sto" needs more work - only set as L%g_sto
 
-character(len=TXTLEN_DERIV), public, save, dimension(6) :: &
-  MET_LCS = [character(len=TXTLEN_DERIV):: & 
-  ! all array members will have len=TXTLEN_DERIV
-  !"DF","GR","CF","BF","NF"]
-   "DF","GR","BF","TC","IAM_DF","IAM_CR"]
+character(len=TXTLEN_DERIV), public, save, dimension(MAX_NUM_MOSLCS) :: &
+  MET_LCS = '-' 
+! [character(len=TXTLEN_DERIV)::  "DF","GR","BF","TC","IAM_DF","IAM_CR"]
 
 !----------------------
 ! For some reason having this as a parameter caused problems for PC-gfortran runs.
@@ -192,14 +194,14 @@ character(len=TXTLEN_DERIV), public, save, dimension(4:1) :: &
 
 logical, parameter, public :: EmisSplit_OUT = .false.
 
-integer, private :: i,j,k,n, ivoc    ! Local loop variables
+integer, private :: i,j,k,n, ivoc, isec    ! Local loop variables
 
 contains
 
 !=========================================================================
 subroutine Init_My_Deriv()
 
-  integer :: i, itot, nDD, nMET, nVEGO3=0, n1, istat, nMc
+  integer :: i, itot, nDD, nMET, nVEGO3=0, n1, istat, nMc, neigh
   integer :: nOutputConcs
   character(len=100) :: errmsg
   character(len=TXTLEN_DERIV), dimension(size(OutputConcs(:)%txt1)) :: &
@@ -210,11 +212,13 @@ subroutine Init_My_Deriv()
   character(len=12), save :: sub='InitMyDeriv:'
   logical ::  &
     lev3d_from_surface=.false. ! levels are to be read from surface up
-   
+  character(len=2)::  isec_char
+  character(len=3)::  neigh_char
   NAMELIST /OutputConcs_config/OutputMisc,OutputConcs,OutputVegO3
-  NAMELIST /OutputDep_config/DDEP_ECOS, DDEP_WANTED, WDEP_WANTED, SDEP_WANTED
-  NAMELIST /OutputSize_config/fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,hour_DOMAIN,&
-                              num_lev3d,lev3d,lev3d_from_surface
+  NAMELIST /OutputDep_config/DDEP_ECOS, DDEP_WANTED, WDEP_WANTED,SDEP_WANTED,&
+             NewMosaic, MOSAIC_METCONCS, MET_LCS, Mosaic_timefmt
+  NAMELIST /OutputSize_config/fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,&
+              hour_DOMAIN, num_lev3d,lev3d,lev3d_from_surface
 
 ! default output sizes
   fullrun_DOMAIN = RUNDOMAIN
@@ -253,13 +257,16 @@ subroutine Init_My_Deriv()
     if(MasterProc)&
       call CheckStop(count(lev3d(1:i)==lev3d(i)),1,&
         "Init_My_Deriv, repeated levels in lev3d")
-  enddo
+  end do
 
   !! Find number of wanted OutoutConcs
   nOutputMisc  = find_index("-", OutputMisc(:)%name, first_only=.true. ) -1
   nOutputConcs = find_index("-", OutputConcs(:)%txt1, first_only=.true. ) -1
   nOutputVegO3 = find_index("-", OutputVegO3(:)%name, first_only=.true. ) -1
   nOutputWdep  = find_index("-", WDEP_WANTED(:)%txt1, first_only=.true. ) -1
+  nOutputMosMet = find_index("-", MOSAIC_METCONCS(:), first_only=.true. ) -1
+  nOutputMosLC  = find_index("-", MET_LCS(:), first_only=.true. ) -1
+  nOutputNewMos = find_index("-", NewMosaic(:)%txt1, first_only=.true. ) -1
        
   if(MasterProc) write(*,"(a,i3)") "NMLOUT nOUTMISC ", nOutputMisc
   do i = 1,nOutputMisc  
@@ -272,8 +279,8 @@ subroutine Init_My_Deriv()
       call AddArray(tag_name(1:1),wanted_deriv3d,NOT_SET_STRING,errmsg)
     else
       call AddArray(tag_name(1:1),wanted_deriv2d,NOT_SET_STRING,errmsg)
-    endif
-  enddo
+    end if
+  end do
    ! OutputVegO3 will be added to derived fields from within the Mosaics_ml
    ! after adding 
   if(MasterProc) then
@@ -285,15 +292,15 @@ subroutine Init_My_Deriv()
     do i = 1,size(DDEP_ECOS)  
       if(all(SCAN(DDEP_ECOS(i)%ind,IOU_KEY)==0)) exit
       write(*,"(3a)") "NMLOUT DEP ", DDEP_ECOS(i)%name, DDEP_ECOS(i)%ind
-    enddo
+    end do
     do i = 1,size(DDEP_WANTED)  
       if(DDEP_WANTED(i)%txt1=='-') exit
       write(*,"(2a)") "NMLOUT DDEP ", DDEP_WANTED(i)%txt1
-    enddo
+    end do
     write(*,"(3a)")("NMLOUT WDEP ",&
       WDEP_WANTED(i)%txt1,WDEP_WANTED(i)%txt3, i=1,nOutputWdep)
     write(*,*) " END NMLOUT INSIDE Init_My_Deriv"
-  endif
+  end if
 
   call Init_MosaicMMC(MOSAIC_METCONCS)  ! sets MMC_USTAR etc.
 
@@ -308,35 +315,39 @@ subroutine Init_My_Deriv()
   do i = 1, size(EMIS_FILE)
     tag_name(1) = "Emis_mgm2_" // trim(EMIS_FILE(i))
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
-  enddo
+  end do
+  do  i = 1, NEMIS_FILE
+    if(SecEmisOut(i))then
+       do isec=1,NSECTORS
+          write(tag_name(1),"(A,I0,A)")"Emis_mgm2_sec",isec,trim(EMIS_FILE(i))
+          call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
+       end do
+    endif
+  end do ! ind  
   do i = 1, size(BVOC_GROUP)
     itot = BVOC_GROUP(i)
     tag_name(1) = "Emis_mgm2_BioNat" // trim(species(itot)%name)
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
-  enddo
+  end do
   if(USE_SOILNOX) then
     tag_name(1) = "Emis_mgm2_BioNatNO"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
-  endif
+  end if
   if(USE_OCEAN_DMS)then
     tag_name(1) = "Emis_mgm2_DMS"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
-  endif
-  if(USE_uEMEP)then
-    !NOTE "Local_Fraction" must be AFTER "Local_Pollutant" and "Total_Pollutant"
-    tag_name(1:3) = [character(len=TXTLEN_DERIV)::&
-      "Local_Pollutant","Total_Pollutant","Local_Fraction"]
-    call AddArray( tag_name(1:3), wanted_deriv2d, NOT_SET_STRING, errmsg)
-!   tag_name(1:3) = [character(len=TXTLEN_DERIV)::&
-!      "Local_Fraction3D","Local_Pollutant3D","Total_Pollutant3D"]
-!   call AddArray( tag_name(1:3), wanted_deriv3d, NOT_SET_STRING, errmsg)
-  endif
+  end if
+  if(USE_OCEAN_NH3)then
+    tag_name(1) = "Emis_mgm2_Ocean_NH3"
+    call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
+  end if
+
  if(EmisSplit_OUT)then
     do i=1,max(18,nrcemis)
       tag_name(1) = "EmisSplit_mgm2_"//trim(species(iqrc2itot(i))%name)
       call AddArray(tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
-    enddo
- endif
+    end do
+ end if
 
 ! Do SR last, so we get PM25 after groups have been done
   call AddArray( D2_SR,  wanted_deriv2d, NOT_SET_STRING, errmsg)
@@ -344,7 +355,7 @@ subroutine Init_My_Deriv()
   if(.not.SOURCE_RECEPTOR) then !may want extra?
     call AddArray( D2_EXTRA, wanted_deriv2d, NOT_SET_STRING, errmsg)
     call CheckStop( errmsg, errmsg // "D2_EXTRA too long" )
-  endif
+  end if
 
 !------------- Depositions to ecosystems --------------------------------
   call Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
@@ -359,28 +370,38 @@ subroutine Init_My_Deriv()
 
   do n = 1, nOutputVegO3
     VEGO3_OUTPUTS(n) = OutputVegO3(n)
-    if(debug0)  write(*,*) "VEGO3 NUMS ", n, n1, trim(OutputVegO3(n)%name) 
-  enddo
-  if(MasterProc)call WriteArray(VEGO3_OUTPUTS(:)%name,nOutputVegO3," VEGO3 OUTPUTS:")
-  call Add_MosaicVEGO3(nOutVEGO3) ! nVEGO3 is output, excluding missing LC types
+    if(debug0)  write(*,*) "VEGO3 NUMS ", n, trim(OutputVegO3(n)%name) 
+  end do
+  if(MasterProc) call WriteArray(VEGO3_OUTPUTS(:)%name,nOutputVegO3,&
+                                   " VEGO3 OUTPUTS:")
+  ! nVEGO3 is output, excluding missing LC types:
+  call Add_MosaicVEGO3(nOutVEGO3) 
 
 !----- some "luxury outputs" -------------------------------------------
   if( .not.SOURCE_RECEPTOR)then
     !------------- Deposition velocities ---------------------
     call Add_NewMosaics(NewMosaic, nMc)
-    if(debug0) then
-      write(*,*) "NEWMOSAIC   NUM ", nMc
-      write(*,*) "VEGO3 FINAL NUM ", nVEGO3
-    endif
+    if(debug0)  write(*,*) 'NewMos Nums ', nOutputNewMos, nMC
 
     !------------- Met data for d_2d -------------------------
     ! We find the various combinations of met and ecosystem,
     ! adding them to the derived-type array LCC_Met (e.g. => Met_CF)
     !FEB2011  Daiyl output asked for just now. Change larer
 
-    call Add_MosaicMetConcs(MOSAIC_METCONCS,MET_LCS,'YMD', nMET)
+    call Add_MosaicMetConcs(MOSAIC_METCONCS(1:nOutputMosMet),&
+           MET_LCS(1:nOutputMosLC),Mosaic_timefmt, nMET)
     nOutMET = nMET !not needed?
-  endif ! SOURCE_RECEPTOR
+
+    if(debug0) then
+      write(*,*) "NEWMOSAIC   NUM ", nMc
+      write(*,*) "VEGO3 FINAL NUM ", nVEGO3
+      write(*,*) "nOutputMosMet FINAL NUM ", nOutputMosMet
+      write(*,*) "nOutputMosLC  FINAL NUM ", nOutputMosLC
+      write(*,*) "nOutputNewMos  FINAL NUM ", nOutputNewMos
+      write(*,*) "nOutMet  FINAL NUM ", nOutMet
+      write(*,*) "nMosaic  FINAL NUM ", nMosaic 
+    end if
+  end if ! SOURCE_RECEPTOR
 
 !------------- end LCC data for d_2d -------------------------
   call CheckStop( NMosaic >= MAX_MOSAIC_OUTPUTS, sub//"too many nMosaics" )
@@ -420,16 +441,17 @@ subroutine Init_My_Deriv()
       case default
          if(outdim=='3d')Is3D=.true.
          tag_name(1)= trim(outname) ! Just use raw name here
-      endselect
+      end select
        
-      ! OutputConcs can redefine output param of an output that is wanted by default
+      ! OutputConcs can redefine output param of an output that is wanted by
+      ! default
       if(Is3D)then
         if(find_index(tag_name(1),wanted_deriv3d)<1)& 
         call AddArray(tag_name(1:1),wanted_deriv3d,NOT_SET_STRING,errmsg)
       else
         if(find_index(tag_name(1),wanted_deriv2d)<1)&
         call AddArray(tag_name(1:1),wanted_deriv2d,NOT_SET_STRING,errmsg)
-      endif
+      end if
       call CheckStop(errmsg,errmsg//trim(outname)//" too long")
       nOutputFields = nOutputFields + 1
       OutputFields(nOutputFields) = OutputConcs(n)
@@ -440,18 +462,26 @@ subroutine Init_My_Deriv()
         case(SHL  ) ;n1=find_index(outname,species(:)%name)
         case(GROUP) ;n1=find_index(outname,chemgroups(:)%name)
         case default;n1=-1
-      endselect
+      end select
 
       if(n1<1) then
         if( debug0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
         call PrintLog("WARNING: Requested My_Derived OutputField not found: "&
             //trim(outclass)//":"//trim(outname), MasterProc)
         cycle
-      endif
+      end if
 
       select case(outdim)
       case("2d","2D","SURF")   
         tag_name(1) = "SURF_" // trim(outunit) // "_" //  trim(outname)
+        call AddArray(  tag_name(1:1) , wanted_deriv2d, &
+                  NOT_SET_STRING, errmsg)
+        call CheckStop( errmsg, errmsg // trim(outname) // " too long" )
+        nOutputFields = nOutputFields + 1
+        OutputFields(nOutputFields) = OutputConcs(n)
+
+      case("Local_Correct")   
+        tag_name(1) = "SURF_LF_" // trim(outunit) // "_" //  trim(outname)
         call AddArray(  tag_name(1:1) , wanted_deriv2d, &
                   NOT_SET_STRING, errmsg)
         call CheckStop( errmsg, errmsg // trim(outname) // " too long" )
@@ -471,20 +501,20 @@ subroutine Init_My_Deriv()
         call PrintLog("WARNING: Unsupported My_Derived OutputField%outdim: "&
             //trim(outclass)//":"//trim(outname)//":"//trim(outdim), MasterProc)
         cycle
-      endselect
+      end select
     else
       call CheckStop("My_Deriv: Unsupported OutputConcs" // &
           trim(outname)//":"//trim(outtyp)//":"//trim(outdim))
-    endif
+    end if
 
     if(debug0)write(*,*)"OutputFields-tags ",n,trim(outname),"->",tag_name(1)
-  enddo
+  end do
 
   ! ditto wanted_deriv3d....
   if (.not.SOURCE_RECEPTOR.and.size(D3_OTHER)>0) then
     call AddArray( D3_OTHER,  wanted_deriv3d, NOT_SET_STRING, errmsg)
     call CheckStop( errmsg, errmsg // "Wanted D3 too long" )
-  endif
+  end if
 
 ! TEST HERE
   mynum_deriv2d = LenArray( wanted_deriv2d, NOT_SET_STRING )
@@ -494,12 +524,13 @@ subroutine Init_My_Deriv()
     if(DEBUG%MY_DERIVED )then
       write(*,*) "Init_My_Deriv, mynum_deriv2d = ", mynum_deriv2d
       write(*,*) "Init_My_Deriv, mynum_deriv3d = ", mynum_deriv3d
-      write(*,*)("DEBUG MyDERIV2D ",i,mynum_deriv2d,wanted_deriv2d(i),i=1,mynum_deriv2d)
-    endif
+      write(*,*)("DEBUG MyDERIV2D ",i,mynum_deriv2d,wanted_deriv2d(i),&
+           i=1,mynum_deriv2d)
+    end if
     call WriteArray(wanted_deriv2d,mynum_deriv2d," Required 2D output ")
     call WriteArray(wanted_deriv3d,mynum_deriv3d," Required 3D output ")
-  endif
-endsubroutine Init_My_Deriv
+  end if
+end subroutine Init_My_Deriv
 !=========================================================================
 subroutine My_DerivFunc( e_2d, class )!  , density )
 
@@ -528,8 +559,8 @@ subroutine My_DerivFunc( e_2d, class )!  , density )
       if ( MasterProc .and. num_warnings < 100 ) then
         write(*,*) "My_Deriv:WARNING - REQUEST FOR UNDEFINED OUTPUT:", n, class
           num_warnings = num_warnings + 1
-      endif
-    endselect
-endsubroutine My_DerivFunc
+      end if
+    end select
+end subroutine My_DerivFunc
 !=========================================================================
 endmodule My_Derived_ml

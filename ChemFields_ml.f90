@@ -1,7 +1,7 @@
-! <Chem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <ChemFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -24,7 +24,7 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-module Chemfields_ml
+module ChemFields_ml
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 use AllocInits,   only: AllocInit
 use ChemSpecs,    only: NSPEC_ADV, NSPEC_SHL, NSPEC_TOT, & ! => No. species 
@@ -57,6 +57,11 @@ private
     !  model, as well as cfac (converts from 50m to 1m/3m output)         ! 
     !---------------------------------------------------------------------!
 
+
+    !March 2017: moved from Solver
+  real, save, public, dimension(NSPEC_TOT):: &
+     x, xold ,xnew  ! Work arrays [molecules/cm3]
+
   real, save, allocatable, public :: &
      xn_adv(:,:,:,:)  &
     ,xn_shl(:,:,:,:)  &
@@ -80,6 +85,8 @@ private
 
   real, save, allocatable, public :: &
      Grid_snow(:,:) !snow_flag fraction in grid
+
+  real, save, public :: cell_tinv  ! 1/temp,  tmp location
 
   public ::alloc_ChemFields
 
@@ -120,7 +127,7 @@ contains
     if(FIRST_SEMIVOL>0)then !FSOA
       allocate(Fgas3d(FIRST_SEMIVOL:LAST_SEMIVOL,LIMAX,LJMAX,KCHEMTOP:KMAX_MID))
       Fgas3d = 1.0
-    endif
+    end if
 
     allocate(rcemis(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID))
     allocate(deltaZcm(KCHEMTOP:KMAX_MID))
@@ -166,5 +173,5 @@ contains
 
 
 !_____________________________________________________________________________
-endmodule Chemfields_ml
+endmodule ChemFields_ml
 ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

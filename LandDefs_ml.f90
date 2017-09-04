@@ -1,7 +1,7 @@
-! <LandDefs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4_10(3282)>
+! <LandDefs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2016 met.no
+!*  Copyright (C) 2007-2017 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -149,44 +149,51 @@ contains
   end subroutine Growing_season
 
   !=======================================================================
-  subroutine Init_LandDefs(ncodes, wanted_codes)
+  subroutine Init_LandDefs(fname,ncodes, wanted_codes)
   !=======================================================================
       !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
       ! Reads file Inputs_LandDefs.csv and extracts land-defs. Checks that
       ! codes match the "wanted_codes" which have been set in Inputs-Landuse
+      character(len=*), intent(in) :: fname  ! for LandDefs
       integer, intent(in) :: ncodes  ! Num. land codes found in mapped data
       character(len=*), dimension(:), intent(in) :: wanted_codes
       character(len=20), dimension(25) :: Headers
       character(len=200) :: txtinput  ! Big enough to contain one input record
       type(KeyVal), dimension(2) :: KeyValues ! Info on units, coords, etc.
-      character(len=50) :: errmsg, fname
-      character(len=*), parameter :: sub='Ini-LandDefs:'
+      character(len=50) :: errmsg
+      character(len=*), parameter :: dtxt='Ini-LandDefs:'
       integer :: n, nn, NHeaders, NKeys
       logical :: dbg
 
       dbg = ( DEBUG%LANDDEFS .and. MasterProc ) 
 
+      if ( dbg ) then
+         do n = 1, size(wanted_codes)
+            write(*,*) dtxt//' WANTED ', n, wanted_codes(n)
+         end do
+      end if
+
       ! Quick safety check (see Landuse_ml for explanation)
        call CheckStop(&
          maxval( len_trim(wanted_codes(:))) >= len(LandInput%code),& 
-          sub//" increase size of character array" )
+          dtxt//" increase size of character array" )
 
       ! Read data
 
 
-      fname = "Inputs_LandDefs.csv"
+      !fname = "Inputs_LandDefs.csv"
       if ( MasterProc ) then
-         write(*,*) sub//" for Ncodes= ", ncodes
+         write(*,*) dtxt//" for Ncodes= ", ncodes
          do n = 1, ncodes
-            write(*,*) sub//"LC  wants ",n, trim(wanted_codes(n))
+            write(*,*) dtxt//"LC  wants ",n, trim(wanted_codes(n))
          end do
          call open_file(IO_TMP,"r",fname,needed=.true.)
-         call CheckStop(ios,sub//"open_file error on " // fname )
+         call CheckStop(ios,dtxt//"open_file error on " // fname )
       end if
 
       call Read_Headers(IO_TMP,errmsg,NHeaders,NKeys,Headers,Keyvalues)
 
-      call CheckStop( errmsg , sub//"Read Headers" )
+      call CheckStop( errmsg , dtxt//"Read Headers" )
  
 
       !------ Read in file. Lines beginning with "!" are taken as
@@ -198,7 +205,7 @@ contains
             if ( ios /= 0 ) then
                  exit   ! likely end of file
             end if
-            if ( dbg ) write(*,*) sub//' READLINE: ------ '// trim(txtinput)
+            if ( dbg ) write(*,*) dtxt//' READLINE: ------ '// trim(txtinput)
             if ( txtinput(1:1) == "#" ) then
                  cycle
             end if
@@ -210,7 +217,7 @@ contains
             call CheckStop ( ios, fname // " txt error:" // trim(txtinput) )
             n = find_index( LandInput%code, wanted_codes )!index in map data?
             if ( n < 1 ) then
-                if ( MasterProc ) write(*,*) sub//" skipping nn,n ",&
+                if ( MasterProc ) write(*,*) dtxt//" skipping nn,n ",&
                    nn,n, trim(LandInput%code)
                 cycle
             end if
@@ -227,12 +234,13 @@ contains
 
             if ( dbg ) then
                  write(*,"(a)") trim(txtinput)
-                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") sub//":=> ", &
+                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") dtxt//":=> ", &
                   n,nn, ncodes, trim(LandInput%name), trim(LandInput%code),&
                     LandDefs(n)%SGS50,LandDefs(n)%EGS50, &
                     LandDefs(n)%LAImax, LandDefs(n)%Emtp
             end if
-            call CheckStop(  LandInput%code, wanted_codes(n), sub//"MATCHING CODES")
+            call CheckStop(  LandInput%code, wanted_codes(n), &
+                                           dtxt//"MATCHING CODES")
 
             LandType(n)%is_water  =  LandInput%code == "W" 
             LandType(n)%is_ice    =  LandInput%code == "ICE" 
@@ -241,7 +249,7 @@ contains
             LandType(n)%flux_wanted = LandType(n)%is_iam  ! default
            !Also:
            if( find_index( LandInput%code, FLUX_VEGS(:) ) > 0 ) then
-             if(MasterProc) write(*,*) sub//"FLUX_VEG SET:", trim(LandInput%code)
+             if(MasterProc) write(*,*) dtxt//"FLUX_VEG SET:", trim(LandInput%code)
              LandType(n)%flux_wanted = .true.
            end if
 
@@ -253,9 +261,8 @@ contains
 
             LandType(n)%pft = find_index( LandDefs(n)%LPJtype, PFT_CODES)
 
-            if ( dbg ) write(unit=*,fmt='(a,i3,a,i5)') sub//"PFT? ", n,&
-             trims(LandInput%name//':'// LandInput%code//':'// &
-                   wanted_codes(n) ), LandType(n)%pft
+            if ( dbg ) write(unit=*,fmt='(a,i3,a,i5)') dtxt//"PFT? ", n,&
+                  trim(  wanted_codes(n) ), LandType(n)%pft
 
            !is_decid, is_conif used mainly for BVOC and soil-NO. Not essential
            ! for IAM-type landcover
@@ -266,14 +273,14 @@ contains
             LandType(n)%is_bulk   =  LandInput%type == "BLK" 
             LandType(n)%is_veg    =  LandInput%code /= "U" .and. &
                   LandInput%hveg_max > 0.01   ! Excludes water, ice_nwp, desert 
-            if( LandInput%code(1:2) == "GR" ) iLC_grass =  n ! for use with clover
+            if( LandInput%code(1:2) == "GR" ) iLC_grass =  n ! for eg clover
        end do
        if ( MasterProc ) then 
              close(unit=IO_TMP)
-             write(*,*) sub//"DONE NN,NCODES = ", nn, ncodes
+             write(*,*) dtxt//"DONE NN,NCODES = ", nn, ncodes
        end if
 
-       call CheckStop( nn /= ncodes, sub//" didn't find all codes")
+       call CheckStop( nn /= ncodes, dtxt//" didn't find all codes")
 
   end subroutine Init_LandDefs
  !=========================================================================
@@ -287,13 +294,14 @@ contains
              ind = 0
           else
              ind = find_index(  txt, LandDefs(:)%code )
-          !if( DEBUG ) print *, "LC-CHECKING", descrip, txt, ind
           end if
           if( ind < 0 .and.  write_condition .and. MasterProc ) write(*,*) &
                 descrip // "NOT FOUND!! Skipping : " //  txt
   end function Check_LandCoverPresent_Item
  !=========================================================================
-  function Check_LandCoverPresent_Array( descrip, n, txt, write_condition) result(ind)
+  function Check_LandCoverPresent_Array( descrip, n, txt, &
+                                          write_condition) result(ind)
+
     character(len=*),intent(in) :: descrip
     integer, intent(in) :: n
     character(len=*),dimension(:),intent(in) :: txt
@@ -305,7 +313,6 @@ contains
           else
              ind = find_index(  txt(n), LandDefs(:)%code )
           end if
-          !if( DEBUG ) print *, "LC-CHECKING", descrip, n, txt(n), ind
           if( ind < 0 .and.  write_condition .and. MasterProc ) write(*,*) &
                 descrip // "NOT FOUND!! Skipping : " //  txt(n)
   end function Check_LandCoverPresent_Array
