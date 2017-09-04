@@ -10,7 +10,8 @@ which supports the development of air quality polices in the European Union.
 
 [CLRTAP]:   http://www.unece.org/env/lrtap/welcome.html
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
-[publ2016]: http://emep.int/publ/emep2016_publications.html
+[publ2017]: http://emep.int/publ/emep2017_publications.html
+[rel415]:   http://github.com/metno/emep-ctm/releases/tag/rv4_15
 [rel410]:   http://github.com/metno/emep-ctm/releases/tag/rv4_10
 [rel48]:    http://github.com/metno/emep-ctm/releases/tag/rv4_8
 [rel45]:    http://github.com/metno/emep-ctm/releases/tag/rv4_5
@@ -22,13 +23,14 @@ which supports the development of air quality polices in the European Union.
 [rel30]:    http://github.com/metno/emep-ctm/releases/tag/rv3
 
 ## Releases
-The latest Open Source EMEP/MSC-W model version ([rv4.10][rel410]),
-corresponds to the [EMEP status reporting of the year 2016][publ2016].
+The latest Open Source EMEP/MSC-W model version ([rv4.15][rel415]),
+corresponds to the [EMEP status reporting of the year 2017][publ2017].
 The source code, together with a set of input data,
-an updated user guide and a full year model results for the year 2014,
+an updated user guide and a full year model results for the year 2015,
 under [GPL license v3][GPLv3].
 
 #### Previous releases (YYYYMM - date of release)
+* [OpenSource rv4.10 (201609)][rel410].
 * [OpenSource rv4.8 (201510)][rel48].
 * [OpenSource rv4.5 (201409)][rel45].
 * [OpenSource rv4.4 (201309)][rel44].  
