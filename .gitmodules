@@ -1,0 +1,12 @@
+[submodule "docs"]
+	path = docs
+	url = git@github.com:metno/emep-ctm.git
+	branch = docs
+[submodule "source"]
+	path = source
+	url = git@github.com:metno/emep-ctm.git
+	branch = source
+[submodule "tools"]
+	path = tools
+	url = git@github.com:metno/emep-ctm.git
+	branch = tools
