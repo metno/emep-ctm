@@ -13,17 +13,17 @@ import tarfile
 import shutil
 
 _CONST = {
-    'VERSION':"0.1.1",                      # script version
+    'VERSION':"0.1.1",                          # script version
     'RELEASE':['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
-               'rv4_10','rv4_15'],            # released model versions
-    'METYEAR':[2005, 2008]+range(2010, 2015), # released met-years
+               'rv4_10','rv4_15'],              # released model versions
+    'METYEAR':[2005, 2008]+range(2010, 2015),   # released met-years
     'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
     'GIT':"https://github.com/metno/emep-ctm/",
-    'CSV':'/catalog.csv',                   # list all files from all releases
+    'CSV':'/catalog.csv',                       # list all files from all releases
     'RAW':'https://raw.githubusercontent.com/metno/emep-ctm/'+
-          'master/tools/catalog.csv',       # catalog on the repo
-    'TMPDIR':"./downloads",                 # temp path for downloads
-    'DATADIR':'.'                           # base path for datasets
+          'tools/catalog.csv',                  # catalog on the repo
+    'TMPDIR':"./downloads",                     # temp path for downloads
+    'DATADIR':'.'                               # base path for datasets
 }
 
 def parse_arguments():
@@ -59,7 +59,7 @@ Examples:
                       help="Override dataset cataloque path/file (default:%default)")
 
     group = OptionGroup(parser, "Release options", "Select release dataset")
-    group.add_option("-R", "--revision", "-r",
+    group.add_option("-R", "--revision",
                      type="string", metavar="REV",
                      action="append", dest="tag",
                      help="revision REV")
@@ -77,6 +77,9 @@ Examples:
     group.add_option("-m", "--meteo", const="meteo",
                      action="append_const", dest="data",
                      help="get meteorology input")
+    group.add_option("--met-domain", default=None,
+                      action="store", type="string", dest="domain",
+                      help="get only DOMAIN meteorology")
     group.add_option("-i", "--input", const="input",
                      action="append_const", dest="data",
                      help="get other input")
@@ -203,7 +206,7 @@ class DataPoint(object):
         except ValueError:
             self.year = None
         try:
-            self.model = str(model)       # model version
+            self.model = str(model)       # model version (or meteo domain)
         except ValueError:
             self.model = None
         self.src = str(src)               # single source url/file
@@ -465,6 +468,9 @@ def main(opts):
         for ds in get_datasets(catalog, attr, target):
             try:
                 ds = {key:ds.dataset[key] for key in opts.data}
+                # only download meteo with matching --met-domain option
+                if 'meteo' in ds and opts.domain:
+                    ds['meteo'] = [ x for x in ds['meteo'] if x.model == opts.domain ]
             except KeyError:
                 print("No datasets found for --%s=%s"%(attr, target))
                 sys.exit(-1)
@@ -473,11 +479,13 @@ def main(opts):
                     print("  Found %-6s:%s"%(key, ds[key]))
 
             for key in ds:
-                total = sum([x.size for x in ds[key]])
+                # do not try to download 0-size files
+                aux = [x for x in ds[key] if x.size > 0]
+                total = sum([x.size for x in aux])
                 if(total>0):
-                    downloads += ds[key]
-                if opts.verbose and ds[key]:
-                    print("Queue download: %6s %s"%(file_size(total), ds[key][0].tag))
+                    downloads += aux
+                if opts.verbose and aux:
+                    print("Queue download: %6s %s"%(file_size(total), aux[0].tag))
         return downloads
 
     # list files to download
