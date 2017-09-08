@@ -138,7 +138,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201410.tar.bz2,,1921662605,253dbb74754a1b85c54e0923809dadba
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201411.tar.bz2,,1857245870,973e3d71f60e2931679ae1b33d7b7e28
 201609,meteo,2014,,{FTP}/{REL}/input_data/meteo/meteo201412.tar.bz2,,2036311088,d53e8bc117b84bb85be95607dbeddd8c
-201609,docs,,rv4_10,{GIT}/releases/download/{MOD}/User_Guide.pdf,,389676,dcc0bf2f6a1e7325146af5bcefceaf5970c23645
+201609,docs,,rv4_10,{GIT}/releases/download/{MOD}/User_Guide.pdf,,390340,9d29b4951c7ebe4a674750f110c28610
 201709,input,2015,rv4_15,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,0,0
 201709,source,2017,rv4_15,{GIT}/archive/{MOD}.tar.gz,,718308,071a6838f485f9cd8e6b517ae884f9ca
 201709,output,2015,rv4_15,{FTP}/{REL}/model_results_rv4_15_2015/Base_model_rv4_10_results_EECCA.tar.bz2,,0,0
