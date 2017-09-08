@@ -1,6 +1,5 @@
 # Open Source EMEP/MSC-W model
 
-## Welcome
 The EMEP models have been instrumental to the development of
 air quality policies in Europe since the late 1970s,
 mainly through their support to the strategy work under the
@@ -9,58 +8,12 @@ In the 1990s the EMEP models became also the reference tools for
 atmospheric dispersion calculations as input to the Integrated Assessment Modelling,
 which supports the development of air quality polices in the European Union.
 
-Through this web page the latest EMEP/MSC-W model version used for the
-[EMEP status reporting of the year 2016][publ2016] - rv4.10 - is released,
-together with a set of input data,
-an updated user guide and a full year model results for the year 2014,
-under [GPL license v3][GPLv3].
-
-You are recommended to read all chapters of the
-[EMEP/MSC-W model User Guide][guide]
-before you start downloading data from the following link:<br/>
-[OpenSource rv4.10 (201609)][rel410].
-
-This contains the following set of information:
-
-* a complete set of 'input data' to allow for model runs for year 2014
-* the open source 'model code' of the EMEP/MSC-W model version rv4_10
-* 'model results' for the year 2014 for comparison of a successful run
-
-The standard input files for the EMEP model are provided in two different formats,
-netCDF or ASCII.
-We presently follow as much as possible the [netCDF CF conventions][netCDF_CF]
-for both input and output data.
-More details about the input files are described in Chapter 2 of the
-[EMEP/MSC-W model User Guide][guide].
-
-The tar file of the 'Open source model code' includes the model source code,
-a run script, a makefile and a copy of the gpl license.
-More details about the model code is given in the User Guide.  
-
-The main output files are in netCDF ([netCDF CF conventions][netCDF_CF]) format
-and some additional output files are in ASCII format.
-Details about the output files are described in Chapter 3 of the User Guide.
-
-How to submit a run is described in detail in the chapter 4,
-'Submitting a Run' of the User Guide.
-
-The EMEP/MSC-W model is very flexible with regard to the horizontal resolution
-and in 2008 the EMEP domain was extended to include EECCA countries.
-The current version, and the provided gridded input data,
-have a horizontal resolution of 50x50 km2 (at 60°N) and are defined
-on a polar stereographic projection.
-
-**IMPORTANT:**
-The input data available in this ftp site should be appropriately acknowledged
-when used for model runs.
-If nothing else is specified according to references further in this chapter,
-please acknowledge EMEP/MSC-W in any use of these data.
-
 [CLRTAP]:   http://www.unece.org/env/lrtap/welcome.html
-[publ2016]: http://emep.int/publ/emep2016_publications.html
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
-[guide]:    http://github.com/metno/emep-ctm/releases/download/rv4_8/User_Guide.pdf
+[guide]:    http://github.com/metno/emep-ctm/releases/download/rv4_10/User_Guide.pdf
+[publ2017]: http://emep.int/publ/emep2017_publications.html
+[rel415]:   http://github.com/metno/emep-ctm/releases/tag/rv4_15
 [rel410]:   http://github.com/metno/emep-ctm/releases/tag/rv4_10
 [rel48]:    http://github.com/metno/emep-ctm/releases/tag/rv4_8
 [rel45]:    http://github.com/metno/emep-ctm/releases/tag/rv4_5
@@ -71,7 +24,31 @@ please acknowledge EMEP/MSC-W in any use of these data.
 [rel201106]:http://github.com/metno/emep-ctm/releases/tag/v201106
 [rel30]:    http://github.com/metno/emep-ctm/releases/tag/rv3
 
-**Previous releases (YYYYMM - date of release):**
+The EMEP/MSC-W model is designed to calculate air concentrations
+and deposition fields for major acidifying and eutrophying pollutants,
+photo-oxidants and particulate matter.
+The Open Source releases are intended to:
+* facilitate insight in the model assumptions, the parametrisation used,
+  the requirements for input data and the actual model code
+* encourage dialogue and collaboration with the modelling community
+* allow individual model runs and insight on how to run different scenarios
+
+## Releases
+
+The latest Open Source EMEP/MSC-W model version ([rv4.15][rel415]),
+corresponds to the [EMEP status reporting of the year 2017][publ2017].
+The source code, together with a set of input data,
+an updated user guide and a full year model results for the year 2015,
+under [GPL license v3][GPLv3].
+
+You are recommended to read all chapters of the
+[EMEP/MSC-W model User Guide][guide]
+before you start retrieving data as instructed on the 
+[OpenSource rv4.15 (201709)][rel415] release page.
+
+#### Previous releases (YYYYMM - date of release)
+
+* [OpenSource rv4.10 (201609)][rel410].
 * [OpenSource rv4.8 (201510)][rel48].
 * [OpenSource rv4.5 (201409)][rel45].
 * [OpenSource rv4.4 (201309)][rel44].  
@@ -80,21 +57,38 @@ please acknowledge EMEP/MSC-W in any use of these data.
 * [OpenSource v.2011-06 (201108)][rel201106].
 * [OpenSource rv3 (200802)][rel30].
 
-Please read the updated EMEP MSC-W model User Guide available
-for each releaseon respective ftp site.
+### Model domain and resolution
 
-The EMEP/MSC-W model is designed to calculate air concentrations
-and deposition fields for major acidifying and eutrophying pollutants,
-photo-oxidants and particulate matter.
-The present release of the model is intended to:
-* facilitate insight in the model assumptions, the parametrisation used,
-  the requirements for input data and the actual model code
-* encourage dialogue and collaboration with the modelling community
-* allow individual model runs and insight on how to run different scenarios
+The EMEP/MSC-W model is very flexible with regard to the horizontal resolution
+and vertical resolutions. In 2008 the EMEP domain was extended to include EECCA countries.
+In 2017 the vertical resolution increased from 20 to 34 model levels.
+In the latest release, the provided gridded input and output data
+are provided on 2 different model domains and resolutions:
+- `EECCA` domain with a horizontal resolution of 50x50 km2 (at 60°N), 
+  on polar stereographic projection, and 20 vertical levels;
+- `EMEP01` domain with a 0.1x0.1 degrees on long-lat projection,
+  and 34 vertical levels.
 
-Questions on the EMEP model can be addressed to <emep.mscw@met.no>.
-Support to the user community will be developed here with your contribution.
-Please let us know what your needs for information are.
+### Input data
+
+The standard input files for the EMEP model are provided in two different formats,
+netCDF or ASCII.
+We presently follow as much as possible the [netCDF CF conventions][netCDF_CF]
+for both input and output data.
+More details about the input files are described in Chapter 2 of the
+[EMEP/MSC-W model User Guide][guide].
+
+**IMPORTANT:**
+The input data that accompanies each release model should be appropriately acknowledged
+when used for model runs.
+If nothing else is specified according to references further in this chapter,
+please acknowledge EMEP/MSC-W in any use of these data.
+
+### Model output
+
+The main output files are in netCDF format
+and some additional output files are in ASCII format.
+Details about the output files are described in Chapter 3 of the User Guide.
 
 ## Documentation
 The EMEP/MSC-W model is a chemical transport model developed at the
@@ -123,7 +117,19 @@ C. Richter, V. S. Semeena, S. Tsyro, J.-P. Tuovinen, Á. Valdebenito, and P. Win
 Atmos. Chem. Phys., 12, 7825-7865, 2012
 http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html
 
+## Running the model
+
+How to submit a run is described in detail in Chapter 4
+of the [EMEP/MSC-W model User Guide][guide].
+
+Questions on the EMEP model can be submitted to the [issues tracker].
+Support to the user community will be developed here with your contribution.
+Please let us know what your needs for information are.
+
+[issues tracker]: https://github.com/metno/emep-ctm/issues
+
 ### Computer requirements
+
 To compile the EMEP model you need:
 
 * Fortran 95 compiler
@@ -152,6 +158,7 @@ The model can be run for shorter periods, users can download meteorology for
 only the period they are interested in, plus one day.
 
 ## Verification
+
 The EMEP/MSC-W model is validated and reported to the
 Cooperative Programme for Monitoring and Evaluation of the
 Long-range Transmission for Air Pollutants in Europe ([EMEP][]) each year
