@@ -4,10 +4,12 @@ Simplified access to the source code, input data and benchmark results
 ## Get the latest release dataset
 ```bash
 # download the catalog tool
-wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.py
+wget https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.py
 
 # make it executable and run it
 chmod +x catalog.py
+
+# get the latest release
 catalog.py
 ```
 
