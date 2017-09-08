@@ -13,9 +13,9 @@ import tarfile
 import shutil
 
 _CONST = {
-    'VERSION':"0.1.0",                      # script version
+    'VERSION':"0.1.1",                      # script version
     'RELEASE':['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
-               'rv4_10'],                   # released model versions
+               'rv4_10','rv4_15'],            # released model versions
     'METYEAR':[2005, 2008]+range(2010, 2015), # released met-years
     'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
     'GIT':"https://github.com/metno/emep-ctm/",
@@ -59,7 +59,7 @@ Examples:
                       help="Override dataset cataloque path/file (default:%default)")
 
     group = OptionGroup(parser, "Release options", "Select release dataset")
-    group.add_option("-R", "--revision",
+    group.add_option("-R", "--revision", "-r",
                      type="string", metavar="REV",
                      action="append", dest="tag",
                      help="revision REV")
@@ -473,9 +473,10 @@ def main(opts):
                     print("  Found %-6s:%s"%(key, ds[key]))
 
             for key in ds:
-                downloads += ds[key]
+                total = sum([x.size for x in ds[key]])
+                if(total>0):
+                    downloads += ds[key]
                 if opts.verbose and ds[key]:
-                    total = sum([x.size for x in ds[key]])
                     print("Queue download: %6s %s"%(file_size(total), ds[key][0].tag))
         return downloads
 
