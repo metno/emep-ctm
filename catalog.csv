@@ -155,4 +155,7 @@ release,dataSet,met/statusYear,modelVersion,dataSource,dataDestination,diskSize,
 201709,meteo,2015,EECCA,{FTP}/{REL}/input_data/meteo/meteo201511.tar.bz2,,1870633545,7974005f821a027182815c9fc1dd857f
 201709,meteo,2015,EECCA,{FTP}/{REL}/input_data/meteo/meteo201512.tar.bz2,,1929643105,a14ff455b75a737b75853a7a2b475ede
 201709,meteo,2015,EECCA,{FTP}/{REL}/input_data/meteo/meteo201513.tar.bz2,,116011382,22bf5f96f7e428b71159c6dac1e7ff8a
+201709,output,2015,rv4_15,{FTP}/{REL}/model_results_rv4_15_2015/Base_model_rv4_15_results_EMEP01.tar.bz2,,2861362591,2b3615f874e67c69874662185a627c6a
+201709,output,2015,rv4_15,{FTP}/{REL}/model_results_rv4_15_2015/EMEP01/Base_day.nc,EMEP_MSC-W_model.rv4.15.OpenSource/Base_EMEP01_34lev/,51073576741,d050fa6359372cba84c07029f93f9fc3
+201709,output,2015,rv4_15,{FTP}/{REL}/model_results_rv4_15_2015/EMEP01/Base_hourInst.nc,EMEP_MSC-W_model.rv4.15.OpenSource/Base_EMEP01_34lev/,18728219480,4784ecec857061b10d25fdeaf47cafff
 201709,docs,,rv4_15,{GIT}/releases/download/{MOD}/User_Guide.pdf,,0,0
