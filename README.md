@@ -24,8 +24,14 @@ catalog.py -R REV
 # get only the source code and user guide for revision REV
 catalog.py -R REV -sd
 
-# download meteorological input for YEAR (2005|2008|2010..2013)
+# download meteorological input for YEAR (2005|2008|2010..2015)
 catalog.py -Y YEAR -m
+
+# download meteorological input for 2015 and EECCA domain
+catalog.py -Y 2015 -m --met-domain EECCA
+
+# download meteorological input for 2015 and EMEP01 domain
+catalog.py -Y 2015 -m --met-domain EMEP01
 ```
 
 # Tools to read sites and sondes output
