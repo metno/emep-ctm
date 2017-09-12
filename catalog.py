@@ -17,7 +17,7 @@ _CONST = {
     'RELEASE':['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
                'rv4_10','rv4_15'],              # released model versions
     'METYEAR':[2005, 2008]+range(2010, 2015),   # released met-years
-    'THREDDS':'http://thredds.met.no/thredds/catalog/data/EMEP',
+    'THREDDS':'http://thredds.met.no/thredds/fileServer/data/EMEP',
     'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
     'GIT':"https://github.com/metno/emep-ctm/",
     'CSV':'/catalog.csv',                       # list all files from all releases
