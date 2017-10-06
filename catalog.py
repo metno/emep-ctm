@@ -371,7 +371,7 @@ class DataSet(object):
     def __str__(self):
         return "%-8s (meteo:%s, status:%s)"%(self.tag, self.year, self.status)
     def __repr__(self):
-        return "%s: %s"%(self, {k:str(v) for k, v in self.dataset.items() if v})
+        return "%s: %s"%(self, dict((k, str(v)) for k, v in self.dataset.items() if v))
 #       return "%s: %s"%(self,self.dataset)
 
 def read_catalog(filename, verbose=1):
@@ -468,7 +468,7 @@ def main(opts):
             print("Searching datasets:%s"%(opts.data))
         for ds in get_datasets(catalog, attr, target):
             try:
-                ds = {key:ds.dataset[key] for key in opts.data}
+                ds = dict((key,ds.dataset[key]) for key in opts.data)
                 # only download meteo with matching --met-domain option
                 if 'meteo' in ds and opts.domain:
                     ds['meteo'] = [ x for x in ds['meteo'] if x.model == opts.domain ]
