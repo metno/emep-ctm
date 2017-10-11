@@ -197,7 +197,22 @@ If no ``out_DOMAIN`` is given, the model inner domain will be written out.
       !-------- Sub domain for write modes
       out_DOMAIN       = 60,107,11,58,    ! istart,iend,jstart,jend
     &end
+    
+Reduce the size of BC files
+_______________________________________________________________
 
+The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
+If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC can be stored.
+To achieve this, two parameters have to be passed in &Nest_config: 
+1.  ``RUNDOMAIN_inner`` which must match exactly the ``RUNDOMAIN`` used in for the inner run
+2.  ``MET_inner`` which should be a link to any metdata of the inner grid, in order to define the projection parameters of the inner grid. 
+
+Example:
+.. code-block:: text
+    RUNDOMAIN_inner = 30,70,30,70, 
+    MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
+    
+Note that the file will have the same dimensions, but zeros are put into the unused parts. The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
 Read BCs from EMEP MSC-W model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
