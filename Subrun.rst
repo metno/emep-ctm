@@ -57,7 +57,7 @@ meteorology data. The trendyear can be set to change the boundary
 emissions for earlier and future years, see the modules
 ``BoundaryConditions_ml.f90`` and ``GlobalBCs_ml.f90`` to understand
 better what the trendyear setting does. The default setting is the
-meteorological year you are running for, in this case 2014. The
+meteorological year you are running for, in this case 2015. The
 runlabel1 option sets the name of the different output NetCDF files, see
 :numref:`ch-output`. The ``startdate`` and ``enddate`` parameters are set for the
 time period you want the model to run (YYYY,MM,DD), and you need
@@ -66,10 +66,7 @@ meteorology data for the period, as shown in :numref:`config-emep`.
 .. literalinclude:: config_emep.nml
     :name: config-emep
     :caption: Basic namelist example; ``config_emep.nml`` extract.
-    :lines: 1-14,42-44,62-64
-.. comment:
-    :language: Fortran
-    :linenos:
+    :lines: 1-15,53-54,75-77
 
 In :numref:`config-emep`, the model is run for the period 1 January to 10 Januray
 2014 and the trend year used is 2014. Output files will be stored with
@@ -83,7 +80,7 @@ namelist to idicate the sub-domain indexes. In :numref:`config-emep`,
 ``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
 
 To run the model, the correct path to the EMEP/MSC-W model code has to
-be set (``mpirun path_to_the_modelcode/Unimod``).
+be set (``mpiexec path_to_the_modelcode/Unimod``).
 
 It is recommended to submit the script as a batch job. Please check the
 submission routine on the computer system you are running on.
@@ -203,17 +200,19 @@ ___________________________
 
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
 If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC can be stored.
-To achieve this, two parameters have to be passed in &Nest_config: 
+To achieve this, two parameters have to be passed in ``&Nest_config``:
+
 1.  ``RUNDOMAIN_inner`` which must match exactly the ``RUNDOMAIN`` used in for the inner run
 2.  ``MET_inner`` which should be a link to any metdata of the inner grid,
-    in order to define the projection parameters of the inner grid. 
+    in order to define the projection parameters of the inner grid.
+
 
 .. code-block:: text
     :name: nest-write-inner
     :caption: Inner domain options for nested BC output example.
 
     &Nest_config
-      [...]
+    [...]
       RUNDOMAIN_inner = 30,70,30,70, 
       MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
     &end
@@ -412,14 +411,23 @@ any sector and/or any country. Several lines can be written in the file.
 Other less used options
 -----------------------
 
-There are many internal settings that are set to a default value by the model. These default values can often be overrided by setting specific values for keywords in config_emep.nml.
+There are many internal settings that are set to a default value by the model.
+These default values can often be overridden by setting specific values for keywords in ``config_emep.nml``.
 
-The ``RUNDOMAIN`` is divided by the model into subdomains which are assigned to each processor. Normally this partioning is done such that the X and Y direction are divided into approximately equal number of parts. For runs in lat lon projection containing poles the Y division is done into one or two parts, so that each processor has the same share of pole regions.
-The default partitioning can be overrided using the ``DOMAIN_DECOM_MODE`` parameter in ``config_emep.nml``. Recognized values are:
-'X*Y', 'XY', 'X*1', 'Y=1', 'X', '1*Y', 'X=1', 'Y', '2*Y', 'X=2', 'X*2', 'Y=2'. See also in Par_ml.f90 for details.
+The ``RUNDOMAIN`` is divided by the model into subdomains which are assigned to each processor.
+Normally this partioning is done such that the X and Y direction are divided into approximately equal number of parts.
+For runs in lat lon projection containing poles the Y division is done into one or two parts,
+so that each processor has the same share of pole regions.
+The default partitioning can be overrided using the ``DOMAIN_DECOM_MODE`` parameter in ``config_emep.nml``.
+Recognized values are: 
+`'X*Y'`, `'XY'`, `'X*1'`, `'Y=1'`, `'X'`, `'1*Y'`, `'X=1'`, `'Y'`, `'2*Y'`, `'X=2'`, `'X*2'`, `'Y=2'`.
+See also in ``Par_ml.f90`` for details.
 
-The main timestep parameter ``dt_advec`` can be set manually in config_emep.nml (in seconds, real number). It must be a factor of 3600.
+The main timestep parameter ``dt_advec`` can be set manually in config_emep.nml (in seconds, real number).
+It must be a factor of 3600.
 
-``JUMPOVER29FEB`` : if set to T , will not treat the 29th of February even for leap years. (Useful if that date is missing, for instance in Climate runs).
+``JUMPOVER29FEB`` : if set to T , will not treat the 29th of February even for leap years.
+(Useful if that date is missing, for instance in Climate runs).
 
-``NETCDF_DEFLATE_LEVEL``: The level of compression used in the NetCDF output files (integer). Negative values means netcdf3 format.
+``NETCDF_DEFLATE_LEVEL``: The level of compression used in the NetCDF output files (integer).
+Negative values means netcdf3 format.

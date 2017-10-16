@@ -1,13 +1,17 @@
 #!/bin/bash
-	    
-# Minimalistic script for run the EMEP/MSC-W model
+
+# Minimalistic script for run the Unified EMEP model
+GRID=EECCA
+NLEV=20lev
 
 # Link the input data
-inputdir=.
-ln -s $inputdir/input/* .   # Other input files
+inputdir=../
+ln -s $inputdir/input/* .        # input files except meteorology
+ln -s $inputdir/input/$NLEV/* .  # num-level dependant input
+ln -s $inputdir/input/$GRID/* .  # grid dependant input
 
 # Run the model
-mpirun $inputdir/code/Unimod
+mpiexec $inputdir/code/Unimod
 
 # Clean the links to the input data
-find . -type l -delete
+find -maxdepth 1 -type l -delete

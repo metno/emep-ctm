@@ -1,20 +1,30 @@
 &INPUT_PARA
   GRID      = 'EECCA',
-  iyr_trend = 2014,
+  iyr_trend = 2015,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2016',
-  startdate = 2014,01,01,000000,
-  enddate   = 2014,12,31,000000,
+  runlabel2 = 'Opensource_Setup_2017',
+  startdate = 2015,01,01,00,
+  enddate   = 2015,12,31,24,
 &end
 &Machine_config
   DataPath(1) = '../input',           ! define 'DataDir' keyword
 &end
 &ModelConstants_config
-  meteo                 = '../meteoYYYY/meteoYYYYMMDD.nc',
+  meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
 !------------------------------
   EXP_NAME              = 'EMEPSTD',
   MY_OUTPUTS            = 'EMEPSTD',
+!------------------------------
+  EmBio%GlobBvocMethod  = 'GLC-CLM', ! default for GLOBAL runs, not used for Europe
+  EmBio%CLF             =  0.59,     ! 1/1.7 for CLM
+  LandCoverInputs%LandDefs  = 'DataDir/Inputs_LandDefs.csv',
+  LandCoverInputs%Do3seDefs = 'DataDir/Inputs_DO3SE.csv',
+  LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
+                              'DataDir/glc2000mCLM.nc',
+  YieldModifications    = 'VBS', 
+  PBL%ZiMIN             =  50.0,
+!------------------------------
   USES%testname         = 'EMEPSTD',
   USES%FOREST_FIRES     = F,
   USES%EMISSTACKS       = F,          ! Reads PointSources file
@@ -41,13 +51,16 @@
   INERIS_SNAP2          = F,
 !------------------------------
   EmisDir               = 'DataDir/EECCA',
-  emis_inputlist(1)%name= 'EmisDir/gridPOLL', ! ASCII
+  emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
 ! IMPORTANT: Specify the keyword "POLL" rather than sox, nox, etc. and the code
 !   will check against emissions names listed in CM_EmisFiles.inc
 !   NB: CM_EmisFiles uses lowercase. Renames or link if they are in capital letters.
 ! One can either include or exclude, not both, as follows
-! emis_inputlist(1)%incl(1:) = 'EU15', ! example take only countries from the 'EUMACC2' list
-! emis_inputlist(2)%name     = 'EmisDir/Emis_GLOB_05.nc', !example of Fractions type
+! emis_inputlist(1)%incl(1:) = 'EU15', ! example take only countries from the 'EUMAC
+C2' list
+! emis_inputlist(2)%name= 'EmisDir/Emis_GLOB_05.nc', !example of Fractions type
+  emis_inputlist(2)%name= 'DataDir/OceanicEmissions_GEIA.nc',
+  emis_inputlist(2)%type= 'DMS',
   EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
 !------------------------------
   SELECT_LEVELS_HOURLY  = F,          ! hourly output flag for 3DPROFILES
@@ -82,11 +95,6 @@
   template_read_3D = 'EMEP_IN.nc',            ! a different path can be set here
   template_read_BC = 'EMEP_IN.nc',            ! for each of the IO IC/BC files,
   template_write   = 'EMEP_OUT.nc',           ! if needed.
-!-------- Sub domain for write modes
-! istart =  60,   ! default RUNDOMAIN(1)+1
-! jstart =  11,   ! default RUNDOMAIN(3)+1
-! iend   = 107,   ! default RUNDOMAIN(2)-1
-! jend   =  58,   ! default RUNDOMAIN(4)-1
 &end
 &ExternalBICs_config
   USE_EXTERNAL_BIC  = F,
