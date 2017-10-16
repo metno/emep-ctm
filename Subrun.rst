@@ -40,7 +40,7 @@ set the right paths for the input directories. All the input files in
 the input directories are linked to the directory you are working from.
 
 ``config_emep.nml``
-~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^
 
 The model has a namelist system. It is possible to set different
 constants and flags for running the model. The constants and flags
@@ -174,7 +174,7 @@ in ``Nest_config``. The IC data (entire 3D domain) will
 be set at start of run from the file defined by ``template_read_3D`` in ``Nest_config``.
 
 Write BCs from EMEP MSC-W model
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 :numref:`nest-write-config` shows an example to write every 3 hours into
 daily Nest/BC files. Output file name is defined by ``template_write`` ('BC_YYYYMMDD.nc'),
@@ -199,23 +199,31 @@ If no ``out_DOMAIN`` is given, the model inner domain will be written out.
     &end
     
 Reduce the size of BC files
-_______________________________________________________________
+___________________________
 
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
 If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC can be stored.
 To achieve this, two parameters have to be passed in &Nest_config: 
 1.  ``RUNDOMAIN_inner`` which must match exactly the ``RUNDOMAIN`` used in for the inner run
-2.  ``MET_inner`` which should be a link to any metdata of the inner grid, in order to define the projection parameters of the inner grid. 
+2.  ``MET_inner`` which should be a link to any metdata of the inner grid,
+    in order to define the projection parameters of the inner grid. 
 
-Example:
 .. code-block:: text
-    RUNDOMAIN_inner = 30,70,30,70, 
-    MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
+    :name: nest-write-inner
+    :caption: Inner domain options for nested BC output example.
+
+    &Nest_config
+      [...]
+      RUNDOMAIN_inner = 30,70,30,70, 
+      MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
+    &end
     
-Note that the file will have the same dimensions, but zeros are put into the unused parts. The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
+    
+Note that the file will have the same dimensions, but zeros are put into the unused parts.
+The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
 Read BCs from EMEP MSC-W model
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 :numref:`nest-read-config` shows an example to read every 3 hours from
 the Nest/BC files created previously by running :numref:`nest-write-config`.
@@ -234,7 +242,7 @@ as shown in :numref:`config-emep`.
     &end
 
 Read external BCs
-~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^
 
 Reading BCs from a different model is more involved than the previous example.
 The vertical axis and variables in the file need to be mapped to the
@@ -415,6 +423,3 @@ The main timestep parameter ``dt_advec`` can be set manually in config_emep.nml 
 ``JUMPOVER29FEB`` : if set to T , will not treat the 29th of February even for leap years. (Useful if that date is missing, for instance in Climate runs).
 
 ``NETCDF_DEFLATE_LEVEL``: The level of compression used in the NetCDF output files (integer). Negative values means netcdf3 format.
-
-
-
