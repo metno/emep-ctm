@@ -12,6 +12,11 @@ installed in a [conda environment][conda].
 [sphinx]: http://www.sphinx-doc.org
 [conda]: http://conda.pydata.org
 
+### LaTeX package
+```bash
+sudo apt-get install latexmk
+```
+
 ### conda setup
 ```bash
 # create env
@@ -22,7 +27,7 @@ source activate sphinx
 
 # add modules
 # conda install sphinx-autobuild
-pip install sphinxcontrib-bibtexls
+pip install sphinxcontrib-bibtex
 ```
 
 ### run sphinx
