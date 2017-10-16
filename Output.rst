@@ -244,10 +244,7 @@ specified in ``My_Outputs.f90`` by the use of arrays.
 Only a few met fields are defined so far but more can be added into
 ``Sites_ml.f90`` as required.
 
-The output files ``sites_2014.csv`` and ``sondes_2010.csv`` are comma
+The output files ``sites_2015.csv`` and ``sondes_2015.csv`` are comma
 separated files that can be read by excel.
 If you include the whole year, or the 31\ :sup:`st` December,
-``sites_2015.csv`` and ``sondes_2015.csv`` are also included in the output.
-
-
-
+``sites_2016.csv`` and ``sondes_2016.csv`` are also included in the output.

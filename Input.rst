@@ -4,31 +4,38 @@ Input files
 ===========
 
 This chapter provides an overview on the necessary input files to run
-the EMEP/MSC-W model. A complete set of input files is provided in the
-EMEP/MSC-W Open Source web page to allow model runs for the meteorological
-year 2014. :numref:`tab-inputdata` lists the input files.
+the EMEP/MSC-W model. A complete set of input files is provided as part of the
+EMEP/MSC-W Open Source release to allow model runs for the meteorological
+year 2015. :numref:`tab-inputdata` lists the input files.
 
-The input files can be downloaded directly from our
-ftp server (ftp://ftp.met.no/projects/emep/OpenSource/201609/),
-However, the preferred retrieval method is via the catalog tool
-(:numref:`sec-ModelCode`) as follows:
+In the latest release, meteorology is provided for 2 different model domains and resolutions:
+
+- `EECCA` domain with a horizontal resolution of 50x50 km2 (at 60°N), 
+  on polar stereographic projection, and 20 vertical levels;
+- `EMEP01` domain with a 0.1x0.1 degrees on long-lat projection,
+  and 34 vertical levels.
+
+Download the input via the catalog tool (:numref:`sec-ModelCode`) as follows:
 
 .. code-block:: bash
 
-    # download the meteorology
-    catalog.py -R rv4_15 --meteo
+    # download 2015 meteorology for the EECCA domain
+    catalog.py -R rv4_15 --meteo --met-domain EECCA
+
+    # download 2015 meteorology for the EMEP01 domain
+    catalog.py -R rv4_15 --meteo --met-domain EMEP01
 
     # download other input files
     catalog.py -R rv4_15 --input
 
 The meteorology files will be placed under
-``EMEP_MSC-W_model.rv4.15.OpenSource/meteo2014/``,
+``EMEP_MSC-W_model.rv4.15.OpenSource/meteo2015/``,
 and the remaining input files will be placed under
 ``EMEP_MSC-W_model.rv4.15.OpenSource/input/``
 
 This are all input files needed to run the EMEP/MSC-W model,
 except the aircraft emissions (``AircraftEmis_FL.nc``),
-and forest fire emissions (``FINN_ForestFireEmis_2014.nc``).
+and forest fire emissions (``FINN_ForestFireEmis_2015.nc``).
 See sections :numref:`emisair` and :numref:`emisff`
 for details about these emissions data.
 
@@ -408,7 +415,7 @@ globally for access by the EMEP/MSC-W model. To include forest fire
 emissions set ``USE_FOREST_FIRES=.true.`` in ``config_emep.nml`` and
 download the 2012 GEOS-chem daily data
 http://bai.acom.ucar.edu/Data/fire/. The data needs to be stored with
-units mole/day in a NetCDF file called ``FINN_ForestFireEmis_2014.nc``
+units mole/day in a NetCDF file called ``FINN_ForestFireEmis_2015.nc``
 compatible with the ``ForestFire_ml.f90`` module.
 
 Dust files
