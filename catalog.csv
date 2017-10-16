@@ -525,4 +525,4 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 201709,meteo,2015,EMEP01,{THREDDS}/Meteo/{MOD}/{YEAR}/meteo20151230.nc,EMEP_MSC-W_model.rv4.15.OpenSource/meteo2015/EMEP01/,1794275452,28bd6fda91250f85970e6fdb5a409578
 201709,meteo,2015,EMEP01,{THREDDS}/Meteo/{MOD}/{YEAR}/meteo20151231.nc,EMEP_MSC-W_model.rv4.15.OpenSource/meteo2015/EMEP01/,1795587890,9f5ef3be6e3bbec105c94c8b17790435
 201709,meteo,2015,EMEP01,{THREDDS}/Meteo/{MOD}/{YEAR}/meteo20160101.nc,EMEP_MSC-W_model.rv4.15.OpenSource/meteo2015/EMEP01/,1770525897,5d1f8471c8f6dbab9a0ad2463943122a
-201709,docs,,rv4_15,{GIT}/releases/download/{MOD}/User_Guide.pdf,,0,0
+201709,docs,,rv4_15,{GIT}/releases/download/{MOD}/User_Guide.pdf,,511666,0f3732c79934520dfc1db597061fc341005baa33
