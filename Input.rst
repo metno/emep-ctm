@@ -16,15 +16,15 @@ However, the preferred retrieval method is via the catalog tool
 .. code-block:: bash
 
     # download the meteorology
-    catalog.py -R rv4_10 --meteo
+    catalog.py -R rv4_15 --meteo
 
     # download other input files
-    catalog.py -R rv4_10 --input
+    catalog.py -R rv4_15 --input
 
 The meteorology files will be placed under
-``EMEP_MSC-W_model.rv4.10.OpenSource/meteo2014/``,
+``EMEP_MSC-W_model.rv4.15.OpenSource/meteo2014/``,
 and the remaining input files will be placed under
-``EMEP_MSC-W_model.rv4.10.OpenSource/input/``
+``EMEP_MSC-W_model.rv4.15.OpenSource/input/``
 
 This are all input files needed to run the EMEP/MSC-W model,
 except the aircraft emissions (``AircraftEmis_FL.nc``),
