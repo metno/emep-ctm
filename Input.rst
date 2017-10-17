@@ -569,7 +569,7 @@ The first column represents the country code
 the sector (http://reports.eea.eu.int/technical_report_2001_3/en) where
 '0' means all sectors, and then in the remaining columns one can specify
 which emissions to reduce. Here 1.0 means no reduction of the given
-pollutant (|SOx|\ , |NOx|\ , VOC, |NH3|\ , CO, |PM25|\ and |PMco|\ )
+pollutant (|SOx|\ , |NOx|\ , VOC, |NH3|\ , CO, |PM25| and |PMco|\ )
 from sectors of specified country. The number following the first text ("Name")
 in line 1 (number 5 in the downloaded file) gives the number of pollutants
 treated in the file.
