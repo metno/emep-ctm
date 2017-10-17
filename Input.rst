@@ -573,19 +573,26 @@ pollutant (|SOx|\ , |NOx|\ , VOC, |NH3|\ , CO, |PM25|\ and |PMco|\ )
 from sectors of specified country. The number following the first text ("Name")
 in line 1 (number 5 in the downloaded file) gives the number of pollutants
 treated in the file.
-Instead of country code, reductions can be specified by coordinates too 
-(and combined with country reductions). The line with coordinate corrections must start with the keyword ``lonlat``.
-The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
-Example 
 
-    .. csv-table:: Example femis.dat 
-        :name: femis
-        :caption: country with code 17 (NL), will reduce pm emisions by half for all sectors. Emissions of NH3 will be removed from the rectangle with longitudes between 3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North.
-        
-        Name&  7 &        sox &      nox    &    co   &    voc  &     nh3  &    pm25   &   pmco
-         17  & 0 &   1.0&   1.0&   1.0&   1.0&   1.0&   0.5&   0.5
-        lonlat &3.3 &7.2& 50.7 &53.5 &   0   &     1.0   &    1.0    &   1.0   &    1.0    &   0.0   &    1.0   &    1.0
+Instead of country code, reductions can be specified by coordinates too (and combined with country reductions).
+The line with coordinate corrections must start with the keyword ``lonlat``.
+The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested.
+Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
 
+
+.. code-block:: Fortran
+    :name: femis
+    :caption: ``femis.dat`` example.
+    :linenos:
+
+    Name                       7  sox  nox  co   voc  nh3  pm25  pmco
+    17                         0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
+    lonlat 3.3 7.2 50.7 53.5   0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+
+
+In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
+Emissions of |NH3| will be removed from the rectangle with longitudes between
+3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North.
 
 
 Chemical speciation of emissions
