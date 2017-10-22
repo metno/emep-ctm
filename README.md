@@ -11,7 +11,7 @@ which supports the development of air quality polices in the European Union.
 [CLRTAP]:   http://www.unece.org/env/lrtap/welcome.html
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
-[guide]:    http://github.com/metno/emep-ctm/releases/download/rv4_10/User_Guide.pdf
+[guide]:    http://github.com/metno/emep-ctm/releases/download/rv4_15/User_Guide.pdf
 [publ2017]: http://emep.int/publ/emep2017_publications.html
 [rel415]:   http://github.com/metno/emep-ctm/releases/tag/rv4_15
 [rel410]:   http://github.com/metno/emep-ctm/releases/tag/rv4_10
