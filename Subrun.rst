@@ -221,6 +221,9 @@ To achieve this, two parameters have to be passed in ``&Nest_config``:
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
 The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
+If a BC file has been created using this method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
+
+
 Read BCs from EMEP MSC-W model
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
