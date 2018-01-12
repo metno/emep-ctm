@@ -574,8 +574,8 @@ A more general format, can be provided, which release the emissions at different
      7         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP7
      8         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP8
      9         0.0      0.00     0.41     0.57     0.02     0.00     0.0     ! SNAP9
-    10        0.85     0.15     0.00     0.00     0.00     0.00     0.0     ! SNAP10
-    11        1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP11
+    10         0.85     0.15     0.00     0.00     0.00     0.00     0.0     ! SNAP10
+    11         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP11
 
 
 The line starting with the keyword ``Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
@@ -619,8 +619,8 @@ Gridcells are either entirely included or entirely reduced, never cut into small
     :caption: ``femis.dat`` example.
     :linenos:
 
-    Name                       7  sox  nox  co   voc  nh3  pm25  pmco
-    17                         0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
+    Name                          7  sox  nox  co   voc  nh3  pm25  pmco
+    17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
     lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
 
 
