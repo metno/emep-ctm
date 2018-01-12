@@ -546,10 +546,45 @@ Simpson et al. (2012) section 6.1.2
 Emission heights
 ~~~~~~~~~~~~~~~~
 
+Old format:
 A vertical distribution for the eleven SNAP sectors are given in the
 file ``EmisHeights.txt``. The file has seven vertical levels, over the
 columns and the SNAP sectors given in the first row. Read more in
 Simpson et al. (2012) section 6.1.1.
+
+A more general format, can be provided, which release the emissions at different heights, independently of the number of layer used by the model. The release heights are defined as layers at specific pressure. Example:
+
+
+.. code-block:: Fortran
+    :name: EmisHeights.txt
+    :caption: ``EmisHeights.txt`` example.
+    :linenos:
+    
+# Emissions distribution
+# Upper layer heights in meters: 20. 92. 184. 324. 522. 781. 1106.
+# Has 100% SNAP2 emissions in lowest layer
+# Plevels are pressure in Pa at top of corresponding levels (P Surface = 101325.0)
+ Nklevels 7   Vertical Levels
+ Plevels 101084.9 100229.1 99133.2 97489.35 95206.225 92283.825 88722.15
+ 1         0.0      0.00     0.0025   0.1475   0.40     0.30     0.15    ! SNAP1
+ 2         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP2
+ 3         0.06     0.16     0.75     0.03     0.00     0.00     0.0     ! SNAP3
+ 4         0.05     0.15     0.70     0.10     0.00     0.00     0.0     ! SNAP4
+ 5         0.02     0.08     0.60     0.30     0.00     0.00     0.0     ! SNAP5
+ 6         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP6
+ 7         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP7
+ 8         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP8
+ 9         0.0      0.00     0.41     0.57     0.02     0.00     0.0     ! SNAP9
+ 10        0.85     0.15     0.00     0.00     0.00     0.00     0.0     ! SNAP10
+ 11        1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP11
+
+
+The line starting with the keyword ``Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
+
+These layers are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
+The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
+
+
 
 .. _`sec-femis`:
 
