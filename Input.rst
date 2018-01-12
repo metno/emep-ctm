@@ -558,25 +558,24 @@ A more general format, can be provided, which release the emissions at different
 .. code-block:: Fortran
     :name: EmisHeights.txt
     :caption: ``EmisHeights.txt`` example.
-    :linenos:
     
-# Emissions distribution
-# Upper layer heights in meters: 20. 92. 184. 324. 522. 781. 1106.
-# Has 100% SNAP2 emissions in lowest layer
-# Plevels are pressure in Pa at top of corresponding levels (P Surface = 101325.0)
- Nklevels 7   Vertical Levels
- Plevels 101084.9 100229.1 99133.2 97489.35 95206.225 92283.825 88722.15
- 1         0.0      0.00     0.0025   0.1475   0.40     0.30     0.15    ! SNAP1
- 2         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP2
- 3         0.06     0.16     0.75     0.03     0.00     0.00     0.0     ! SNAP3
- 4         0.05     0.15     0.70     0.10     0.00     0.00     0.0     ! SNAP4
- 5         0.02     0.08     0.60     0.30     0.00     0.00     0.0     ! SNAP5
- 6         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP6
- 7         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP7
- 8         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP8
- 9         0.0      0.00     0.41     0.57     0.02     0.00     0.0     ! SNAP9
- 10        0.85     0.15     0.00     0.00     0.00     0.00     0.0     ! SNAP10
- 11        1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP11
+    # Emissions distribution
+    # Upper layer heights in meters: 20. 92. 184. 324. 522. 781. 1106.
+    # Has 100% SNAP2 emissions in lowest layer
+    # Plevels are pressure in Pa at top of corresponding levels (P Surface = 101325.0)
+     Nklevels 7   Vertical Levels
+     Plevels 101084.9 100229.1 99133.2 97489.35 95206.225 92283.825 88722.15
+     1         0.0      0.00     0.0025   0.1475   0.40     0.30     0.15    ! SNAP1
+     2         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP2
+     3         0.06     0.16     0.75     0.03     0.00     0.00     0.0     ! SNAP3
+     4         0.05     0.15     0.70     0.10     0.00     0.00     0.0     ! SNAP4
+     5         0.02     0.08     0.60     0.30     0.00     0.00     0.0     ! SNAP5
+     6         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP6
+     7         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP7
+     8         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP8
+     9         0.0      0.00     0.41     0.57     0.02     0.00     0.0     ! SNAP9
+    10        0.85     0.15     0.00     0.00     0.00     0.00     0.0     ! SNAP10
+    11        1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP11
 
 
 The line starting with the keyword ``Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
@@ -609,7 +608,7 @@ from sectors of specified country. The number following the first text ("Name")
 in line 1 (number 5 in the downloaded file) gives the number of pollutants
 treated in the file.
 
-Instead of country code, reductions can be specified by coordinates too (and combined with country reductions).
+Instead of country code, reductions can also be specified by coordinates too (and combined with country reductions).
 The line with coordinate corrections must start with the keyword ``lonlat``.
 The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested.
 Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
@@ -622,12 +621,12 @@ Gridcells are either entirely included or entirely reduced, never cut into small
 
     Name                       7  sox  nox  co   voc  nh3  pm25  pmco
     17                         0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
-    lonlat 3.3 7.2 50.7 53.5   0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
 
 
 In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
-Emissions of |NH3| will be removed from the rectangle with longitudes between
-3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North.
+Emissions of |NH3| from country with code 17 only, will be removed from the rectangle with longitudes between
+3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North. Use zero (0) as country code to specify that emissions from all countries should be reduced.
 
 
 Chemical speciation of emissions
