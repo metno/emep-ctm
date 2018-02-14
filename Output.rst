@@ -203,7 +203,7 @@ and the values of the field must be put into the d_2d or d_3d array, using this 
 
     if(photo_out_ix>0) d_3d(photo_out_ix,i,j,1:num_lev3d,IOU_INST) = rcphot(IDNO2,lev3d(1:num_lev3d))
 
-(for 2D output write in d_2d and ommit the vertical index)
+(for 2D output, write in d_2d and ommit the vertical index)
 
 
 Other outputs
