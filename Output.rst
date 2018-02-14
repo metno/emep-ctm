@@ -175,18 +175,39 @@ Most standard output can be outputted by adding lines and modifying the paramete
 The meteorological fields defined in the ``met`` array in the ``MetFields_ml.f90`` file, can be retrieved by using the 'MET2D' or 'MET3D' keywords. If a 3D array is requested with the 'MET2D' keyword, only the lowest level is written out.
 
 If you want an array that does not fit in any category, or even make your own special field, you can get it in the output using the procedure shown below; this will however require that you write in the code and recompile.
-For 2D fields:
+For instance in config_emep.nml OutputMisc define:
 
-- set a value for ``Nspecial2d``  in ``MetFields_ml.f90`` according to the number of new outputs
-- write in the code the values of the array special2d(i,j,N), where N is the output number (i.e. 1,2,... Nspecial2d). 
-  For instance ``special2d(i,j,1)=Grid%invL`` in ``CellMet_ml.f90``
-- include ``special2d`` array in the same routine by adding the line ``use MetFields_ml  , only : special2d``
-- In ``config_emep.nml`` include the corresponding line, for instance: 
+``  'J(NO2)'  ,'USET','D3_J(NO2)'  ,'photorate','1/s' ,-99,-99,F,1.0,T,'H',`` 
 
-``'MyinvL','MET2D','special2d1', '-','MyUnit' ,-99,-99,F,1.0,T,'YMD',`` 
+- The first column (name) is the name as shown in the output
+- The second column (class) must be 'USET'
+- The strings of the first and third columns can be chosen freely, but if one of them starts with the two characters 'D3', it will be interpreted as a 3 dimensional field
+- The fourth column can be any string
+- The fifth column is the unit, as show in the output
+- The sixth column (index) is an integer that can be used to characterize internal indices
+- The seventh columns should be a negative integer
+- The eigth column can F or T, indicating wether the field must be divided by the time step (dt_advec)
+- The ninth column (scale) is a scaling factor
+- The tenth column, F or T, indicates if the filed must be averaged (T) or accumulated (F)
+- The eleventh (last) column indicates the periodicity of the output. 'H'-> every hour, 'YMH'--> every hour, month and at the end of the run (and other combinations are allowed).
 
-(and 'special2d2', 'special2d3', ... for additional outputs) 
-For 3D fields replace all the "2d" by "3d".
+In the code you must define the indice of your new ouput. The requested outputs strings are stored in f_2d and f_3d; for instance
+
+.. code-block:: fortran
+
+    photo_out_ix = find_index("D3_J(NO2)", f_3d(:)%subclass)
+    
+and the values of the field must be put into the d_2d or d_3d array, using this indice, for instance:
+
+.. code-block:: fortran
+
+    if(photo_out_ix>0) d_3d(photo_out_ix,i,j,1:num_lev3d,IOU_INST) = rcphot(IDNO2,lev3d(1:num_lev3d))
+
+(for 2D output write in d_2d and ommit the vertical index)
+
+
+Other outputs
+-------------
 
 Detailed emissions by sectors can be obtained by adding the keyword ``SecEmisOuPoll``, and specify the pollutants required. For example adding the line:
 
