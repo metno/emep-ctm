@@ -186,9 +186,9 @@ For instance in config_emep.nml OutputMisc define:
 - The fifth column is the unit, as show in the output
 - The sixth column (index) is an integer that can be used to characterize internal indices
 - The seventh columns should be a negative integer
-- The eigth column can F or T, indicating wether the field must be divided by the time step (dt_advec)
+- The eigth column can be F or T, indicating wether the field must be divided by the time step (dt_advec)
 - The ninth column (scale) is a scaling factor
-- The tenth column, F or T, indicates if the filed must be averaged (T) or accumulated (F)
+- The tenth column, F or T, indicates if the field must be averaged (T) or accumulated (F)
 - The eleventh (last) column indicates the periodicity of the output. 'H'-> every hour, 'YMH'--> every hour, month and at the end of the run (and other combinations are allowed).
 
 In the code you must define the indice of your new ouput. The requested outputs strings are stored in f_2d and f_3d; for instance
@@ -197,7 +197,7 @@ In the code you must define the indice of your new ouput. The requested outputs 
 
     photo_out_ix = find_index("D3_J(NO2)", f_3d(:)%subclass)
     
-and the values of the field must be put into the d_2d or d_3d array, using this indice, for instance:
+and the values of the field must be put into the d_2d or d_3d array, using this index, for instance:
 
 .. code-block:: fortran
 
