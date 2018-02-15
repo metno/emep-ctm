@@ -1,4 +1,6 @@
 # Open Source EMEP/MSC-W model
+[![Documentation Status](https://readthedocs.org/projects/emep-ctm/badge/?version=latest)](http://emep-ctm.readthedocs.io/en/latest/?badge=latest)
+
 
 The EMEP models have been instrumental to the development of
 air quality policies in Europe since the late 1970s,
