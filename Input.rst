@@ -332,7 +332,7 @@ are given for other land-cover categories in the file
 ``Inputs_LandDefs.csv``. The underlying emission potentials, land-cover
 data bases, and model coding have however changed substantially since
 model version v.2011-06. The new approach is documented in Simpson *et
-al.*, 2012.
+al.*, 2012 and Simpson *et al.* 2017.
 
 Landuse
 ~~~~~~~
@@ -351,8 +351,9 @@ effects work.
 
 There are two NetCDF files included, one file
 ``Landuse_PS_5km_LC.nc`` on 5 km resolution over the EMEP domain,
-and a global ``LanduseGLC.nc``. The different landuse types are desribed
-in Simpson et al (2012).
+and a global ``LanduseGLC.nc`` which combines data from GLC2000 with the Community Land Model (CLM).
+The different landuse types are desribed
+in Simpson et al (2012) and Simpson et al. (2017).
 
 Degree-day factor
 ~~~~~~~~~~~~~~~~~
