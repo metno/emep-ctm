@@ -19,7 +19,127 @@ Details about the submission of these different types of runs are given
 below. We suggest that users test the "Base run" first, which can be
 done without significant changes in the code itself. One can also use
 the outputs of such a run in the future as a reference run for the other
-simulations.
+simulations. In  all cases, the configuration file ``config_emep.nml`` must
+be prepared, and we explain that first.
+
+``config_emep.nml``
+-------------------
+
+The model has a namelist system. It is possible to set different
+constants and flags for running the model. The constants and flags
+themselves are defined in ``Config_module.f90``, while they are set in the
+namelist file under ``ModelConstants_config`` parameter. Some of these
+are briefly explained in :numref:`ch-inputfiles`. Model gets information
+about running for special cases from this file. The datasets provided
+are for the EMEP grid EECCA.
+
+The different parameters for the model run are set in the
+``config_emep.nml`` file. In the very beginning of this, the section
+``INPUT_PARA`` has all these variables including the link to the
+meteorology data. The trendyear can be set to change the boundary
+emissions for earlier and future years, see the modules
+``BoundaryConditions_ml.f90`` and ``GlobalBCs_ml.f90`` to understand
+better what the trendyear setting does. The default setting is the
+meteorological year you are running for, in this case 2015. The
+runlabel1 option sets the name of the different output NetCDF files, see
+:numref:`ch-output`. The ``startdate`` and ``enddate`` parameters are set for the
+time period you want the model to run (YYYY,MM,DD), and you need
+meteorology data for the period, as shown below:
+
+:: 
+
+  &INPUT_PARA
+    GRID = 'EECCA',
+    iyr_trend = 2015,
+    runlabel1 = 'Base',
+    runlabel2 = 'Opensource_Setup_2017',
+    startdate = 2015,01,01,00,
+    enddate = 2015,12,31,24,
+  &end
+  &Machine_config
+   DataPath(1) = '../input', ! define 'DataDir' keyword
+  &end
+  &ModelConstants_config
+   meteo = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
+   DegreeDayFactorsFile = 'MetDir/DegreeDayFactors.nc',
+  !------------------------------
+   EmisDir = 'DataDir/EECCA',
+   emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
+  !--------Sub domain x0, x1, y0, y1
+    RUNDOMAIN = 36, 100, 50, 150, ! EECCA sub-domain
+  &end
+
+In the extract above, the model is run for the period 1 January to 10 January
+2014 and the trend year used is 2014. Output files will be stored with
+the name 'Base' and the meteorological correspond to the 'EECCA' grid.
+
+It is possible to run the model on a smaller domain than the full
+regional model domain, as defined by indexes :math:`x` and :math:`y`.
+For the 'EECCA' grid  :math:`x=1,\ldots,132; y=1,\ldots,159`\ .
+To set a smaller domain, use ``RUNDOMAIN`` variable in the ``ModelConstants_config``
+namelist to indicate the sub-domain indexes. In the config_emep extract above,
+``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
+
+
+config: Europe or Global?
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+The EMEP model has traditionally been run on the EMEP grid covering
+Europe, and using meteorology from the ECMWF IFS model. In this environment,
+we typically set several configuration variables to make use of
+Euro-specific data. In other regions it is better to make use of the
+model's 'global' settings, which will ensure better handling of
+vegetation (eg LAI) changes, convection, and various emission
+settings.
+
+Typical European/EMEP settings are:
+
+.. code-block:: text
+
+  USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
+  USES%PFT_MAPS = F,
+  USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = F, 
+  USES%EURO_SOILNOX = T, ! diff for global + Euro
+
+Typical non-European/global settings are:
+
+.. code-block:: text
+
+  USES%DEGREEDAY_FACTORS = F
+  USES%PFT_MAPS = T,    ! PFT LAI tests
+  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = T
+  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
+  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
+
+The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
+controlling SNAP2 emissions. This requires pre-processed files of heating degree days.
+Such files (DegreeDayFactors.nc) can be produced from any meteorology, but the difference in
+results even for Europe is not too significant. In other regions of the
+world emissions from SNAP2 may not be as dependent on degree-days as in
+Europe, and so this setting should probably be false.
+
+``PFT_MAPS=T`` triggers the use of a global file which provides monthly
+variations in leaf area index (LAI) for different vegetation types. This
+controls deposition and biogenic VOC emission parameters. In Europe, a
+simpler latitude-dependent system is used (based upon DO3SE), and so
+``PFT_MAPS`` should be set F.
+
+``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
+indeed any non-European runs are better off with monthly emissions for
+that particular area.
+
+``CONVECTION`` is difficult. In principle, all models runs should use the T
+setting, but for Europe we find it degrades the model results too much
+and we use F. The problem is likely that the sub-grid processes behind
+convection are so complex and the paramererisation is very uncertain.
+Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
+which may be changed to allow more or less influence of this variable.
+
+
+
 
 Base run
 --------
@@ -39,38 +159,7 @@ files) is linked directly in the ``config_emep.nml`` file. You need to
 set the right paths for the input directories. All the input files in
 the input directories are linked to the directory you are working from.
 
-``config_emep.nml``
-^^^^^^^^^^^^^^^^^^^
 
-The model has a namelist system. It is possible to set different
-constants and flags for running the model. The constants and flags
-itself is defined in ``ModelConstants_ml.f90``, while they are set in the
-namelist file under ``ModelConstants_config`` parameter. Some of these
-are briefly explained in :numref:`ch-inputfiles`. Model gets information
-about running for special cases from this file. The datasets provided
-are for the EMEP grid EECCA.
-
-The different parameters for the model run are set in the
-``config_emep.nml`` file. In the very beginning of this, the section
-``INPUT_PARA`` has all these variables including the link to the
-meteorology data. The trendyear can be set to change the boundary
-emissions for earlier and future years, see the modules
-``BoundaryConditions_ml.f90`` and ``GlobalBCs_ml.f90`` to understand
-better what the trendyear setting does. The default setting is the
-meteorological year you are running for, in this case 2015. The
-runlabel1 option sets the name of the different output NetCDF files, see
-:numref:`ch-output`. The ``startdate`` and ``enddate`` parameters are set for the
-time period you want the model to run (YYYY,MM,DD), and you need
-meteorology data for the period, as shown in :numref:`config-emep`.
-
-.. literalinclude:: config_emep.nml
-    :name: config-emep
-    :caption: Basic namelist example; ``config_emep.nml`` extract.
-    :lines: 1-15,53-54,75-77
-
-In :numref:`config-emep`, the model is run for the period 1 January to 10 Januray
-2014 and the trend year used is 2014. Output files will be stored with
-the name 'Base' and the meteorological correspond to the 'EECCA' grid.
 
 It is possible to run the model on a smaller domain than the full
 regional model domain, as defined by indexes :math:`x` and :math:`y`.
