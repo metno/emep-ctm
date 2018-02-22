@@ -46,7 +46,7 @@ runlabel1 option sets the name of the different output NetCDF files, see
 time period you want the model to run (YYYY,MM,DD), and you need
 meteorology data for the period, as shown below:
 
-:: 
+.. code-block:: text
 
   &INPUT_PARA
     GRID = 'EECCA',
