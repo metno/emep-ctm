@@ -260,7 +260,7 @@ in ``Nest_config``. The IC data (entire 3D domain) will
 be set at start of run from the file defined by ``template_read_3D`` in ``Nest_config``.
 
 Write BCs from EMEP MSC-W model
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :numref:`nest-write-config` shows an example to write every 3 hours into
 daily Nest/BC files. Output file name is defined by ``template_write`` ('BC_YYYYMMDD.nc'),
@@ -314,7 +314,7 @@ If a BC file has been created using this method, it cannot be used for initializ
 
 
 Read BCs from EMEP MSC-W model
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :numref:`nest-read-config` shows an example to read every 3 hours from
 the Nest/BC files created previously by running :numref:`nest-write-config`.
@@ -333,7 +333,7 @@ as shown in :numref:`config-emep`.
     &end
 
 Read external BCs
-^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~
 
 Reading BCs from a different model is more involved than the previous example.
 The vertical axis and variables in the file need to be mapped to the
@@ -371,9 +371,9 @@ is defined in the ``ExternalBICs_bc`` namelist.
 
 
 Vertical coordinate
-^^^^^^^^^^^^^^^^^^^
+___________________
 
-In ordet the determine the vertical levels on the external BC file
+In order the determine the vertical levels on the external BC file
 ('MyBC.nc' in :numref:`nest-mybc-config`),
 the following checks will take place in the following order:
 
@@ -413,7 +413,7 @@ In this file, the first 21 values in ``vct`` represent :math:`hyai`
 and the remaining 21 represent :math:`hybi` values in hPa.
 
 Variable mapping
-^^^^^^^^^^^^^^^^
+________________
 
 The variables to be used from the external boundary condition data are
 given in the ``ExternalBICS_bc`` namelist in the ``config_emep.nml`` file.
