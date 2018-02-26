@@ -1,7 +1,7 @@
-! <Met_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Met_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -51,7 +51,6 @@ module Met_ml
 !
 !=============================================================================
 
-use emep_Config_mod,      only: PBL
 use BLPhysics_ml,         only: &
    KZ_MINIMUM, KZ_SBL_LIMIT, PIELKE   &
   ,HmixMethod, UnstableKzMethod, StableKzMethod, KzMethod  &
@@ -72,9 +71,21 @@ use BLPhysics_ml,         only: &
   ,SigmaKz_2_m2s
 
 use CheckStop_ml,         only: CheckStop
+use Config_module,    only: PASCAL, PT, Pref, METSTEP  &
+     ,PBL & ! Has ZiMIN, ZiMAX, HmixMethod
+     ,KMAX_BND, KMAX_MID, MasterProc, DEBUG_MET, nmax  &
+     ,DEBUG_BLM, DEBUG_Kz, DEBUG_SOILWATER, DEBUG_LANDIFY &
+     ,DomainName & !HIRHAM,EMEP,EECCA etc.
+     ,TXTLEN_FILE & ! path/filename lenght for namelist inputs
+     ,TEGEN_DATA, USES &
+     ,nstep,USE_EtaCOORDINATES,USE_FASTJ &
+     ,CONVECTION_FACTOR &
+     ,LANDIFY_MET,MANUAL_GRID  &
+     ,CW_THRESHOLD,RH_THRESHOLD, CW2CC, JUMPOVER29FEB, meteo, startdate&
+     ,SoilTypesFile, Soil_TegenFile, TopoFile, SurfacePressureFile
 use FastJ_ml,             only: setup_phot_fastj,rcphot_3D
 use Functions_ml,         only: Exner_tab, Exner_nd
-use Functions_ml,         only: T_2_Tpot  !OS_TESTS
+use Functions_ml,         only: T_2_Tpot, StandardAtmos_kPa_2_km 
 use GridValues_ml,        only: glat, xm_i, xm_j, xm2         &
        ,Poles, sigma_bnd, sigma_mid, xp, yp, fi, GRIDWIDTH_M  &
        ,debug_proc, debug_li, debug_lj, A_mid, B_mid          &
@@ -86,15 +97,6 @@ use Landuse_ml,           only: water_fraction, water_frac_set, &
                                 likely_coastal, mainly_sea
 use MetFields_ml
 use MicroMet_ml,          only: PsiH  ! Only if USE_MIN_KZ
-use ModelConstants_ml,    only: PASCAL, PT, Pref, METSTEP  &
-     ,KMAX_BND, KMAX_MID, MasterProc, DEBUG_MET, nmax  &
-     ,DEBUG_BLM, DEBUG_Kz, DEBUG_SOILWATER, DEBUG_LANDIFY &
-     ,DomainName & !HIRHAM,EMEP,EECCA etc.
-     ,USE_DUST, TEGEN_DATA, USE_SOILWATER &
-     ,nstep,USE_CONVECTION,USE_EtaCOORDINATES,USE_FASTJ &
-     ,CONVECTION_FACTOR &
-     ,LANDIFY_MET,MANUAL_GRID  &
-     ,CW_THRESHOLD,RH_THRESHOLD, CW2CC, JUMPOVER29FEB, meteo, startdate
 use MPI_Groups_ml,     only: MPI_DOUBLE_PRECISION, MPI_BYTE, MPI_LOGICAL,&
                              MPI_COMM_IO, MPI_COMM_CALC, IERROR, ME_IO, ME_CALC,&
                              request_e,request_n,request_s,request_w,LargeSub_Ix,&
@@ -141,8 +143,8 @@ contains
 
 subroutine MeteoRead_io()
 
-  character (len = 100), save  ::  meteoname   ! name of the meteofile
-  character (len = 100)        ::  namefield  ! name of the requested field
+  character(len=TXTLEN_FILE), save :: meteoname   ! name of the meteofile
+  character(len=100) ::  namefield  ! name of the requested field
   integer :: ix, KMAX, istart,jstart,ijk,i,j,k,k1,k2
   integer :: nr
   integer ::   ndim,nyear,nmonth,nday,nhour
@@ -165,7 +167,7 @@ subroutine MeteoRead_io()
 
       !On first call, check that date from meteo file correspond to dates requested.
       !Also defines nhour_first and Nhh (and METSTEP in case of WRF metdata).
-      call Check_Meteo_Date !note that all procs read this
+      call Check_Meteo_Date_Short !note that all procs read this
     else
       nsec=METSTEP*3600.0 !from hr to sec
       ts_now = make_timestamp(current_date)
@@ -274,8 +276,8 @@ subroutine MeteoRead()
   !       domains    and sends subfields to the processors
   implicit none
 
-  character (len = 100), save  ::  meteoname   ! name of the meteofile
-  character (len = 100)        ::  namefield & ! name of the requested field
+  character(len=TXTLEN_FILE), save :: meteoname   ! name of the meteofile
+  character(len=100) ::  namefield & ! name of the requested field
        ,unit='   ',validity='    '    ! field is either instaneous or averaged
   integer ::   ndim,nyear,nmonth,nday,nhour
   integer ::   nr   ! Fields are interpolate in
@@ -324,6 +326,8 @@ subroutine MeteoRead()
   real, dimension(LJMAX,KMAX_MID) :: buf_uw,buf_ue
   real, dimension(LIMAX,KMAX_MID) :: buf_vn,buf_vs
   integer :: INFO,i_large,j_large
+  logical, save:: ps_in_hPa = .true.
+  logical, save:: precip_accumulated = .false.
 
   if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
 
@@ -348,7 +352,8 @@ subroutine MeteoRead()
 
      !On first call, check that date from meteo file correspond to dates requested.
      !Also defines nhour_first and Nhh (and METSTEP and bucket in case of WRF metdata).
-     call Check_Meteo_Date !note that all procs read this
+     !Also check if data is in format short
+     call Check_Meteo_Date_Short !note that all procs read this
 
      call Exner_tab()!init table
 
@@ -606,8 +611,22 @@ subroutine MeteoRead()
   end if
 
   ! correct surface pressure here, because we will need it before we get to the 2D block
+  if(first_call)then
+     if(maxval(ps)<2000.0)then
+        ps_in_hPa = .true.
+        if(write_now)write(*,*)'Asuming surface pressure in hPa'
+      else
+        if(write_now)write(*,*)'Asuming surface pressure in Pa'
+        ps_in_hPa = .false.
+     endif
+  endif
   ! conversion of pressure from hPa to Pascal.
-  if(.not.WRF_MET_CORRECTIONS)ps(1:limax,1:ljmax,nr) = ps(1:limax,1:ljmax,nr)*PASCAL
+  if(ps_in_hPa)ps(1:limax,1:ljmax,nr) = ps(1:limax,1:ljmax,nr)*PASCAL
+
+
+  if(first_call)then !constant->read only once
+     call read_surf_elevation(ix_elev)
+  endif
 
   if(foundcc3d)then
     if(WRF_MET_CORRECTIONS)then
@@ -636,20 +655,50 @@ subroutine MeteoRead()
 
   if(.not.foundprecip)then
     !Will construct 3D precipitations from 2D precipitations
-    if(write_now)then
-      write(*,*)'WARNING: deriving 3D precipitations from 2D precipitations '
-      write(*,*)'2D precipitations sum of large_scale and convective precipitations'
-    end if
+    if(write_now)write(*,*)'WARNING: deriving 3D precipitations from 2D precipitations '
 
     ix = ix_surface_precip
-    call Getmeteofield(meteoname,met(ix)%name,nrec,met(ix)%dim,unit,&
+    met(ix)%found = .false.
+    if(.not. precip_accumulated)then
+      call Getmeteofield(meteoname,met(ix)%name,nrec,met(ix)%dim,unit,&
            met(ix)%validity,met(ix)%field,needed=met(ix)%needed,found=met(ix)%found)
+      if(met(ix)%found)then
+         if(write_now )write(*,*)'2D precipitations sum of large_scale and convective precipitations'
+         ix = ix_convective_precip
+         call Getmeteofield(meteoname,met(ix)%name,nrec,met(ix)%dim,unit,&
+              met(ix)%validity,met(ix)%field,needed=met(ix)%needed,found=met(ix)%found)
+         surface_precip = surface_precip + convective_precip
+      else
+         !only set once
+         if(write_now )write(*,*)trim(met(ix)%name),' not found. assuming accumulated'
+         precip_accumulated = .true.
+      endif
+    endif
+    ix = ix_surface_precip
+    if(precip_accumulated)then
+       !assume accumulated precipitations (AROME)
+       ix = ix_surface_precip
+       met(ix)%name = 'precipitation_amount_acc' 
+       if(me==0)write(*,*)'assuming 2D precipitations accumulated and named '//trim(met(ix)%name)
+       call Getmeteofield(meteoname,met(ix)%name,nrec,met(ix)%dim,unit,&
+            met(ix)%validity,met(ix)%field,needed=met(ix)%needed,found=met(ix)%found)
+       buff=surface_precip !save to save in old below
+       if(nr == 1 .and. nhour_first>0) buff=0.0 !the first reading of metdata is not from 00:00
+       !must first check that precipitation is increasing. At some dates acc maybe restarted!
+       minprecip=minval(surface_precip(1:limax,1:ljmax) - surface_precip_old(1:limax,1:ljmax))
+       
+       CALL MPI_ALLREDUCE(minprecip, x_out, 1,MPI_DOUBLE_PRECISION, &
+            MPI_MIN, MPI_COMM_CALC, IERROR)
+       minprecip=x_out
+       if(minprecip<-10)then
+          if(me==0)write(*,*)'WARNING: found negative precipitations. set precipitations to zero!',minprecip
+          surface_precip = 0.0
+       else
+          surface_precip = max(0.0,(surface_precip - surface_precip_old))*0.001/(METSTEP*3600)! get only the variation. mm ->m/s
+       end if
+       surface_precip_old = buff ! Accumulated precipitation
+     end if
 
-    ix = ix_convective_precip
-    call Getmeteofield(meteoname,met(ix)%name,nrec,met(ix)%dim,unit,&
-           met(ix)%validity,met(ix)%field,needed=met(ix)%needed,found=met(ix)%found)
-
-    surface_precip = surface_precip + convective_precip
     !write(*,*)'precip ',nrec,Nhh,surface_precip(5,5),convective_precip(5,5),surface_precip_old(5,5)
     if(WRF_MET_CORRECTIONS) then
       if(found_wrf_bucket)then
@@ -672,7 +721,6 @@ subroutine MeteoRead()
         surface_precip = max(0.0,(surface_precip - surface_precip_old))*0.001/(METSTEP*3600)! get only the variation. mm ->m/s
       end if
       surface_precip_old = buff ! Accumulated rain in WRF
-      sdepth=sdepth*0.001 !mm->m
       ice_nwp = ice_nwp*100!flag->%
       !smooth qrain, because it is instantaneous but rain may move
       do k=1,kmax_mid
@@ -795,7 +843,7 @@ subroutine MeteoRead()
             if(relh1>RH_THRESHOLD.or.relh2>RH_THRESHOLD)then
               !fill the column up to this level with constant precip
               do kk=k,KMAX_MID-1
-                pr(i,j,kk)= surface_precip(i,j)*METSTEP*3600.0*1000.0!3hours and m->mm
+                pr(i,j,kk)= surface_precip(i,j)*METSTEP*3600.0*1000.0!METSTEP hours and m->mm
               end do
               exit
             else
@@ -814,7 +862,7 @@ subroutine MeteoRead()
   ! large_scale_precipitations+convective_precipitations)
   surface_precip(:,:) = pr(:,:,KMAX_MID) * inv_METSTEP
 
-  if(USE_CONVECTION)then
+  if(USES%CONVECTION)then
     cnvuf=max(0.0,cnvuf)      !no negative upward fluxes
     cnvuf(:,:,KMAX_BND)=0.0   !no flux through surface
     cnvuf(:,:,1)=0.0          !no flux through top
@@ -849,6 +897,11 @@ subroutine MeteoRead()
       write(*,*)'WARNING: relative_humidity_2m not found'
     rh2m(:,:,nr) = -999.9  ! ?
   end if
+
+  if(.not. WRF_MET_CORRECTIONS .and. foundsdepth)then
+     !IFS defines snowdepth in units of water equivalent
+     sdepth(:,:,nr) = sdepth(:,:,nr)*5 !crude conversion from water equivalent into meters of snow
+  endif
 
   if(WRF_MET_CORRECTIONS)then
     ! flux defined with opposite signs
@@ -899,9 +952,9 @@ subroutine MeteoRead()
   !
   ! Start with shallow
 
-  call CheckStop(USE_DUST.and..not.USE_SOILWATER,"Inconsistent SM, DUST")
+  call CheckStop(USES%DUST.and..not.USES%SOILWATER,"Inconsistent SM, DUST")
 
-  if(USE_SOILWATER) then
+  if(USES%SOILWATER) then
     ! Soil water fields. Somewhat tricky.
     ! Ideal is soil moisture index, available from IFS, = (SW-PWP)/(FC-PWP)
     ! Otherwise m3/m3 or m units are converted
@@ -953,9 +1006,9 @@ subroutine MeteoRead()
     if(SoilWaterSource == "IFS")then
       if(first_call)then
         !needed for transforming IFS soil water
-        call ReadField_CDF('SoilTypes_IFS.nc','pwp',pwp, 1,&
+        call ReadField_CDF(SoilTypesFile,'pwp',pwp, 1,&
             interpol='conservative',needed=.true.,UnDef=-999.,debug_flag=.false.)
-        call ReadField_CDF('SoilTypes_IFS.nc','fc',fc, 1,&
+        call ReadField_CDF(SoilTypesFile,'fc',fc, 1,&
             interpol='conservative',needed=.true.,UnDef=-999.,debug_flag=.false.)
 
         ! landify(x,intxt,xmin,xmax,wfmin,xmask)
@@ -1031,7 +1084,7 @@ subroutine MeteoRead()
     SoilWater_uppr(:,:,nr) = min(1.0, SoilWater_uppr(:,:,nr))
     SoilWater_deep(:,:,nr) = min(1.0, SoilWater_deep(:,:,nr) )
 
-  end if ! USE_SOILWATER
+  end if ! USES%SOILWATER
 
   !========================================
 
@@ -1492,10 +1545,10 @@ subroutine met_derived(nt)
             / (CP*rho_surf(i,j) * ustar_nwp(i,j)**3 * t2_nwp(i,j,nt) )
   end forall
 
-  where ( invL_nwp < -1.0 )
-    invL_nwp  = -1.0
-  else where ( invL_nwp > 1.0 )
-    invL_nwp  = 1.0
+  where ( invL_nwp(:,:) < -1.0 )
+    invL_nwp(:,:)  = -1.0
+  else where ( invL_nwp(:,:) > 1.0 )
+    invL_nwp(:,:)  = 1.0
   end where
 
 
@@ -1516,30 +1569,27 @@ subroutine MetModel_LandUse(callnum)
 
   integer, intent(in) :: callnum
 
-  character(len=20) :: fname
-
   ios = 0
 
   if ( callnum == 1  ) then
   !.. Clay soil content    !
     ios = 0
-    if(USE_DUST)then
+    if(USES%DUST)then
       if(TEGEN_DATA)then
         !use global data interpolated to present grid
 
-        fname='Soil_Tegen.nc'
-        if(MasterProc)write(6,*)'Sand and clay fractions from ',fname
+        if(MasterProc)write(6,*)'Sand and clay fractions from ',trim(Soil_TegenFile)
 
-        call ReadField_CDF(fname,'clay',clay_frac,1,  &
+        call ReadField_CDF(Soil_TegenFile,'clay',clay_frac,1,  &
              interpol='conservative',needed=.true.,debug_flag=.false.)
-        call ReadField_CDF(fname,'sand',sand_frac,1,  &
+        call ReadField_CDF(Soil_TegenFile,'sand',sand_frac,1,  &
              interpol='conservative',needed=.true.,debug_flag=.false.)
 
       elseif(MasterProc)then
         !use grid specific data
         call CheckStop('ASCII DUST NO MORE AVAILABLE! ')
       end if
-    end if ! USE_DUST
+    end if ! USES%DUST
 
   end if ! callnum == 1
 end subroutine MetModel_LandUse
@@ -2918,14 +2968,15 @@ subroutine check(status)
      trim(call_msg)//" "//trim(nf90_strerror(status)))
 end subroutine check
 
-subroutine Check_Meteo_Date
+subroutine Check_Meteo_Date_Short
   !----------------------------------------------------------------------
   ! On first call, check that dates from meteo file correspond to dates requested.
   ! Also defines nhour_first and Nhh (and METSTEP in case of WRF metdata)
+  ! Also check if data is in format short
   !----------------------------------------------------------------------
   character(len=len(meteo)) :: meteoname
   integer :: nyear,nmonth,nday
-  integer :: status,ncFileID,timeDimID,timeVarID
+  integer :: status,ncFileID,timeDimID,timeVarID,VarID,xtype
   character (len = 50) :: timeunit
   integer ::ihh,ndate(4),n1,nseconds(1)
   real :: ndays(1),Xminutes(24)
@@ -3019,18 +3070,32 @@ subroutine Check_Meteo_Date
         end if
       end if
     end if
-   call check(nf90_close(ncFileID))
+
+    !check wether the meteo fields are defined as short
+    call check(nf90_inq_varid(ncid = ncFileID, name = met(ix_ps)%name, varID = VarID))
+    call check(nf90_Inquire_Variable(ncFileID,VarID,xtype=xtype))
+    if(xtype==NF90_SHORT)then
+       write(*,*)'assuming meteo variables type short'
+    else
+       if(xtype==NF90_FLOAT .or. xtype==NF90_DOUBLE)then
+          write(*,*)'assuming meteo variables type float or double'
+          MET_SHORT = .false.
+       endif
+    endif
+    call check(nf90_close(ncFileID))
   end if
   if(me_calc>=0)then
     CALL MPI_BCAST(nhour_first,4*1,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     CALL MPI_BCAST(Nhh,4*1,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     CALL MPI_BCAST(METSTEP,4*1,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     CALL MPI_BCAST(found_wrf_bucket,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
+    CALL MPI_BCAST(MET_SHORT,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
   else
     CALL MPI_BCAST(nhour_first,4*1,MPI_BYTE,0,MPI_COMM_IO,IERROR)
     CALL MPI_BCAST(Nhh,4*1,MPI_BYTE,0,MPI_COMM_IO,IERROR)
     CALL MPI_BCAST(METSTEP,4*1,MPI_BYTE,0,MPI_COMM_IO,IERROR)
     CALL MPI_BCAST(found_wrf_bucket,1,MPI_LOGICAL,0,MPI_COMM_IO,IERROR)
+    CALL MPI_BCAST(MET_SHORT,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
   end if
   if(found_wrf_bucket)then
     if(me_calc>=0)CALL MPI_BCAST(wrf_bucket,8,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
@@ -3040,6 +3105,23 @@ subroutine Check_Meteo_Date
     met(ix_irainnc)%read_meteo = found_wrf_bucket
     met(ix_irainnc)%needed     = found_wrf_bucket
   end if
-end subroutine Check_Meteo_Date
+end subroutine Check_Meteo_Date_Short
+
+subroutine read_surf_elevation(ix)
+
+  integer :: ix
+
+  call GetCDF_modelgrid(met(ix)%name,TopoFile,met(ix)%field,&
+                        1,1,1,1,needed=met(ix)%needed,found=met(ix)%found)
+
+  if(met(ix)%found == .false.) then
+     if( me==0 )write(*,*)'WARNING: met topography not found. Approximating elevation using standard map'
+     call ReadField_CDF(SurfacePressureFile,'surface_pressure_year',&
+          met(ix)%field,1,needed=.true.,interpol='zero_order')
+     
+     met(ix)%field=1000.0*StandardAtmos_kPa_2_km(0.001*met(ix)%field)
+  endif
+
+end subroutine read_surf_elevation
 
 end module met_ml

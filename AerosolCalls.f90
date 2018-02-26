@@ -1,7 +1,7 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,7 +43,7 @@ module AerosolCalls
                                    cfac
  use EQSAM_v03d_ml,        only :  eqsam_v03d
  use MARS_ml,              only :  rpmares, rpmares_2900, DO_RPMARES_new
- use ModelConstants_ml,    only :  KMAX_MID, KCHEMTOP, DEBUG, MasterProc, AERO
+ use Config_module,    only :  KMAX_MID, KCHEMTOP, DEBUG, MasterProc, AERO
  use PhysicalConstants_ml, only :  AVOG
  use Setup_1dfields_ml,    only :  xn_2d, temp, rh, pp
  implicit none
@@ -53,6 +53,7 @@ module AerosolCalls
 
  public :: AerosolEquilib
  public :: emep2MARS, emep2EQSAM, Aero_Water, Aero_Water_MARS
+ !FUTURE private :: emep2isorropia
                     
 !    logical, public, parameter :: AERO_DYNAMICS     = .false.  &  
 !                                , EQUILIB_EMEP      = .false.  & !old Ammonium stuff
@@ -97,6 +98,65 @@ contains
 
  ! Adapted from List 10, p130, Isoropia manual
 
+ !FUTURE subroutine emep2isorropia(debug_flag)
+!FUTURE   logical, intent(in) :: debug_flag
+!FUTURE
+!FUTURE   real, dimension(8) :: wi = 0.0, wt
+!FUTURE   real, dimension(3) :: gas
+!FUTURE   real, dimension(15) :: aerliq
+!FUTURE   real, dimension(19) :: aersld
+!FUTURE   real, parameter, dimension(2) :: CNTRL =  (/ 0, 0 /)
+!FUTURE   real, dimension(9) :: other
+!FUTURE   !real :: rhi, tempi
+!FUTURE   character(len=15) :: scase
+!FUTURE
+!FUTURE   !EMEP
+!FUTURE   real, parameter :: Ncm3_to_molesm3 = 1.0e6/AVOG    ! #/cm3 to moles/m3
+!FUTURE   real, parameter :: molesm3_to_Ncm3 = 1.0/Ncm3_to_molesm3
+!FUTURE   integer :: k
+!FUTURE!BUG   real :: tmpno3
+!FUTURE
+!FUTURE   ! WI(1)  = max(FLOOR2, xn_2d(Na,k))  / species(Na)%molwt  * Ncm3_to_molesm3
+!FUTURE   ! 5=Cl, 6=Ca, 7=K, 8=Mg
+!FUTURE
+!FUTURE   do k = KMAX_MID, KMAX_MID  ! TESTING KCHEMTOP, KMAX_MID
+!FUTURE
+!FUTURE     WI(1)  = 0.0 !FINE sum( xn_2d(SS_GROUP,k) ) * Ncm3_to_molesm3
+!FUTURE     WI(2)  = xn_2d(SO4,k)             * Ncm3_to_molesm3
+!FUTURE     WI(3)  = sum( xn_2d(RDN_GROUP,k) ) * Ncm3_to_molesm3  !NH3, NH4
+!FUTURE     !FINE WI(4)  = ( xn_2d(NO3_F,k) + xn_2d(NO3_C,k) + xn_2d(HNO3,k) )&
+!FUTURE     WI(4)  = ( xn_2d(NO3_F,k) + xn_2d(HNO3,k) )&
+!FUTURE                * Ncm3_to_molesm3
+!FUTURE     WI(5)  =0.0 !FINE  WI(1)  ! Cl only from sea-salt. Needs consideration!
+!FUTURE
+!FUTURE     call isoropia ( wi, rh(k), temp(k), CNTRL,&
+!FUTURE                     wt, gas, aerliq, aersld, scase, other)
+!FUTURE
+!FUTURE    ! gas outputs are in moles/m3(air)
+!FUTURE
+!FUTURE     xn_2d(NH3,k)  = gas(1) * molesm3_to_Ncm3
+!FUTURE     xn_2d(HNO3,k) = gas(2) * molesm3_to_Ncm3
+!FUTURE     !xn_2d(HCl,k) = gas(3) * molesm3_to_Ncm3
+!FUTURE
+!FUTURE    ! aerosol outputs are in moles/m3(air)
+!FUTURE    ! 1=H+, 2=Na+, 3=NH4+, 4=Cl-, 5=SO42-, 6=HSO4-, 7=NO3-, 8=Ca2+
+!FUTURE    ! 9=K+, 10=Mg2+
+!FUTURE     !xn_2d(NH4_F,k) = MOLAL(3)
+!FUTURE
+!FUTURE    ! Just use those needed:
+!FUTURE    ! QUERY: Is NaNO3 always solid? Ans = No!
+!FUTURE
+!FUTURE      !xn_2d(NO3_c,k ) = aeroHCl * molesm3_to_Ncm3 ! assume all HCl from NaNO3 formation?
+!FUTURE      !FINE xn_2d(NO3_f,k ) = tmpno3 - xn_2d(NO3_c,k ) - xn_2d(HNO3,k)
+!FUTURE      xn_2d(NO3_f,k ) = tmpno3 - xn_2d(HNO3,k)
+!FUTURE
+!FUTURE     if( debug_flag ) then 
+!FUTURE       write(*, "(a,2f8.3,99g12.3)") "ISORROPIA ", rh(k), temp(k), gas
+!FUTURE     end if
+!FUTURE     !call StopAll("ISOR")
+!FUTURE     
+!FUTURE   end do
+!FUTURE end subroutine emep2isorropia
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
       subroutine emep2MARS(debug_flag)

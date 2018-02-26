@@ -1,7 +1,7 @@
-! <PointSource_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <PointSource_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -58,7 +58,7 @@ use GridValues_ml,      only: sigma_bnd, debug_proc &
 use Io_Progs_ml,        only: open_file, ios, read_line, datewrite
 use LocalVariables_ml,  only: Grid ! Grid-meteorology
 use MetFields_ml,       only: pzpbl, z_bnd, z_mid
-use ModelConstants_ml,  only: KMAX_MID, PT, Pref, MasterProc, &
+use Config_module,  only: KMAX_MID, PT, Pref, MasterProc, &
                               USES, & ! for PlumeMethod
                               DEBUG => DEBUG_EMISSTACKS
 use Par_ml,             only: me, LIMAX, LJMAX, limax, ljmax, &

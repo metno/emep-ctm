@@ -1,4 +1,4 @@
-  integer, parameter, public ::  NEMIS_Specs  = 43
+  integer, parameter, public ::  NEMIS_Specs  = 44
   character(len=14), save, dimension(NEMIS_Specs), public:: &
       EMIS_Specs =  (/ &
              "NO            " &
@@ -23,6 +23,7 @@
            , "C5H8          " &
            , "ASH_F         " &
            , "ASH_C         " &
+           , "FFIRE_CO      " &
            , "BIOTERP       " &
            , "POM_F_FFUEL   " &
            , "POM_C_FFUEL   " &

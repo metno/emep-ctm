@@ -1,7 +1,7 @@
-! <AOTnPOD_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <AOTnPOD_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,7 +37,7 @@ module AOTx_ml
   use LandDefs_ml,   only : LandType, LandDefs
   use LocalVariables_ml, only : Grid, L
   use MetFields_ml, only: zen
-  use ModelConstants_ml, only : dt_advec, KMAX_MID, DEBUG  & 
+  use Config_module, only : dt_advec, KMAX_MID, DEBUG  & 
      ,PPBINV ! 1.0e9, for conversion from mixing ratio to ppb
   use NumberConstants, only : UNDEF_R, UNDEF_I
   use OwnDataTypes_ml, only : TXTLEN_DERIV, TXTLEN_SHORT, TXTLEN_IND

@@ -1,7 +1,7 @@
-! <MosaicOutputs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <MosaicOutputs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,7 +41,7 @@ use LandDefs_ml,      only: LandDefs, LandType, Check_LandCoverPresent ! e.g. "C
 use Landuse_ml,       only: LandCover ! for POD
 use LocalVariables_ml,only: Grid,SubDat, L
 use MetFields_ml
-use ModelConstants_ml,only: MasterProc, DEBUG, &
+use Config_module,only: MasterProc, DEBUG, &
                             NLANDUSEMAX, IOU_INST,IOU_KEY
 use OwnDataTypes_ml,  only: Deriv, print_deriv_type, typ_s5ind, typ_s1ind, typ_s3,&
                             TXTLEN_DERIV, TXTLEN_SHORT

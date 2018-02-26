@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,7 +42,7 @@
 ! Cleaned, 3-D possibility added, JEJ and DS, April-May 2007
 !------------------------------------------------------------
   use CheckStop_ml,  only : CheckStop
-  use ModelConstants_ml, only : NPROC, IIFULLDOM, JJFULLDOM
+  use Config_module, only : NPROC, IIFULLDOM, JJFULLDOM
   use MPI_Groups_ml  , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
                               MPI_MIN, MPI_MAX, MPI_SUM, &
                               MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI

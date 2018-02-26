@@ -1,7 +1,7 @@
-! <Par_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Par_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,7 @@ module Par_ml
 !
 !----------------------------------------------------------------------------
 !  Erik Berge, DNMI    Roar Skaalin, SINTEF Industrial Mathematics
-!  Modified to use ModelConstants_ml for domain, July 2007, ds
+!  Modified to use Config_module for domain, July 2007, ds
 !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 !
 !
@@ -50,7 +50,7 @@ module Par_ml
 
 use CheckStop_ml,      only : CheckStop
 use Io_Nums_ml,        only:  IO_LOG
-use ModelConstants_ml, only : RUNDOMAIN, IIFULLDOM, JJFULLDOM, &
+use Config_module, only : RUNDOMAIN, IIFULLDOM, JJFULLDOM, &
                               MasterProc, &  ! Set true for me=0 processor
                               NPROCX, NPROCY, NPROC, DOMAIN_DECOM_MODE
 use MPI_Groups_ml, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &

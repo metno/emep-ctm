@@ -1,7 +1,7 @@
-! <CM_ChemGroups_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <CM_ChemGroups_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,8 +39,8 @@ public :: Init_ChemGroups
 integer, public, target, save, dimension(2) :: &
   DDEP_SS_GROUP = (/ SEASALT_F,SEASALT_C /)
 
-integer, public, target, save, dimension(5) :: &
-  WDEP_OXN_GROUP = (/ HO2NO2,HNO3,HONO,NO3_F,NO3_C /)
+integer, public, target, save, dimension(6) :: &
+  WDEP_OXN_GROUP = (/ HO2NO2,N2O5,HNO3,HONO,NO3_F,NO3_C /)
 
 integer, public, target, save, dimension(11) :: &
   WDEP_PPM10_GROUP = (/ POM_F_WOOD,POM_F_FFUEL,POM_C_FFUEL,EC_F_WOOD_NEW,EC_F_WOOD_AGE,EC_C_WOOD,EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,EC_C_FFUEL,REMPPM25,REMPPM_C /)
@@ -72,8 +72,8 @@ integer, public, target, save, dimension(1) :: &
 integer, public, target, save, dimension(15) :: &
   DDEP_PMFINE_GROUP = (/ SO4,NO3_F,NH4_F,ASH_F,EC_F_WOOD_NEW,EC_F_WOOD_AGE,EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,REMPPM25,FFIRE_BC,FFIRE_REMPPM25,SEASALT_F,DUST_ROAD_F,DUST_WB_F,DUST_SAH_F /)
 
-integer, public, target, save, dimension(68) :: &
-  NMVOC_GROUP = (/ PAN,CH3COO2,GLYOX,MGLYOX,MAL,MEK,HCHO,CH3CHO,C2H6,NC4H10,C2H4,C3H6,OXYL,C5H8,APINENE,BPINENE,XTERP,BIOTERP,CH3O2H,C2H5OOH,BURO2H,ETRO2H,PRRO2H,MEKO2H,MALO2H,CH3COO2H,CH3OH,C2H5OH,ACETOL,ISO2,MACRO2,MACR,MACROOH,HACET,ISOOH,ISON,HCOOH,MPAN,NALD,HPALD,PACALD,MVK,POM_F_WOOD,POM_F_FFUEL,POM_C_FFUEL,EC_F_WOOD_NEW,EC_F_WOOD_AGE,EC_C_WOOD,EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,EC_C_FFUEL,FFIRE_OM,FFIRE_BC,OM25_BGND,SQT_SOA_NV,ASOC_NG100,ASOC_UG1,ASOC_UG10,ASOC_UG1E2,ASOC_UG1E3,BSOC_NG100,BSOC_UG1,BSOC_UG10,BSOC_UG1E2,BSOC_UG1E3,FFFUEL_NG10,WOODOA_NG10,FFIREOA_NG10 /)
+integer, public, target, save, dimension(69) :: &
+  NMVOC_GROUP = (/ PAN,CH3COO2,GLYOX,MGLYOX,MAL,MEK,HCHO,CH3CHO,C2H6,NC4H10,C2H4,C3H6,OXYL,C5H8,APINENE,BPINENE,XTERP,BIOTERP,CH3O2H,C2H5OOH,BURO2H,ETRO2H,PRRO2H,MEKO2H,MALO2H,CH3COO2H,CH3OH,C2H5OH,ACETOL,ISO2,MACRO2,MACR,MACROOH,HACET,ISOOH,ISON,HCOOH,MPAN,NALD,HPALD,PACALD,MVK,FFIRE_CO,POM_F_WOOD,POM_F_FFUEL,POM_C_FFUEL,EC_F_WOOD_NEW,EC_F_WOOD_AGE,EC_C_WOOD,EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,EC_C_FFUEL,FFIRE_OM,FFIRE_BC,OM25_BGND,SQT_SOA_NV,ASOC_NG100,ASOC_UG1,ASOC_UG10,ASOC_UG1E2,ASOC_UG1E3,BSOC_NG100,BSOC_UG1,BSOC_UG10,BSOC_UG1E2,BSOC_UG1E3,FFFUEL_NG10,WOODOA_NG10,FFIREOA_NG10 /)
 
 integer, public, target, save, dimension(7) :: &
   WDEP_PPM25_GROUP = (/ POM_F_WOOD,POM_F_FFUEL,EC_F_WOOD_NEW,EC_F_WOOD_AGE,EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,REMPPM25 /)
@@ -120,8 +120,8 @@ integer, public, target, save, dimension(4) :: &
 integer, public, target, save, dimension(2) :: &
   OX_GROUP = (/ O3,NO2 /)
 
-integer, public, target, save, dimension(9) :: &
-  DDEP_OXN_GROUP = (/ NO2,HO2NO2,SHIPNOX,PAN,HNO3,HONO,MPAN,NO3_F,NO3_C /)
+integer, public, target, save, dimension(10) :: &
+  DDEP_OXN_GROUP = (/ NO2,HO2NO2,SHIPNOX,PAN,N2O5,HNO3,HONO,MPAN,NO3_F,NO3_C /)
 
 integer, public, target, save, dimension(1) :: &
   WDEP_PFFUELOA25_GROUP = (/ FFFUEL_NG10 /)
@@ -180,8 +180,8 @@ integer, public, target, save, dimension(1) :: &
 integer, public, target, save, dimension(13) :: &
   NONVOLPCM_GROUP = (/ POM_F_WOOD,POM_F_FFUEL,POM_C_FFUEL,EC_F_WOOD_NEW,EC_F_WOOD_AGE,EC_C_WOOD,EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,EC_C_FFUEL,FFIRE_OM,FFIRE_BC,OM25_BGND,SQT_SOA_NV /)
 
-integer, public, target, save, dimension(2) :: &
-  WDEP_DAOBS_GROUP = (/ HO2NO2,SO2 /)
+integer, public, target, save, dimension(1) :: &
+  WDEP_DAOBS_GROUP = (/ SO2 /)
 
 integer, public, target, save, dimension(4) :: &
   DDEP_TMPOX_GROUP = (/ O3,NO2,HO2NO2,SHIPNOX /)
@@ -435,8 +435,8 @@ integer, public, target, save, dimension(2) :: &
 integer, public, target, save, dimension(1) :: &
   SVFFIREOA25_GROUP = (/ FFIREOA_NG10 /)
 
-integer, public, target, save, dimension(4) :: &
-  DDEP_DAOBS_GROUP = (/ O3,NO2,HO2NO2,SO2 /)
+integer, public, target, save, dimension(3) :: &
+  DDEP_DAOBS_GROUP = (/ O3,NO2,SO2 /)
 
 integer, public, target, save, dimension(1) :: &
   NVFFUELOC25_GROUP = (/ POM_F_FFUEL /)
@@ -462,8 +462,8 @@ integer, public, target, save, dimension(2) :: &
 integer, public, target, save, dimension(2) :: &
   WDEP_ASH_GROUP = (/ ASH_F,ASH_C /)
 
-integer, public, target, save, dimension(4) :: &
-  DAOBS_GROUP = (/ O3,NO2,HO2NO2,SO2 /)
+integer, public, target, save, dimension(3) :: &
+  DAOBS_GROUP = (/ O3,NO2,SO2 /)
 
 integer, public, target, save, dimension(3) :: &
   WDEP_FFUELEC_GROUP = (/ EC_F_FFUEL_NEW,EC_F_FFUEL_AGE,EC_C_FFUEL /)

@@ -1,4 +1,4 @@
-! <Precision_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
+! <BiDir_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2018 met.no
@@ -24,19 +24,7 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-module Precision_ml
-
-! from KPP system
-!
-! Definition of different levels of accuracy
-! for REAL variables using KIND parameterization
-!
-! KPP SP - Single precision kind
-  integer, parameter :: sp = selected_real_kind(6,30)
-! KPP DP - Double precision kind
-  integer, parameter :: dp = selected_real_kind(14,300)
-! KPP QP - Quadruple precision kind
-  integer, parameter :: qp = selected_real_kind(18,400)
-
-end module Precision_ml
-
+module BiDir_module
+  ! DUMMY 
+  character(len=*), parameter :: BiDir_module_status='TOBEDONE'
+end module BiDir_module

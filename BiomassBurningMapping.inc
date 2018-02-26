@@ -7,8 +7,8 @@
       BiomassBurningMapping = "FINNv1.5toEmChem09soa"
   !FINNv1.5 uses 7 more GEOS-CHEM species and 2 more EMEP:
   integer, private, parameter :: &
-    NBB_DEFS  = 26 & ! No mapping lines below
-   ,NEMEPSPECS  = 17   ! No EMEP chemical mech specs used
+    NBB_DEFS  = 27 & ! No mapping lines below
+   ,NEMEPSPECS  = 18   ! No EMEP chemical mech specs used
 
   !-----------------------------------------------------------------------!
   ! Column-1 gives FINNv1 species ,
@@ -22,7 +22,8 @@
 
   !     BBname    unitsfac frac  emep:
   type(bbtype), private, dimension(NBB_DEFS) :: FF_defs = (/ &
-    bbtype("CO  ",0.028 , 1.000, CO          ) &
+    bbtype("CO  ",0.028 , 1.000, CO    ) & ! Tracer, will add to CO too
+   ,bbtype("CO  ",0.028 , 1.000, FFIRE_CO    ) & ! Tracer, will add to CO too
    ,bbtype("NO  ",0.030 , 1.000, NO          ) &
    ,bbtype("NO2 ",0.046 , 1.000, NO2         ) &
    ,bbtype("SO2 ",0.064 , 1.000, SO2         ) &

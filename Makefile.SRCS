@@ -2,14 +2,16 @@
 FOBJ ?=	\
 	AeroFunctions.o Aero_Vds_ml.o Ammonium_ml.o AOD_PM_ml.o \
 	Advection_ml.o AirEmis_ml.o AllocInit.o \
-	AOTnPOD_ml.o Aqueous_n_WetDep_ml.o BLPhysics_ml.o Biogenics_ml.o \
+	AOTnPOD_ml.o Aqueous_n_WetDep_ml.o \
+	BiDir_emep.o BiDir_module.o \
+	BLPhysics_ml.o Biogenics_ml.o \
 	BoundaryConditions_ml.o CellMet_ml.o CheckStop_ml.o ChemFields_ml.o \
 	ChemSpecs_wrapper.o CoDep_ml.o Country_ml.o \
 	ChemFunctions_ml.o CM_ChemRates_ml.o Convection_ml.o ColumnSource_ml.o \
 	CM_ChemGroups_ml.o CM_ChemSpecs_ml.o  \
+	Config_module.o  \
 	DefPhotolysis_ml.o Derived_ml.o DerivedFields_ml.o DO3SE_ml.o \
-	DryDep_ml.o DustProd_ml.o \
-	EcoSystem_ml.o emep_Config_mod.o \
+	DryDep_ml.o DustProd_ml.o EcoSystem_ml.o  \
 	EmisDef_ml.o EmisGet_ml.o Emissions_ml.o ExternalBICs_ml.o \
 	FastJ_ml.o ForestFire_ml.o Functions_ml.o \
         GasParticleCoeffs_ml.o \
@@ -18,7 +20,7 @@ FOBJ ?=	\
 	Io_ml.o Io_Nums_ml.o Io_Progs_ml.o KeyValueTypes.o  LandDefs_ml.o Landuse_ml.o \
 	LandPFT_ml.o LocalVariables_ml.o MARS_ml.o MARS_Aero_water_ml.o \
 	MassBudget_ml.o Met_ml.o MetFields_ml.o EQSAM_ml.o MicroMet_ml.o \
-	ModelConstants_ml.o MosaicOutputs_ml.o MPI_Groups_ml.o AerosolCalls.o \
+	MosaicOutputs_ml.o MPI_Groups_ml.o AerosolCalls.o \
         My_Derived_ml.o My_Outputs_ml.o NetCDF_ml.o Nest_ml.o NumberConstants.o \
         Output_hourly.o OutputChem_ml.o OwnDataTypes_ml.o Par_ml.o \
 	PhysicalConstants_ml.o PlumeRise_ml.o PointSource_ml.o \
@@ -36,3 +38,5 @@ FOBJ ?=	\
 # default target
 all:
 
+# ensure pollen_const_ml.mod is updated for `make MACC`
+Pollen_const_ml.o: My_Pollen_ml.o

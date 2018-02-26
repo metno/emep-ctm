@@ -1,7 +1,7 @@
-! <SOA_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <SOA_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -65,9 +65,9 @@ module OrganicAerosol_ml
 
    use Functions_ml, only: StandardAtmos_kPa_2_km !ds for use in Hz scaling
    use GridValues_ml, only: A_mid,B_mid, debug_proc, debug_li, debug_lj
-   use ModelConstants_ml,    only :  PT
+   use Config_module,    only :  PT
 
-   use ModelConstants_ml,    only : CHEMTMIN, CHEMTMAX, &
+   use Config_module,    only : CHEMTMIN, CHEMTMAX, &
                                     MasterProc, DEBUG, &
                                     K2 => KMAX_MID, K1 => KCHEMTOP
    use Par_ml,               only : LIDIM => LIMAX, LJDIM => LJMAX, me

@@ -1,7 +1,7 @@
-! <Aqueous_n_WetDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Aqueous_n_WetDep_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -64,7 +64,7 @@ use DerivedFields_ml, only: f_2d, d_2d     ! Contains Wet deposition fields
 use GridValues_ml,    only: gridwidth_m,xm2,dA,dB
 use Io_ml,            only: IO_DEBUG, datewrite
 use MassBudget_ml,    only : wdeploss,totwdep
-use ModelConstants_ml,only: &
+use Config_module,only: &
     CHEMTMIN, CHEMTMAX      &       ! -> range of temperature
    ,MasterProc              &
    ,DEBUG   &  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH &

@@ -1,7 +1,7 @@
-! <Landuse_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Landuse_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,8 +30,13 @@
 module Landuse_ml
 
 use CheckStop_ml,   only: CheckStop,StopAll
+use Config_module,only: DEBUG, NLANDUSEMAX, SEA_LIMIT, & 
+                            USES, emep_debug, &
+                            FLUX_VEGS, FLUX_IGNORE,  nFluxVegs, & 
+                            VEG_2dGS, VEG_2dGS_Params, & 
+                            NPROC, IIFULLDOM, JJFULLDOM, &
+                            DomainName, MasterProc, LandCoverInputs 
 use DO3SE_ml,       only: fPhenology, Init_DO3SE
-use emep_Config_mod, only : LandCoverInputs 
 use GridAllocate_ml,only: GridAllocate
 use GridValues_ml,  only:  glat , glon   & ! latitude,
                           , i_fdom, j_fdom   & ! coordinates
@@ -44,13 +49,6 @@ use LandDefs_ml,    only: Init_LandDefs, LandType, LandDefs, &
                           STUBBLE, Growing_Season,&
                           NLANDUSE_EMEP
 use LandPFT_ml,       only: MapPFT_LAI, pft_lai
-use ModelConstants_ml,only: DEBUG, NLANDUSEMAX, &
-                            SEA_LIMIT, & 
-                            USES, emep_debug, &
-                            FLUX_VEGS, FLUX_IGNORE,  nFluxVegs, & 
-                            VEG_2dGS, VEG_2dGS_Params, & 
-                            NPROC, IIFULLDOM, JJFULLDOM, &
-                            DomainName, MasterProc
 use MPI_Groups_ml, only : MPI_INTEGER,MPI_COMM_CALC, IERROR
 use Par_ml,         only: LIMAX, LJMAX, &
                           limax, ljmax, me
@@ -274,9 +272,9 @@ contains
              end if
 
              if ( LandType(lu)%is_water ) water_fraction(i,j) = &
-                  LandCover(i,j)%fraction(ilu)
+                  water_fraction(i,j) + LandCover(i,j)%fraction(ilu)
              if ( LandType(lu)%is_ice   ) ice_landcover(i,j) = &
-                  LandCover(i,j)%fraction(ilu)
+                  ice_landcover(i,j) + LandCover(i,j)%fraction(ilu)
 
 
           end do ! ilu
@@ -480,6 +478,7 @@ contains
     landuse_codes(:,:,:)  = 0     !***  initialise  ***
     landuse_data  (:,:,:) = 0.0   !***  initialise  ***
     landuse_in  = 0.0              !***  initialise  ***
+    landuse_tot   = 0.0              !***  initialise  *** Oct2017
     landuse_glob  = 0.0              !***  initialise  ***
 
     !Landusefile where landcodes are not predefined, but read from the file.
@@ -540,13 +539,13 @@ contains
 
          !CHECK HERE to see if we already have this landcode:...
           lu = find_index( ewords(2), Land_codes(:) ) 
-          call CheckStop( ilu>NLANDUSEMAX , dtxt//&
-            "NLANDUSEMAX smaller than number of landuses defined in file "//&
-            trim(fname) )
           if (  lu > 0 ) then
             if ( mydbg ) write(*,*) dtxt//"Already have"//ewords(2), lu
           else
             ilu = ilu + 1
+            call CheckStop( ilu>NLANDUSEMAX , dtxt//&
+            "NLANDUSEMAX smaller than number of landuses defined in file "//&
+            trim(fname) )
             lu  = ilu  
             if ( mydbg ) write(*,*) dtxt//"Adding code"//ewords(2), ilu
             Land_codes(ilu) = ewords(2)    ! Landuse code found on file
@@ -560,8 +559,10 @@ contains
                needed=.true.,debug_flag=.false.,UnDef=-9.9E19) 
 
           if ( ifile == 1 ) then
+             where ( landuse_tmp > 0.0 ) !Oct2017
                landuse_in(:,:,lu) = landuse_tmp
-               landuse_tot(:,:) = landuse_tot(:,:) + landuse_tmp
+               landuse_tot(:,:) = landuse_tot(:,:) + landuse_tmp ! Sum of data from file1
+             end where  !Oct2017
           else
                landuse_glob(:,:,lu) = landuse_tmp ! will merge below
           end if
@@ -636,6 +637,8 @@ contains
   ! Append flux vegs to Land_codes
     do iam = 1, nFluxVegs
        NLand_codes = NLand_codes + 1
+       call CheckStop( NLand_codes>NLANDUSEMAX , dtxt//&
+            " flux vegs makes NLANDUSEMAX smaller than number of landuses defined")
        Land_codes(NLand_codes) = FLUX_vegs(iam) 
        iam_index(iam) = NLand_codes
        if ( mydbg ) write(*,*) dtxt//'IAM veg:'//trim(FLUX_VEGS(iam)), &
@@ -701,6 +704,10 @@ contains
                     i_fdom(i),j_fdom(j), sumfrac, limax,  ljmax, &
                        i_fdom(1), j_fdom(1), i_fdom(limax), j_fdom(ljmax), &
                          glat(i,j), glon(i,j)
+               write(*,*)'LandCover(i,j)%ncodes ',LandCover(i,j)%ncodes
+               write(*,*)'LandCover(i,j)%codes(:) ',LandCover(i,j)%codes(1),LandCover(i,j)%codes(2:LandCover(i,j)%ncodes)
+               write(*,*)'landuse_tot(i,j) ',landuse_tot(i,j)
+               write(*,*)'landuse_glob(i,j,:) ',landuse_glob(i,j,:)
                print *, trim(errmsg)
 
                if(abs(sumfrac-1.0)<0.2.and.abs(glat(i,j))>89.0)then

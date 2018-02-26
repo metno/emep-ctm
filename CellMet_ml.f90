@@ -1,7 +1,7 @@
 ! <CellMet_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,16 +34,18 @@ module CellMet_ml
 !=============================================================================
 
 use CheckStop_ml,     only: CheckStop
-use GridValues_ml,    only: dA,dB
+use DerivedFields_ml, only: d_2d, f_2d
+use GridValues_ml,    only: dA,dB, glat, glon
 use Landuse_ml,       only: LandCover, ice_landcover ! Provides SGS,hveg,LAI,...
 use Landuse_ml,       only: mainly_sea
+use LandDefs_ml,      only: LandType
 use LocalVariables_ml,only: Grid, ResetSub
 use MicroMet_ml,      only: PsiH, PsiM, AerRes       ! functions
 use MetFields_ml,     only: ps, u_ref, cc3dmax, sdepth, surface_precip, &
-                            ice_nwp,fh, fl, z_mid, z_bnd, q, roa, rh2m, &
+                            ice_nwp,fh, fl, z_mid, z_bnd, q, roa, rh2m, sst, &
                             rho_surf, th, pzpbl, t2_nwp, ustar_nwp, zen,&
                             coszen, Idirect, Idiffuse
-use ModelConstants_ml,    only: KMAX_MID, KMAX_BND, PT, USE_ZREF
+use Config_module,    only: KMAX_MID, KMAX_BND, PT, USE_ZREF, IOU_INST
 use PhysicalConstants_ml, only: PI, CP, GRAV, KARMAN
 use SoilWater_ml,     only: fSW
 use SubMet_ml,        only: Get_SubMet, Sub
@@ -57,6 +59,7 @@ public :: Get_CellMet   ! sets Grid-average (e.g. NWP) near-surface met, and
                         ! calls Get_Submet routines
 
 logical, private, parameter ::  MY_DEBUG = .false.
+integer, save, public :: z0_out_ix = -1, invL_out_ix = -1
 
 contains
 !=======================================================================
@@ -65,7 +68,10 @@ subroutine Get_CellMet(i,j,debug_flag)
   integer, intent(in) :: i,j
   logical, intent(in) :: debug_flag   ! set true for wanted grid square
   integer :: lu, ilu, nlu
+  real :: land_frac
 !---------------------------------------------------------------
+
+     if(z0_out_ix>0) d_2d(z0_out_ix,i,j,IOU_INST) = 0.0
 
 ! We assume that the area of grid which is wet is proportional to
 ! cloud-cover. To avoid some compiler/numerical issues when
@@ -87,8 +93,15 @@ subroutine Get_CellMet(i,j,debug_flag)
 
   Grid%i        = i
   Grid%j        = j
+  Grid%latitude  = glat(i,j) !SPOD tests
+  Grid%longitude = glon(i,j)
+
   Grid%psurf    = ps(i,j,1)             ! Surface pressure, Pa
   Grid%z_mid    = z_mid(i,j,KMAX_MID)   ! NB: Approx, updated every 3h
+  Grid%rh2m = rh2m(i,j,1) !NWP value !now used in BiDir
+  Grid%sst  = sst(i,j,1)  !NWP value !to be used in BiDir
+  Grid%is_frozen = Grid%t2 < 271.15 ! BiDir extra
+
 
   ! Have option to use a different reference ht:
   if ( USE_ZREF ) then
@@ -126,7 +139,8 @@ subroutine Get_CellMet(i,j,debug_flag)
   Grid%rho_s = rho_surf(i,j)    ! Should replace Met_ml calc. in future
 
   Grid%is_mainlysea = mainly_sea(i,j)
-  Grid%is_allsea = ( mainly_sea(i,j) .and. LandCover(i,j)%ncodes == 1)
+  Grid%is_allsea = .true. !set to false below if land found
+  
   Grid%sdepth    = sdepth(i,j,1)
   Grid%ice_nwp   = max( ice_nwp(i,j,1), ice_landcover(i,j) )
   Grid%snowice   = ( Grid%sdepth  > 1.0e-10 .or. Grid%ice_nwp > 1.0e-10 )
@@ -137,8 +151,10 @@ subroutine Get_CellMet(i,j,debug_flag)
   ! to prevent numerical problems
   Grid%ustar = max( Grid%ustar, 0.1 )
 
+  !NB: invL_nwp is already defined, with similar defintion 
   Grid%invL  = -1* KARMAN * GRAV * Grid%Hd & ! -Grid%Hd disliked by gfortran
             / (CP*Grid%rho_s * Grid%ustar*Grid%ustar*Grid%ustar * Grid%t2 )
+
   !.. we limit the range of 1/L to prevent numerical and printout problems
   !.. and because we don't trust HIRLAM or other NWPs enough.
   !   This range is very wide anyway.
@@ -162,8 +178,11 @@ subroutine Get_CellMet(i,j,debug_flag)
   Sub(:)%SAI      = 0.0
   Sub(:)%hveg     = 0.0
 
+  
   LULOOP: do ilu= 1, nlu
     lu = LandCover(i,j)%codes(ilu)
+
+    if((.not. LandType(lu)%is_water) .and. LandCover(i,j)%fraction(ilu)>0.0) Grid%is_allsea = .false. 
 
     Sub(lu)%coverage = LandCover(i,j)%fraction(ilu)
     Sub(lu)%LAI      = LandCover(i,j)%LAI(ilu)
@@ -172,9 +191,48 @@ subroutine Get_CellMet(i,j,debug_flag)
 
     !=======================
     call Get_SubMet(lu, debug_flag )
-    Sub(lu)%SWP   =  0.0  ! Not yet implemented
+        
+    Sub(lu)%SWP = 0.0  ! Not yet implemented
+    
     !=======================
   end do LULOOP
+
+
+  !if requested, make weighted average for output
+  if(z0_out_ix>0 .or. invL_out_ix>0)then
+     !we need a separate loop, beacause Grid%is_allsea is set in the first one
+     land_frac=0.0
+     do ilu= 1, nlu        
+        lu = LandCover(i,j)%codes(ilu)
+       if(Grid%is_allsea)then
+           if(z0_out_ix>0) d_2d(z0_out_ix,i,j,IOU_INST) = log(Sub(lu)%z0)
+           if(invL_out_ix>0) d_2d(invL_out_ix,i,j,IOU_INST) = Sub(lu)%invL 
+        else if(.not.LandType(lu)%is_water) then
+           land_frac = land_frac+LandCover(i,j)%fraction(ilu)
+           if(z0_out_ix) d_2d(z0_out_ix,i,j,IOU_INST) = &
+                d_2d(z0_out_ix,i,j,IOU_INST) + log(Sub(lu)%z0)*LandCover(i,j)%fraction(ilu)
+           if(invL_out_ix>0)  d_2d(invL_out_ix,i,j,IOU_INST) = &
+                d_2d(invL_out_ix,i,j,IOU_INST) + Sub(lu)%invL*LandCover(i,j)%fraction(ilu)
+        endif
+     enddo
+     if(.not.Grid%is_allsea)then
+        !renormalize to land
+        if(land_frac >= 1.E-6)then
+           if(z0_out_ix) d_2d(z0_out_ix,i,j,IOU_INST) = &
+                d_2d(z0_out_ix,i,j,IOU_INST)/land_frac
+           if(invL_out_ix>0)  d_2d(invL_out_ix,i,j,IOU_INST) = &
+                d_2d(invL_out_ix,i,j,IOU_INST)/land_frac
+        else
+           write(*,*)'WARNING: found grid with no sea and no land',i,j,nlu,land_frac
+           do ilu= 1, nlu  
+              lu = LandCover(i,j)%codes(ilu)
+              write(*,*)lu,LandCover(i,j)%fraction(ilu),LandType(lu)%is_water
+          enddo
+       endif
+    endif
+     
+  endif
+  
 
 end subroutine Get_CellMet
 !=======================================================================

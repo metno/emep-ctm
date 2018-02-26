@@ -1,7 +1,7 @@
-! <CM_ChemRates_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <CM_ChemRates_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,7 +36,7 @@ module ChemRates_rct_ml
   use Setup_1dfields_ml ! => tinv, h2o, m, Fgas
   use Setup_1dfields_ml, m=> amk
   use ChemSpecs_tot_ml  ! => PINALD, .... for FgasJ08
-  use ModelConstants_ml, only: KMAX_MID,KCHEMTOP,DebugCell,DEBUG,AERO
+  use Config_module, only: KMAX_MID,KCHEMTOP,DebugCell,DEBUG,AERO
 implicit none
 private
 
@@ -44,7 +44,7 @@ private
 
     public :: set_rct_rates
 
-    integer, parameter, public :: NRCT = 115   !! No. coefficients
+    integer, parameter, public :: NRCT = 111   !! No. coefficients
 
     real, allocatable, save, public, dimension(:,:) :: rct
 
@@ -62,7 +62,7 @@ private
        rct(1,:) = (6.0e-34*O2+5.6E-34*N2)*O2*exp(-2.6*LOGTDIV300) 
        rct(2,:) = 1.8e-11*N2*exp(107.0*TINV) 
        rct(3,:) = 3.2e-11*O2*exp(67.0*TINV) 
-       rct(4,:) = 2.2e-10*H2O 
+       rct(4,:) = 2.14e-10*H2O 
        rct(5,:) = 1.4e-12*exp(-1310.0*TINV) 
        rct(6,:) = 1.4e-13*exp(-2470.0*TINV) 
        rct(7,:) = 1.7e-12*exp(-940.0*TINV) 
@@ -80,7 +80,7 @@ private
        rct(19,:) = 3.2e-13*exp(690/TEMP) 
        rct(20,:) = (1.0+1.4e-21*H2O*exp(2200.0*TINV))*2.2E-13*exp(600.0*TINV) 
        rct(21,:) = (1.0+1.4e-21*H2O*exp(2200.0*TINV))*1.9E-33*exp(980.0*TINV)*M 
-       rct(22,:) = 2.5e-12*exp(-260.0*TINV) 
+       rct(22,:) = 2.5e-12*exp(260.0*TINV) 
        rct(23,:) = 1.85e-20*exp(2.82*LOG(TEMP))*exp(-987.0*TINV) 
        rct(24,:) = 1.44e-13+M*3.43E-33 
        rct(25,:) = 2.3e-12*exp(360.0*TINV) 
@@ -178,42 +178,38 @@ private
          ,M  &
          ,0.75-1.27*LOG10(0.81)) 
        rct(79,:) = UPTAKERATE(CNO3,GAM=0.001,S=S_M2M3(AERO%PM,:)) 
-       rct(80,:) = UPTAKERATE(CNO2,GAM=0.0001,S=S_M2M3(AERO%PM,:)) 
-       rct(81,:) = UPTAKERATE(CHNO3(:),GAM=0.1,S=S_M2M3(AERO%DU_C,:)) 
-       rct(82,:) = UPTAKERATE(CHNO3(:),GAM=0.01,S=S_M2M3(AERO%SS_C,:)) 
-       rct(83,:) = UPTAKERATE(CHO2,GAM=0.2,S=S_M2M3(AERO%PM,:)) 
-       rct(84,:) = UPTAKERATE(CO3,GAM=1.0e-6,S=S_M2M3(AERO%DU_C,:)) 
-       rct(85,:) = GAMN2O5(:) 
-       rct(86,:) = UPTAKERATE(CO3,GAM=1.0e-6,S=S_M2M3(AERO%DU_F,:)) 
-       rct(87,:) = 1.2e-11*exp(440*TINV) 
-       rct(88,:) = 2.38e-11*exp(357*TINV) 
-       rct(89,:) = 3.948e-11*exp(440*TINV) 
-       rct(90,:) = 7.5e-13*exp(700*TINV) 
-       rct(91,:) = 3.8e-12*exp(200*TINV) 
-       rct(92,:) = 8.05e-16*exp(-640*TINV) 
-       rct(93,:) = 1.35e-15*exp(-1270*TINV) 
-       rct(94,:) = 2.6887e-15*exp(-640*TINV) 
-       rct(95,:) = 1.2e-12*exp(490*TINV) 
-       rct(96,:) = 2.6988e-12*exp(490*TINV) 
-       rct(97,:) = 1.2e-12*exp(490.0*TINV) 
-       rct(98,:) = 4e-12*FGAS(ASOC_UG1,:) 
-       rct(99,:) = 4e-12*FGAS(ASOC_UG10,:) 
-       rct(100,:) = 4e-12*FGAS(ASOC_UG1E2,:) 
-       rct(101,:) = 4e-12*FGAS(ASOC_UG1E3,:) 
-       rct(102,:) = 4e-12*FGAS(NON_C_ASOA_UG1,:) 
-       rct(103,:) = 4e-12*FGAS(NON_C_ASOA_UG10,:) 
-       rct(104,:) = 4e-12*FGAS(NON_C_ASOA_UG1E2,:) 
-       rct(105,:) = 4e-12*FGAS(NON_C_ASOA_UG1E3,:) 
-       rct(106,:) = 4e-12*FGAS(BSOC_UG1,:) 
-       rct(107,:) = 4e-12*FGAS(BSOC_UG10,:) 
-       rct(108,:) = 4e-12*FGAS(BSOC_UG1E2,:) 
-       rct(109,:) = 4e-12*FGAS(BSOC_UG1E3,:) 
-       rct(110,:) = 4e-12*FGAS(NON_C_BSOA_UG1,:) 
-       rct(111,:) = 4e-12*FGAS(NON_C_BSOA_UG10,:) 
-       rct(112,:) = 4e-12*FGAS(NON_C_BSOA_UG1E2,:) 
-       rct(113,:) = 4e-12*FGAS(NON_C_BSOA_UG1E3,:) 
-       rct(114,:) = EC_AGEING_RATE() 
-       rct(115,:) = EC_AGEING_RATE() 
+       rct(80,:) = UPTAKERATE(CHNO3(:),GAM=0.1,S=S_M2M3(AERO%DU_C,:)) 
+       rct(81,:) = UPTAKERATE(CHNO3(:),GAM=0.01,S=S_M2M3(AERO%SS_C,:)) 
+       rct(82,:) = UPTAKERATE(CHO2,GAM=0.2,S=S_M2M3(AERO%PM,:)) 
+       rct(83,:) = 1.2e-11*exp(440*TINV) 
+       rct(84,:) = 2.38e-11*exp(357*TINV) 
+       rct(85,:) = 3.948e-11*exp(440*TINV) 
+       rct(86,:) = 7.5e-13*exp(700*TINV) 
+       rct(87,:) = 3.8e-12*exp(200*TINV) 
+       rct(88,:) = 8.05e-16*exp(-640*TINV) 
+       rct(89,:) = 1.35e-15*exp(-1270*TINV) 
+       rct(90,:) = 2.6887e-15*exp(-640*TINV) 
+       rct(91,:) = 1.2e-12*exp(490*TINV) 
+       rct(92,:) = 2.6988e-12*exp(490*TINV) 
+       rct(93,:) = 1.2e-12*exp(490.0*TINV) 
+       rct(94,:) = 4e-12*FGAS(ASOC_UG1,:) 
+       rct(95,:) = 4e-12*FGAS(ASOC_UG10,:) 
+       rct(96,:) = 4e-12*FGAS(ASOC_UG1E2,:) 
+       rct(97,:) = 4e-12*FGAS(ASOC_UG1E3,:) 
+       rct(98,:) = 4e-12*FGAS(NON_C_ASOA_UG1,:) 
+       rct(99,:) = 4e-12*FGAS(NON_C_ASOA_UG10,:) 
+       rct(100,:) = 4e-12*FGAS(NON_C_ASOA_UG1E2,:) 
+       rct(101,:) = 4e-12*FGAS(NON_C_ASOA_UG1E3,:) 
+       rct(102,:) = 4e-12*FGAS(BSOC_UG1,:) 
+       rct(103,:) = 4e-12*FGAS(BSOC_UG10,:) 
+       rct(104,:) = 4e-12*FGAS(BSOC_UG1E2,:) 
+       rct(105,:) = 4e-12*FGAS(BSOC_UG1E3,:) 
+       rct(106,:) = 4e-12*FGAS(NON_C_BSOA_UG1,:) 
+       rct(107,:) = 4e-12*FGAS(NON_C_BSOA_UG10,:) 
+       rct(108,:) = 4e-12*FGAS(NON_C_BSOA_UG1E2,:) 
+       rct(109,:) = 4e-12*FGAS(NON_C_BSOA_UG1E3,:) 
+       rct(110,:) = EC_AGEING_RATE() 
+       rct(111,:) = EC_AGEING_RATE() 
        first_call=.false.
   end subroutine set_rct_rates
 end module  ChemRates_rct_ml

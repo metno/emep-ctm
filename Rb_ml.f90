@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -27,7 +27,7 @@
 !*****************************************************************************! 
 module Rb_ml
 
-use ModelConstants_ml,    only :  DEBUG_RB
+use Config_module,    only :  DEBUG_RB
 use PhysicalConstants_ml, only :  KARMAN
                     
 use GasParticleCoeffs_ml, only : DryDepDefs &  !  Table for 64 gases

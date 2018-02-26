@@ -1,7 +1,7 @@
-! <Setup_1d_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Setup_1d_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -63,7 +63,7 @@ use MassBudget_ml,       only: totem    ! sum of emissions
 use MetFields_ml,        only: ps,sst
 use MetFields_ml,        only: roa, th, q, t2_nwp, cc3dmax, &
                                zen, Idirect, Idiffuse,z_bnd,ws_10m
-use ModelConstants_ml,   only:  &
+use Config_module,   only:  &
    DEBUG,DEBUG_MASS             &
   ,AERO                         & ! for wet radii and surf area.
   ,SKIP_RCT                     & ! kHet tests
@@ -72,9 +72,6 @@ use ModelConstants_ml,   only:  &
   ,MasterProc                   & 
   ,PPB, PT                      & ! PT-pressure at top
   ,USES                         & ! forest fires, hydrolysis, dergee_days etc.
-  ,USE_SEASALT                  &
-  ,USE_LIGHTNING_EMIS, USE_AIRCRAFT_EMIS      &
-  ,USE_GLOBAL_SOILNOX, USE_DUST, USE_ROADDUST &
   ,USE_OCEAN_NH3,USE_OCEAN_DMS,FOUND_OCEAN_DMS&
   ,VOLCANO_SR                   & ! Reduce Volcanic Emissions
   ,emis_inputlist               & ! Used in EEMEP
@@ -518,13 +515,13 @@ subroutine setup_rcemis(i,j)
   end if
 
   ! lightning and aircraft ... Aerial NOx emissions if required:
-  if(USE_LIGHTNING_EMIS)then
+  if(USES%LIGHTNING_EMIS)then
     do k=KCHEMTOP, KMAX_MID
       rcemis(NO ,k) = rcemis(NO ,k) + 0.95 * airlig(k,i,j)
       rcemis(NO2,k) = rcemis(NO2,k) + 0.05 * airlig(k,i,j)
     end do
   end if
-  if(USE_AIRCRAFT_EMIS) then
+  if(USES%AIRCRAFT_EMIS) then
     do k=KCHEMTOP, KMAX_MID
       rcemis(NO ,k) = rcemis(NO ,k) + 0.95 * airn(k,i,j)
       rcemis(NO2,k) = rcemis(NO2,k) + 0.05 * airn(k,i,j)
@@ -532,11 +529,11 @@ subroutine setup_rcemis(i,j)
   end if ! AIRCRAFT NOX
   if(DEBUG%SETUP_1DCHEM.and.debug_proc.and.i==debug_li.and.j==debug_lj)&
     write(*,"(a,2L2,10es10.3)") &
-      dtxt//"AIRNOX ", USE_LIGHTNING_EMIS, USE_AIRCRAFT_EMIS, &
+      dtxt//"AIRNOX ", USES%LIGHTNING_EMIS, USES%AIRCRAFT_EMIS, &
       airn(KMAX_MID,i,j),airlig(KMAX_MID,i,j)
 
   ! Road dust
-  if(USE_ROADDUST.and.itot_RDF>0) then  ! Hard-code indices for now
+  if(USES%ROADDUST.and.itot_RDF>0) then  ! Hard-code indices for now
     rcemis(itot_RDF,KMAX_MID) = gridrcroadd(1,i,j)
     rcemis(itot_RDC,KMAX_MID) = gridrcroadd(2,i,j)
    end if
@@ -547,7 +544,7 @@ subroutine setup_rcemis(i,j)
   end if
 
   ! Soil NOx
-  if(USE_GLOBAL_SOILNOX)then !NEEDS CHECKING NOV2011
+  if(USES%GLOBAL_SOILNOX)then !NEEDS CHECKING NOV2011
     rcemis(NO,KMAX_MID)=rcemis(NO,KMAX_MID)+SoilNOx(i,j)
   end if
 

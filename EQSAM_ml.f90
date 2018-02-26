@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -104,7 +104,7 @@ subroutine eqsam_v03d (SO4in, HNO3in,NO3in,NH3in,NH4in,NAin,CLin, relh,temp,pa, 
                        gSO4out, gNH3out, gNO3out, gClout, aH2Oout) 
 !>-------------------------------------------------------------------------------<
 
-  use ModelConstants_ml,  only :  KMAX_MID, KCHEMTOP
+  use Config_module,  only :  KMAX_MID, KCHEMTOP
 
 implicit none
  real, intent(in):: temp(KCHEMTOP:KMAX_MID),relh(KCHEMTOP:KMAX_MID),  &

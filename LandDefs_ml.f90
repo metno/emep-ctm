@@ -1,7 +1,7 @@
-! <LandDefs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <LandDefs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,8 +32,8 @@ module LandDefs_ml
  use Io_ml, only : IO_TMP, open_file, ios, Read_Headers, read_line
  use KeyValueTypes, only :  KeyVal
  use LandPFT_ml,  only : PFT_CODES
- use ModelConstants_ml, only : NLANDUSEMAX, MasterProc, DEBUG
- use ModelConstants_ml, only :  FLUX_VEGS
+ use Config_module, only : NLANDUSEMAX, MasterProc, DEBUG
+ use Config_module, only :  FLUX_VEGS
  use SmallUtils_ml, only : find_index, trims
   implicit none
   private
@@ -108,6 +108,7 @@ end interface Check_LandCoverPresent
      logical :: is_conif
      logical :: is_decid
      logical :: is_crop 
+     logical :: is_desert 
      logical :: is_seminat 
      logical :: is_water
      logical :: is_ice
@@ -270,7 +271,8 @@ contains
             LandType(n)%is_decid = ( LandInput%type == "EDF"  )
             LandType(n)%is_crop  = ( LandInput%type == "ECR"  )
             LandType(n)%is_seminat  = ( LandInput%type == "SNL"  )
-            LandType(n)%is_bulk   =  LandInput%type == "BLK" 
+            LandType(n)%is_bulk   =  LandInput%type == "BLK"
+            LandType(n)%is_desert = ( LandInput%code == "DE"  )
             LandType(n)%is_veg    =  LandInput%code /= "U" .and. &
                   LandInput%hveg_max > 0.01   ! Excludes water, ice_nwp, desert 
             if( LandInput%code(1:2) == "GR" ) iLC_grass =  n ! for eg clover

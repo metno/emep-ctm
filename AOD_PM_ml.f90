@@ -1,7 +1,7 @@
-! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <AOD_PM_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,7 +46,7 @@ use ChemGroups_ml,        only: chemgroups
 use CheckStop_ml,         only: CheckStop
 use GridValues_ml,        only: i_fdom, j_fdom
 use MetFields_ml,         only: z_bnd
-use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, ANALYSIS, USE_AOD
+use Config_module,    only: KMAX_MID, KCHEMTOP, ANALYSIS, USES
 use Par_ml,               only: LIMAX,LJMAX   ! => x, y dimensions
 use PhysicalConstants_ml, only: AVOG
 use Setup_1dfields_ml,    only: xn_2d, rh
@@ -423,7 +423,7 @@ subroutine AOD_Ext(i,j,debug)
 
   if(first_call)then
     call AOD_init("AOD_Ext")
-    call CheckStop(USE_AOD.and..not.any(wanted_wlen(:)),&
+    call CheckStop(USES%AOD.and..not.any(wanted_wlen(:)),&
       "USE_AOR=T, but no AOD/EXT output. Check config_*.nml")
     first_call=.false.
   end if

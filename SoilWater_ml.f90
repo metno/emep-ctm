@@ -34,7 +34,7 @@ module SoilWater_ml
  use Met_ml,            only : extendarea
  use MetFields_ml,      only : SoilWater_deep, SoilWaterSource,fSW &
                                ,foundSoilWater_deep  ! false if no SW-deep
- use ModelConstants_ml, only : USE_SOILWATER, DEBUG_SOILWATER
+ use Config_module, only : USES, DEBUG_SOILWATER
  use Par_ml,            only : limax, ljmax, me
  use TimeDate_ml,       only : current_date, daynumber
 
@@ -71,7 +71,7 @@ contains
 
   ! WARNING - THE SOIL MOISTURE WORK IS STILL UNDERWAY, AND IS NOT
   ! FUNCTIONING FOR ALL POSSIBLE METEOROLOGY INPUTS.
-  ! If in doubt, set USE_SOILWATER = .false. in ModelConstants_ml
+  ! If in doubt, set USE_SOILWATER = .false. in Config_module
    subroutine Set_SoilWater()
       integer :: i, j, hourloc
       logical :: my_first_call = .true.
@@ -81,10 +81,10 @@ contains
       if( DEBUG_SOILWATER .and. debug_proc ) write(*,*) "DEBUG_SW START: ", &
         current_date%day, current_date%hour, current_date%seconds
 
-      if ( .not. USE_SOILWATER  ) return ! and fSW has been set to 1. at start
+      if ( .not. USES%SOILWATER  ) return ! and fSW has been set to 1. at start
       if ( .not. foundSoilWater_deep  ) then
         if( my_first_call ) &
-           call PrintLog("WARNING: USE_SOILWATER=true, but no deep SW found")
+           call PrintLog("WARNING: USES%SOILWATER=true, but no deep SW found")
         my_first_call = .false.
         return ! and fSW has been set to 1. at start
       end if

@@ -1,7 +1,7 @@
-! <PhyChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <PhyChem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,6 +38,18 @@ use CheckStop_ml,     only: CheckStop
 use Chemfields_ml,    only: xn_adv,cfac,xn_shl
 use ChemSpecs,        only: IXADV_SO2, IXADV_NH3, IXADV_O3, NSPEC_SHL, species
 use CoDep_ml,         only: make_so2nh3_24hr
+use Config_module,only: MasterProc, KMAX_MID, nmax, nstep,END_OF_EMEPDAY &
+                           ,dt_advec       & ! time-step for phyche/advection
+                           ,DEBUG, PPBINV, PPTINV  &
+                           ,IOU_INST       &
+                           ,FORECAST       & ! use advecdiff_poles on FORECAST mode
+                           ,ANALYSIS       & ! 3D-VAR Analysis
+                           ,SOURCE_RECEPTOR&
+                           ,USES&
+                           ,FREQ_HOURLY    & ! hourly netcdf output frequency
+                           ,USE_EtaCOORDINATES,JUMPOVER29FEB&
+                           ,USE_uEMEP, IOU_HOUR, IOU_HOUR_INST, IOU_YEAR&
+                           ,fileName_O3_Top
 use DA_ml,            only: DEBUG_DA_1STEP
 use DA_3DVar_ml,      only: main_3dvar, T_3DVAR
 use Derived_ml,       only: DerivedProds, Derived, num_deriv2d
@@ -49,20 +61,8 @@ use Emissions_ml,     only: EmisSet
 use Gravset_ml,       only: gravset
 use GridValues_ml,    only: debug_proc,debug_li,debug_lj,&
                             glon,glat,projection,i_local,j_local,i_fdom,j_fdom
-use ModelConstants_ml,only: MasterProc, KMAX_MID, nmax, nstep &
-                           ,dt_advec       & ! time-step for phyche/advection
-                           ,DEBUG, PPBINV, PPTINV  &
-                           ,END_OF_EMEPDAY & ! (usually 6am)
-                           ,IOU_INST       &
-                           ,FORECAST       & ! use advecdiff_poles on FORECAST mode
-                           ,ANALYSIS       & ! 3D-VAR Analysis
-                           ,SOURCE_RECEPTOR&
-                           ,USE_ASH&
-                           ,FREQ_HOURLY    & ! hourly netcdf output frequency
-                           ,USE_POLLEN, USE_EtaCOORDINATES,JUMPOVER29FEB&
-                           ,USE_uEMEP, IOU_HOUR, IOU_HOUR_INST, IOU_YEAR&
-                           ,fileName_O3_Top
 use MetFields_ml,     only: ps,roa,z_bnd,z_mid,cc3dmax, &
+                            PARdbh, PARdif, fCloud, & !WN17
                             zen,coszen,Idirect,Idiffuse
 use NetCDF_ml,        only: ReadField_CDF,Real4
 use OutputChem_ml,    only: WrtChem
@@ -82,6 +82,8 @@ use uEMEP_ml,         only: uEMEP_emis
 use Radiation_ml,     only: SolarSetup,       &! sets up radn params
                             ZenithAngle,      &! gets zenith angle
                             ClearSkyRadn,     &! Idirect, Idiffuse
+                            WeissNormanPAR,   &! WN17=WeissNorman radn, 2017 work
+                            fCloudAtten,      &!
                             CloudAtten         !
 use Runchem_ml,       only: runchem   ! Calls setup subs and runs chemistry
 use Sites_ml,         only: siteswrt_surf, siteswrt_sondes    ! outputs
@@ -137,7 +139,7 @@ subroutine phyche()
   call Code_timer(tim_before)
   call readxn(current_date) !Read xn_adv from earlier runs
 
-  if(FORECAST.and.USE_POLLEN) call pollen_read ()
+  if(FORECAST.and.USES%POLLEN) call pollen_read ()
   call Add_2timing(15,tim_after,tim_before,"nest: Read")
   if(ANALYSIS.and.first_call)then
     call main_3dvar(status)   ! 3D-VAR Analysis for "Zero hour"
@@ -181,6 +183,11 @@ subroutine phyche()
 
   call CloudAtten(cc3dmax(:,:,KMAX_MID),Idirect,Idiffuse)
 
+!WN17
+! Gets PAR values, W/m2 here
+  fCloud = fCloudAtten(cc3dmax(:,:,KMAX_MID))
+  call WeissNormanPAR(ps(:,:,1),coszen,fCloud,PARdbh,PARdif)
+
   !================
   ! advecdiff_poles considers the local Courant number along a 1D line
   ! and divides the advection step "locally" in a number of substeps.
@@ -202,7 +209,7 @@ subroutine phyche()
  
   call Add_2timing(13,tim_after,tim_before0,"phyche: total advecdiff")
 
-  if(USE_ASH) call gravset
+  if(USES%ASH) call gravset
 
   !================
 
@@ -282,7 +289,7 @@ subroutine phyche()
     call Add_2timing(T_3DVAR,tim_after,tim_before)
   end if
   call wrtxn(current_date,.false.) !Write xn_adv for future nesting
-  if(FORECAST.and.USE_POLLEN) call pollen_dump()
+  if(FORECAST.and.USES%POLLEN) call pollen_dump()
   call Add_2timing(14,tim_after,tim_before,"nest: Write")
 
   End_of_Day=(current_date%seconds==0).and.(current_date%hour==END_OF_EMEPDAY)

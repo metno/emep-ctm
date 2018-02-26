@@ -4,7 +4,9 @@ Simpson et al., (2012, 2017, and refs therein).
 (The main documentation paper of the EMEP MSC-W model is Simpson et al.,
 2012. Many updates have been made since then, recorded in the annual
 EMEP status reports, from 2013-2017, which are listed below and
-are available at www.emep.int.)
+are available at www.emep.int. Stadtler et al. (2018) present results
+from rv4.16 of the model, with extensive discussion of the gas-aerosol
+reactions added in rv4.15)
 
    Simpson, D., Benedictow, A., Berge, H., Bergström, R., Emberson,
      L. D., Fagerli, H., Flechard, C. R., Hayman, G. D., Gauss, M.,
@@ -18,6 +20,10 @@ are available at www.emep.int.)
      photo-oxidants, acidifying and eutrophying components. Status
      Report 1/2017, The Norwegian Meteorological Institute, Oslo, Norway,
      www.emep.int, 2017, 115-122
+
+   Stadtler, S., Simpson, D., Schröder, S., Taraborrelli, D., Bott, A.,
+     and Schultz, M.: Ozone Impacts of Gas-Aerosol Uptake in Global
+     Chemistry Transport Models, Atmos. Chem. Phys., in press, 2018
 
 
 The performance of the model is also assessed annually in the EMEP reports, e.g.

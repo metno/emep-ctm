@@ -122,10 +122,10 @@
         + rct(77,k)* xnew(C3H6 )  &
         + rct(78,k)* xnew(NO )  &
         + rct(74,k)* xnew(SHIPNOX )  &
-        + rct(87,k)* xnew(APINENE )  &
-        + rct(88,k)* xnew(BPINENE )  &
-        + rct(89,k)* xnew(XTERP )  &
-        + rct(91,k)* xnew(TERPOOH ) 
+        + rct(83,k)* xnew(APINENE )  &
+        + rct(84,k)* xnew(BPINENE )  &
+        + rct(85,k)* xnew(XTERP )  &
+        + rct(87,k)* xnew(TERPOOH ) 
 
       xnew(OH)=  ( xold(OH) + dt2 * P) /(1.0 + dt2*L )
 
@@ -192,8 +192,6 @@
         + rcphot(IDCH3O2H,K) * xnew(PRRO2H )  &
         + rcphot(IDCH3O2H,K) * xnew(OXYO2H )  &
         + rcphot(IDCH3O2H,K) * xnew(MALO2H )  &
-        + rct(84,k) * xnew(O3 )  &
-        + rct(86,k) * xnew(O3 )  &
         + rct(44,k) * xnew(TERPO2 ) * xnew(NO )  &
         + 0.25*1.0e6 * xnew(XMTO3_RO2 ) 
 
@@ -218,8 +216,8 @@
         + rct(51,k)* xnew(MALO2 )  &
         + rct(51,k)* xnew(ISO2 )  &
         + rct(45,k)* xnew(MACRO2 )  &
-        + rct(83,k)  &
-        + rct(90,k)* xnew(TERPO2 ) 
+        + rct(82,k)  &
+        + rct(86,k)* xnew(TERPO2 ) 
 
       xnew(HO2)=  ( xold(HO2) + dt2 * P) /(1.0 + dt2*L )
 
@@ -360,26 +358,26 @@
 !-> TERPO2 
 
       P =   &
-          rct(87,k) * xnew(APINENE ) * xnew(OH )  &
-        + rct(88,k) * xnew(BPINENE ) * xnew(OH )  &
-        + rct(89,k) * xnew(XTERP ) * xnew(OH )  &
-        + rct(91,k) * xnew(TERPOOH ) * xnew(OH )  &
-        + rct(95,k) * xnew(APINENE ) * xnew(NO3 )  &
+          rct(83,k) * xnew(APINENE ) * xnew(OH )  &
+        + rct(84,k) * xnew(BPINENE ) * xnew(OH )  &
+        + rct(85,k) * xnew(XTERP ) * xnew(OH )  &
+        + rct(87,k) * xnew(TERPOOH ) * xnew(OH )  &
+        + rct(91,k) * xnew(APINENE ) * xnew(NO3 )  &
         + 2.51e-12 * xnew(BPINENE ) * xnew(NO3 )  &
-        + rct(96,k) * xnew(XTERP ) * xnew(NO3 ) 
+        + rct(92,k) * xnew(XTERP ) * xnew(NO3 ) 
 
       L =  &
           rct(44,k)* xnew(NO )  &
-        + rct(90,k)* xnew(HO2 ) 
+        + rct(86,k)* xnew(HO2 ) 
 
       xnew(TERPO2)=  ( xold(TERPO2) + dt2 * P) /(1.0 + dt2*L )
 
 !-> XMTO3_RO2 
 
       P =   &
-          rct(92,k) * xnew(APINENE ) * xnew(O3 )  &
-        + rct(93,k) * xnew(BPINENE ) * xnew(O3 )  &
-        + rct(94,k) * xnew(XTERP ) * xnew(O3 ) 
+          rct(88,k) * xnew(APINENE ) * xnew(O3 )  &
+        + rct(89,k) * xnew(BPINENE ) * xnew(O3 )  &
+        + rct(90,k) * xnew(XTERP ) * xnew(O3 ) 
 
       L =  &
           1.0e6 
@@ -411,11 +409,9 @@
         + rct(62,k)* xnew(MACR )  &
         + rcphot(IDAO3,K)  &
         + rcphot(IDBO3,K)  &
-        + rct(84,k)  &
-        + rct(86,k)  &
-        + rct(92,k)* xnew(APINENE )  &
-        + rct(93,k)* xnew(BPINENE )  &
-        + rct(94,k)* xnew(XTERP ) 
+        + rct(88,k)* xnew(APINENE )  &
+        + rct(89,k)* xnew(BPINENE )  &
+        + rct(90,k)* xnew(XTERP ) 
 
       xnew(O3)=  ( xold(O3) + dt2 * P) /(1.0 + dt2*L )
 
@@ -504,8 +500,7 @@
         + rct(72,k)* xnew(NO3 )  &
         + rct(74,k)* xnew(OH )  &
         + rct(75,k)* xnew(CH3COO2 )  &
-        + rcphot(IDNO2,K)  &
-        + rct(80,k) 
+        + rcphot(IDNO2,K) 
 
       xnew(NO2)=  ( xold(NO2) + dt2 * P) /(1.0 + dt2*L )
 
@@ -561,9 +556,9 @@
         + rct(72,k)* xnew(NO2 )  &
         + rcphot(IDNO3,K)  &
         + rct(79,k)  &
-        + rct(95,k)* xnew(APINENE )  &
+        + rct(91,k)* xnew(APINENE )  &
         + 2.51e-12* xnew(BPINENE )  &
-        + rct(96,k)* xnew(XTERP ) 
+        + rct(92,k)* xnew(XTERP ) 
 
       xnew(NO3)=  ( xold(NO3) + dt2 * P) /(1.0 + dt2*L )
 
@@ -586,22 +581,20 @@
         + rct(74,k) * xnew(NO2 ) * xnew(OH )  &
         + rct(74,k) * xnew(SHIPNOX ) * xnew(OH )  &
         + 3.2e-5 * xnew(SHIPNOX )  &
-        + rct(79,k) * xnew(NO3 )  &
-        + 0.5*rct(80,k) * xnew(NO2 ) 
+        + rct(79,k) * xnew(NO3 ) 
 
       L =  &
           rct(16,k)* xnew(OH )  &
         + rcphot(IDHNO3,K)  &
-        + rct(81,k)  &
-        + rct(82,k) 
+        + rct(80,k)  &
+        + rct(81,k) 
 
       xnew(HNO3)=  ( xold(HNO3) + dt2 * P) /(1.0 + dt2*L )
 
 !-> HONO 
 
       P =   &
-          rct(78,k) * xnew(OH ) * xnew(NO )  &
-        + 0.5*rct(80,k) * xnew(NO2 ) 
+          rct(78,k) * xnew(OH ) * xnew(NO ) 
 
       L =  &
           rct(22,k)* xnew(OH )  &
@@ -848,9 +841,9 @@
           0.45*rcemis(BIOTERP,k) 
 
       L =  &
-          rct(87,k)* xnew(OH )  &
-        + rct(92,k)* xnew(O3 )  &
-        + rct(95,k)* xnew(NO3 ) 
+          rct(83,k)* xnew(OH )  &
+        + rct(88,k)* xnew(O3 )  &
+        + rct(91,k)* xnew(NO3 ) 
 
       xnew(APINENE)=  ( xold(APINENE) + dt2 * P) /(1.0 + dt2*L )
 
@@ -860,8 +853,8 @@
           0.2*rcemis(BIOTERP,k) 
 
       L =  &
-          rct(88,k)* xnew(OH )  &
-        + rct(93,k)* xnew(O3 )  &
+          rct(84,k)* xnew(OH )  &
+        + rct(89,k)* xnew(O3 )  &
         + 2.51e-12* xnew(NO3 ) 
 
       xnew(BPINENE)=  ( xold(BPINENE) + dt2 * P) /(1.0 + dt2*L )
@@ -872,9 +865,9 @@
           0.35*rcemis(BIOTERP,k) 
 
       L =  &
-          rct(89,k)* xnew(OH )  &
-        + rct(94,k)* xnew(O3 )  &
-        + rct(96,k)* xnew(NO3 ) 
+          rct(85,k)* xnew(OH )  &
+        + rct(90,k)* xnew(O3 )  &
+        + rct(92,k)* xnew(NO3 ) 
 
       xnew(XTERP)=  ( xold(XTERP) + dt2 * P) /(1.0 + dt2*L )
 
@@ -986,7 +979,7 @@
         + 0.14*rct(47,k) * xnew(C2H4 ) * xnew(O3 )  &
         + 0.09*rct(48,k) * xnew(O3 ) * xnew(C3H6 )  &
         + 0.27*rct(55,k) * xnew(O3 ) * xnew(C5H8 )  &
-        + 0.5*rct(83,k) * xnew(HO2 )  &
+        + 0.5*rct(82,k) * xnew(HO2 )  &
         + 0.09*1.0e6 * xnew(XMTO3_RO2 ) 
 
       L =  &
@@ -1079,6 +1072,7 @@
         + 1.9*rcphot(IDHCOHCO,K) * xnew(GLYOX )  &
         + rcphot(IDRCOHCO,K) * xnew(MGLYOX )  &
         + rcemis(CO,k)  &
+        + rcemis(FFIRE_CO,k)  &
         + 0.14*1.0e6 * xnew(XMTO3_RO2 ) 
 
       L =  &
@@ -1313,9 +1307,9 @@
 !-> TERPOOH 
 
       P =   &
-          rct(90,k) * xnew(TERPO2 ) * xnew(HO2 ) 
+          rct(86,k) * xnew(TERPO2 ) * xnew(HO2 ) 
 
       L =  &
-          rct(91,k)* xnew(OH ) 
+          rct(87,k)* xnew(OH ) 
 
       xnew(TERPOOH)=  ( xold(TERPOOH) + dt2 * P) /(1.0 + dt2*L )

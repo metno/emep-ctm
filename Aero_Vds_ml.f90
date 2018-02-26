@@ -1,7 +1,7 @@
-! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Aero_Vds_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,7 +28,7 @@
   module Aero_Vds_ml
 !==============================================================================
   use PhysicalConstants_ml, only : FREEPATH, VISCO, BOLTZMANN, PI, GRAV, ROWATER
-  use ModelConstants_ml,    only : DEBUG_VDS, MasterProc
+  use Config_module,    only : DEBUG_VDS, MasterProc
 
   ! DESCRIPTION
   ! Calculates laminar sub-layer resistance (rb) and gravitational settling

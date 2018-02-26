@@ -1,7 +1,7 @@
-! <ChemFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <ChemFields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,7 +29,7 @@ module ChemFields_ml
 use AllocInits,   only: AllocInit
 use ChemSpecs,    only: NSPEC_ADV, NSPEC_SHL, NSPEC_TOT, & ! => No. species 
                     FIRST_SEMIVOL, LAST_SEMIVOL ! both -999 unless SOA used
-use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, AERO        ! =>  z dimension
+use Config_module,    only: KMAX_MID, KCHEMTOP, AERO        ! =>  z dimension
 use NumberConstants,      only: UNDEF_R
 use Par_ml,               only: LIMAX,LJMAX   ! => x, y dimensions
 use Setup_1dfields_ml

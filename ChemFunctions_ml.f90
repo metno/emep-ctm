@@ -1,7 +1,7 @@
-! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <ChemFunctions_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,8 +44,9 @@ module ChemFunctions_ml
  use AeroFunctions,         only : UptakeRate, GammaN2O5_EJSS, GammaN2O5
  use CheckStop_ml,          only : StopAll
  use ChemSpecs,             only : SO4, NO3_f, NH4_f, NO3_c
+! use Config_module,         only : DebugCell, DEBUG  ! set with DEBUG%RUNCHEM
  use LocalVariables_ml,     only : Grid   ! => izen, is_mainlysea
- use ModelConstants_ml,     only : K1  => KCHEMTOP, K2 => KMAX_MID, USES, AERO
+ use Config_module,     only : K1  => KCHEMTOP, K2 => KMAX_MID, USES, AERO
  use PhysicalConstants_ml,  only : AVOG, RGAS_J, DAY_ZEN
  use Setup_1dfields_ml,     only : itemp, tinv, rh, x=> xn_2d, amk, &
      aero_fom,aero_fss,aero_fdust, aero_fbc,  &
@@ -362,28 +363,32 @@ module ChemFunctions_ml
 
   function HydrolysisN2O5(ormethod) result(rate) 
    character(len=*), intent(in) , optional:: ormethod ! overrides default method if wanted
-   character(len=30) :: method
+   character(len=30), save :: method
    real, dimension(K1:K2) :: rate
    real    :: rc
    real    :: f   ! Was f_Riemer
-   real    :: gam, S,  S_ss, S_du, Rwet  ! for newer methods
+   real    :: gam, gamSS,gamDU, S,  S_ss, S_du, Rwet  ! for newer methods
    real, save :: g1 = 0.02, g2=0.002 ! gammas for 100% SO4, 100% NO3, default
-   real, save :: gFix  ! for Gamma:xxxx values
+  ! fixed-value gammas can be specified with e.g. Gamma:0.02. We derive
+  ! the numerical value, gFix, from this string
+   real, save :: gFix= -999.         ! fixed-value, from Gamma:xxxx values
+   character(len=20) :: gtxt         ! for Gamma:xxxx values
    real, parameter :: EPSIL = 1.0  ! One mol/cm3 to stop div by zero
    integer :: k
    real :: xNO3  ! As the partitioning between fine and coarse is so difficult
                  ! we include both in the nitrate used here.
    logical, save :: first_call = .true.
+   character(len=*), parameter :: dtxt = 'HydrolN2O5:'
 
 
-   method = USES%n2o5HydrolysisMethod
-   if ( present(ormethod) )then
-     method = ormethod
-   end if
-   if( first_call .and. method(1:6)=="Gamma:"  ) then
-       gFix = 0.002
-       if( method == "Gamma:0.05" ) gFix = 0.05
-       if( method == "Gamma:0.005" ) gFix = 0.005
+   if( first_call ) then
+     method = USES%n2o5HydrolysisMethod
+     if ( present(ormethod) ) method = ormethod  ! WHEN is this used?
+     if( method(1:6)=="Gamma:"  ) then
+       gtxt=method(7:)
+       read(gtxt,*) gFix
+       method='gFixed'
+      end if
    end if
 
    select case ( method )
@@ -410,8 +415,11 @@ module ChemFunctions_ml
         end if
       end do ! k
   !---------------------------------------
-   case ( "Smix", "SmixTen", "SmixC" )
+   case ( "Smix", "SmixTen" )
 
+!if ( DEBUG%RUNCHEM .and. DebugCell ) then
+!  write(*,*) dtxt//trim(method), rh(K2), S_m2m3(AERO%PM_F,K2) , S_m2m3(AERO%DU_C,K2)
+!end if
      do k = K1, K2
 
        if ( rh(k)  > 0.4) then ! QUERY???
@@ -423,18 +431,22 @@ module ChemFunctions_ml
             gam = GammaN2O5(temp(k),rh(k),&
                    f,aero_fom(k),aero_fss(k),aero_fdust(k),aero_fbc(k))
 
-            if( method == "SmixTen") gam = 0.1 * gam ! cf Brown et al, 2009!
 
             rate(k) = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
 
-            if( method == "SmixC") then
+            !Add coarse model ! was SmixC
                  S_ss = S_m2m3(AERO%SS_C,k)
-                 gam=GammaN2O5_EJSS(rh(k))
+                 gamSS=GammaN2O5_EJSS(rh(k))
                  S_du = S_m2m3(AERO%DU_C,k)
-                 gam=0.01 ! for dust
+                ! gamDU=0.01 ! for dust
                ! same as UptakeRate(cN2O5,gam,S), but easier to code here:
-                 rate(k) = rate(k) + cN2O5(k)*(gam*S_ss+0.01*S_du)/4 
-            end if ! SmixC
+                 rate(k) = rate(k) + cN2O5(k)*(gamSS*S_ss+0.01*S_du)/4 
+                 ! ToDo update gam for export. Currently at fine-mod only
+            !Coarse end 
+            if( method == "SmixTen") then
+              gam = 0.1 * gam ! cf Brown et al, 2009!
+              rate(k) = 0.1 * rate(k)
+            end if
        else
             gam = 0.0 ! just for export
             rate(k) = 0.0
@@ -503,7 +515,8 @@ module ChemFunctions_ml
          rate(k) = 0.0
       end if
     end do ! k
-    case ( "Gamma:0.002", "Gamma:0.05", "Gamma:0.005")  ! Inspired by Brown et al. 2009
+    !case ( "Gamma:0.002", "Gamma:0.05", "Gamma:0.005")  ! Inspired by Brown et al. 2009
+    case ( "gFixed")  !  Fixed gammas
      do k = K1, K2
 
        if ( rh(k)  > 0.4) then ! QUERY???

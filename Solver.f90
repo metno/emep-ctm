@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -48,20 +48,20 @@
 
     use Aqueous_ml,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3
     use CheckStop_ml,      only: CheckStop, StopAll
-    use ChemFunctions_ml, only :VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
+    use ChemFunctions_ml,  only: VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
     use ChemGroups_ml,     only: RO2_POOL, RO2_GROUP
     use ChemSpecs                  ! => NSPEC_TOT, O3, NO2, etc.
-    use ChemFields_ml, only : x, xold ,xnew  & ! Working arrays [molecules/cm3]
+    use ChemFields_ml,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]
                              ,cell_tinv & ! tmp location, for Yields
                              ,NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
     use ChemRates_rct_ml,   only: rct
+    use Config_module,     only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv &
+                                ,DebugCell, MasterProc, DEBUG, USES &
+                                ,YieldModifications
     use DefPhotolysis_ml         ! => IDHNO3, etc.
-    use emep_Config_mod,    only : YieldModifications
     use EmisDef_ml,      only: KEMISTOP
     use GridValues_ml,     only : GRIDWIDTH_M, i_fdom, j_fdom
     use Io_ml,             only : IO_LOG, datewrite
-    use ModelConstants_ml, only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv, &
-                                 DebugCell, MasterProc, DEBUG, USE_SEASALT
     use Par_ml,            only: me, LIMAX, LJMAX
     use PhysicalConstants_ml, only:  RGAS_J
     use Precision_ml, only:  dp

@@ -1,7 +1,7 @@
-! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Runchem_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -40,28 +40,28 @@ module RunChem_ml
   use AOD_PM_ml,        only: AOD_Ext
   use Aqueous_ml,       only: Setup_Clouds, prclouds_present, WetDeposition
   use Biogenics_ml,     only: setup_bio
-  use CellMet_ml,       only: Get_CellMet
+  use CellMet_ml,       only: Get_CellMet, z0_out_ix, invL_out_ix
   use CheckStop_ml,     only: CheckStop, StopAll
   use Chemfields_ml,    only: xn_adv    ! For DEBUG 
   use Chemsolver_ml,    only: chemistry
   use ChemSpecs                         ! DEBUG ONLY
   use ColumnSource_ml,  only: Winds, getWinds
+  use Config_module,    only: USES, & 
+                              MasterProc, & 
+                              KMAX_MID, END_OF_EMEPDAY, nstep,  &
+                              AERO, USES, & ! need USES%EMISSTACKS and more 
+                              USE_FASTJ, &
+                              dt_advec, &  ! for Emergency
+                              DEBUG_EMISSTACKS, & ! MKPS
+                              DebugCell, DEBUG    ! RUNCHEM
   use DefPhotolysis_ml, only: setup_phot
+  use DerivedFields_ml, only: f_2d
   use DryDep_ml,        only: drydep
-  use DustProd_ml,      only: WindDust  !DUST -> USE_DUST
+  use DustProd_ml,      only: WindDust  !DUST -> USES%DUST
   use FastJ_ml,         only: setup_phot_fastj,phot_fastj_interpolate
   use GridValues_ml,    only: debug_proc, debug_li, debug_lj, i_fdom, j_fdom
   use Io_Progs_ml,      only: datewrite
   use MassBudget_ml,    only: emis_massbudget_1d
-  use ModelConstants_ml,only: USE_DUST, USE_SEASALT, USE_AOD, USE_POLLEN, & 
-                              MasterProc, & 
-                              KMAX_MID, END_OF_EMEPDAY, nstep,  &
-                              AERO,  USES, & ! need USES%EMISSTACKS 
-                              USE_FASTJ, &
-                              dt_advec, USE_NOCHEM, &  ! for Emergency
-                              DEBUG_EMISSTACKS, & ! MKPS
-                              DebugCell, DEBUG, &    ! RUNCHEM
-                              USE_PreADV
   use OrganicAerosol_ml,only: ORGANIC_AEROSOLS, OrganicAerosol, &
                               Init_OrganicAerosol, & 
                               Reset_OrganicAerosol, & 
@@ -74,6 +74,7 @@ module RunChem_ml
   use Setup_1d_ml,      only: setup_1d, setup_rcemis, reset_3d
   use Setup_1dfields_ml,only: first_call, &
                               amk, rcemis, xn_2d  ! DEBUG for testing
+  use SmallUtils_ml,    only: find_index
   use TimeDate_ml,      only: current_date,daynumber,print_date
 !--------------------------------
   implicit none
@@ -108,9 +109,15 @@ subroutine runchem()
                    "Wrong My_SOA? Flag is "// trim(SOA_MODULE_FLAG) )
 
 !TEMPORARY HERE could be put in Met_ml
-  if( (.not. first_call) .and. USE_PreADV)then
+  if( (.not. first_call) .and. USES%PreADV)then
      call getWinds
   endif
+
+  if(first_call)then
+     z0_out_ix = find_index("logz0", f_2d(:)%subclass)
+     invL_out_ix = find_index("invL", f_2d(:)%subclass)
+  endif
+
 ! Processes calls 
   errcode = 0
 
@@ -145,17 +152,17 @@ subroutine runchem()
       call setup_rcemis(i,j) ! Sets initial rcemis=0.0
       call Add_2timing(27,tim_after,tim_before,"Runchem:setup_rcemis ")
  
-      if(USE_SEASALT)  &
+      if(USES%SEASALT)  &
         call SeaSalt_flux(i,j,debug_flag) ! sets rcemis(SEASALT_...)
 
-      if(USE_DUST)     &
+      if(USES%DUST)     &
         call WindDust(i,j,debug_flag)     ! sets rcemis(DUST...)
 
       if ( USES%EMISSTACKS ) then
          if ( pointsources(i,j) ) call get_pointsources(i,j,DEBUG_EMISSTACKS)
       end if
     
-      if(USE_POLLEN) &
+      if(USES%POLLEN) &
         call Pollen_flux(i,j,debug_flag)
 
       call Setup_Clouds(i,j,debug_flag)
@@ -192,7 +199,7 @@ subroutine runchem()
 !     !-------------------------------------------------
 !     !-------------------------------------------------
 
-      if( .not. USE_NOCHEM) then
+      if( .not. USES%NOCHEM) then
         call chemistry(i,j,DEBUG%RUNCHEM.and.debug_flag)
       else
         xn_2d(NSPEC_SHL+1:NSPEC_TOT,:) =  xn_2d(NSPEC_SHL+1:NSPEC_TOT,:)  &
@@ -246,7 +253,7 @@ subroutine runchem()
 
 
       !// Calculate Aerosol Optical Depth
-      if(USE_AOD)  &
+      if(USES%AOD)  &
         call AOD_Ext(i,j,debug_flag)
 
       !  Calculates PM water: 1. for ambient Rh and T (3D)

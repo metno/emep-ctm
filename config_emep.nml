@@ -1,10 +1,10 @@
 &INPUT_PARA
-  GRID      = 'EMEP01',
+  GRID      = 'EECCA',
   iyr_trend = 2015
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2017',
-  startdate = 2015,01,01,000000,
-  enddate   = 2015,12,31,000024,
+  runlabel2 = 'Opensource_Setup_2018',
+  startdate = 2015,01,01,00,
+  enddate   = 2015,12,31,24,
 &end
 &Machine_config
   DataPath(1) = '../input',
@@ -12,6 +12,13 @@
 &ModelConstants_config
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
+  EmisHeightsFile       = 'DataDir/EmisHeights.txt',
+  SplitDefaultFile      = 'DataDir/emissplit.defaults.POLL',
+  SplitSpecialsFile     = 'DataDir/emissplit.specials.POLL',
+  MonthlyFacFile        = 'DataDir/MonthlyFac.POLL',
+  DailyFacFile          = 'DataDir/DailyFac.POLL',
+  HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
+  EMEP_EuroBVOCFile     = 'DataDir/EMEP_EuroBVOC.nc',
 !------------------------------
   EXP_NAME              = 'EMEPSTD',
   MY_OUTPUTS            = 'EMEPSTD',
@@ -21,7 +28,7 @@
   LandCoverInputs%LandDefs  = 'DataDir/Inputs_LandDefs.csv',
   LandCoverInputs%Do3seDefs = 'DataDir/Inputs_DO3SE.csv',
   LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
-                              'DataDir/glc2000mCLM.nc',
+                              'DataDir/glc2000xCLMf18.nc',
   YieldModifications    = 'VBS', 
   PBL%ZiMIN             =  50.0,
 !------------------------------
@@ -31,21 +38,20 @@
   USES%DEGREEDAY_FACTORS = T,
   USES%PlumeMethod      = 'PVDI',    ! default PVDI, possible: NILU, ASMI, PVDI
   USES%PFT_MAPS         = F,         ! PFT LAI tests
-  USES%n2o5HydrolysisMethod = "Gamma:0.002" ! EmepRiemer=ACP2012 EMEP implementation
 !------------------------------
-  USE_SOILWATER         = T,          ! Uses SMI from meteo data
-  USE_CONVECTION        = F,
-  USE_SEASALT           = T,
-  USE_AIRCRAFT_EMIS     = T,          ! Needs global file, see manual
-  USE_LIGHTNING_EMIS    = T,
+  USES%SOILWATER         = T,          ! Uses SMI from meteo data
+  USES%CONVECTION        = F,
+  USES%SEASALT           = T,
+  USES%AIRCRAFT_EMIS     = T,          ! Needs global file, see manual
+  USES%LIGHTNING_EMIS    = T,
 !------------------------------
-  USE_EURO_SOILNOX      = T,          ! diff for global + Euro runs
+  USES%EURO_SOILNOX      = T,          ! diff for global + Euro runs
   EURO_SOILNOX_DEPSCALE = 1.0,        ! Scale, default 1  (see ModelConstants_ml)
-  USE_GLOBAL_SOILNOX    = F,          ! diff for global + Euro runs
+  USES%GLOBAL_SOILNOX    = F,          ! diff for global + Euro runs
 !------------------------------
-  USE_POLLEN            = F,
-  USE_ROADDUST          = T,
-  USE_DUST              = T,
+  USES%POLLEN            = F,
+  USES%ROADDUST          = T,
+  USES%DUST              = T,
   NETCDF_DEFLATE_LEVEL  = 4,          ! 1-9 GZIP compress, 0 no compress, -1 netcdf3
   INERIS_SNAP1          = F,
   INERIS_SNAP2          = F,
@@ -54,6 +60,7 @@
   emis_inputlist(1)%name= 'EmisDir/GNFRemis_EMEP01_YYYY.nc', ! fractions emiss format
 ! One can either include or exclude, not both, as follows
 ! emis_inputlist(1)%incl(1:) = 'EU15', ! example take only countries from the 'EUMACC2' list
+! emis_inputlist(2)%name     = 'EmisDir/Emis_GLOB_05.nc', !example of Fractions type
   emis_inputlist(2)%name= 'DataDir/OceanicEmissions_GEIA.nc',
   emis_inputlist(2)%type= 'DMS',
   emis_inputlist(3)%name= 'DataDir/FMIGlobShip2015mon.nc',
@@ -62,14 +69,24 @@
 !------------------------------
   SELECT_LEVELS_HOURLY  = F,          ! hourly output flag for 3DPROFILES
   FORECAST              = F,
-  USE_ASH               = F,          ! Used for FORECASTs and Status 2010
+  USES%ASH               = T,          ! Ash from historical Volcanic Eruptions
   ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
-  USE_AOD               = F,          ! Used for FORECASTs usually
+  USES%AOD               = F,          ! Used for FORECASTs usually
   BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
 !--- 'fake' vegetation for ozone POD calculations
   FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF',
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE'   ! Ignore these for FLUX calcs.
+&end
+&ColumnSource_config
+!------------------------------
+! volcanic emissions from passive degassing and historical eruptions
+!------------------------------
+  flocdef='DataDir/columnsource_location.csv',
+  femsdef='DataDir/columnsource_emission.csv',
+  need_topo=T, ! stop simulation if topo_nc not found
+  NMAX_LOC=-1, ! estimate from lines in flocdef
+  NMAX_EMS=-1, ! estiamte from lines in femsdef
 &end
 &Fire_config
   need_poll = F,

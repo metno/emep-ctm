@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,7 +38,7 @@ module Tabulations_ml
  !
  !----------------------------------------------------------------------------
   use PhysicalConstants_ml, only : RGAS_J, CP, T0, KAPPA
-  use ModelConstants_ml,    only : CHEMTMIN, CHEMTMAX  ! temperature range
+  use Config_module,    only : CHEMTMIN, CHEMTMAX  ! temperature range
   implicit none
   private
 

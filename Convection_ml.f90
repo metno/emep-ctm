@@ -1,7 +1,7 @@
-! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Convection_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,7 +41,7 @@ module Convection_ml
 use Chemfields_ml,        only  : xn_adv
 use ChemSpecs,            only  : NSPEC_ADV
 !CRM  use ChemSpecs_adv_ml ,    only  : NSPEC_ADV
-use ModelConstants_ml,    only  : KMAX_BND,KMAX_MID,PT,Pref
+use Config_module,    only  : KMAX_BND,KMAX_MID,PT,Pref
 use MetFields_ml ,        only  : ps,sdot,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
 use GridValues_ml,        only  : dA, dB, sigma_bnd
 use Par_ml,               only  : LIMAX,LJMAX,limax,ljmax,li0,li1,lj0,lj1

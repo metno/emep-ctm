@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,7 +43,7 @@ module Trajectory_ml
   use GridValues_ml ,     only : glon, glat
   use Io_ml,              only : IO_AIRCR
   use MetFields_ml,       only : z_bnd,z_mid
-  use ModelConstants_ml , only : dt_advec,PPBINV,KMAX_BND,NPROC, METSTEP
+  use Config_module , only : dt_advec,PPBINV,KMAX_BND,NPROC, METSTEP
   use MPI_Groups_ml , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
                              MPI_MIN, MPI_MAX, MPI_SUM, &
                              MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI

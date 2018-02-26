@@ -1,7 +1,7 @@
-! <CM_ChemSpecs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <CM_ChemSpecs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@ implicit none
 
 !   ( Output from GenChem, sub print_species ) 
 
-   integer, public, parameter ::  NSPEC_ADV = 118 
+   integer, public, parameter ::  NSPEC_ADV = 119 
  
 
 
@@ -119,67 +119,68 @@ implicit none
   ,  IXADV_DUMMY       =  65   &
   ,  IXADV_ASH_F       =  66   &
   ,  IXADV_ASH_C       =  67   &
-  ,  IXADV_POM_F_WOOD  =  68   &
-  ,  IXADV_POM_F_FFUEL =  69
+  ,  IXADV_FFIRE_CO    =  68   &
+  ,  IXADV_POM_F_WOOD  =  69
 
    integer, public, parameter ::   & 
-     IXADV_POM_C_FFUEL =  70   &
-  ,  IXADV_EC_F_WOOD_NEW=  71   &
-  ,  IXADV_EC_F_WOOD_AGE=  72   &
-  ,  IXADV_EC_C_WOOD   =  73   &
-  ,  IXADV_EC_F_FFUEL_NEW=  74   &
-  ,  IXADV_EC_F_FFUEL_AGE=  75   &
-  ,  IXADV_EC_C_FFUEL  =  76   &
-  ,  IXADV_REMPPM25    =  77   &
-  ,  IXADV_REMPPM_C    =  78   &
-  ,  IXADV_FFIRE_OM    =  79
+     IXADV_POM_F_FFUEL =  70   &
+  ,  IXADV_POM_C_FFUEL =  71   &
+  ,  IXADV_EC_F_WOOD_NEW=  72   &
+  ,  IXADV_EC_F_WOOD_AGE=  73   &
+  ,  IXADV_EC_C_WOOD   =  74   &
+  ,  IXADV_EC_F_FFUEL_NEW=  75   &
+  ,  IXADV_EC_F_FFUEL_AGE=  76   &
+  ,  IXADV_EC_C_FFUEL  =  77   &
+  ,  IXADV_REMPPM25    =  78   &
+  ,  IXADV_REMPPM_C    =  79
 
    integer, public, parameter ::   & 
-     IXADV_FFIRE_BC    =  80   &
-  ,  IXADV_FFIRE_REMPPM25=  81   &
-  ,  IXADV_OM25_BGND   =  82   &
-  ,  IXADV_OM25_P      =  83   &
-  ,  IXADV_SQT_SOA_NV  =  84   &
-  ,  IXADV_ASOC_NG100  =  85   &
-  ,  IXADV_ASOC_UG1    =  86   &
-  ,  IXADV_ASOC_UG10   =  87   &
-  ,  IXADV_ASOC_UG1E2  =  88   &
-  ,  IXADV_ASOC_UG1E3  =  89
+     IXADV_FFIRE_OM    =  80   &
+  ,  IXADV_FFIRE_BC    =  81   &
+  ,  IXADV_FFIRE_REMPPM25=  82   &
+  ,  IXADV_OM25_BGND   =  83   &
+  ,  IXADV_OM25_P      =  84   &
+  ,  IXADV_SQT_SOA_NV  =  85   &
+  ,  IXADV_ASOC_NG100  =  86   &
+  ,  IXADV_ASOC_UG1    =  87   &
+  ,  IXADV_ASOC_UG10   =  88   &
+  ,  IXADV_ASOC_UG1E2  =  89
 
    integer, public, parameter ::   & 
-     IXADV_NON_C_ASOA_NG100=  90   &
-  ,  IXADV_NON_C_ASOA_UG1=  91   &
-  ,  IXADV_NON_C_ASOA_UG10=  92   &
-  ,  IXADV_NON_C_ASOA_UG1E2=  93   &
-  ,  IXADV_NON_C_ASOA_UG1E3=  94   &
-  ,  IXADV_BSOC_NG100  =  95   &
-  ,  IXADV_BSOC_UG1    =  96   &
-  ,  IXADV_BSOC_UG10   =  97   &
-  ,  IXADV_BSOC_UG1E2  =  98   &
-  ,  IXADV_BSOC_UG1E3  =  99
+     IXADV_ASOC_UG1E3  =  90   &
+  ,  IXADV_NON_C_ASOA_NG100=  91   &
+  ,  IXADV_NON_C_ASOA_UG1=  92   &
+  ,  IXADV_NON_C_ASOA_UG10=  93   &
+  ,  IXADV_NON_C_ASOA_UG1E2=  94   &
+  ,  IXADV_NON_C_ASOA_UG1E3=  95   &
+  ,  IXADV_BSOC_NG100  =  96   &
+  ,  IXADV_BSOC_UG1    =  97   &
+  ,  IXADV_BSOC_UG10   =  98   &
+  ,  IXADV_BSOC_UG1E2  =  99
 
    integer, public, parameter ::   & 
-     IXADV_NON_C_BSOA_NG100= 100   &
-  ,  IXADV_NON_C_BSOA_UG1= 101   &
-  ,  IXADV_NON_C_BSOA_UG10= 102   &
-  ,  IXADV_NON_C_BSOA_UG1E2= 103   &
-  ,  IXADV_NON_C_BSOA_UG1E3= 104   &
-  ,  IXADV_FFFUEL_NG10 = 105   &
-  ,  IXADV_WOODOA_NG10 = 106   &
-  ,  IXADV_FFIREOA_NG10= 107   &
-  ,  IXADV_SEASALT_F   = 108   &
-  ,  IXADV_SEASALT_C   = 109
+     IXADV_BSOC_UG1E3  = 100   &
+  ,  IXADV_NON_C_BSOA_NG100= 101   &
+  ,  IXADV_NON_C_BSOA_UG1= 102   &
+  ,  IXADV_NON_C_BSOA_UG10= 103   &
+  ,  IXADV_NON_C_BSOA_UG1E2= 104   &
+  ,  IXADV_NON_C_BSOA_UG1E3= 105   &
+  ,  IXADV_FFFUEL_NG10 = 106   &
+  ,  IXADV_WOODOA_NG10 = 107   &
+  ,  IXADV_FFIREOA_NG10= 108   &
+  ,  IXADV_SEASALT_F   = 109
 
    integer, public, parameter ::   & 
-     IXADV_DUST_ROAD_F = 110   &
-  ,  IXADV_DUST_ROAD_C = 111   &
-  ,  IXADV_DUST_WB_F   = 112   &
-  ,  IXADV_DUST_WB_C   = 113   &
-  ,  IXADV_DUST_SAH_F  = 114   &
-  ,  IXADV_DUST_SAH_C  = 115   &
-  ,  IXADV_RN222       = 116   &
-  ,  IXADV_RNWATER     = 117   &
-  ,  IXADV_PB210       = 118
+     IXADV_SEASALT_C   = 110   &
+  ,  IXADV_DUST_ROAD_F = 111   &
+  ,  IXADV_DUST_ROAD_C = 112   &
+  ,  IXADV_DUST_WB_F   = 113   &
+  ,  IXADV_DUST_WB_C   = 114   &
+  ,  IXADV_DUST_SAH_F  = 115   &
+  ,  IXADV_DUST_SAH_C  = 116   &
+  ,  IXADV_RN222       = 117   &
+  ,  IXADV_RNWATER     = 118   &
+  ,  IXADV_PB210       = 119
 
  !-----------------------------------------------------------
   end module ChemSpecs_adv_ml
@@ -231,13 +232,13 @@ implicit none
 
 !   ( Output from GenChem, sub print_species ) 
 
-   integer, public, parameter ::  NSPEC_TOT = 134 
+   integer, public, parameter ::  NSPEC_TOT = 135 
  
   ! Aerosols:
            integer, public, parameter :: &
                 NAEROSOL=23,   &!   Number of aerosol species
-                FIRST_SEMIVOL=101, &!   First aerosol species
-                LAST_SEMIVOL=123     !   Last  aerosol species  
+                FIRST_SEMIVOL=102, &!   First aerosol species
+                LAST_SEMIVOL=124     !   Last  aerosol species  
 
 
 
@@ -341,67 +342,68 @@ implicit none
   ,  DUMMY       =  81   &
   ,  ASH_F       =  82   &
   ,  ASH_C       =  83   &
-  ,  POM_F_WOOD  =  84   &
-  ,  POM_F_FFUEL =  85   &
-  ,  POM_C_FFUEL =  86   &
-  ,  EC_F_WOOD_NEW=  87   &
-  ,  EC_F_WOOD_AGE=  88   &
-  ,  EC_C_WOOD   =  89
+  ,  FFIRE_CO    =  84   &
+  ,  POM_F_WOOD  =  85   &
+  ,  POM_F_FFUEL =  86   &
+  ,  POM_C_FFUEL =  87   &
+  ,  EC_F_WOOD_NEW=  88   &
+  ,  EC_F_WOOD_AGE=  89
 
    integer, public, parameter ::   & 
-     EC_F_FFUEL_NEW=  90   &
-  ,  EC_F_FFUEL_AGE=  91   &
-  ,  EC_C_FFUEL  =  92   &
-  ,  REMPPM25    =  93   &
-  ,  REMPPM_C    =  94   &
-  ,  FFIRE_OM    =  95   &
-  ,  FFIRE_BC    =  96   &
-  ,  FFIRE_REMPPM25=  97   &
-  ,  OM25_BGND   =  98   &
-  ,  OM25_P      =  99
+     EC_C_WOOD   =  90   &
+  ,  EC_F_FFUEL_NEW=  91   &
+  ,  EC_F_FFUEL_AGE=  92   &
+  ,  EC_C_FFUEL  =  93   &
+  ,  REMPPM25    =  94   &
+  ,  REMPPM_C    =  95   &
+  ,  FFIRE_OM    =  96   &
+  ,  FFIRE_BC    =  97   &
+  ,  FFIRE_REMPPM25=  98   &
+  ,  OM25_BGND   =  99
 
    integer, public, parameter ::   & 
-     SQT_SOA_NV  = 100   &
-  ,  ASOC_NG100  = 101   &
-  ,  ASOC_UG1    = 102   &
-  ,  ASOC_UG10   = 103   &
-  ,  ASOC_UG1E2  = 104   &
-  ,  ASOC_UG1E3  = 105   &
-  ,  NON_C_ASOA_NG100= 106   &
-  ,  NON_C_ASOA_UG1= 107   &
-  ,  NON_C_ASOA_UG10= 108   &
-  ,  NON_C_ASOA_UG1E2= 109
+     OM25_P      = 100   &
+  ,  SQT_SOA_NV  = 101   &
+  ,  ASOC_NG100  = 102   &
+  ,  ASOC_UG1    = 103   &
+  ,  ASOC_UG10   = 104   &
+  ,  ASOC_UG1E2  = 105   &
+  ,  ASOC_UG1E3  = 106   &
+  ,  NON_C_ASOA_NG100= 107   &
+  ,  NON_C_ASOA_UG1= 108   &
+  ,  NON_C_ASOA_UG10= 109
 
    integer, public, parameter ::   & 
-     NON_C_ASOA_UG1E3= 110   &
-  ,  BSOC_NG100  = 111   &
-  ,  BSOC_UG1    = 112   &
-  ,  BSOC_UG10   = 113   &
-  ,  BSOC_UG1E2  = 114   &
-  ,  BSOC_UG1E3  = 115   &
-  ,  NON_C_BSOA_NG100= 116   &
-  ,  NON_C_BSOA_UG1= 117   &
-  ,  NON_C_BSOA_UG10= 118   &
-  ,  NON_C_BSOA_UG1E2= 119
+     NON_C_ASOA_UG1E2= 110   &
+  ,  NON_C_ASOA_UG1E3= 111   &
+  ,  BSOC_NG100  = 112   &
+  ,  BSOC_UG1    = 113   &
+  ,  BSOC_UG10   = 114   &
+  ,  BSOC_UG1E2  = 115   &
+  ,  BSOC_UG1E3  = 116   &
+  ,  NON_C_BSOA_NG100= 117   &
+  ,  NON_C_BSOA_UG1= 118   &
+  ,  NON_C_BSOA_UG10= 119
 
    integer, public, parameter ::   & 
-     NON_C_BSOA_UG1E3= 120   &
-  ,  FFFUEL_NG10 = 121   &
-  ,  WOODOA_NG10 = 122   &
-  ,  FFIREOA_NG10= 123   &
-  ,  SEASALT_F   = 124   &
-  ,  SEASALT_C   = 125   &
-  ,  DUST_ROAD_F = 126   &
-  ,  DUST_ROAD_C = 127   &
-  ,  DUST_WB_F   = 128   &
-  ,  DUST_WB_C   = 129
+     NON_C_BSOA_UG1E2= 120   &
+  ,  NON_C_BSOA_UG1E3= 121   &
+  ,  FFFUEL_NG10 = 122   &
+  ,  WOODOA_NG10 = 123   &
+  ,  FFIREOA_NG10= 124   &
+  ,  SEASALT_F   = 125   &
+  ,  SEASALT_C   = 126   &
+  ,  DUST_ROAD_F = 127   &
+  ,  DUST_ROAD_C = 128   &
+  ,  DUST_WB_F   = 129
 
    integer, public, parameter ::   & 
-     DUST_SAH_F  = 130   &
-  ,  DUST_SAH_C  = 131   &
-  ,  RN222       = 132   &
-  ,  RNWATER     = 133   &
-  ,  PB210       = 134
+     DUST_WB_C   = 130   &
+  ,  DUST_SAH_F  = 131   &
+  ,  DUST_SAH_C  = 132   &
+  ,  RN222       = 133   &
+  ,  RNWATER     = 134   &
+  ,  PB210       = 135
 
  !-----------------------------------------------------------
   end module ChemSpecs_tot_ml
@@ -530,6 +532,7 @@ subroutine define_chemicals()
     species(DUMMY       ) = Chemical("DUMMY       ",   1.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 
     species(ASH_F       ) = Chemical("ASH_F       ",  12.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 
     species(ASH_C       ) = Chemical("ASH_C       ",  12.0000,  0,  0,   0,  0,  0.0000,    0.0 ) 
+    species(FFIRE_CO    ) = Chemical("FFIRE_CO    ",  28.0000,  0,  1,   0,  0,  0.0000,    0.0 ) 
     species(POM_F_WOOD  ) = Chemical("POM_F_WOOD  ",  20.4000,  0,  1,   0,  0,  0.0000,    0.0 ) 
     species(POM_F_FFUEL ) = Chemical("POM_F_FFUEL ",  15.0000,  0,  1,   0,  0,  0.0000,    0.0 ) 
     species(POM_C_FFUEL ) = Chemical("POM_C_FFUEL ",  15.0000,  0,  1,   0,  0,  0.0000,    0.0 ) 

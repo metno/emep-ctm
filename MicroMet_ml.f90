@@ -1,7 +1,7 @@
 ! <MicroMet_ml.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -27,7 +27,7 @@
 module Micromet_ml
   !ESX - disable the Ln95 for now to avoid dependency. Also, it never worked 
   !ESX   very well, likely due to problems with large-scale NWP met.
-  !ESX use ModelConstants_ml, only: FluxPROFILE
+  !ESX use Config_module, only: FluxPROFILE
 !____________________________________________________________________
 ! Miscellaneous collection of "standard" micromet functions
 ! Including PsiM, PsiH, AerRes

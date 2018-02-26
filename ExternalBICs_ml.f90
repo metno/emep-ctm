@@ -1,7 +1,7 @@
-! <ExternalBICs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <ExternalBICs_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,7 @@ module ExternalBICs_ml
 use CheckStop_ml,           only: CheckStop
 use ChemSpecs,              only: NSPEC_ADV, species_adv
 use Io_ml,                  only: PrintLog,IO_NML
-use ModelConstants_ml,      only: MasterProc, DEBUG=>DEBUG_NEST_ICBC
+use Config_module,      only: MasterProc, DEBUG=>DEBUG_NEST_ICBC
 use SmallUtils_ml,          only: find_index
 use TimeDate_ml,            only: date
 use TimeDate_ExtraUtil_ml,  only: date2string

@@ -1,7 +1,7 @@
-! <ModelConstants_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Config_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -24,7 +24,7 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-module ModelConstants_ml
+module Config_module
 !----------------------------------------------------------------------------
 ! Specifies a number of constants used in the model, and reads namelist
 ! file to (re-)configure where possible.
@@ -34,7 +34,6 @@ module ModelConstants_ml
 use Aerofunctions,        only: DpgV2DpgN
 use CheckStop_ml,         only: CheckStop
 use ChemSpecs,            only: species
-use emep_Config_mod,      only: PBL, EmBio, YieldModifications, LandCoverInputs
 use Io_Nums_ml,           only: IO_NML, IO_LOG, IO_TMP
 use OwnDataTypes_ml,      only: typ_ss, uEMEP_type
 use Precision_ml,         only: dp
@@ -62,6 +61,44 @@ public :: Config_ModelConstants
 CHARACTER(LEN=30), public, save :: EXP_NAME="EMEPSTD"
 CHARACTER(LEN=30), public, save :: MY_OUTPUTS="EMEPSTD"
 
+! EMEP daily measurements end at 6am, hence we typically adjust
+! for that. For global though, zero would be more normal
+  integer, save, public :: END_OF_EMEPDAY = 6 ! 
+
+  type, private :: PBL_t
+    real :: ZiMIN = 100.0                     ! minimum mixing height
+    real :: ZiMAX = 3000.0                    ! maximum mixing height
+    character(len=10) :: HmixMethod = "JcRb"  ! Method used for Hmix
+      ! JcRb = Jericevic/Richardson number method
+      ! "SbRb"= Seibert !"TIZi" = Original from Trond Iversen tiphysics
+  end type PBL_t
+  type(PBL_t), public, save :: PBL = PBL_t()
+
+  type, private :: EmBio_t
+    character(len=10) :: GlobBvocMethod = '-' ! can be MEGAN
+    real :: IsopFac = 1.0                     ! for experiments
+    real :: TerpFac = 1.0                     ! for experiments
+  ! canopy light factor, 1/1.7=0.59, based on Lamb 1993 (cf MEGAN 0.57)
+    real :: CLF     = 1.0                     ! canopy factor, leaf vs branch emissions
+  end type EmBio_t
+  type(EmBio_t), public, save :: EmBio = EmBio_t()
+
+ ! We allow a flexible string which can switch between different
+ ! experiments called by e.g. Solver. A but crude, but
+ ! it makes sure the experiments are recorded in the config
+ ! system
+
+  character(len=100), save, public :: YieldModifications = 'VBS' ! Default for EmChem16mt
+
+  
+  type, private :: LandCoverInputs_t
+    character(len=200), dimension(2) :: MapFile = 'NOTSET'  ! Usually PS European + global
+    character(len=200) :: LandDefs = '-'   !  LAI, h, etc (was Inputs_LandDefs
+    character(len=200) :: Do3seDefs = '-'  !  DO3SE inputs
+  end type LandCoverInputs_t
+  type(LandCoverInputs_t), public, save :: LandCoverInputs=LandCoverInputs_t()
+
+
 ! Namelist controlled:
 ! Some flags for model setup
 !------------ NAMELIST VARIABLES - can be reset by emep_namelist.nml file
@@ -72,6 +109,20 @@ type, public :: emep_useconfig
   character(len=10) :: testname = "STD"
   logical :: &                   ! Forest fire options
      FOREST_FIRES     = .true.  &!
+    ,SOILWATER        = .false. &!
+    ,SEASALT          = .true.  &!
+    ,CONVECTION       = .false. &! false works best for Euro runs
+    ,AIRCRAFT_EMIS    = .true.  &! Needs global file, see manual 
+    ,LIGHTNING_EMIS   = .true.  &! 
+    ,ROADDUST         = .false. &! TNO Road Dust routine. So far with simplified "climate-correction" factor
+    ,DUST             = .false. &! Experimental
+    ,EURO_SOILNOX     = .true.  &! ok, but diff for global + Euro runs
+    ,GLOBAL_SOILNOX   = .false. &! Need to design better switch
+    ,ASH          = .true.  &! Ash from historical Volcanic Eruption
+    ,PreADV       = .false. &! Column Emissions are preadvected when winds are very strong 
+    ,NOCHEM       = .false. &! Turns of chemistry for emergency runs
+    ,AOD          = .false. &
+    ,POLLEN       = .false. &! EXPERIMENTAL. Only works if start Jan 1
     ,SURF_AREA        = .true.  &! For improved aerosol uptake
     ,MACEHEADFIX      = .true.  &! Correction to O3 BCs (Mace Head Obs.)
     ,MACEHEAD_AVG     = .false. &! Uses 10-year avg. Good for e.g. RCA runs.
@@ -100,6 +151,11 @@ type, public :: emep_useconfig
 ! Selection of method for Whitecap calculation for Seasalt
   character(len=15) :: WHITECAPS  = 'Callaghan'
 
+! In development
+   logical :: BIDIR       = .false.  !< FUTURE Bi-directional exchange
+   character(len=20)      :: BiDirMethod = 'NOTSET'  ! FUTURE
+   character(len=20)      :: MonthlyNH3  = 'NOTSET'  ! can be 'LOTOS'
+
 end type emep_useconfig
 type(emep_useconfig), public, save :: USES
 
@@ -110,6 +166,7 @@ type, public :: emep_debug
     ,AQUEOUS         = .false. &
     ,BCS             = .false. & ! BoundaryConditions
     ,BIO             = .false. & !< Biogenic emissions
+    ,BIDIR           = .false. & !< FUTURE Bi-directional exchange
     ,COLUMN          = .false. & !  Used in Derived_ml for column integration
     ,COLSRC          = .false. & !  Volcanic emissions and Emergency scenarios
     ,DERIVED         = .false. & !
@@ -127,6 +184,7 @@ type, public :: emep_debug
     ,MY_DERIVED      = .false. &
     ,pH              = .false. &
     ,PHYCHEM         = .false. &
+    ,POLLEN          = .false. &
     ,RSUR            = .false. & ! Surface resistance
     ,RUNCHEM         = .false. & ! DEBUG%RUNCHEM is SPECIAL
        ,MY_WETDEP    = .false. &
@@ -162,50 +220,42 @@ type, public :: emis_in
   character(len=40), dimension(20) ::  pollemepName = "NOTSET"
   character(len=40) ::  periodicity = "once" !How often new data should be read in
   character(len=40) ::  type = "sectors" !steers special treatments
+  logical ::  use_lonlat_femis = .true. !allows to switch off lonlat femis reductions 
+                                        !for specific emission files
+                                        !Country+sector specific reductions can be dealt
+                                        !with with incl/excl, so those are not affected
 end type emis_in
 type(emis_in), public, dimension(5) :: emis_inputlist = emis_in()
 
 character(len=40), dimension(20), public, save  :: SecEmisOutPoll = "NOTSET"
+logical, public, save  :: HourlyEmisOut = .false. !to output snap and sector emissions hourly
 
 character(len=40), public, save   :: SECTORS_NAME='SNAP'
+character(len=40), public, save   :: USE_SECTORS_NAME='NOTSET'
 
-character(len=200), public, save :: &
+integer, public, parameter :: &
+  TXTLEN_NAME =  50, &
+  TXTLEN_FILE = 200    ! large enough for paths from namelists
+
+character(len=TXTLEN_FILE), public, save :: &
   EmisDir = '.',  &
   DataDir = '.',  &
   GRID = 'EECCA', & ! default grid
   meteo= 'DataDir/GRID/metdata_EC/YYYY/meteoYYYYMMDD.nc', & ! template for meteofile
   DegreeDayFactorsFile = 'MetDir/HDD18-GRID-YYYY.nc'        ! template for DegreeDayFactors.nc
 
-
-
 integer, public, save :: startdate(4)=(/0,0,0,0/),enddate(4)=(/0,0,0,24/) ! start and end of the run
 
 !-----------------------------------------------------------
 ! Convection factor - reduces convective fluxes (which can be
 ! too high in some NWPs)
-real, public, save :: CONVECTION_FACTOR = 1.0
+real, public, save :: CONVECTION_FACTOR = 0.33   ! Pragmatic default
 !-----------------------------------------------------------
 logical, public, save ::             &
   FORECAST              = .false.    & ! reset in namelist
- ,USE_SOILWATER         = .false.    &
- ,USE_SEASALT           = .true.     &
- ,USE_CONVECTION        = .false.    & ! false works best for Euro runs,
-!
-! Might sometimes change for scenario runs (e.g. EnsClim):
- ,USE_AIRCRAFT_EMIS  = .true.        & ! Needs global file, see manual
- ,USE_LIGHTNING_EMIS = .true.        &
-!
-! More experimental:
- ,USE_ROADDUST       = .false.       & ! TNO Road Dust routine. So far with simplified "climate-correction" factor
- ,USE_DUST           = .false.       & ! Experimental
  ,TEGEN_DATA         = .true.        & ! Interpolate global data to make dust if  USE_DUST=.true.
  ,INERIS_SNAP1       = .false.       & !(EXP_NAME=="TFMM"), & ! Switches off decadal trend
  ,INERIS_SNAP2       = .false.       & !(EXP_NAME=="TFMM"), & ! Allows near-zero summer values
- ,USE_ASH            = .false.       & ! Ash from Volcanic Eruption, w/gravitational settling
- ,USE_PreADV         = .false.       & ! Column Emissions are preadvected when winds are very strong 
- ,USE_NOCHEM         = .false.       & ! Turns of chemistry for emergency runs
- ,USE_AOD            = .false.       &
- ,USE_POLLEN         = .false.       & ! EXPERIMENTAL. Only works if start Jan 1
  ,USE_AMINEAQ        = .false.       & ! MKPS
  ,ANALYSIS           = .false.       & ! EXPERIMENTAL: 3DVar data assimilation
  ,USE_FASTJ          = .false.       & ! use FastJ_ml for computing rcphot
@@ -235,9 +285,9 @@ integer, public, save :: &
 ! Remember, soil-NO emissions are *very* uncertain.
 
   logical, public, save ::             &
-    USE_EURO_SOILNOX      = .true.     & ! ok, but diff for global + Euro runs
-   ,USE_GLOBAL_SOILNOX    = .false.    & ! Need to design better switch
-   ,USE_SOILNOX           = .true.       ! DO NOT ALTER: Set after config
+!    USE_EURO_SOILNOX      = .true.     & ! ok, but diff for global + Euro runs
+!   ,USE_GLOBAL_SOILNOX    = .false.    & ! Need to design better switch
+   USE_SOILNOX           = .true.       ! DO NOT ALTER: Set after config
   real, public, save :: EURO_SOILNOX_DEPSCALE = 1.0 !
 
 !NB: *OCEAN*  are internal variables. Cannot be set manually.
@@ -253,7 +303,7 @@ integer, public, save :: &
   logical, public, save :: USE_WRF_MET_NAMES = .false. !to read directly WRF metdata
 
 !Machine_config variables
- character (len=100), public :: DataPath(20) = 'NOTSET'
+ character (len=TXTLEN_FILE), public :: DataPath(20) = 'NOTSET'
 !
 !------------ END OF NAMELIST VARIABLES ------------------------------------!
 
@@ -307,10 +357,6 @@ character(len=*), parameter, public :: &
 !IN-TESTING (reset in NML if wanted)
 !) Emissions. Standard =ascii emislist. CdfFractions possible for INERIS
 !  and new cdf emission system in testing. Reset in config_ files
-! EMIS_TEST can be merged with EMIS_SOURCE after tests
-character(len=20), save, public :: &
-  EMIS_SOURCE = "Mixed",  & ! "Mixed" or old formats: "emislist" or "CdfFractions"
-  EMIS_TEST   = "None"      ! "None" or "CdfSnap"
 Logical , save, public :: &
   EMIS_OUT    = .false.     ! output emissions in separate files (memory demanding)
 
@@ -377,7 +423,7 @@ logical, public, parameter ::    &
   ,DEBUG_NH3            = .false. & ! NH3Emis experimental
   ,DEBUG_OUTPUTCHEM     = .false. & ! Output of netcdf results
   ,DEBUG_OUT_HOUR       = .false. & ! Debug Output_hourly.f90
-  ,DEBUG_POLLEN         = .false. &
+! ,DEBUG_POLLEN         = .false. &
 !MV  ,DEBUG_RUNCHEM        = .false. & ! DEBUG_RUNCHEM is SPECIAL
     ,DEBUG_DUST           = .false. & ! Skips fast chemistry to save some CPU
     ,DEBUG_ROADDUST     = .false. &
@@ -474,9 +520,6 @@ integer, public, save :: nFluxVegs = 0 ! reset in Landuse_ml
 type(typ_ss), public, save, dimension(NLANDUSEMAX) :: &
   PFT_MAPPINGS=typ_ss('-','-')
 
-! EMEP measurements end at 6am, used in  daily averages
-integer, public, parameter :: END_OF_EMEPDAY  = 6
-
 real, public, save :: &
   dt_advec = -999.9,   & ! time-step for advection (s), grid resolution dependent
   dt_advec_inv  ! =1/dt_advec
@@ -507,7 +550,6 @@ real, public, parameter :: &
 integer, public, save   :: nterm, nmax, nstep &
                          , iyr_trend ! Year specified for say BC changes
 
-integer, public, parameter :: TXTLEN_NAME = 50
 character(len=120), public, save :: runlabel1&!SHORT Allows explanatory text
                                   , runlabel2 !LONG  Read in from grun.pl
 
@@ -547,11 +589,61 @@ character, public, parameter ::  & ! output shorthands, order should match IOU_*
   IOU_KEY(IOU_YEAR:IOU_HOUR_INST)=['Y','M','D','H','I']
 
 character(len=*), public, parameter :: model="EMEP_MSC-W "
-character(len=200), public :: fileName_O3_Top = "NOTSET"
+character(len=TXTLEN_FILE), public :: fileName_O3_Top = "NOTSET"
 
 logical, parameter, public :: EmisSplit_OUT = .false.
 
 logical, public, parameter:: MANUAL_GRID=.false.!under developement.
+
+!file names
+type, public ::names
+character(len=TXTLEN_FILE), pointer:: filename => null()
+end type names
+integer, public, parameter :: Size_InputFiles = 40
+type(names), public, save :: InputFiles(Size_InputFiles)
+
+!To add a new filename:
+!1) add a line just here below, XXFile = '/default/Path/Default.name'
+!2) add the XXFile in NAMELIST /ModelConstants_config/
+!3) add a call associate_File(XXFile) near the end of Config_ModelConstants
+!4) In the routine using the file, add the XXFile under  "use Config_module"
+!5) replace the name you used in the routine with XX_File
+character(len=TXTLEN_FILE), target, save, public :: femisFile = 'DataDir/femis.dat'
+character(len=TXTLEN_FILE), target, save, public :: Vertical_levelsFile = 'DataDir/Vertical_levels20.txt'
+character(len=TXTLEN_FILE), target, save, public :: EmisHeightsFile = 'DataDir/inputs_emepdefaults_Jun2017/EmisHeights.txt'
+character(len=TXTLEN_FILE), target, save, public :: SoilTypesFile = 'DataDir/SoilTypes_IFS.nc'
+character(len=TXTLEN_FILE), target, save, public :: SurfacePressureFile = 'DataDir/SurfacePressure.nc'
+character(len=TXTLEN_FILE), target, save, public :: AircraftEmis_FLFile = 'DataDir/AircraftEmis_FL.nc'
+character(len=TXTLEN_FILE), target, save, public :: nox_emission_1996_2005File = 'DataDir/nox_emission_1996-2005.nc'
+!POLL replaced by name of pollutant in EmisSplit
+character(len=TXTLEN_FILE), target, save, public :: MonthlyFacFile = 'DataDir/inputs_emepdefaults_Jun2012/MonthlyFac.POLL'
+!POLL replaced by name of pollutant in EmisSplit
+character(len=TXTLEN_FILE), target, save, public :: DailyFacFile = 'DataDir/inputs_emepdefaults_Jun2012/DailyFac.POLL'
+character(len=TXTLEN_FILE), target, save, public :: HourlyFacFile = 'DataDir/inputs_emepdefaults_Jun2012/HourlyFacs.INERIS'
+!POLL replaced by name of pollutant in EmisSplit
+character(len=TXTLEN_FILE), target, save, public :: SplitDefaultFile = 'DataDir/ZCM_EmChem16mt/EMISSPLIT/emissplit.defaults.POLL'
+!POLL replaced by name of pollutant in EmisSplit
+character(len=TXTLEN_FILE), target, save, public :: SplitSpecialsFile = 'DataDir/ZCM_EmChem16mt/EMISSPLIT/emissplit.specials.POLL'
+character(len=TXTLEN_FILE), target, save, public :: RoadMapFile = 'DataDir/RoadMap.nc'
+character(len=TXTLEN_FILE), target, save, public :: AVG_SMI_2005_2010File = 'DataDir/AVG_SMI_2005_2010.nc'
+character(len=TXTLEN_FILE), target, save, public :: Soil_TegenFile = 'DataDir/Soil_Tegen.nc'
+character(len=TXTLEN_FILE), target, save, public :: SitesFile = 'DataDir/sitesLL.dat'
+character(len=TXTLEN_FILE), target, save, public :: SondesFile = 'DataDir/sondesLL.dat'
+character(len=TXTLEN_FILE), target, save, public :: GLOBAL_LAInBVOCFile = 'DataDir/GLOBAL_LAInBVOC.nc'
+character(len=TXTLEN_FILE), target, save, public :: EMEP_EuroBVOCFile = 'DataDir/LandInputs_Mar2011/EMEP_EuroBVOC.nc'
+!SEASON replace by 'jan', 'apr', 'jul' or 'oct' in readdiss
+character(len=TXTLEN_FILE), target, save, public :: jclearFile = 'DataDir/jclear.SEASON'
+!SEASON replace by 'jan', 'apr', 'jul' or 'oct' in readdiss
+character(len=TXTLEN_FILE), target, save, public :: jcl1kmFile = 'DataDir/jcl1.SEASON'
+!SEASON replace by 'jan', 'apr', 'jul' or 'oct' in readdiss
+character(len=TXTLEN_FILE), target, save, public :: jcl3kmFile = 'DataDir/jcl3.SEASON'
+character(len=TXTLEN_FILE), target, save, public :: NdepFile = 'DataDir/AnnualNdep_PS50x_EECCA2005_2009.nc'
+!MM replace by month in lightning()
+character(len=TXTLEN_FILE), target, save, public :: lightningFile = 'DataDir/lt21-nox.datMM'
+character(len=TXTLEN_FILE), target, save, public :: LoganO3File = 'DataDir/Logan_P.nc'
+character(len=TXTLEN_FILE), target, save, public :: DustFile = 'DataDir/Dust.nc'
+character(len=TXTLEN_FILE), target, save, public :: TopoFile = 'DataDir/GRID/topography.nc'
+character(len=TXTLEN_FILE), target, save, public :: BiDirInputFile = 'NOTSET' ! FUTURE
 
 !----------------------------------------------------------------------------
 contains
@@ -565,6 +657,7 @@ subroutine Config_ModelConstants(iolog)
 
   NAMELIST /ModelConstants_config/ &
     DegreeDayFactorsFile, meteo & !meteo template with full path
+   ,END_OF_EMEPDAY &
    ,EXP_NAME &  ! e.g. EMEPSTD, FORECAST, TFMM, TodayTest, ....
    ,USES   & ! just testname so far
    ,PBL    & ! Mar2017 testing
@@ -574,10 +667,8 @@ subroutine Config_ModelConstants(iolog)
    ,AERO   & ! Aerosol settings
    ,DEBUG  & !
    ,MY_OUTPUTS  &  ! e.g. EMEPSTD, FORECAST, TFMM
-   ,USE_SOILWATER, USE_CONVECTION, CONVECTION_FACTOR &
-   ,USE_AIRCRAFT_EMIS, USE_LIGHTNING_EMIS, USE_ROADDUST, USE_DUST &
-   ,USE_EURO_SOILNOX, USE_GLOBAL_SOILNOX, EURO_SOILNOX_DEPSCALE &
-   ,USE_SEASALT, USE_POLLEN, USE_ASH, USE_NOCHEM, USE_AOD,USE_PreADV &
+   ,CONVECTION_FACTOR &
+   ,EURO_SOILNOX_DEPSCALE &
    ,USE_uEMEP, uEMEP &
    ,INERIS_SNAP1, INERIS_SNAP2 &   ! Used for TFMM time-factors
    ,SELECT_LEVELS_HOURLY, FREQ_HOURLY  & ! incl. FORECAST, 3DPROFILES
@@ -585,8 +676,10 @@ subroutine Config_ModelConstants(iolog)
    ,SEAFIX_GEA_NEEDED     & ! only if problems, see text above.
    ,BGND_CH4              & ! Can reset background CH4 values
    ,SKIP_RCT              & ! Can  skip some rct
-   ,EMIS_SOURCE, EMIS_TEST, EMIS_OUT, emis_inputlist, EmisDir &
+   ,EMIS_OUT, emis_inputlist, EmisDir &
+   ,USE_SECTORS_NAME      & !to force a specific sector (SNAP or GNFR)
    ,SecEmisOutPoll        & ! to output sectorwise emissions
+   ,HourlyEmisOut         & ! to output snap and sector emissions hourly
    ,FLUX_VEGS             & ! Allows user to add veg categories for eg IAM ouput
    ,FLUX_IGNORE           & ! Specify which landcovers don't need FLUX
    ,VEG_2dGS              & ! Allows 2d maps of growing seasons
@@ -596,7 +689,36 @@ subroutine Config_ModelConstants(iolog)
    ,JUMPOVER29FEB, HOURLYFILE_ending, USE_WRF_MET_NAMES &
    ,dt_advec & ! can be set to override dt_advec
    ,ZERO_ORDER_ADVEC &! force zero order horizontal and vertical advection 
-   ,fileName_O3_Top
+   ,fileName_O3_Top&
+   ,femisFile&
+   ,Vertical_levelsFile&
+   ,EmisHeightsFile&
+   ,SoilTypesFile&
+   ,SurfacePressureFile&
+   ,AircraftEmis_FLFile&
+   ,nox_emission_1996_2005File&
+   ,MonthlyFacFile&
+   ,DailyFacFile&
+   ,HourlyFacFile&
+   ,SplitDefaultFile&
+   ,SplitSpecialsFile&
+   ,RoadMapFile&
+   ,AVG_SMI_2005_2010File&
+   ,Soil_TegenFile&
+   ,SitesFile&
+   ,SondesFile&
+   ,GLOBAL_LAInBVOCFile&
+   ,EMEP_EuroBVOCFile&
+   ,jclearFile&
+   ,jcl1kmFile&
+   ,jcl3kmFile&
+   ,NdepFile&
+   ,lightningFile&
+   ,BiDirInputFile&
+   ,LoganO3File&
+   ,DustFile&
+   ,TopoFile
+
   NAMELIST /Machine_config/ DataPath
 
   NAMELIST /INPUT_PARA/GRID,iyr_trend,runlabel1,runlabel2,&
@@ -606,7 +728,7 @@ subroutine Config_ModelConstants(iolog)
   read(IO_NML,NML=ModelConstants_config)
   ! do not close(IO_NML), other modules will be read namelist on this file
 
-  USE_SOILNOX = USE_EURO_SOILNOX .or. USE_GLOBAL_SOILNOx
+  USE_SOILNOX = USES%EURO_SOILNOX .or. USES%GLOBAL_SOILNOx
 
   ! Convert DEBUG%SPEC to index
   if(first_call)then
@@ -696,6 +818,53 @@ subroutine Config_ModelConstants(iolog)
        key2str(LandCoverInputs%Do3seDefs,'DataDir',DataDir)
   !print *, dtxt//'Landcover =>', LandCoverInputs
 
+
+  call associate_File(femisFile)
+  call associate_File(Vertical_levelsFile)
+  call associate_File(EmisHeightsFile)
+  call associate_File(SoilTypesFile)
+  call associate_File(SurfacePressureFile)
+  call associate_File(AircraftEmis_FLFile)
+  call associate_File(nox_emission_1996_2005File)
+  call associate_File(MonthlyFacFile)
+  call associate_File(DailyFacFile)
+  call associate_File(HourlyFacFile)
+  call associate_File(SplitDefaultFile)
+  call associate_File(SplitSpecialsFile)
+  call associate_File(RoadMapFile)
+  call associate_File(AVG_SMI_2005_2010File)
+  call associate_File(Soil_TegenFile)
+  call associate_File(SitesFile)
+  call associate_File(SondesFile)
+  call associate_File(GLOBAL_LAInBVOCFile)
+  call associate_File(EMEP_EuroBVOCFile)
+  call associate_File(jclearFile)
+  call associate_File(jcl1kmFile)
+  call associate_File(jcl3kmFile)
+  call associate_File(NdepFile)
+  call associate_File(lightningFile)
+  call associate_File(BiDirInputFile)  ! FUTURE INPUT
+  call associate_File(LoganO3File)
+  call associate_File(DustFile)
+  call associate_File(TopoFile)
+
+  do i = 1,size(InputFiles)
+     if(associated(InputFiles(i)%filename))then
+        InputFiles(i)%filename = key2str(InputFiles(i)%filename,'DataDir',DataDir)
+        InputFiles(i)%filename = key2str(InputFiles(i)%filename,'GRID',GRID)
+     endif
+  enddo
+
+
 end subroutine Config_ModelConstants
-endmodule ModelConstants_ml
+
+subroutine associate_File(FileName)
+  integer, save::ix=0
+  character(len=*), target ::FileName
+  ix = ix+1
+  call CheckStop(ix > size(InputFiles) , "Config_module: Size_InputFiles too small")
+  InputFiles(ix)%filename => FileName  
+end subroutine associate_File
+
+end module Config_module
 !_____________________________________________________________________________

@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,13 +37,14 @@ module AirEmis_ml
    use Io_ml                , only : IO_AIRN, IO_LIGHT, ios, open_file
    use GridValues_ml        , only : glon,glat, GRIDWIDTH_M
    use MetFields_ml         , only : z_bnd  
-   use ModelConstants_ml    , only : KCHEMTOP, KMAX_MID, KMAX_BND, NPROC, &
-                                     USE_LIGHTNING_EMIS
+   use Config_module    , only : KCHEMTOP, KMAX_MID, KMAX_BND, NPROC, &
+                                     USES, TXTLEN_FILE, lightningFile
    use MPI_Groups_ml, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
                              MPI_MIN, MPI_MAX, MPI_SUM, &
                              MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
    use Par_ml               , only : LIMAX, LJMAX, limax,ljmax, me
    use PhysicalConstants_ml , only : AVOG
+   use SmallUtils_ml,         only : key2str
    use TimeDate_ml,           only : current_date
 
    implicit none
@@ -89,7 +90,7 @@ module AirEmis_ml
                                                      ! molecules/cm3/s 
             
 
-      character(len=20) :: fname
+      character(len=TXTLEN_FILE) :: fname
 
       data ygrdum / 85.76058712, 80.26877907, 74.74454037, &
                 69.21297617, 63.67863556, 58.14295405, &
@@ -122,8 +123,9 @@ module AirEmis_ml
 
      if(me == 0)then
      sumnox = 0.
-     write(fname,fmt='(''lightning'',i2.2,''.dat'')')     &
-        current_date%month
+!     write(fname,fmt='(''lightning'',i2.2,''.dat'')')     &
+!        current_date%month
+     fname = key2str(lightningFile, 'MM', current_date%month)
 
 ! - open and read 1 line of header
   

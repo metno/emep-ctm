@@ -1,7 +1,7 @@
-! <DefPhotolysis_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <DefPhotolysis_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,20 +42,28 @@
 !-------------------------------------------------------------------------------
 
    use CheckStop_ml,      only: CheckStop
-   use GridValues_ml    , only : glat
-   use Io_ml,           only : IO_DJ, open_file, ios
-   use MetFields_ml           , only : cc3d,cc3dmax,z_bnd
-   use ModelConstants_ml,    only: KMAX_MID, KCHEMTOP, NPROC
-   use MPI_Groups_ml      , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_INTEGER&
+   use DerivedFields_ml,  only: d_3d, f_3d
+   use GridValues_ml   , only : glat, A_bnd, B_bnd
+   use Io_ml,            only : IO_DJ, open_file, ios
+   use LocalVariables_ml,only : Grid  ! => izen
+   use MetFields_ml    , only : cc3d,cc3dmax,z_bnd,ps
+   use Config_module,     only: TXTLEN_FILE, KMAX_MID, KCHEMTOP, NPROC, IOU_INST,&
+                                   jcl1kmFile,jcl3kmFile,jclearFile,num_lev3d,lev3d
+   use MPI_Groups_ml   , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_INTEGER&
                                      ,MPI_COMM_CALC, IERROR
-   use Par_ml      ,    only : me,LIMAX,LJMAX
-   use LocalVariables_ml, only : Grid  ! => izen
+   use Par_ml      ,     only : me,LIMAX,LJMAX
+   use SmallUtils_ml,     only: key2str, find_index
+   use Functions_ml,      only: StandardAtmos_km_2_kPa
    implicit none
    private
 
    integer, public, parameter :: &
              NRCPHOT      = 17   ! Number of photolytic reactions
    
+   integer, public, parameter:: NzPHODIS=20 !number of heights defined in the input files
+   real, save, public :: zPHODIS(NzPHODIS) !heights of the input files, in km assumed constants
+   real, save, public :: P_PHODIS(NzPHODIS) !heights of the input files, in Pa
+
    real, allocatable,save,public, dimension(:,:) &
          :: rcphot       ! photolysis rates    -   main output
 
@@ -88,6 +96,8 @@
       IDHO2NO2 = 16 , IDACETON = 17
     integer, public, parameter ::  IDRCOCHO  = IDRCOHCO ! Just tmp
 
+    integer, save :: photo_out_ix = -1
+
  !/ subroutines: 
 
   public :: readdiss
@@ -100,68 +110,78 @@
 
       integer ::  newseason
 
-      integer ::  k     &  ! help index
+      integer ::  kz     &  ! help index
                  ,izn   &  ! integer zenith angle
                  ,nr    &  ! numbering of photolytic reactions
                  ,la       ! counting every 10 deg. latitude
         real myz
-        character*20 fname1, fname2, fname3
+        character(len=TXTLEN_FILE) fname1
+        character(len=3) ::season3
 
         logical,save:: first_call=.true.
 
+        if(newseason==1)season3='jan'
+        if(newseason==2)season3='apr'
+        if(newseason==3)season3='jul'
+        if(newseason==4)season3='oct' 
 
         if(first_call)then
            if(.not.(allocated(rcphot)))allocate(rcphot(NRCPHOT,KCHEMTOP:KMAX_MID))
-           allocate(dj(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON,NLAT))
-           allocate(djcl1(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON))
-           allocate(djcl3(NPHODIS,KCHEMTOP:KMAX_MID,HORIZON))
+           allocate(dj(NPHODIS,NzPHODIS,HORIZON,NLAT))
+           allocate(djcl1(NPHODIS,NzPHODIS,HORIZON))
+           allocate(djcl3(NPHODIS,NzPHODIS,HORIZON))
+
+           photo_out_ix = 0
+           if(allocated(f_3d)) &
+             photo_out_ix = find_index("D3_J(NO2)", f_3d(:)%subclass)
+           if(photo_out_ix>0 .and. me==0)write(*,*)'will output J(NO2)'
+           
         end if
 !    Open, read and broadcast clear sky rates
 !---------------
 
         if(me == 0)then
-           write(fname1,fmt='(''jclear'',i2.2,''.dat'')') newseason
+           fname1 = key2str(jclearFile,'SEASON',season3)
            call open_file(IO_DJ,"r",fname1,needed=.true.)
            call CheckStop(ios,"DefPhotolysis: ios error in jclear ")
         end if
 
 
 !       Format of input data from Phodis - careful with "17" and NPHODIS
-999     FORMAT(1x, f8.3, 17(1x, 1pe8.2))
+999     FORMAT(1x, f8.3, 17(1x, 1pe8.2)) !Format imposed by file
 
 
         if(me == 0)then
 
           do la = 1,NLAT
-            do izn = 1,HORIZON
-               do k = 1,KCHEMTOP
-                  read(IO_DJ,999) myz,(dj(nr,KCHEMTOP,izn,la),nr=1,NPHODIS)
-               end do
-               do k = 2,KMAX_MID-KMAX20+2
-                  do nr=1,NPHODIS
-                     dj(nr,k,izn,la)=dj(nr,KCHEMTOP,izn,la)
-                  end do
-               end do
-              do k = KMAX_MID-KMAX20+3,KMAX_MID
-!TEMPORARY FIX  do k = KCHEMTOP+1,KMAX_MID
-                read(IO_DJ,999) myz,(dj(nr,k,izn,la),nr=1,NPHODIS)
-              end do   ! k
+            do izn = 1,HORIZON        
+              do kz = 1,NzPHODIS
+                 !we assume that zPHODIS(kz) is constant, and simply overwrite
+                read(IO_DJ,999) zPHODIS(kz),(dj(nr,kz,izn,la),nr=1,NPHODIS)
+              end do   ! kz
             end do    ! izn
           end do     ! la
           close(IO_DJ)
         end if  ! me = 0
 
-        CALL MPI_BCAST(dj  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON*NLAT,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
+        CALL MPI_BCAST(zPHODIS  ,8*NzPHODIS,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
+        CALL MPI_BCAST(dj  ,8*NPHODIS*NzPHODIS*HORIZON*NLAT,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
+!        write(*,*)'zPHODIS, P_PHODIS ',(kz,zPHODIS(kz),P_PHODIS(kz),kz=1,NzPHODIS)
 
+        if(first_call)then
+           !convert from z in meters to pressure
+           do kz = 1,NzPHODIS             
+              P_PHODIS(kz) = 1000*StandardAtmos_km_2_kPa(zPHODIS(kz)) ! P_PHODIS in Pa
+              !write(*,*)'PHODIS LEVELS ',kz,P_PHODIS(kz),zPHODIS(kz)
+           enddo
+        endif
 
-
-
-!    Open, read and broadcast light cloud rates
+        !   Open, read and broadcast light cloud rates
 !---------------
 
         if(me == 0)then
-           write(fname2,fmt='(''jcl1km'',i2.2,''.dat'')') newseason
-           call open_file(IO_DJ,"r",fname2,needed=.true.)
+           fname1 = key2str(jcl1kmFile,'SEASON',season3)
+           call open_file(IO_DJ,"r",fname1,needed=.true.)
            call CheckStop(ios,"DefPhotolysis: ios error in jcl1km ")
         end if
 
@@ -169,75 +189,53 @@
         if(me == 0)then
 
           do izn = 1,HORIZON
-            do k = 1,KCHEMTOP
-              read(IO_DJ,999) myz,(djcl1(nr,KCHEMTOP,izn),nr=1,NPHODIS)
-            end do
-               do k = 2,KMAX_MID-KMAX20+2
-                  do nr=1,NPHODIS
-                     djcl1(nr,K,izn)=djcl1(nr,KCHEMTOP,izn)
-                  end do
-               end do
-              do k = KMAX_MID-KMAX20+3,KMAX_MID
-!TEMPORARY FIX              do k = KCHEMTOP+1,KMAX_MID
-              read(IO_DJ,999) myz,(djcl1(nr,k,izn),nr=1,NPHODIS)
+             do kz = 1,NzPHODIS
+              read(IO_DJ,999) myz,(djcl1(nr,kz,izn),nr=1,NPHODIS)
             end do
           end do  ! izn
 
           do izn = 1,HORIZON
-            do k = KCHEMTOP,KMAX_MID
+            do kz = 1,NzPHODIS
               do nr=1,NPHODIS
-                djcl1(nr,k,izn)=djcl1(nr,k,izn)/dj(nr,k,izn,3)-1.0
+                djcl1(nr,kz,izn)=djcl1(nr,kz,izn)/dj(nr,kz,izn,3)-1.0
               end do ! nr
             end do ! k
           end do  ! izn
           close(IO_DJ)
         end if   ! me = 0
 
-        CALL MPI_BCAST(djcl1  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
-
-
+        CALL MPI_BCAST(djcl1  ,8*NPHODIS*NzPHODIS*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
 
 !    Open, read and broadcast dense cloud rates
 !---------------
 
         if(me == 0)then
-           write(fname3,fmt='(''jcl3km'',i2.2,''.dat'')') newseason
-           call open_file(IO_DJ,"r",fname3,needed=.true.)
+           fname1 = key2str(jcl3kmFile,'SEASON',season3)
+           call open_file(IO_DJ,"r",fname1,needed=.true.)
            call CheckStop(ios,"DefPhotolysis: ios error in jcl3km ")
         end if
 
 
         if(me == 0)then
 
-          do izn = 1,HORIZON
-            do k = 1,KCHEMTOP
-              read(IO_DJ,999) myz,(djcl3(nr,KCHEMTOP,izn),nr=1,NPHODIS)
-            end do
-               do k = 2,KMAX_MID-KMAX20+2
-                  do nr=1,NPHODIS
-                     djcl3(nr,K,izn)=djcl3(nr,KCHEMTOP,izn)
-                  end do
-               end do
-              do k = KMAX_MID-KMAX20+3,KMAX_MID
-!TEMPORARY FIX              do k = KCHEMTOP+1,KMAX_MID
-              read(IO_DJ,999) myz,(djcl3(nr,k,izn),nr=1,NPHODIS)
-            end do  ! k
-          end do   ! izn
-          close(IO_DJ)
-          do izn = 1,HORIZON
-            do k = KCHEMTOP,KMAX_MID
-              do nr=1,NPHODIS
-                djcl3(nr,k,izn)=djcl3(nr,k,izn)/dj(nr,k,izn,3)-1.
-              end do  ! nr
-            end do  ! k
-          end do   ! izn
-       end if      !  me = 0
-
-        CALL MPI_BCAST(djcl3  ,8*NPHODIS*(KMAX_MID-KCHEMTOP+1)*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
-
-
-!       if(me == 0) then
+           do izn = 1,HORIZON
+              do kz = 1,NzPHODIS
+                 read(IO_DJ,999) myz,(djcl3(nr,kz,izn),nr=1,NPHODIS)
+              end do  ! kz
+           end do   ! izn
+           close(IO_DJ)
+           do izn = 1,HORIZON
+              do kz = 1,NzPHODIS
+                 do nr=1,NPHODIS
+                    djcl3(nr,kz,izn)=djcl3(nr,kz,izn)/dj(nr,kz,izn,3)-1.
+                 end do  ! nr
+              end do  ! k
+           end do   ! izn
+        end if      !  me = 0
+        
+        CALL MPI_BCAST(djcl3  ,8*NPHODIS*NzPHODIS*HORIZON,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
+        
 !        do k=1,KMAX_MID
 !           write(6,*) 'jverdi i niv. k',k
 !           write(6,*) (dj(3,1,k,nr),nr=1,4)
@@ -253,7 +251,7 @@
         subroutine setup_phot(i,j,errcode)
 
 !       input
-        integer :: i,j
+        integer :: i,j,iz
         integer :: errcode
 
 !       local
@@ -265,6 +263,21 @@
                ,iclcat    ! cloud type
 
         real clear        ! clear sky fraction
+        integer k2P_PHODIS(KMAX_MID)! converts model level k into PHODIS height index
+        logical, save ::firstc=.true.
+
+! make conversion between P_PHODIS heights and model level (k) for this (i,j)
+! should be fast and does not need to be too accurate (smooth field) -> no interpolation
+        do k=KMAX_MID,1,-1
+           k2P_PHODIS(k) = NzPHODIS    
+           do iz = NzPHODIS,1,-1
+              if(A_bnd(k)+B_bnd(k)*ps(i,j,1)>P_PHODIS(iz))exit
+              k2P_PHODIS(k) = iz       
+           enddo
+!           if(firstc and me==0)write(*,*)'PHODIS level conversion ',k,k2P_PHODIS(k),A_bnd(k)+B_bnd(k)*ps(i,j,1),P_PHODIS(k2P_PHODIS(k))
+        enddo
+        
+        firstc=.false.
 
 !---- assign photolysis rates ------------------------------------------------
 
@@ -316,20 +329,20 @@
 
 
 
-            la = max(1,int(0.1*glat(i,j)-2.0001))
+            la = max(1,int(0.1*abs(glat(i,j))-2.0001))
 
             if(iclcat == 0)then
               do k = KCHEMTOP,KMAX_MID
                 do n=1,NRCPHOT
-                  rcphot(n,k)  = dj(n,k,Grid%izen,la)
+                  rcphot(n,k)  = dj(n,k2P_PHODIS(k),Grid%izen,la)
                 end do
               end do
             else if(iclcat == 1)then
               clear = cc3dmax(i,j,KMAX_MID)
               do k = KCHEMTOP,KMAX_MID
                 do n=1,NRCPHOT
-                  rcphot(n,k)  = (1. +          &
-                               clear*djcl1(n,k,Grid%izen)) * dj(n,k,Grid%izen,la)
+                  rcphot(n,k)  = (1. + clear*djcl1(n,k2P_PHODIS(k),Grid%izen)) &
+                                * dj(n,k2P_PHODIS(k),Grid%izen,la)
                 end do  !  n
               end do   !  k
 
@@ -338,8 +351,8 @@
               clear = cc3dmax(i,j,KMAX_MID)
               do k = KCHEMTOP,KMAX_MID
                 do n=1,NRCPHOT
-                  rcphot(n,k)  = (1. +            &
-                               clear*djcl3(n,k,Grid%izen))*dj(n,k,Grid%izen,la)
+                  rcphot(n,k)  = (1. +     clear*djcl3(n,k2P_PHODIS(k),Grid%izen)) &
+                               * dj(n,k2P_PHODIS(k),Grid%izen,la)
                  end do
               end do
             end if
@@ -351,6 +364,9 @@
 
 
           end if   !  end izen <  90 (daytime)  test
+
+          if(photo_out_ix>0) d_3d(photo_out_ix,i,j,1:num_lev3d,IOU_INST) = &
+               rcphot(IDNO2,lev3d(1:num_lev3d))
 
     end subroutine setup_phot
   ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

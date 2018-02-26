@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -77,10 +77,10 @@
                                 extendarea_N
   use Io_ml,             only : datewrite
   use Io_Progs_ml,       only : PrintLog
-  use ModelConstants_ml, only : KMAX_BND,KMAX_MID,NMET, nstep, nmax, &
+  use Config_module, only : KMAX_BND,KMAX_MID,NMET, nstep, nmax, &
                   dt_advec, dt_advec_inv,  PT,Pref, KCHEMTOP, NPROCX,NPROCY,NPROC, &
                   FORECAST,&
-                  USE_CONVECTION,DEBUG_ADV,USE_uEMEP,uEMEP,ZERO_ORDER_ADVEC
+                  USES,DEBUG_ADV,USE_uEMEP,uEMEP,ZERO_ORDER_ADVEC
   use MetFields_ml,      only : ps,sdot,Etadot,SigmaKz,EtaKz,u_xmj,v_xmi,cnvuf,cnvdf&
                                 ,uw,ue,vs,vn
   use MassBudget_ml,     only : fluxin_top,fluxout_top,fluxin,fluxout
@@ -697,7 +697,7 @@
        end if ! yxs sequence
     end do
 
-    if(USE_CONVECTION)then
+    if(USES%CONVECTION)then
 
        call CheckStop(ADVEC_TYPE/=1, "ADVEC_TYPE no longer supported")
 
@@ -1183,7 +1183,7 @@
 !     executes advection with a. bott's integreated flux-form
 !     using 2'nd order polynomial in the vertical.
 
-    use ModelConstants_ml   , only : EPSIL, dt_advec
+    use Config_module   , only : EPSIL, dt_advec
     use ChemSpecs,         only : NSPEC_ADV
     implicit none
 

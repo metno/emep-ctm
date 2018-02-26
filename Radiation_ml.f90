@@ -1,7 +1,7 @@
-! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Radiation_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -31,7 +31,7 @@ module Radiation_ml
   !! canopies. IMPORTANT - Most routines expect SolarSetup to 
   !! have been called first.
   !
-  !  F-compliant.  Module usable by stand-alone deposition code.
+  !  Module usable by stand-alone deposition code.
 
   use PhysicalConstants_ml  , only: PI, DEG2RAD, RAD2DEG, DAY_ZEN, DAY_COSZEN
   use TimeDate_ml  , only: julian_date, day_of_year
@@ -43,7 +43,9 @@ module Radiation_ml
   public :: ZenithAngle   !> => CosZen=cos(Zen), Zen=zenith angle (degrees) 
   public :: ZenithAngleS  !>    (simpler version)
   public :: ClearSkyRadn  !> => irradiance (W/m2), clear-sky
+  public :: WeissNormanPAR   ! OCT/NOV  2017 after RIVM found bug
   public :: CloudAtten    !> => Cloud-Attenuation factor
+  public :: fCloudAtten    !> => Cloud-Attenuation factor
   public :: CanopyPAR     !> => sun & shade PAR  values, and LAIsunfrac
   public :: ScaleRad      !>  Scales modelled radiation where observed values
                           !!  available.
@@ -51,7 +53,10 @@ module Radiation_ml
   !/ Functions:
   public :: daytime       !> true if zen < 89.9 deg
   public :: daylength     !> Lenght of day, hours
-  public :: solarnoon     !> time of solarnoon
+  public :: solarnoon     !> time of solarnoon, hours
+  private :: hourangle    !> hour angle for sunrise/sunset special case
+  public :: sunrise       !> time of sunrise, hours
+  public :: sunset        !> time of sunset, hours
 
 
   real, public, parameter :: &
@@ -82,7 +87,7 @@ logical, private, parameter :: DEBUG = .false.
     type(ashrae_tab), save, public ::  Ashrae    ! Current values
 
     type(ashrae_tab), parameter, dimension(14), private ::  ASHRAE_REV = (/ &
-    !         nday    a      b      c
+    !               nday    a      b      c
          ashrae_tab(  1, 1203.0, 0.141, 0.103 ) &
         ,ashrae_tab( 21, 1202.0, 0.141, 0.103 ) &
         ,ashrae_tab( 52, 1187.0, 0.142, 0.104 ) &
@@ -233,8 +238,9 @@ contains
 
  end subroutine ZenithAngle
   ! ======================================================================
- elemental subroutine ZenithAngleS(lon, lat, daynr, nydays, hr, Z, CosZ )
+  subroutine ZenithAngleS(lon, lat, daynr, nydays, hr, Z, CosZ )
   ! ======================================================================
+  ! (Non-elemental version of ZenithAngle, used for debugging sometimes)
   !  routine determines (approximate) cos(zen), where "zen" denotes the zenith 
   !  angle, (in accordance with Iversen and Nordeng (1987, p.28))
   !  dnmi  29-9-95  Hugo Jakobsen, modified Dave, 2002-2004
@@ -263,7 +269,53 @@ contains
      Z      = acos(CosZ) * RAD2DEG 
   end subroutine ZenithAngleS
 
-  !=============================================================================
+ !=============================================================================
+ ! After Weiss & Norman 1985 (WN below), but use notation 'dbh' for direct beam
+ ! on horizontal surface to avoid confusion with irradiance (normal to beams)
+ ! PAR is here in W/m2
+
+  elemental subroutine WeissNormanPAR(p,CosZ,fcloud,Svdbh,Svdif)
+    real, intent(in) :: p                  ! Pressure, Pa
+    real, intent(in) :: CosZ               ! Cos(Zenith)
+    real, intent(in) :: fcloud   ! cloud factor (RATIO in WN), clear sky=1.
+  ! Outputs clear-sky values of PAR:
+    real, intent(out) ::  Svdbh   ! Direct beam on horizontal surface,  W/m2
+    real, intent(out) ::  Svdif   ! Diffuse, W/m2
+
+   ! R terms represent potential (clear-sky) radiation:
+    real ::  Rvdbh                ! Direct PAR beam on horizontal surface, W/m2
+    real ::  Rvdif                ! Diffuse PAR, W/m2
+    real ::  Rvh, Svh             ! Total visible on horizontal surface, W/m2
+    real ::  fvdbh                ! fraction vis, direct beam
+    real ::  m                    ! optical air mass, 1/cos(theta)
+    real, parameter  :: PRES0 = 101300.0  ! std sea-level pressure (Pa)
+    real, parameter  :: A=0.9, B = 0.7    ! WN coefficients
+  
+    if ( CosZ > DAY_COSZEN ) then
+
+      m=1/cosZ
+      Rvdbh = 600 * exp( -0.185*(p/PRES0) *m ) * cosZ   !WN1
+      Rvdif = 0.4*( 600 - Rvdbh ) * cosZ                !WN2
+      Rvh   = Rvdbh + Rvdif                             !WN9
+
+      if ( fcloud <  A ) then
+        fvdbh = Rvdbh/Rvh * ( 1- ((A-fcloud)/B)**0.6667 ) ! !WN11
+      else
+        fvdbh = Rvdbh/Rvh    !WN11
+      end if
+
+      Svh   = fcloud * Rvh      ! C7
+
+      Svdbh = fvdbh *  Svh      ! C12
+      Svdif = Svh - Svdbh       ! C12
+      
+    else
+      Svdbh  = 0.0
+      Svdif  = 0.0
+    end if
+
+  end subroutine WeissNormanPAR
+ !=============================================================================
 
   elemental subroutine ClearSkyRadn(p,CosZ,Idirect,Idiffuse)
 
@@ -318,7 +370,6 @@ contains
 
    !X solar  = Idirect + Idiffuse ! total solar radiation, diff.+direct (W/m2)
 
-
   end subroutine ClearSkyRadn
 !===========================================================================
   elemental subroutine CloudAtten(cl,a,b)!,c)
@@ -341,9 +392,22 @@ contains
 !      if( present(c) ) c = c * f
 
   end subroutine CloudAtten
-
 !===========================================================================
-    subroutine CanopyPAR(LAI,sinB,Idrctt,Idfuse,&
+  elemental function fCloudAtten(cl) result(f)
+    real, intent(in) :: cl
+    integer :: icl
+    real :: f 
+    real, parameter, dimension(0:100) :: fcloud = [ (1-0.75*(0.01*icl)**3.4, icl=0,100) ]
+      ! Varies :
+      !  10  0.999701440    30  0.987489522    50  0.928950787    
+      !  60  0.867938757    70  0.776953936    80  0.648789823    
+      !  90  0.475813627   100  0.250000000    
+    f = fcloud( int(100*cl) )
+  end function fCloudAtten
+!===========================================================================
+    !WN17 subroutine CanopyPAR(LAI,sinB,Idrctt,Idfuse,&
+    !WN17 PARdbh, PARdif is in W/m2
+    subroutine CanopyPAR(LAI,sinB,PARdbh,PARdif,&
                             PARsun,PARshade,LAIsunfrac)
 !===========================================================================
 !
@@ -354,7 +418,7 @@ contains
 
     real, intent(in)  :: LAI       ! leaf area index (m^2/m^2), one-sided
     real, intent(in)  :: sinB      ! B = solar elevation angle; sinB = CosZen
-    real, intent(in)  :: Idrctt, Idfuse     ! Direct, diffuse Radn, W/m2
+    real, intent(in)  :: PARdbh, PARdif     ! Direct, diffuse Radn, W/m2
     real, intent(out) :: PARsun, PARshade   ! Photosyn
     real, intent(out) :: LAIsunfrac
 
@@ -375,15 +439,15 @@ contains
 ! Norman (1982, p.79): 
 ! "conceptually, 0.07 represents a scattering coefficient"  
 
-    PARshade = Idfuse * exp(-0.5*LAI**0.7) +  &
-               0.07 * Idrctt  * (1.1-0.1*LAI)*exp(-sinB)   
+    PARshade = PARdif * exp(-0.5*LAI**0.7) +  &
+               0.07 * PARdbh  * (1.1-0.1*LAI)*exp(-sinB)   
 
-    PARsun = Idrctt *cosA/sinB + PARshade
+    PARsun = PARdbh *cosA/sinB + PARshade
 
-!.. Convert units, and to PAR fraction
+!.. Convert units, and to PAR fraction !NOT needed for WN17
 
-    PARshade = PARshade * Wm2_2uEPAR 
-    PARsun   = PARsun   * Wm2_2uEPAR 
+!WN17    PARshade = PARshade * Wm2_2uEPAR 
+!WN17    PARsun   = PARsun   * Wm2_2uEPAR 
 
   end subroutine CanopyPAR
 
@@ -469,6 +533,64 @@ contains
         noon = 12.0 - eqt_h - long*24.0/360.0
 
   end function solarnoon
+  !-----------------------------------------------------------------
+  ! sunrise/sunset
+  elemental function hourangle(lat) result (ha)
+  !  Hour angle for the special case of sunrise or sunset.
+  !  The zenith is set to 90.833 (the approximate correction for atmospheric
+  !  refraction at sunrise and sunset, and the size of the solar disk)
+  !  https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
+    real, intent(in) :: lat    !  latitude, deg.
+    real :: ha
+    real, parameter ::      &
+      ANG_ZENITH = 90.833,  &
+      COS_ZENITH = cos(DEG2RAD*ANG_ZENITH)
+    ha = acos(COS_ZENITH/(cos(DEG2RAD*lat)*cosrdecl)-tan(lat)*tan_decl)
+  end function hourangle
+  elemental function sunrise(lat,lon) result (noon)
+    real, intent(in) :: lat,lon    !  latitude,Longitude, deg.
+    real :: noon
+    noon = solarnoon(lon+hourangle(lat))
+  end function sunrise
+  elemental function sunset(lat,lon) result (noon)
+    real, intent(in) :: lat,lon    !  latitude,Longitude, deg.
+    real :: noon
+    noon = solarnoon(lon-hourangle(lat))
+  end function sunset
 !===============================================================
 end module Radiation_ml
 !===============================================================
+!TSTEMX program testr
+!TSTEMX use Radiation_ml
+!TSTEMX use PhysicalConstants_ml, only:  DEG2RAD
+!TSTEMX use TimeDate_ml  , only: day_of_year
+!TSTEMX implicit none
+!TSTEMX integer :: iZen,icl, beta, difFrac
+!TSTEMX real :: CosZ,Idirect,Idiffuse,cl,fcloud, PARdbh, PARdif
+!TSTEMX real :: PARdbh_cs, PARdif_cs    !clear-sky values
+!TSTEMX call SolarSetup(2012,6,21,0.0)  ! Day 173
+!TSTEMX print *, "DAY ", day_of_year(2012,6,21)
+!
+!TSTEMX do iZen = 90, 0, -10
+!TSTEMX   print "(/,a3,a6,a3,5a10)", 'run', 'cl', 'Z', 'PARdbh_cs', 'PARdif_cs', 'PARdbh', 'PARdif', 'diff/tot'
+!TSTEMX do icl = 0, 10
+!TSTEMX    cl = 0.1 * icl
+!TSTEMX    beta = 90.0 - iZen   ! Use solar elev angle, better for plots
+!TSTEMX    CosZ = cos(iZen*DEG2RAD)
+!TSTEMX    call ClearSkyRadn(1.0e5,CosZ,Idirect,Idiffuse)
+!TSTEMX    PARdbh_cs = Idirect*PARfrac; PARdif_cs = Idiffuse *PARfrac! save for printout
+!TSTEMX    !ORIG METHOD:
+!TSTEMX    call CloudAtten(cl,Idirect,Idiffuse) !BUG SCALED BOTH DIR & DIF IDENTICALLY
+!TSTEMX    difFrac = 100   ! Only for printout, but limit as night approaches
+!TSTEMX    if( Idiffuse > 0.0) difFrac = nint( 100*Idiffuse/(Idirect+ Idiffuse))
+!TSTEMX    fcloud = fCloudAtten(cl)
+!TSTEMX    print "(a3,2f6.1,i3,4f10.3,i5)", 'old', cl, 100*fcloud, int(beta), PARdbh_cs, PARdif_cs, Idirect*PARfrac, Idiffuse*PARfrac, difFrac
+!TSTEMX    !NEW  METHOD! Note that weissNorman uses PAR directly
+!TSTEMX    call WeissNormanPAR(1.0e5,CosZ,fcloud,PARdbh,PARdif)
+!TSTEMX    difFrac = 100   ! Only for printout, but limit as night approaches
+!TSTEMX    if( PARdif >0) difFrac = nint(100*PARdif/(PARdbh+ PARdif))
+!TSTEMX    print "(a3,2f6.1,i3,4f10.3,i5)", 'new', cl, 100*fcloud, int(beta), PARdbh_cs, PARdif_cs, PARdbh, PARdif, difFrac
+!TSTEMX   end do
+!TSTEMX end do
+!TSTEMX print *, DEG2RAD
+!TSTEMX end program testr

@@ -1,7 +1,7 @@
-! <Timing_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Timing_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

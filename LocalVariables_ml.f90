@@ -1,7 +1,7 @@
-! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <LocalVariables_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,11 +32,14 @@ module LocalVariables_ml
 ! e.g. for a measurement site or for a specific landuse within a grid square
 ! -----------------------------------------------------------------------
 
-use GasParticleCoeffs_ml,         only: NDRYDEP_CALC
+! To simplify some other dependencies we removed this:
+! use GasParticleCoeffs_ml,         only: NDRYDEP_CALC
+! And use NLOCDRYDEP_MAX below (will test in DryDep )
 
 implicit none
 private
 
+integer, public, parameter :: NLOCDRYDEP_MAX = 99   ! 
 real,    private, parameter ::  NOT_SET = -999.     ! Fake value to check for
 integer, private, parameter :: INOT_SET = -999      ! variables being set
 
@@ -51,6 +54,7 @@ type, public :: GridDat
   integer :: i            ! index
   integer :: j            ! index
   logical :: is_wet       ! true if precip > 0
+  logical :: is_frozen    ! true if T< -2  ! BiDir CRUDE
   logical :: is_mainlysea !  Usually > 50% sea/water
   logical :: is_allsea    ! Only sea in grid-square
   real    :: precip       ! Precip at surface
@@ -68,6 +72,7 @@ type, public :: GridDat
 ! the following are likely used in Sub below also
   real    :: t2C          ! Surface (2m) temperature in degrees C
   real    :: t2           ! Surface (2m) temperature in degrees K
+  real    :: sst          ! Sea surface temperature in degrees K
   real    :: rh2m         ! Relative humidity, fraction (0-1)
   real    :: rho_s        !  Air density (kg/m3) at surface, here 2m
   real    :: vpd          ! Vapour pressure deficit  (kPa) ! CHECK UNITS
@@ -96,7 +101,7 @@ type, public :: GridDat
     ,zen       = NOT_SET  & !   Zenith angle (degrees)
     ,coszen    = NOT_SET    ! = cos(zen)(= sinB, where B is elevation angle)
   integer :: izen = INOT_SET  ! int(zen)
-  real, dimension(NDRYDEP_CALC) :: &  ! for species subject to dry depostion
+  real, dimension(NLOCDRYDEP_MAX) :: &  ! for species subject to dry depostion
      Vg_ref = 0.0   & ! Grid average of Vg at ref ht. (effective Vg for cell)
     ,StoFrac = 0.0  & ! Fraction of flux (Vg) going through stomata.
     ,Vg_3m    & ! and at 3m
@@ -118,6 +123,7 @@ type, public :: SubDat
   real ::                 &
      t2C       = NOT_SET  & ! Surface (2m) temperature in degrees C
     ,t2        = NOT_SET  & ! Surface (2m) temperature in degrees K
+    ,sst       = NOT_SET  & ! Sea surface temperature in degrees K
     ,rh        = NOT_SET  & ! Relative humidity, fraction (0-1)
     ,rho_s     = NOT_SET  & ! Air density (kg/m3) at surface, here 2m
     ,vpd       = NOT_SET  & ! Vapour pressure deficit  (kPa) ! CHECK UNITS
@@ -128,8 +134,9 @@ type, public :: SubDat
     ,wstar     = NOT_SET  & ! convective velocity scale, m/s
     ,invL      = NOT_SET  & ! 1/L, where L is Obukhiov length (1/m)
     ,Hd        = NOT_SET  & !  Sensible Heat flux, *away from* surface
-    ,LE        = NOT_SET  & !  Latent Heat flux, *away from* surface
-    ,Ra_ref    = NOT_SET  &
+    ,LE        = NOT_SET    !  Latent Heat flux, *away from* surface
+  real ::                 &
+     Ra_ref    = NOT_SET  &
     ,Ra_2m     = NOT_SET  &
     ,Ra_3m     = NOT_SET  &
     ,RgsO      = NOT_SET  & ! ground-surface resistances - set in DO3SE
@@ -144,9 +151,10 @@ type, public :: SubDat
 ! Canopy-Associated Radiation
     ,PARsun    = NOT_SET  & ! photosynthetic active radn. for sun-leaves
     ,PARshade  = NOT_SET  & !  " " for shade leaves
-    ,LAIsunfrac= NOT_SET  & ! fraction of LAI in sun
+    ,LAIsunfrac= NOT_SET    ! fraction of LAI in sun
 ! outputs from Rsurface will include:
-    ,g_sto     = NOT_SET  & ! stomatal conductance (m/s)
+  real ::                 &
+     g_sto     = NOT_SET  & ! stomatal conductance (m/s)
     ,g_sun     = NOT_SET  & ! g_sto for sunlit upper-canopy (flag) leaves
     ,f_sun     = NOT_SET  & ! f_env for SPOD?
     ,f_shade   = NOT_SET  & ! f_env for SPOD?
@@ -160,7 +168,7 @@ type, public :: SubDat
     ,cano3_ppb  = 0.0     & ! Use 0.0 to make d_2d behave better
     ,cano3_nmole= 0.0     & ! Use 0.0 to make d_2d behave better
     ,FstO3      = 0.0       ! leaf O3 flux, nmole/m2/s
-  real, dimension(NDRYDEP_CALC) :: & ! for species subject to dry depostion
+  real, dimension(NLOCDRYDEP_MAX) :: & ! for species subject to dry depostion
      Vg_ref   &  ! Grid average of Vg at ref ht. (effective Vg for cell)
     ,Vg_3m    &  ! and at 3m
     ,StoFrac = 0.0  & ! Fraction of flux (Vg) going through stomata.

@@ -33,7 +33,7 @@
 !    , where the dimensions to be distributed, are dimi,dimj
 !    the input array gloarr may be already restricted or not
 !
-    use ModelConstants_ml, only : NPROC  ! Actual total number of processors
+    use Config_module, only : NPROC  ! Actual total number of processors
     use MPI_Groups_ml    , only : MPI_BYTE, MPI_COMM_CALC, MPISTATUS,IERROR
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
@@ -116,7 +116,7 @@
 !    , where the dimensions to be distributed, are dimi,dimj
 !    the input array gloarr may be already restricted or not
 !
-    use ModelConstants_ml, only : NPROC  ! Actual total number of processors
+    use Config_module, only : NPROC  ! Actual total number of processors
     use MPI_Groups_ml
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&
@@ -192,7 +192,7 @@
 !    the input array gloarr may be already restricted or not
 !
 
-    use ModelConstants_ml, only : NPROC  ! Actual total number of processors
+    use Config_module, only : NPROC  ! Actual total number of processors
     use MPI_Groups_ml    , only : MPI_BYTE, MPISTATUS, MPI_COMM_CALC, IERROR
     use PAR_ML , only : &
              MAXLIMAX&    ! Maximum number of local points in longitude&

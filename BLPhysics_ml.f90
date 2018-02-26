@@ -1,7 +1,7 @@
-! <BLPhysics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <BLPhysics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,9 +30,8 @@ module BLPhysics_ml
  !  here in future. Try to keep 1-D or elemental to allow use in offline codes 
  ! (*No* routines in use, except for testing)
 
- use emep_Config_mod,       only : PBL
+ use Config_module,    only : KMAX_MID, KMAX_BND, KWINDTOP, PT, PBL
  use Landuse_ml,           only : Landcover, water_fraction
- use ModelConstants_ml,    only : KMAX_MID, KMAX_BND, KWINDTOP, PT
  use PhysicalConstants_ml, only : KARMAN, GRAV
  implicit none
  private

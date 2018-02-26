@@ -1,7 +1,7 @@
-! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <StoFlux_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,7 +33,7 @@ module StoFlux_ml
   use LandDefs_ml, only : LandType, STUBBLE, iLC_grass
   use LocalVariables_ml, only : L, Grid
   use MicroMet_ml, only : AerRes, Wind_at_h
-  use ModelConstants_ml, only : NLANDUSEMAX, dt_advec, DEBUG
+  use Config_module, only : NLANDUSEMAX, dt_advec, DEBUG
   use Par_ml, only : LIMAX, LJMAX
   use PhysicalConstants_ml, only : AVOG, KARMAN
   use SmallUtils_ml, only : find_index

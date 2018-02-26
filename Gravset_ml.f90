@@ -1,7 +1,7 @@
-! <Gravset_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Gravset_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,7 +38,7 @@ use ChemGroups_ml,        only: chemgroups
 use DerivedFields_ml,     only: f_3d,d_3d ! debug output
 use GridValues_ml,        only: A_mid,B_mid,A_bnd,B_bnd
 use MetFields_ml,         only: roa,th,ps
-use ModelConstants_ml,    only: KMAX_MID,KMAX_BND,dt_advec,MasterProc,&
+use Config_module,    only: KMAX_MID,KMAX_BND,dt_advec,MasterProc,&
                                 IOU_INST,num_lev3d,lev3d
 use Par_ml,               only: MAXLIMAX,MAXLJMAX,li0,li1,lj0,lj1
 use PhysicalConstants_ml, only: GRAV

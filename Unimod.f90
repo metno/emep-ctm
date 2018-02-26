@@ -1,7 +1,7 @@
-! <Unimod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Unimod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,6 +43,7 @@ program myeul
   use Advection_ml,     only: vgrid_Eta, assign_nmax, assign_dtadvec
   use Aqueous_ml,       only: init_aqueous, Init_WetDep   !  Initialises & tabulates
   use AirEmis_ml,       only: lightning
+  use BiDir_emep,       only : Init_BiDir  !  FUTURE
   use Biogenics_ml,     only: Init_BVOC, SetDailyBVOC
   use BoundaryConditions_ml, only: BoundaryConditions
   use CheckStop_ml,     only: CheckStop
@@ -63,7 +64,7 @@ program myeul
   use Landuse_ml,       only: InitLandUse, SetLanduse
   use MassBudget_ml,    only: Init_massbudget, massbudget
   use Met_ml,           only: metfieldint, MetModel_LandUse, Meteoread
-  use ModelConstants_ml,only: MasterProc, &   ! set true for host processor, me==MasterPE
+  use Config_module,only: MasterProc, &   ! set true for host processor, me==MasterPE
        RUNDOMAIN,  &   ! Model domain
        NPROC,      &   ! No. processors
        METSTEP,    &   ! Hours between met input
@@ -71,9 +72,9 @@ program myeul
        runlabel2,  &   ! explanatory text
        iyr_trend, nmax,nstep , meteo,     &
        IOU_INST,IOU_HOUR,IOU_HOUR_INST, IOU_YEAR,IOU_MON, IOU_DAY, &
-       USES, USE_LIGHTNING_EMIS, USE_uEMEP,JUMPOVER29FEB,&
+       USES, USE_uEMEP,JUMPOVER29FEB,&
        FORECAST,ANALYSIS  ! FORECAST/ANALYSIS mode
-  use ModelConstants_ml,only: Config_ModelConstants,DEBUG, startdate,enddate
+  use Config_module,only: Config_ModelConstants,DEBUG, startdate,enddate
   use MPI_Groups_ml,    only: MPI_BYTE, MPISTATUS, MPI_COMM_CALC,MPI_COMM_WORLD, &
                               MasterPE,IERROR, MPI_world_init
   use Nest_ml,          only: wrtxn     ! write nested output (IC/BC)
@@ -220,6 +221,8 @@ program myeul
 
   call Init_BVOC()
 
+  call Init_BiDir()           ! BIDIR FUTURE 
+
   call tabulate()             ! sets up tab_esat, etc.
 
   call Init_WetDep()           ! sets up scavenging ratios
@@ -299,7 +302,7 @@ program myeul
 
       call newmonth
 
-       if(USE_LIGHTNING_EMIS) call lightning()
+       if(USES%LIGHTNING_EMIS) call lightning()
 
       call init_aqueous()
 

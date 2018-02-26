@@ -1,7 +1,7 @@
-! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Units_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,7 +28,7 @@ module Units_ml
 use CheckStop_ml,         only: CheckStop
 use ChemGroups_ml,        only: chemgroups
 use ChemSpecs,            only: NSPEC_ADV, NSPEC_SHL, species_adv
-use ModelConstants_ml,    only: PPBINV
+use Config_module,    only: PPBINV
 use PhysicalConstants_ml, only: AVOG,ATWAIR
 use Pollen_const_ml,      only: pollen_check
 use OwnDataTypes_ml,      only: TXTLEN_DERIV,TXTLEN_SHORT,Asc2D

@@ -1,7 +1,7 @@
-! <FastJ_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <FastJ_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -3312,7 +3312,7 @@
         use LandDefs_ml,    only: LandType, LandDefs
         use Landuse_ml,    only: LandCover
         use MetFields_ml, only : ps ,foundcloudwater,q,th,lwc,cc3dmax
-        use ModelConstants_ml,    only : KMAX_BND,KMAX_MID,KCHEMTOP, METSTEP
+        use Config_module,    only : KMAX_BND,KMAX_MID,KCHEMTOP, METSTEP
         use NetCDF_ml, only :ReadField_CDF
         use Par_ml,           only: me,LIMAX, LJMAX
         use PhysicalConstants_ml, only :KAPPA, RGAS_KG, GRAV

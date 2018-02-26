@@ -1,7 +1,7 @@
-! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <My_3DVar_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,7 +34,7 @@ endmodule DA_ml
 !-----------------------------------------------------------------------
 module DA_3DVar_ml
 use CheckStop_ml,     only: CheckStop
-use ModelConstants_ml,only: ANALYSIS
+use Config_module,only: ANALYSIS
 implicit none
 character(len=*), parameter  ::  &
   mname = 'DA_3DVar_ml', &

@@ -1,7 +1,7 @@
-! <Setup_1dfields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Setup_1dfields_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@
   !
   ! - new aray added to keep o2, m, and for MADE oh, etc
 
-  use ModelConstants_ml, only : AERO ! for %NSAREA = No types surface area
+  use Config_module, only : AERO ! for %NSAREA = No types surface area
   implicit none
   private
 

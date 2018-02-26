@@ -1,4 +1,4 @@
-! <Precision_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
+! <BiDir_emep.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2018 met.no
@@ -24,19 +24,24 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-module Precision_ml
+module BiDir_emep
+  ! DUMMY
+  ! Will act as interface between emep-ctm and BiDir_module
 
-! from KPP system
-!
-! Definition of different levels of accuracy
-! for REAL variables using KIND parameterization
-!
-! KPP SP - Single precision kind
-  integer, parameter :: sp = selected_real_kind(6,30)
-! KPP DP - Double precision kind
-  integer, parameter :: dp = selected_real_kind(14,300)
-! KPP QP - Quadruple precision kind
-  integer, parameter :: qp = selected_real_kind(18,400)
+  use Config_module, only : USES, MasterProc
+  implicit none
+  private
 
-end module Precision_ml
+  character(len=*), parameter, public :: BiDir_emep_Status='TOBEDONE'
 
+  public :: Init_BiDir  ! FUTURE
+
+contains
+  subroutine Init_BiDir()
+     logical, save :: first_call = .true.
+     character(len=*), parameter :: dtxt='IniBD:'
+     if ( USES%BIDIR .and. MasterProc .and.  first_call) then
+        write(*,*) dtxt//' FUTURE INIT'
+     end if
+  end subroutine Init_BiDir
+end module BiDir_emep

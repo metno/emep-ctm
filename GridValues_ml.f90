@@ -1,7 +1,7 @@
-! <GridValues_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <GridValues_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,12 +44,12 @@ use CheckStop_ml,           only: CheckStop,StopAll,check=>CheckNC
 use Functions_ml,           only: great_circle_distance
 use Io_Nums_ml,             only: IO_LOG,IO_TMP
 use MetFields_ml
-use ModelConstants_ml,      only: &
+use Config_module,      only: &
      KMAX_BND, KMAX_MID, & ! vertical extent
      DEBUG,              & ! DEBUG%GRIDVALUES
      MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN, JUMPOVER29FEB,&
      PT,Pref,NMET,METSTEP,USE_EtaCOORDINATES,MANUAL_GRID,USE_WRF_MET_NAMES,&
-     startdate,NPROCX,NPROCY
+     startdate,NPROCX,NPROCY,Vertical_levelsFile
 use MPI_Groups_ml!, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_LOGICAL, &
                  !         MPI_MIN, MPI_MAX, &
                  !         MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, &
@@ -200,7 +200,6 @@ integer, public :: Pole_Singular  ! Pole_included=1 or 2 if the grid include
 ! at least one pole and has lat lon projection
 logical, public :: Grid_Def_exist
 
-character(len=230), public  :: filename_vert
 integer, allocatable, save, public :: k1_met(:),k2_met(:)
 real, allocatable, save, public :: x_k1_met(:)
 logical, public, save ::  External_Levels_Def=.false.
@@ -252,12 +251,11 @@ subroutine GridRead(meteo,cyclicgrid)
      call GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX_MET,METSTEP,projection)
 
     KMAX_MID=0!initialize
-    filename_vert='Vertical_levels.txt'
-    open(IO_TMP,file=filename_vert,action="read",iostat=ios)
+    open(IO_TMP,file=Vertical_levelsFile,action="read",iostat=ios)
     if(ios==0)then
       ! define own vertical coordinates
       if(MasterProc)&
-        write(*,*)'Define vertical levels from ',trim(filename_vert)
+        write(*,*)'Define vertical levels from ',trim(Vertical_levelsFile)
       read(IO_TMP,*)KMAX_MID
       if(MasterProc)&
         write(*,*)KMAX_MID, 'vertical levels '
@@ -766,8 +764,8 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       status = nf90_inq_varid(ncid=ncFileID, name="lat", varID=varID)
       if(status/=nf90_noerr)&
         call check(nf90_inq_varid(ncid=ncFileID, name="latitude", varID=varID))
-      call check(nf90_get_var(ncFileID,varID,v,count=(/1/)))
-      y1_lambert=v(1)
+      call check(nf90_get_var(ncFileID,varID,u,count=(/1/)))
+      y1_lambert=u(1)
     endif
     
     x1_lambert=0.0
@@ -775,15 +773,20 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     call lb2ij(v(1),u(1),x1_lambert,y1_lambert)
     x1_lambert = (x1_lambert-1)*GRIDWIDTH_M
     y1_lambert = (y1_lambert-1)*GRIDWIDTH_M
-    ! test that (i,j)=(1,1) has the coordinates (1,1)
-    ! call lb2ij(v(1),u(1),v(2),u(2))
-    ! write(*,*)v(2),u(2)
-    
+
     if(MasterProc)then
-      write(*,*)"Lambert grid resolution (m) ",GRIDWIDTH_M
-      write(*,*)"x and y at (i,j)=(1,1)",x1_lambert,y1_lambert
-      write(*,*)"y0_lambert,F_lambert ",y0_lambert,F_lambert
-    end if
+    ! test that lon lat from meteo is the same as calculated, for the point (i,j)=(1,1)
+       call lb2ij(v(1),u(1),v(2),u(2))
+       if(abs(u(2)-1.0)+abs(v(2)-1.0)>1.E-4)then
+          write(*,*)'ERROR Lambert projection lon lat of (i,j)=(1,1) in file is',v(1),u(1)
+          write(*,*)'BUT Lambert projection (i,j) for this lon lat is not (1,1) but ',v(2),u(2)
+          call StopAll('ERROR in Lambert projection parameters')
+       else
+          write(*,*)'Lambert projection checked. (i,j)=(1,1) has lon lat',v(1),u(1)
+          write(*,*)"x and y at (i,j)=(1,1)",x1_lambert,y1_lambert
+          write(*,*)"y0_lambert,F_lambert ",y0_lambert,F_lambert
+       endif
+    endif
     
     !make lon lat and mapping factors
     do j = 0, LJMAX+1
@@ -942,7 +945,20 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       if(glon(i,j)<glmin)glon(i,j)=glon(i,j)+360.0
     end do
   end do
-  
+
+  if(projection=='lon lat')then
+     !we require the longitudes to increase if i increases
+     if(glon(1,1)>glon(limax,1))then
+        write(*,*)'WARNING: shifting longitudes by 360 deg for processor ',me,&
+             ' lon was from ', glon(1,1),'to ',glon(limax,1)
+        do j=1,LJMAX
+           do i=1,LIMAX
+              if(glon(i,j)<glon(1,j))glon(i,j)=glon(i,j)+360.0
+           end do
+        end do
+     endif
+  endif
+
   ! map factors
   status=nf90_inq_varid(ncid=ncFileID, name="map_factor", varID=varID)
   
@@ -1041,12 +1057,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     if(status/=nf90_noerr)then
       status=nf90_inq_varid(ncid=ncFileID, name="P00", varID=varID) !WRF case
       if(status/=nf90_noerr)then
-        if(External_Levels_Def)then
-          write(*,*)'WARNING: did not find P0. Assuming vertical levels from ',trim(filename_vert)
-        else
-          write(*,*)'Do not know how to define vertical levels '
-          call StopAll('Define levels in Vertical_levels.txt')
-        end if
+          call StopAll('Do not know how to define vertical levels')
       else
         ! WRF format
         ! asuming sigma levels ZNW=(P-P_TOP_MET)/(PS-P_TOP_MET)
@@ -1110,17 +1121,16 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     if(External_Levels_Def)then
       !model levels defined from external text file
       if(MasterProc)&
-      write(*,*)'reading external hybrid levels from ',trim(filename_vert),&
-      A_bnd_met(kMAX_met-20),B_bnd_met(kMAX_met+1)
+      write(*,*)'reading external hybrid levels from ',trim(Vertical_levelsFile),&
+        A_bnd_met(kMAX_met+1),B_bnd_met(kMAX_met+1)
       P0=Pref
       do k=1,KMAX_MID+1
         read(IO_TMP,*)kk,A_bnd(k),B_bnd(k)
         if(kk/=k.and.MasterProc)write(*,*)'WARNING: unexpected format for vertical levels ',k,kk
       end do
-      if(MasterProc)write(*,*)'A_bnd_met A2',A_bnd_met(kMAX_met-20),B_bnd_met(kMAX_met+1)
       
       if(.not.found_metlevels)then
-        ! assume levels from metdata are defined in filename_vert
+        ! assume levels from metdata are defined in Vertical_levelsFile
         if(.not.allocated(A_bnd_met))allocate(A_bnd_met(KMAX_MET+1),B_bnd_met(KMAX_MET+1))
         A_bnd_met=A_bnd
         B_bnd_met=B_bnd
@@ -1148,7 +1158,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+P0*B_bnd(1)
       write(*,*)'Pressure at top defined in meteo files is ',A_bnd_met(1)+P0*B_bnd_met(1)
       write(*,*)'Pressure at op must be higher (lower altitude) than top defined in meteo '
-      call StopAll('Top level too high! Change values in Vertical_levels.txt')
+      call StopAll('Top level too high! Change values in '//trim(Vertical_levelsFile))
     end if
     
     !test if the levels can cope with highest mountains (400 hPa)
@@ -1166,7 +1176,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     if(MasterProc.and.A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1)-(A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID))<550.0)then
       write(*,*)'WARNING: lowest level very shallow; ',A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1) -&
       (A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID)),'Pa'
-      call StopAll('Lowest level too thin! Change vertical levels definition in Vertical_levels.txt ')
+      call StopAll('Lowest level too thin! Change vertical levels definition in '//trim(Vertical_levelsFile))
     end if
     
     found_hybrid=.true.
@@ -1932,7 +1942,7 @@ end subroutine Alloc_GridFields
 
 subroutine make_vertical_levels_interpolation_coeff
   ! make interpolation coefficients to convert the levels defined in meteo
-  ! into the levels defined in Vertical_levels.txt
+  ! into the levels defined in Vertical_levelsFile
 
   integer ::k,k_met
   real ::p_met,p_mod,p1,p2

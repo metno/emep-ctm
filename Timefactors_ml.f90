@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -60,15 +60,16 @@
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
   use InterpolationRoutines_ml, only : Averageconserved_interpolate
   use Met_ml,       only : Getmeteofield
-  use ModelConstants_ml, only : MasterProc, DEBUG => DEBUG_EMISTIMEFACS
-  use ModelConstants_ml, only : IIFULLDOM, JJFULLDOM
-  use ModelConstants_ml, only : iyr_trend ,USES  ! for GRIDDED_EMIS_MONTHLY_FACTOR 
-  use ModelConstants_ml, only : INERIS_SNAP1, INERIS_SNAP2, DegreeDayFactorsFile
+  use Config_module, only : MasterProc, DEBUG => DEBUG_EMISTIMEFACS
+  use Config_module, only : IIFULLDOM, JJFULLDOM
+  use Config_module, only : iyr_trend ,USES  ! for GRIDDED_EMIS_MONTHLY_FACTOR 
+  use Config_module, only : INERIS_SNAP1, INERIS_SNAP2, DegreeDayFactorsFile&
+                                ,DailyFacFile,MonthlyFacFile,HourlyFacFile,TXTLEN_FILE
   use NetCDF_ml,    only : GetCDF , ReadField_CDF
   use Par_ml,       only : MAXLIMAX,MAXLJMAX, limax,ljmax, me, li0, lj0, li1, lj1
   use Par_ml,       only : IRUNBEG, JRUNBEG, MSG_READ8
   use PhysicalConstants_ml, only : PI
-  use SmallUtils_ml,    only: find_index
+  use SmallUtils_ml,    only: find_index, key2str
   use Io_ml,        only :            &
                      open_file,       & ! subroutine
                      check_file,       & ! subroutine
@@ -101,7 +102,7 @@
 
  ! Hourly for each day ! From EURODELTA/INERIS
   real, public, save, allocatable,  &
-     dimension(:,:,:) :: fac_ehh24x7  !  Hour factors for 7 days
+     dimension(:,:,:,:) :: fac_ehh24x7  !  Hour factors for 7 days
 
  ! We keep track of min value for degree-day work
  !
@@ -121,7 +122,7 @@
 
   ! Used for general file calls and mpi routines below
 
-  character(len=30), private :: fname2   ! input filename - do not change 
+  character(len=TXTLEN_FILE), private :: fname2   ! input filename - do not change 
 
   real, allocatable, public, save,  dimension(:,:,:,:):: GridTfac
 
@@ -147,7 +148,7 @@ contains
 
   !-- local
   integer ::  inland, insec     ! Country and sector value read from femis
-  integer ::  i, ic, isec, n 
+  integer ::  i, ic, isec,ih, n ,icc
   integer ::  idd, idd2, ihh, iday, mm, mm2 , mm0! Loop and count variables
   integer ::  iemis             ! emission count variables
 
@@ -196,7 +197,7 @@ contains
 
    do iemis = 1, NEMIS_FILE
 
-       fname2 = "MonthlyFac." // trim ( EMIS_FILE(iemis) )
+       fname2 = key2str(MonthlyFacFile,'POLL',trim ( EMIS_FILE(iemis) ))
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
 
        call CheckStop( ios, &
@@ -214,6 +215,12 @@ contains
               cycle
            end if
            fac_emm(ic,1:12,insec,iemis)=buff(1:12)
+
+           ! Temporary and crude implementation for BIDIR tests:
+            if ( EMIS_FILE(iemis) == 'nh3' .and. USES%MonthlyNH3 == 'LOTOS' ) then
+              fac_emm(ic,1:12,insec,iemis) = &
+                 [ 0.60, 0.66,1.50,1.36,1.02,1.17,1.19,1.27,0.93,0.89,0.77,0.64]
+            end if
            !defined after renormalization and send to al processors:
            ! fac_min(inland,insec,iemis) = minval( fac_emm(inland,:,insec,iemis) )
 
@@ -253,7 +260,7 @@ contains
 
   do iemis = 1, NEMIS_FILE
 
-       fname2 = "DailyFac." // trim ( EMIS_FILE(iemis) )
+       fname2 = key2str(DailyFacFile,'POLL',trim ( EMIS_FILE(iemis) ))
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
 
        call CheckStop( ios, "Timefactors: Opening error in Dailyfac")
@@ -293,7 +300,7 @@ contains
    ! TNO2005 option has 11x24 
    ! EMEP2003 option has very simple day night
 !
-       fname2 = "HOURLY-FACS"  ! From EURODELTA/INERIS/TNO or EMEP2003
+       fname2 = trim(HourlyFacFile) ! From EURODELTA/INERIS/TNO or EMEP2003
        write(unit=6,fmt=*) "Starting HOURLY-FACS"
        call open_file(IO_TIMEFACS,"r",fname2,needed=.true.)
 
@@ -316,24 +323,29 @@ contains
 
             if(  idd == 0 ) then ! same values very day
               do idd2 = 1, 7
-                fac_ehh24x7(insec,:,idd2) = tmp24(:)
+                 do ihh=1,24
+                    fac_ehh24x7(insec,ihh,idd2,:) = tmp24(ihh)
+                 end do
               end do
               idd = 1 ! Used later
             else
-                fac_ehh24x7(insec,:,idd) = tmp24(:)
+               do ihh=1,24
+                  fac_ehh24x7(insec,ihh,idd,:) = tmp24(ihh)
+               end do
             end if
 
              !(fac_ehh24x7(insec,ihh,idd),ihh=1,24)
 
            ! Use sumfac for mean, and normalise within each day/sector
            ! (Sector 10 had a sum of 1.00625)
-           sumfac = sum(fac_ehh24x7(insec,:,idd))/24.0
+           !use first country to compute sumfac, since all countries have same factors here
+           sumfac = sum(fac_ehh24x7(insec,:,idd,1))/24.0
            if(DEBUG .and. MasterProc) write(*,"(a,2i3,3f12.5)") &
               'HOURLY-FACS mean min max', idd, insec, sumfac, &
-                minval(fac_ehh24x7(insec,:,idd)), &
-                maxval(fac_ehh24x7(insec,:,idd))
+                minval(fac_ehh24x7(insec,:,idd,1)), &
+                maxval(fac_ehh24x7(insec,:,idd,1))
 
-           fac_ehh24x7(insec,:,idd) = fac_ehh24x7(insec,:,idd) * 1.0/sumfac
+           fac_ehh24x7(insec,:,idd,:) = fac_ehh24x7(insec,:,idd,:) * 1.0/sumfac
 
        !    if ( ios <  0 ) exit     ! End of file
        end do
@@ -346,6 +358,61 @@ contains
        if (DEBUG) write(unit=6,fmt=*) "Read ", n, " records from ", fname2
        call CheckStop ( any(fac_ehh24x7 < 0.0 ) , "Unfilled efac_ehh24x7")
 
+       close(IO_TIMEFACS)
+
+!3.1)Additional country specific hourly time factors
+       fname2 = "HOURLY-FACS-SPECIALS"  !
+       write(unit=6,fmt=*) "Starting HOURLY-FACS-SPECIALS"
+       call open_file(IO_TIMEFACS,"r",fname2,needed=.false.,iostat=ios)
+       if(ios==0)then
+       n = 0
+       do 
+          read(IO_TIMEFACS,"(a)",iostat=ios) inputline
+          n = n + 1
+          if(DEBUG)write(*,*) "HourlyFacsSpecials ", n, trim(inputline)
+          if ( ios <  0 ) exit     ! End of file
+          if( index(inputline,"#")>0 ) then ! Headers
+            if(n==1) call PrintLog(trim(inputline))
+            cycle
+          else
+            read(inputline,fmt=*,iostat=ios) inland, idd, insec, &
+              (tmp24(ihh),ihh=1,24)
+            icc=find_index(inland,Country(:)%icode)
+            if( DEBUG ) write(*,*) "HOURLY SPECIAL=> ",icc, idd, insec, tmp24(1), tmp24(13)
+          end if
+
+            if(  idd == 0 ) then ! same values very day
+              do idd2 = 1, 7
+                 do ihh=1,24
+                    fac_ehh24x7(insec,ihh,idd2,icc) = tmp24(ihh)
+                 end do
+              end do
+              idd = 1 ! Used later
+           else
+              do ihh=1,24
+                 fac_ehh24x7(insec,ihh,idd,icc) = tmp24(ihh)
+              enddo
+            end if
+
+             !(fac_ehh24x7(insec,ihh,idd),ihh=1,24)
+
+           ! Use sumfac for mean, and normalise within each day/sector
+           ! (Sector 10 had a sum of 1.00625)
+           sumfac = sum(fac_ehh24x7(insec,:,idd,icc))/24.0
+           if(DEBUG .and. MasterProc) write(*,"(a,2i3,3f12.5)") &
+              'HOURLY-FACS mean min max', idd, insec, sumfac, &
+                minval(fac_ehh24x7(insec,:,idd,icc)), &
+                maxval(fac_ehh24x7(insec,:,idd,icc))
+
+           fac_ehh24x7(insec,:,idd,icc) = fac_ehh24x7(insec,:,idd,icc) * 1.0/sumfac
+
+       !    if ( ios <  0 ) exit     ! End of file
+       end do
+
+       close(IO_TIMEFACS)
+       else
+          if(me==0)write(*,*)'Special hourly factors not found (but not needed): ',trim(fname2)
+       endif
 
 ! #######################################################################
 ! 4) Normalise the monthly-daily factors. This is needed in order to
@@ -470,7 +537,7 @@ contains
             fac_emm(27,mm,2,1), fac_edd(27,1,2,1), fac_edd(27,7,2,1)
        end do ! mm
        write(*,"(a,4f8.3)") " day factors traffic 24x7", &
-           fac_ehh24x7(7,1,4),fac_ehh24x7(7,13,4), &
+           fac_ehh24x7(7,1,4,1),fac_ehh24x7(7,13,4,1), &
               minval(fac_ehh24x7), maxval(fac_ehh24x7)
     end if ! DEBUG
 
@@ -537,6 +604,7 @@ contains
             Endval=min(Endval,2*Average,2*fac_emm(iland ,nmnd2,isec,iemis))
             call Averageconserved_interpolate(Start,Endval,Average,nmdays(nmnd),dd,x)
             timefac(iland,isec,iemis) = x *  fac_edd(iland,weekday,isec,iemis) 
+            if(me==0.and.iemis==2.and.isec==7.and.iland==9)write(*,*)'DAYFAC ',timefac(iland,isec,iemis),fac_edd(iland,weekday,isec,iemis) 
  
          end do ! iland  
       end do ! isec   

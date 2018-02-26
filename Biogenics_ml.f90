@@ -1,7 +1,7 @@
-! <Biogenics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <Biogenics_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -54,13 +54,21 @@ module Biogenics_ml
   !    by the ReadField_CDF interpolation routines. No need to worry about
   !    conserving these very imperfect numbers accurately ;-)
   !
-  !    Dave Simpson, 2010-2012
+  !    Dave Simpson, 2010-2018
   !    Updated for CLM-GLC merge, 2017
+  !    Start of BiDir work, 2018
   !---------------------------------------------------------------------------
 
   use CheckStop_ml,      only: CheckStop, StopAll
   use ChemSpecs,         only : species
-  use emep_Config_mod, only: EmBio
+  use Config_module, only : NPROC, MasterProc, TINY, &
+                           NLANDUSEMAX, IOU_INST, & 
+                           KT => KCHEMTOP, KG => KMAX_MID, & 
+                           EURO_SOILNOX_DEPSCALE, & 
+                           DEBUG, BVOC_USED, MasterProc, &
+                           USES, &
+                           DEBUG_SOILNOX, &
+                           EmBio, EMEP_EuroBVOCFile
   use GridValues_ml    , only : i_fdom,j_fdom, debug_proc,debug_li,debug_lj
   use Io_ml            , only : IO_FORES, open_file, ios, PrintLog, datewrite
   use KeyValueTypes,     only : KeyVal,KeyValue
@@ -69,13 +77,7 @@ module Biogenics_ml
   use Landuse_ml,        only : LandCover
   use LocalVariables_ml, only : Grid  ! -> izen, DeltaZ
   use MetFields_ml,      only : t2_nwp
-  use ModelConstants_ml, only : NPROC, MasterProc, TINY, &
-                           NLANDUSEMAX, IOU_INST, & 
-                           KT => KCHEMTOP, KG => KMAX_MID, & 
-                           EURO_SOILNOX_DEPSCALE, & 
-                           DEBUG, BVOC_USED, MasterProc, &
-                           USE_EURO_SOILNOX, USE_GLOBAL_SOILNOx, &
-                           DEBUG_SOILNOX, USE_SOILNH3
+  use MetFields_ml,     only: PARdbh, PARdif !WN17, in W/m2
   use NetCDF_ml,        only : ReadField_CDF, printCDF
   use OwnDataTypes_ml,  only : Deriv, TXTLEN_SHORT
 !  use Paleo_ml, only : PALEO_mlai, PALEO_miso, PALEO_mmon
@@ -173,6 +175,8 @@ module Biogenics_ml
     allocate(AnnualNdep(LIMAX,LJMAX), &
                 SoilNOx(LIMAX,LJMAX), &
                 SoilNH3(LIMAX,LJMAX))
+    SoilNOx=0.0  !BIDIR safety
+    SoilNH3=0.0  !BIDIR safety
     allocate(EmisNat(NEMIS_BioNat,LIMAX,LJMAX))
     EmisNat=0.0
     allocate(day_embvoc(LIMAX,LJMAX,size(BVOC_USED)))
@@ -195,8 +199,8 @@ module Biogenics_ml
       !call CheckStop( ispec_TERP < 1 , "BiogencERROR TERP")
       if( ispec_TERP < 0 ) call PrintLog("WARNING: No TERPENE Emissions")
      
-      call CheckStop( USE_EURO_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
-      call CheckStop( USE_GLOBAL_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
+      call CheckStop( USES%EURO_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
+      call CheckStop( USES%GLOBAL_SOILNOX .and. ispec_NO < 1 , "BiogencERROR NO")
       if( MasterProc ) write(*,*) "SOILNOX ispec ", ispec_NO
 
       itot_C5H8 = find_index( "C5H8", species(:)%name    ) 
@@ -287,11 +291,12 @@ module Biogenics_ml
 
      do iVeg = 1, size(VegName)
        ibvoc = find_index( VegName(iveg), LandDefs(:)%code )
+       if( ibvoc<0 ) cycle
        HaveLocalEF(ibvoc) = .true.
        do iEmis = 1, size(BVOC_USED)
          varname = trim(BVOC_USED(iEmis)) // "_" // trim(VegName(iVeg))
           
-         call ReadField_CDF('EMEP_EuroBVOC.nc',varname,&
+         call ReadField_CDF(EMEP_EuroBVOCFile,varname,&
              bvocEF(:,:,ibvoc,iEmis),1,interpol='zero_order',needed=.true.,&
               debug_flag=.false.,UnDef=-999.0)
 
@@ -549,6 +554,7 @@ module Biogenics_ml
 
   integer, intent(in) ::  i,j
 
+  character(len=*), parameter :: dtxt = 'setup_bio:'
   integer :: it2m
   real    :: E_ISOP, E_MTP, E_MTL
 
@@ -585,7 +591,8 @@ module Biogenics_ml
 
      ! Light effects from Guenther G93
 
-      par = (Grid%Idirect + Grid%Idiffuse) * PARfrac * Wm2_uE
+!WN      par = (Grid%Idirect + Grid%Idiffuse) * PARfrac * Wm2_uE
+      par = ( PARdbh(i,j) + PARdif(i,j)  ) * Wm2_uE
 
       cL = ALPHA * CL1 * par/ sqrt( 1 + ALPHA*ALPHA * par*par)
 
@@ -623,19 +630,22 @@ module Biogenics_ml
         EmisNat(ispec_TERP,i,j) = (E_MTL+E_MTP) * 1.0e-9/3600.0
     end if
 
-    if ( USE_EURO_SOILNOX ) then
+    if ( USES%EURO_SOILNOX ) then
         rcemis(itot_NO,KG)    = rcemis(itot_NO,KG) + &
              SoilNOx(i,j) * biofac_SOILNO/Grid%DeltaZ
         EmisNat(ispec_NO,i,j) =  SoilNOx(i,j) * 1.0e-9/3600.0
-    else if ( USE_GLOBAL_SOILNOX ) then !TEST
+    else if ( USES%GLOBAL_SOILNOX ) then !TEST
         EmisNat(ispec_NO,i,j) =  SoilNOx(i,j)*Grid%DeltaZ/biofac_SOILNO * 1.0e-9/3600.0
     end if
 
     !EXPERIMENTAL
-    if ( USE_SOILNH3 ) then
-        rcemis(itot_NH3,KG)    = rcemis(itot_NH3,KG) + &
-            SoilNH3(i,j) * biofac_SOILNH3/Grid%DeltaZ
-        EmisNat(ispec_NH3,i,j) =  SoilNH3(i,j) * 1.0e-9/3600.0
+    !if ( USES%SOILNH3 ) then
+    if ( USES%BIDIR ) then
+       rcemis(itot_NH3,KG)    = rcemis(itot_NH3,KG) + &
+           SoilNH3(i,j) * biofac_SOILNH3/Grid%DeltaZ
+        if(ispec_NH3>0)EmisNat(ispec_NH3,i,j) =  SoilNH3(i,j) * 1.0e-9/3600.0
+    else
+        if(ispec_NH3>0)EmisNat(ispec_NH3,i,j) = 0.0
     end if
      
  
@@ -643,8 +653,9 @@ module Biogenics_ml
 
       call datewrite("DBIO env ", it2m, (/ max(par,0.0), max(cL,0.0), &
             canopy_ecf(BIO_ISOP,it2m),canopy_ecf(BIO_TERP,it2m) /) )
-      call datewrite("DBIO EISOP EMTP EMTL ESOIL ", (/  E_ISOP, &
-             E_MTP, E_MTL, SoilNOx(i,j) /) ) 
+      call datewrite("DBIO EISOP EMTP EMTL ESOIL-N ", (/  E_ISOP, &
+             E_MTP, E_MTL, SoilNOx(i,j), SoilNH3(i,j) /) ) 
+      if (USES%BIDIR) call datewrite("DBIO BIDIR ", (/  SoilNOx(i,j), SoilNH3(i,j), rcemis(itot_NH3,KG) /) ) 
       call datewrite("DBIO rcemisL ", (/ &
             rcemis(itot_C5H8,KG), rcemis(itot_TERP,KG) /))
       call datewrite("DBIO EmisNat ", EmisNat(:,i,j) )
@@ -661,17 +672,17 @@ module Biogenics_ml
       integer :: i, j, nLC, iLC, LC
       logical :: my_first_call = .true.
       real    :: f, ft, fn, ftn
-      real    :: enox, enh3  ! emissions, ugN/m2/h
+      real    :: enox !, enh3  ! emissions, ugN/m2/h
       real :: beta, bmin, bmax, bx, by ! for beta function
       real :: hfac
 
 
-      if ( .not. USE_EURO_SOILNOX  ) return ! and fSW has been set to 1. at start
+      if ( .not. USES%EURO_SOILNOX  ) return ! and fSW has been set to 1. at start
 
       if( DEBUG_SOILNOX .and. debug_proc ) then
          write(*,*)"Biogenic_ml DEBUG_SOILNOX EURO: ",&
           current_date%day, current_date%hour, current_date%seconds,&
-          USE_EURO_SOILNOX, EURO_SOILNOX_DEPSCALE
+          USES%EURO_SOILNOX, EURO_SOILNOX_DEPSCALE
       end if
 
       ! We reset once per hour
@@ -695,12 +706,12 @@ module Biogenics_ml
            ! We use a factor normalised to 1.0 at 5000 mgN/m2/a
 
              fn = AnnualNdep(i,j)/5000.0 ! scale for now
-             fn = fn * EURO_SOILNOX_DEPSCALE  ! See ModelConstants_ml
+             fn = fn * EURO_SOILNOX_DEPSCALE  ! See Config_module
 
              ftn = ft * fn * hfac 
 
              enox = 0.0
-             enh3 = 0.0 
+             !enh3 = 0.0 
 
      LCLOOP: do ilc= 1, nLC
 
@@ -719,13 +730,13 @@ module Biogenics_ml
 
                  if ( LandType(LC)%is_conif ) then
                     enox = enox + f*ftn*150.0
-                    enh3 = enh3 + f*ftn*1500.0 ! Huge?! W+E ca. 600 ngNH3/m2/s -> 1800 ugN/m2/h
+                    !enh3 = enh3 + f*ftn*1500.0 ! Huge?! W+E ca. 600 ngNH3/m2/s -> 1800 ugN/m2/h
                  else if ( LandType(LC)%is_decid ) then
                     enox = enox + f*ftn* 50.0
-                    enh3 = enh3 + f*ftn*500.0 !  Just guessing
+                    !enh3 = enh3 + f*ftn*500.0 !  Just guessing
                  else if ( LandType(LC)%is_seminat ) then
                     enox = enox + f*ftn* 50.0
-                    enh3 = enh3 + f * ftn  *20.0 !mg/m2/h approx from US report 1 ng/m2/s
+                    !enh3 = enh3 + f * ftn  *20.0 !mg/m2/h approx from US report 1 ng/m2/s
 
                  else if ( LandType(LC)%is_crop    ) then ! emissions in 1st 70 days
 
@@ -737,7 +748,7 @@ module Biogenics_ml
                     if ( daynumber >= Landcover(i,j)%SGS(iLC) .and. &
                          daynumber <= Landcover(i,j)%EGS(iLC) ) then
                          enox = enox + f* 1.0
-                         enh3 = enh3 + f * 60.0
+                         !enh3 = enh3 + f * 60.0
                     end if
 
                     ! CRUDE - just playing for NH3.
@@ -754,7 +765,7 @@ module Biogenics_ml
                          by = 1.0 - bx
                          beta =  ( bx*by *4.0) 
                          enox = enox + f*80.0*ft* beta 
-                         enh3 = enh3 + f * 1000.0*ft * beta
+                         !enh3 = enh3 + f * 1000.0*ft * beta
                     end if
 
                     
@@ -763,7 +774,7 @@ module Biogenics_ml
                      i == debug_li .and. j == debug_lj ) then
                    write(*, "(a,4i4,f7.2,9g12.3)") "LOOPING SOIL", daynumber, &
                    iLC, LC, LandCover(i,j)%SGS(iLC), t2_nwp(i,j,1)-273.15, &
-                      f, ft, fn, ftn,  beta, enox, enh3
+                      f, ft, fn, ftn,  beta, enox!, enh3
                    if(iLC==1) &
                      call datewrite("HFAC SOIL", (/ 1.0*daynumber,hfac /) )
                  end if
@@ -777,13 +788,12 @@ module Biogenics_ml
      ! Emissions_ml (snapemis).  ug/m2/h -> kg/m2/s needs 1.0-9/3600.0. 
  
            SoilNOx(i,j) = enox
-           SoilNH3(i,j) = enh3
+
+             !enh3 = 0.0 ! BIDIR SOON .... we don't want enh3
+             !SoilNH3(i,j) = enh3
  
          end do
       end do
- !     if ( DEBUG_SOILNOX .and. debug_proc ) then
- !             SoilNOx(:,:) = 1.0 ! Check scaling
- !     end if
 
       if ( DEBUG_SOILNOX .and. debug_proc ) then
          i = debug_li

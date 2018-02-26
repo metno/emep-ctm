@@ -1,7 +1,7 @@
-! <TimeDate_ExtraUtil_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <TimeDate_ExtraUtil_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -27,7 +27,7 @@
 MODULE TimeDate_ExtraUtil_ml
 
 use Par_ml,           only: me
-use ModelConstants_ml,only: METSTEP, MasterProc, startdate,enddate , &
+use Config_module,only: METSTEP, MasterProc, startdate,enddate , &
                             IOU_MON,IOU_DAY,IOU_HOUR,IOU_HOUR_EXTRA_MEAN,FREQ_HOURLY
 use SmallUtils_ml,    only: key2str,to_upper
 use CheckStop_ml,     only: CheckStop

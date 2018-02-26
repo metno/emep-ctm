@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -100,7 +100,11 @@ implicit none
         SNAP_sec2hfac_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_HFAC
    integer, save, target, dimension(NSECTORS_SNAP) :: & ! mapping of sector to height distribution class
         SNAP_sec2split_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_SPECIATION
-   integer, save, dimension(NSECTORS_SNAP) ::snap2gnfr=(/1,3,2,4,13,5,6,7,10,11,-1/)
+!   integer, save, dimension(NSECTORS_SNAP) ::snap2gnfr=(/1,3,2,4,13,5,6,7,10,11,-1/)
+   integer, save, dimension(NSECTORS_SNAP,3) ::snap2gnfr=(/1,3,2,4,13,5,6,7,10,11,-1 &
+                                                          ,-1,-1,-1,-1,-1,-1,-1,8,-1,12,-1 &
+                                                          ,-1,-1,-1,-1,-1,-1,-1,9,-1,-1,-1 &
+                                                          /)
 
 !GNFR  specific definitions
    integer, public, parameter :: &

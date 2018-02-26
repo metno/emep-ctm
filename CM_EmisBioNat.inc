@@ -1,8 +1,9 @@
-  integer, parameter, public ::  NEMIS_BioNat  = 12
+  integer, parameter, public ::  NEMIS_BioNat  = 13
   character(len=11), save, dimension(NEMIS_BioNat), public:: &
       EMIS_BioNat =  (/ &
              "C5H8       " &
            , "NO         " &
+           , "NH3        " &
            , "ASH_F      " &
            , "ASH_C      " &
            , "BIOTERP    " &

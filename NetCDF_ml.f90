@@ -1,7 +1,7 @@
-! <NetCDF_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.15>
+! <NetCDF_ml.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2017 met.no
+!*  Copyright (C) 2007-2018 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -67,7 +67,7 @@ use GridValues_ml,     only : GRIDWIDTH_M,fi,xp,yp,xp_EMEP_official&
                              x1_lambert,& !x value at i=1
                              y1_lambert  !y value at j=1                             
 use InterpolationRoutines_ml,  only : grid2grid_coeff
-use ModelConstants_ml,  only: KMAX_MID,KMAX_BND, runlabel1, runlabel2 &
+use Config_module,  only: KMAX_MID,KMAX_BND, runlabel1, runlabel2 &
                              ,MasterProc, FORECAST, NETCDF_DEFLATE_LEVEL &
                              ,DEBUG_NETCDF, DEBUG_NETCDF_RF &
                              ,NPROC, IIFULLDOM,JJFULLDOM &
@@ -75,8 +75,9 @@ use ModelConstants_ml,  only: KMAX_MID,KMAX_BND, runlabel1, runlabel2 &
                              ,IOU_HOUR,IOU_HOUR_INST,IOU_HOUR_EXTRA &
                              ,PT,Pref,NLANDUSEMAX, model&
                              ,USE_EtaCOORDINATES,RUNDOMAIN&
-                             ,fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,hour_DOMAIN
-use ModelConstants_ml,  only: SELECT_LEVELS_HOURLY,&  ! NML
+                             ,fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,hour_DOMAIN&
+                             ,SurfacePressureFile
+use Config_module,  only: SELECT_LEVELS_HOURLY,&  ! NML
                               num_lev3d,lev3d         ! 3D levels on 3D output
 use MPI_Groups_ml, only     :MPI_LOGICAL, MPI_SUM,MPI_INTEGER, MPI_BYTE,MPISTATUS, &
                              MPI_COMM_IO, MPI_COMM_CALC, IERROR, ME_IO, ME_CALC
@@ -2020,7 +2021,8 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   if(present(found))found=.false.
 
   if(fileneeded)then
-    call check(nf90_open(trim(fileName),nf90_nowrite,ncFileID))
+    call check(nf90_open(trim(fileName),nf90_nowrite,ncFileID),&
+               trim(fileName)//" not found")
   else
     status=nf90_open(trim(fileName),nf90_nowrite,ncFileID)
     if(status/=nf90_noerr)then
@@ -2845,6 +2847,11 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      !inverse of resolution
      dRloni=1.0/(Rlon(2)-Rlon(1))
      dRlati=1.0/(Rlat(2)-Rlat(1))
+     
+     !not likely to happen, but check. Quick fix: change number of procs
+     call CheckStop(abs(Rlon(2)-Rlon(1))>180.0,&
+          "longitude error: crossing of -180 not implemented. file "//trim(fileName))
+     
 
      Grid_resolution = EARTH_RADIUS*abs(Rlat(2)-Rlat(1))*PI/180.0
      Grid_resolution_lon = EARTH_RADIUS*abs(Rlon(2)-Rlon(1))*PI/180.0!NB: varies with latitude
@@ -3163,10 +3170,13 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                  cycle
               endif
 
-              ifirst(ig)=max(1,i_local(max(1,ifirst(ig))))
-              ilast(ig)=min(limax,i_local(min(rundomain(2),ilast(ig))))
+               ! convert to local coordinates:
+              ifirst(ig)=max(ifirst(ig),rundomain(1)) ! first trim to rundomain
+              ilast(ig) =min(ilast(ig) ,rundomain(2))
+              ifirst(ig)=max(i_local(ifirst(ig)),1)   ! convert to local coordinates
+              ilast(ig) =min(i_local(ilast(ig)) ,limax)
               if((ifirst(ig)>limax .or. ilast(ig)<1) )then
-                 !outside subdomain. no need to spend time with this ig
+                 ! outside local domain. no need to spend time with this ig
                  ilast(ig)=ifirst(ig)-1
                  cycle
               endif
@@ -4217,7 +4227,7 @@ end subroutine ReadField_CDF
         
         !need average surface pressure for the current month
         !montly average is needed, not instantaneous pressure
-        call ReadField_CDF('SurfacePressure.nc','surface_pressure',&
+        call ReadField_CDF(SurfacePressureFile,'surface_pressure',&
              Psurf_ref,current_date%month,needed=.true.,interpol='zero_order',debug_flag=debug_flag)
   end if
 
