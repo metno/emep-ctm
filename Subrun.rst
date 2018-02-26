@@ -47,12 +47,14 @@ time period you want the model to run (YYYY,MM,DD), and you need
 meteorology data for the period, as shown below:
 
 .. code-block:: text
+  :name: config-emep
+  :caption: Basic namelist example; ``config_emep.nml`` extract.
 
   &INPUT_PARA
     GRID = 'EECCA',
     iyr_trend = 2015,
     runlabel1 = 'Base',
-    runlabel2 = 'Opensource_Setup_2017',
+    runlabel2 = 'Opensource_Setup_2018',
     startdate = 2015,01,01,00,
     enddate = 2015,12,31,24,
   &end
@@ -63,7 +65,7 @@ meteorology data for the period, as shown below:
    meteo = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
    DegreeDayFactorsFile = 'MetDir/DegreeDayFactors.nc',
   !------------------------------
-   EmisDir = 'DataDir/EECCA',
+   EmisDir = 'DataDir/GRID',
    emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
   !--------Sub domain x0, x1, y0, y1
     RUNDOMAIN = 36, 100, 50, 150, ! EECCA sub-domain
@@ -93,9 +95,8 @@ model's 'global' settings, which will ensure better handling of
 vegetation (eg LAI) changes, convection, and various emission
 settings.
 
-Typical European/EMEP settings are:
-
 .. code-block:: text
+  :caption: Typical European/EMEP settings.
 
   USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
   USES%PFT_MAPS = F,
@@ -103,9 +104,8 @@ Typical European/EMEP settings are:
   USES%CONVECTION = F, 
   USES%EURO_SOILNOX = T, ! diff for global + Euro
 
-Typical non-European/global settings are:
-
 .. code-block:: text
+  :caption: Typical non-European/global settings.
 
   USES%DEGREEDAY_FACTORS = F
   USES%PFT_MAPS = T,    ! PFT LAI tests
@@ -152,18 +152,13 @@ This is an example of a minimum ``modrun.sh`` script to run the model.
 
 This bash shell script is designed so that users can easily adapt it to
 fit their needs. It contain the minimum information required to run the
-EMEP/MSC-W model. The script should be self-explanatory. It assumes one
-directory for input data other than meteorology data. The metdata for
-the year, and for January :math:`1^{st}` the following year (365 +1
-files) is linked directly in the ``config_emep.nml`` file. You need to
-set the right paths for the input directories. All the input files in
-the input directories are linked to the directory you are working from.
-
-
+EMEP/MSC-W model. The script should be self-explanatory. The paths 
+for meteorology and all other input data are defined on the model configuration file,
+``config_emep.nml``. You need to set the right paths for the input directories.
 
 It is possible to run the model on a smaller domain than the full
 regional model domain, as defined by indexes :math:`x` and :math:`y`.
-For the 'EECCA' gtid  :math:`x=1,\ldots,132; y=1,\ldots,159`\ .
+For the 'EECCA' grid  :math:`x=1,\ldots,132; y=1,\ldots,159`\ .
 To set a smaller domain, use ``RUNDOMAIN`` variable in the ``ModelConstants_config``
 namelist to idicate the sub-domain indexes. In :numref:`config-emep`,
 ``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
