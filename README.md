@@ -18,7 +18,7 @@ catalog.py
 # help and usage information
 catalog.py -h
 
-# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8|rv4_10)
+# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8|rv4_10|rv4_15|rv4_17)
 catalog.py -R REV          
 
 # get only the source code and user guide for revision REV
