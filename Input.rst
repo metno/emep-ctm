@@ -57,7 +57,7 @@ IMPORTANT:
     Global Ozone      & ``GLOBAL_O3.nc``                              & netCDF
     New Global Ozone  & ``Logan_P.nc``                                & netCDF [#NewO3]_
     BVOC emissions    & ``EMEP_EuroBVOC.nc``                          & netCDF
-    Landuse           & ``LanduseGLC.nc`` and ``Landuse_PS_5km_LC.nc``& netCDF
+    Landuse           & ``glc2000xCLMf18.nc`` and ``Landuse_PS_5km_LC.nc``& netCDF
     Degree-day factor & ``DegreeDayFactors.nc``                       & netCDF
     N depositions     & ``annualNdep.nc``                             & netCDF
     Road dust         & ``RoadMap.nc`` and ``AVG_SMI_2005_2010.nc``   & netCDF [#Optional]_
