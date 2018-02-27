@@ -542,4 +542,4 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 201802,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201511.tar.bz2,EMEP_MSC-W_model.rv4.17.OpenSource/meteo2015/EECCA/,1870633545,7974005f821a027182815c9fc1dd857f
 201802,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201512.tar.bz2,EMEP_MSC-W_model.rv4.17.OpenSource/meteo2015/EECCA/,1929643105,a14ff455b75a737b75853a7a2b475ede
 201802,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201513.tar.bz2,EMEP_MSC-W_model.rv4.17.OpenSource/meteo2015/EECCA/,116011382,22bf5f96f7e428b71159c6dac1e7ff8a
-201802,docs,,rv4_17,{GIT}/releases/download/{MOD}/User_Guide.pdf,,537216,b0fd3bdf65999e282cb3a17bff1cd899
+201802,docs,,rv4_17,{GIT}/releases/download/{MOD}/User_Guide.pdf,,537244,c795cda58224bcc02838f2d4ec5bbb33
