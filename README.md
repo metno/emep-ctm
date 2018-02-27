@@ -1,4 +1,5 @@
 # EMEP/MSC-W Model Unofficial User’s Guide
+[![Documentation Status](https://readthedocs.org/projects/emep-ctm/badge/?version=latest)](http://emep-ctm.readthedocs.io/en/latest/?badge=latest)
 
 This is part of the [Open Source EMEP/MSC-W model][emep-ctm] documentation.
 
