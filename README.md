@@ -44,10 +44,10 @@ The source code, together with a set of input data,
 an updated user guide and a full year model results for the year 2015,
 under [GPL license v3][GPLv3].
 
-You are recommended to read all chapters of the
-[EMEP/MSC-W model User Guide][guide]
-before you start retrieving data as instructed on the 
+You can download the source code and input data by following the instructions on the 
 [OpenSource rv4.17 (201802)][rel417] release page.
+
+Information on use of the model can be found in the [EMEP/MSC-W model User Guide][guide]
 
 #### Previous releases (YYYYMM - date of release)
 
