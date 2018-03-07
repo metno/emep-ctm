@@ -241,9 +241,8 @@ Countrywise NetCDF emissions:
 Monthly "fraction type" NetCDF emissions.
     \
 
-    This is similar to the yearly "fraction type" NetCDF emissions, but
-    there are 12 monthly values for each field. This format cannot be
-    combined with other formats.
+    This is similar to the yearly NetCDF emissions, but
+    there are 12 monthly values for each field.
 
 Using and combining gridded emissions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
