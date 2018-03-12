@@ -245,7 +245,7 @@ The files start with a description of its content followed by a list of
 the stations. For example, a sondes.dat input file may look like this:
 
 .. literalinclude:: sites.dat
-    :caption: Minimum ``modrun.sh`` example.
+    :caption: Site location definirion (``sites.dat``) example.
 
 The first line in each file is a header with file content. Then, the
 contents are described in more detail. Text strings after ``#`` are just
