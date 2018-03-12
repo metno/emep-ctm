@@ -61,7 +61,7 @@ In ``My_Derived_ml.f90``, the use can specify the output species (air
 concentrations, depositions, column values), units and temporal
 resolution of the outputs (daily, monthly, yearly).
 
-The ``Base_hour.nc`` and `Base_uEMEP_hour.nc`` file names can be edited by adding 
+The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` file names can be edited by adding 
 the day of the year corresponding to the run (e.g. a number from 1 to 366 as
 ``Base_hour_001.nc`` or the full date as ``Base_hour_20180101.nc``). 
 The change is done in Config_module.f90.
