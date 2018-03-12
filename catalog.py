@@ -327,21 +327,22 @@ class DataPoint(object):
 
         if tarfile.is_tarfile(self.dst):
             print("%-8s %s"%('Untar', self))
-            with tarfile.open(self.dst, 'r') as infile:
-                if user_consent('  See the contents first?', inspect, 'no'):
-                    print(infile.list(verbose=(verbose > 1)))
-                    if not user_consent('  Do you wish to proceed?', inspect):
-                        print("OK, skipping file")
-                        return
-                dname = "%s/"%_CONST['DATADIR']
-                if (not os.path.isdir(dname))and(dname != ''):
-                    os.makedirs(dname)
-                try:
-                    infile.extractall(dname)
-                except EOFError as error:
-                    print("  Failed unpack '%s':\n    %s."%(self.dst, error))
-                    if not user_consent('    Do you wish to continue?', inspect, 'yes'):
-                        sys.exit(-1)
+            infile = tarfile.open(self.dst, 'r')
+            if user_consent('  See the contents first?', inspect, 'no'):
+                print(infile.list(verbose=(verbose > 1)))
+                if not user_consent('  Do you wish to proceed?', inspect):
+                    print("OK, skipping file")
+                    return
+            dname = "%s/"%_CONST['DATADIR']
+            if (not os.path.isdir(dname))and(dname != ''):
+                os.makedirs(dname)
+            try:
+                infile.extractall(dname)
+            except EOFError as error:
+                print("  Failed unpack '%s':\n    %s."%(self.dst, error))
+                if not user_consent('    Do you wish to continue?', inspect, 'yes'):
+                    sys.exit(-1)
+            infile.close()
 
         else:
             outfile = "%s/%s/%s"%(_CONST['DATADIR'], self.key, os.path.basename(self.dst))
