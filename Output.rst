@@ -55,16 +55,11 @@ for a whole year, and sometimes with a smaller test run for e.g. April.
 Output parameters NetCDF files
 ------------------------------
 
-Parameters to be written out ``Base_day.nc``, ``Base_month.nc`` and
+Parameters to be written out into ``Base_hour.nc``, ``Base_day.nc``, ``Base_month.nc`` and
 ``Base_year.nc`` are defined in ``My_Derived_ml.f90`` and ``Derived_ml.f90``.
 In ``My_Derived_ml.f90``, the use can specify the output species (air
 concentrations, depositions, column values), units and temporal
 resolution of the outputs (daily, monthly, yearly).
-
-The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` file names can be edited by adding 
-the day of the year corresponding to the run (e.g. a number from 1 to 366 as
-``Base_hour_001.nc`` or the full date as ``Base_hour_20180101.nc``). 
-The change is done in Config_module.f90.
 
 The name of output parameter provides some information about data. The
 names start with TYPE of the parameter, namely SURF (surface air
