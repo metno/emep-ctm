@@ -270,7 +270,7 @@ where ‘YYYYMMDD’ is replaced by corresponding date.
 
 All advected model variables will be written out for the sub-domain defined
 by ``out_DOMAIN`` (\ :math:`x=60,\ldots,107; y=11,\ldots,58`\ ).
-If no ``out_DOMAIN`` is given, the model inner domain will be written out.
+If no ``out_DOMAIN`` is given, the entire model rundomain will be written out.
 
 .. code-block:: text
     :name: nest-write-config
@@ -291,21 +291,8 @@ ___________________________
 
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
 If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC can be stored.
-To achieve this, there are two methods:
-
-1.  Define ``RUNDOMAIN_inner`` in ``&Nest_config``, which must cover at least the ``RUNDOMAIN`` used in for the inner run, example:
-
-.. code-block:: text
-    :name: nest-write-rundomaininner
-    :caption: Inner domain options for nested BC output example.
-
-    &Nest_config
-    [...]
-      RUNDOMAIN_inner = 30,70,30,70, 
-    &end
-
-2.  Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid,
-    in order to define the projection parameters of the inner grid.
+Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid;
+  it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
 
 .. code-block:: text
     :name: nest-write-inner
