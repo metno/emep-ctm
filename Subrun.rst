@@ -284,12 +284,21 @@ ___________________________
 
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
 If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC can be stored.
-To achieve this, two parameters have to be passed in ``&Nest_config``:
+To achieve this, there are two methods:
 
-1.  ``RUNDOMAIN_inner`` which must match exactly the ``RUNDOMAIN`` used in for the inner run
-2.  ``MET_inner`` which should be a link to any metdata of the inner grid,
+1.  Define ``RUNDOMAIN_inner`` in ``&Nest_config``, which must cover at least the ``RUNDOMAIN`` used in for the inner run, example:
+
+.. code-block:: text
+    :name: nest-write-rundomaininner
+    :caption: Inner domain options for nested BC output example.
+
+    &Nest_config
+    [...]
+      RUNDOMAIN_inner = 30,70,30,70, 
+    &end
+
+2.  Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid,
     in order to define the projection parameters of the inner grid.
-
 
 .. code-block:: text
     :name: nest-write-inner
@@ -297,15 +306,13 @@ To achieve this, two parameters have to be passed in ``&Nest_config``:
 
     &Nest_config
     [...]
-      RUNDOMAIN_inner = 30,70,30,70, 
       MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
     &end
-    
-    
+        
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
 The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
-If a BC file has been created using this method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
+If a BC file has been created using the ``MET_inner`` method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
 
 
 Read BCs from EMEP MSC-W model
