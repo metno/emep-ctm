@@ -202,6 +202,13 @@ variables wanted in the output are specified in the
 parameters respectively for surface concentrations, depositions and some
 miscellaneous outputs.
 
+Separate hourly outputs
+-----------------------
+
+The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` files can become very lkarge. It is possible to split them into one file per day by adding 
+the keyword ```HOURLYFILE_ending    = 'JJJ.nc' ```, in the configuration file. ```JJJ```, will be automatically replaced by the corresponding day of the year (i.e. a number from 1 to 366 giving for instance
+``Base_hour_001.nc``). The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```. 
+
 .. _`sec-nesting`:
 
 Nesting
