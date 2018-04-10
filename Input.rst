@@ -286,7 +286,7 @@ If PollName is not specified at all, all pollutants are included (therefore all 
 from emis_inputlist(2)%name will be included).
 The specified pollutants must already be defined in ``CM_EmisFiles.inc``.
 It is possible to disregard the "lonlat" reductions introduced by ``femis.dat`` for specific emissions. To do this use the "use_lonlat_femis" flag.
-Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using "`emislist.POLL``
+Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``
 
 .. code-block:: Fortran
     :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(2)%name``.
@@ -297,7 +297,7 @@ Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as sp
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
 
 
-An alternative way of combining overlapping emissions, is to use a "mask" approach". This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
+An alternative way of combining overlapping emissions, is to use a "mask" approach. This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
 The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
 
 .. code-block:: Fortran
