@@ -297,6 +297,21 @@ Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as sp
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
 
 
+An alternative way of combining overlapping emissions, is to use a "mask" approach". This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
+The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
+.. code-block:: Fortran
+    :caption: Mixed emission using mask configuration example.
+    :linenos:
+
+    emis_inputlist(1)%name = '/MyPathToEmissions/emis_local.POLL',
+    emis_inputlist(1)%set_mask = T,
+    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
+    emis_inputlist(2)%use_mask = T,
+
+There are some details one should take into account: the order of the "set_mask" and "use_mask" matter. The mask should be set before it is used; "before" meaning that the indice of "emis_inputlist" is lower. Also yearly emissions are treated before monthly emissions, therefore one should not use monthly emissions to mask yearly emissions.
+The mask is set for a given position if emissions at that point are larger than 1.0e-20. If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
+There is only one mask. Several emissions files can set and use the mask.
+
 
 Global Ozone
 ~~~~~~~~~~~~
