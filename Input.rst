@@ -299,6 +299,7 @@ Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as sp
 
 An alternative way of combining overlapping emissions, is to use a "mask" approach". This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
 The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
+
 .. code-block:: Fortran
     :caption: Mixed emission using mask configuration example.
     :linenos:
