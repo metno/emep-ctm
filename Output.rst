@@ -209,11 +209,14 @@ and the values of the field must be put into the d_2d or d_3d array, using this 
 Other outputs
 -------------
 
-Detailed emissions by sectors can be obtained by adding the keyword ``SecEmisOuPoll``, and specify the pollutants required. For example adding the line:
+Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
 
-``SecEmisOuPoll(1:) = 'pm25', 'nox',``
+.. code-block:: fortran
 
-will give you the value for all the 11 SNAP sectors for PM25 and NOx.
+  SecEmisOutWanted(2) = T,
+  SecEmisOutWanted(7) = T,
+
+will give you the emissions for sector 2 and 7 for all components.
 
 To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=.true.`` must be set in ``My_Derived_ml.f90``, and the code recompiled. (This parameter cannot be set in ``config_emep.nml`` for now)
 
