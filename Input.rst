@@ -487,9 +487,11 @@ corresponding to the months of the year. In the daily files there are 7
 consecutive columns representing the time factor for each day of the
 week.
 
-The file ``HOURLY-FACS`` includes factors for each of the eleven SNAP
+The file defined in ``HourlyFacFile`` includes factors for each of the eleven SNAP
 sectors for every hour (the columns) for each day of the week, see
-Simpson et al. (2012) section 6.1.2
+Simpson et al. (2012) section 6.1.2 .
+An additional file defined in ``HourlyFacSpecialsFile`` can be created by the user with modified hourly factors to be used for specific countries. The format is the same as for the default factors, except for an additional first column speicifying the country code number.
+
 
 Emission heights
 ~~~~~~~~~~~~~~~~
