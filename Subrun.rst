@@ -313,6 +313,8 @@ in ``Nest_config`` namelist, in ``config_emep.nml`` file. The mode options are:
     ‘NHOUR’
         read at given ``NHOURREAD`` hourly intervals.
         ``NHOURREAD`` is set in ``Nest_config`` and should be an integer fraction of 24.
+    ‘MONTH’
+        read at start of each month.
 ``MODE_SAVE``
     'NONE'
         do nothing (default).
@@ -324,10 +326,12 @@ in ``Nest_config`` namelist, in ``config_emep.nml`` file. The mode options are:
     'NHOUR'
         write at given `NHOURSAVE` hourly intervals.
         ``NHOURSAVE`` is set in ``Nest_config`` and should be an integer fraction of 24.
+    ‘MONTH’
+        write after each month (used for checkpoint/restart for instance).
 
 If BC data are read at ``NHOURREAD`` intervals from the file defined by ``template_read_BC``
-in ``Nest_config``. The IC data (entire 3D domain) will
-be set at start of run from the file defined by ``template_read_3D`` in ``Nest_config``.
+in ``Nest_config``. 
+In addition, the IC data (entire 3D domain) will be set at start of run from the file defined by ``template_read_3D`` in ``Nest_config`` (except if  ``MODE_READ`` = 'NONE').
 
 Write BCs from EMEP MSC-W model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
