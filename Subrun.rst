@@ -329,8 +329,7 @@ in ``Nest_config`` namelist, in ``config_emep.nml`` file. The mode options are:
     ‘MONTH’
         write after each month (used for checkpoint/restart for instance).
 
-If BC data are read at ``NHOURREAD`` intervals from the file defined by ``template_read_BC``
-in ``Nest_config``. 
+BC data are read from the file defined by ``template_read_BC`` in ``Nest_config``. 
 In addition, the IC data (entire 3D domain) will be set at start of run from the file defined by ``template_read_3D`` in ``Nest_config`` (except if  ``MODE_READ`` = 'NONE').
 
 Write BCs from EMEP MSC-W model
