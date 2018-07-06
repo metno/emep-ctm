@@ -127,7 +127,7 @@ It is possible to disregard the "lonlat" reductions introduced by ``femis.dat`` 
 Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``
 
 .. code-block:: Fortran
-    :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(2)%name``.
+    :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(1)%name``.
     :linenos:
 
     emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
