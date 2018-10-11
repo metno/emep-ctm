@@ -3114,7 +3114,7 @@ subroutine read_surf_elevation(ix)
   call GetCDF_modelgrid(met(ix)%name,TopoFile,met(ix)%field,&
                         1,1,1,1,needed=met(ix)%needed,found=met(ix)%found)
 
-  if(met(ix)%found == .false.) then
+  if(.not.met(ix)%found) then
      if( me==0 )write(*,*)'WARNING: met topography not found. Approximating elevation using standard map'
      call ReadField_CDF(SurfacePressureFile,'surface_pressure_year',&
           met(ix)%field,1,needed=.true.,interpol='zero_order')

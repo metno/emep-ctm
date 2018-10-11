@@ -134,7 +134,7 @@ private
          ,M  &
          ,0.75-1.27*LOG10(0.3)) 
        rct(67,:) = 97760000*exp(-7261*TINV) 
-       rct(68,:) = 1450000000000*exp(-10688*TINV) 
+       rct(68,:) = 1450000000000.*exp(-10688*TINV) 
        rct(69,:) = 0.065**2 
        rct(70,:) = HYDROLYSISN2O5() 
        rct(71,:) = IUPAC_TROE(1.0e-31*exp(1.6*LOG300DIVT)  &

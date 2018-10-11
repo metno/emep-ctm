@@ -101,10 +101,11 @@ implicit none
    integer, save, target, dimension(NSECTORS_SNAP) :: & ! mapping of sector to height distribution class
         SNAP_sec2split_map = (/1,2,3,4,5,6,7,8,9,10,11/) !values must be <= N_SPECIATION
 !   integer, save, dimension(NSECTORS_SNAP) ::snap2gnfr=(/1,3,2,4,13,5,6,7,10,11,-1/)
-   integer, save, dimension(NSECTORS_SNAP,3) ::snap2gnfr=(/1,3,2,4,13,5,6,7,10,11,-1 &
-                                                          ,-1,-1,-1,-1,-1,-1,-1,8,-1,12,-1 &
-                                                          ,-1,-1,-1,-1,-1,-1,-1,9,-1,-1,-1 &
-                                                          /)
+    integer, save, dimension(NSECTORS_SNAP,3), public :: &
+        snap2gnfr=reshape([ 1, 3, 2, 4,13, 5, 6,7,10,11,-1 &
+                          ,-1,-1,-1,-1,-1,-1,-1,8,-1,12,-1 &
+                          ,-1,-1,-1,-1,-1,-1,-1,9,-1,-1,-1 &
+                          ],shape(snap2gnfr))
 
 !GNFR  specific definitions
    integer, public, parameter :: &

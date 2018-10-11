@@ -13,8 +13,8 @@ INCL = -I/global/apps/netcdf/4.1.3/include
 LLIB = -L/global/apps/netcdf/4.1.3/lib
 
 # options by nc-config/nf-config utility
-INCL = $(shell nc-config --fflags)
-LLIB = $(shell nc-config --flibs)
+INCL = $(shell nf-config --fflags)
+LLIB = $(shell nf-config --flibs)
 
 F90 = mpif90
 
@@ -22,7 +22,7 @@ F90 = mpif90
 F90FLAGS = -ffree-line-length-none -fdefault-real-8 -O3
 
 # Intel ifort compiler
-F90FLAGS = -shared-intel -r8 -recursive -O3
+#F90FLAGS = -shared-intel -r8 -recursive -O3
 
 ###################################################
 

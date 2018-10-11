@@ -156,6 +156,11 @@ subroutine Config_ColumnSource()
   integer,parameter :: read_ok(4)=[0,-1,84,85] ! OK if namelist not found
   integer :: ios=0
   character(len=*), parameter :: dtxt = 'ColSrcConf:'
+  NAMELIST /ColumnSource_config/&
+    NMAX_LOC,NMAX_EMS,flocdef,femsdef,need_topo
+  rewind(IO_NML)
+  read(IO_NML,NML=ColumnSource_config,iostat=ios)
+  call CheckStop(all(ios/=read_ok),dtxt//"NML=ColumnSource_config")
   ! test if topography file was found
   if(.not.foundtopo)then
     call PrintLog(dtxt//"WARNING: "//trim(TopoFile)//" not found",MasterProc)
@@ -169,11 +174,6 @@ subroutine Config_ColumnSource()
        call PrintLog(dtxt//"WARNING: Column emissions calculated using approximate elevations")
     endif
   end if
-  NAMELIST /ColumnSource_config/&
-    NMAX_LOC,NMAX_EMS,flocdef,femsdef,need_topo
-  rewind(IO_NML)
-  read(IO_NML,NML=ColumnSource_config,iostat=ios)
-  call CheckStop(all(ios/=read_ok),dtxt//"NML=ColumnSource_config")
   ! expand DataDir keyswords
   flocdef=key2str(flocdef,'DataDir',DataDir)
   femsdef=key2str(femsdef,'DataDir',DataDir)

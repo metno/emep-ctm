@@ -209,7 +209,7 @@ subroutine Get_CellMet(i,j,debug_flag)
            if(invL_out_ix>0) d_2d(invL_out_ix,i,j,IOU_INST) = Sub(lu)%invL 
         else if(.not.LandType(lu)%is_water) then
            land_frac = land_frac+LandCover(i,j)%fraction(ilu)
-           if(z0_out_ix) d_2d(z0_out_ix,i,j,IOU_INST) = &
+           if(z0_out_ix>0) d_2d(z0_out_ix,i,j,IOU_INST) = &
                 d_2d(z0_out_ix,i,j,IOU_INST) + log(Sub(lu)%z0)*LandCover(i,j)%fraction(ilu)
            if(invL_out_ix>0)  d_2d(invL_out_ix,i,j,IOU_INST) = &
                 d_2d(invL_out_ix,i,j,IOU_INST) + Sub(lu)%invL*LandCover(i,j)%fraction(ilu)
@@ -218,7 +218,7 @@ subroutine Get_CellMet(i,j,debug_flag)
      if(.not.Grid%is_allsea)then
         !renormalize to land
         if(land_frac >= 1.E-6)then
-           if(z0_out_ix) d_2d(z0_out_ix,i,j,IOU_INST) = &
+           if(z0_out_ix>0) d_2d(z0_out_ix,i,j,IOU_INST) = &
                 d_2d(z0_out_ix,i,j,IOU_INST)/land_frac
            if(invL_out_ix>0)  d_2d(invL_out_ix,i,j,IOU_INST) = &
                 d_2d(invL_out_ix,i,j,IOU_INST)/land_frac
