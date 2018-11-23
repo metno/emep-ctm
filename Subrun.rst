@@ -38,7 +38,7 @@ The different parameters for the model run are set in the
 ``INPUT_PARA`` has all these variables including the link to the
 meteorology data. The trendyear can be set to change the boundary
 emissions for earlier and future years, see the modules
-``BoundaryConditions_ml.f90`` and ``GlobalBCs_ml.f90`` to understand
+``BoundaryConditions_ml.f90`` to understand
 better what the trendyear setting does. The default setting is the
 meteorological year you are running for, in this case 2015. The
 runlabel1 option sets the name of the different output NetCDF files, see
