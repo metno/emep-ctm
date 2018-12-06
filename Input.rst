@@ -559,9 +559,7 @@ in line 1 (number 5 in the downloaded file) gives the number of pollutants
 treated in the file.
 
 Instead of country code, reductions can also be specified by coordinates too (and combined with country reductions).
-The line with coordinate corrections must start with the keyword ``lonlat``.
-The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested.
-Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
+The line with coordinate corrections must start with the keyword ``lonlat``. Note that the lonlat will not work if you specify the country code. The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
 
 
 .. code-block:: Fortran
@@ -571,7 +569,7 @@ Gridcells are either entirely included or entirely reduced, never cut into small
 
     Name                          7  sox  nox  co   voc  nh3  pm25  pmco
     17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
-    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+    lonlat 3.3 7.2 50.7 53.5   0 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
 
 
 In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
