@@ -218,7 +218,7 @@ Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWante
 
 will give you the emissions for sector 2 and 7 for all components.
 
-To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=.true.`` must be set in ``My_Derived_ml.f90``, and the code recompiled. (This parameter cannot be set in ``config_emep.nml`` for now)
+To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=.true.`` must be set in ``Config_module.f90``, and the code recompiled. (This parameter cannot be set in ``config_emep.nml`` for now)
 
 
 
