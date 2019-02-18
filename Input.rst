@@ -569,7 +569,7 @@ The line with coordinate corrections must start with the keyword ``lonlat``. Not
 
     Name                          7  sox  nox  co   voc  nh3  pm25  pmco
     17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
-    lonlat 3.3 7.2 50.7 53.5   0 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
 
 
 In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
