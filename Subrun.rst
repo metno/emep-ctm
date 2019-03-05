@@ -613,7 +613,7 @@ Emissions can be assigned to a sector. A sector defines three properties:
 
 The set of Emission heights available is defined in the file "EmisHeights.txt".  The set of splits in files "emissplit.defaults.POLL" and "emissplit.specials.POLL". The timefactors are defined in "MonthlyFac.POLL" "DailyFac.POLL" and "HourlyFacc.INERIS".
 
-Which height/split/timefac is chosen for a given sector is defined through the a mapping. There are two predefined mapping you can choose from: SNAP and GNFR. The mapping are simply three tables (one dimensional array). Those mappings are defined in "EmisDef_mod.f90" in the arrays "XXX_sec2hfac_map", "XXX_sec2sfac_map","XXX_sec2tfac_map", where "XXX" is the name of the mapping (SNAP or GNFR).
+Which height/split/timefac is chosen for a given sector is defined through a mapping system. There are two predefined mapping you can choose from: SNAP and GNFR. The mapping are simply three tables (one dimensional array). Those mappings are defined in "EmisDef_mod.f90" in the arrays "XXX_sec2hfac_map", "XXX_sec2sfac_map","XXX_sec2tfac_map", where "XXX" is the name of the mapping (SNAP or GNFR).
 For example the mapping "GNFR_sec2hfac_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/)", means that in the GNFR convention, the sector 13 is mapped to the fifth emission height in "EmisHeights.txt".
 You can add both more emission heghts in "EmisHeights.txt" and access them by changing the maps. (The maps cannot be set by config_emep.nml for now because it is not guaranteed that everything will work when you change the wrong things).
 You can define a new mapping for example using the "TEST" mapping (also in EmisDef.f90). To switch to "TEST" for those mappings set "SECTOR_NAME='TEST'" in "config_emep.nml".
