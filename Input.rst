@@ -266,16 +266,32 @@ BVOC emissions
 
 Biogenic emissions of isoprene and monoterpene are calculated in the
 model as a function of temperature and solar radiation, using the
-landuse datasets. The light and temperature dependencies are similar to
-those used in the original open source model, see Chapter 4.2 of the
-EMEP Status Report 1/2003 Part I (Simpson *et al.*, 2003).
+landuse datasets. The light and temperature dependencies follow
+the ideas proposed
+in Guenther et al (1993,1995), the first step in the
+emission processing is to define 'standard' emission potentials, which
+give the emissions of particular land-covers at standard environmental
+conditions (:math:`30^\circ C`  and photosynthetically active radiation of
+1000 :math:`\mu mole/m^2/s`).
 
-Biogenic VOC emission potentials (i.e. rates at :math:`30^\circ C` and
-full sunlight) are included for four different forest types in the
-NetCDF file ``EMEP_EuroBVOC.nc``. These emission potentials have unit
-:math:`\mu g/m^2/h`\ , and refer to emissions per area of the
-appropriate forest category. In addition, default emission potentials
-are given for other land-cover categories in the file
+European forests are treated in most detail.  For these, BVOC emission
+potentials have been created from the the map of forest species generated
+by Koeble and Seufert (2001). This work provided maps for 115 tree
+species in 30 European countries, based upon a compilation of data from
+the ICP-forest network. The emission potentials for each species are
+as given in Simpson *et al.*, 2012, and have been aggregated into the
+four default forest classes used by EMEP over Europe (DF, CF, NF, BF).
+The NetCDF file ``EMEP_EuroBVOC.nc`` provides the aggregated emission
+potenitals for these 4 categories. These emission potentials have unit
+:math:`\mu g/m^2/h`\ , and refer to emissions per area of the appropriate
+forest category.
+
+On the global scale, new landcover maps were created as a combination of
+GLC2000 and Community Land Model (CLM) data as described in 
+Simpson *et al.*, 2017.
+The default emission potentials
+are given for these extra CLM categories, and for any non-forest land-cover on
+Europe  in the file
 ``Inputs_LandDefs.csv``. The underlying emission potentials, land-cover
 data bases, and model coding have however changed substantially since
 model version v.2011-06. The new approach is documented in Simpson *et
