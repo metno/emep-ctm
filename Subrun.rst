@@ -617,8 +617,9 @@ To define which gridcells to include in your local region, you must find a suita
 A "mask" can be defined for instance with:
 
 .. code-block:: Fortran
-    :name: mask-config
-    :caption: define a mask example.
+    :caption: Define a mask example
+    :linenos:
+
     EmisMask(1)%filename = '/mypath/myfile.nc' !name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'London_PM'  !name of the variable to read from the file
     EmisMask(1)%ID       = 'LONDON'  !the name you give to that mask
