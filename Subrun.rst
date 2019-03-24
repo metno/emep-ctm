@@ -615,7 +615,8 @@ Typically you have got fine scale emissions for a small region of interest, a ci
 To define which gridcells to include in your local region, you must find a suitable variable that shows the region of interest. It could be for example the PM emissions in your local area. 
 
 A "mask" can be defined for instance with:
-.. code-block:: text
+
+.. code-block:: Fortran
     :name: mask-config
     :caption: define a mask example.
     EmisMask(1)%filename = '/mypath/myfile.nc' !name of the netcdf file to read from
