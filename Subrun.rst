@@ -3,8 +3,8 @@
 Setting the input parameters
 ============================
 
-In this chapter we provide detailed information on how to set the parameters of the
-regional EMEP/MSC-W model.
+In this chapter we provide detailed information on how to set the parameters of the regional EMEP/MSC-W model.
+
 In general the parameters and pathes to the input files are all set in the configuration file ``config_emep.nml`` (a fortran namelist).
 
 ``config_emep.nml``
@@ -611,7 +611,7 @@ Note about species: These can be interpreted in one of three categories
 Masks
 -----
 
-Typically yu have got fine scale emissions for a small region of interest, a city for instance. You may want to remove that area from the coarse scale emissions, and replace it with your own. The mask allows you to define a specific region (the mask).
+Typically you have got fine scale emissions for a small region of interest, a city for instance. You may want to remove that area from the coarse scale emissions, and replace it with your own. The mask allows you to define a specific region (the mask).
 To define which gridcells to include in your local region, you must find a suitable variable that shows the region of interest. It could be for example the PM emissions in your local area. 
 
 A "mask" can be defined for instance with:
@@ -622,6 +622,7 @@ A "mask" can be defined for instance with:
     EmisMask(1)%cdfname  = 'London_PM'  !name of the variable to read from the file
     EmisMask(1)%ID       = 'LONDON'  !the name you give to that mask
     EmisMask(1)%threshold = 1.0E-10 !the mask is set at any point larger than the threshold
+
     
 Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell whicgh are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region).
 
