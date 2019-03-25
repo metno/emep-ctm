@@ -628,7 +628,9 @@ A "mask" can be defined for instance with:
     
 Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell whicgh are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region).
 
-The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set. It is however not possible to set masks by both systems simultaneously.
+A mask defines only a region. It is not directly related to any pollutant. 
+
+The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set. It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above.
 
 Other less used options
 -----------------------
