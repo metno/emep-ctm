@@ -630,7 +630,7 @@ Several masks can be defined. Each mask is identified by their "ID". If you want
 
 A mask defines only a region. It is not directly related to any pollutant. 
 
-The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set. It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above.
+The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set. It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
 
 Other less used options
 -----------------------
