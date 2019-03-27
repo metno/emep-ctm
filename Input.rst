@@ -512,14 +512,10 @@ An additional file defined in ``HourlyFacSpecialsFile`` can be created by the us
 Emission heights
 ~~~~~~~~~~~~~~~~
 
-Old format:
-A vertical distribution for the eleven SNAP sectors are given in the
-file ``EmisHeights.txt``. The file has seven vertical levels, over the
-columns and the SNAP sectors given in the first row. Read more in
-Simpson et al. (2012) section 6.1.1.
+A vertical distribution for different sectors are given in the
+file ``EmisHeights.txt``. The release heights are defined as layers at specific pressure.
 
-A more general format, can be provided, which release the emissions at different heights, independently of the number of layer used by the model. The release heights are defined as layers at specific pressure. Example:
-
+The release height defintions are independent of the layers used by the model. 
 
 .. code-block:: Fortran
     :name: EmisHeights.txt
