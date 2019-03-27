@@ -571,10 +571,12 @@ In the new format, emissions are organised in a number of files (Emis_sourceFile
 For now the main constraint is that a source is any 2D field (possibly+time).
 The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
-The file and sources can be characterized by a set of variables. These variable can be set by and in order of increasing priority:
-1) Default value
-2) Attribute read in the netcdf file
-3) Value set in config_emep.nml 
+The file and sources can be characterized by a set of variables. In genereal these variable can be set by and in order of increasing priority:
+1. Default value
+2. Global attribute read in the netcdf file
+3. Variable attribute read in the netcdf file
+4. Value set for Emis_sourceFiles(i)%XXX in config_emep.nml
+5. Value set for Emis_sourceFiles(i)%source(s)%XXX in config_emep.nml
 
 List of file attributes (default in parenthesis):
 filename (‘NOTSET’) Name of the file (with path)
