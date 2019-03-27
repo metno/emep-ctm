@@ -121,6 +121,8 @@ There are some details one should take into account: the order of the "set_mask"
 The mask is set for a given position if emissions at that point are larger than 1.0e-20. If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
 There is only one mask. Several emissions files can set and use the mask.
 
+Masks can also be set from any field, see own section below.
+
 
 Source Receptor (SR) Runs
 -------------------------
@@ -130,9 +132,7 @@ of one or more pollutants from a particular country or a number of
 countries. Such runs are called "Scenario runs". They are used for source-receptor calculations.
 
 Emission factors for reduced emissions of pollutants from different
-sectors and countries can be defined in the input file called
-``femis.dat``, which can be found in the downloaded input data directory,
-see section :numref:`sec-femis`.
+sectors and countries can be defined in the input file ``femis.dat``.
 
 .. code-block:: text
     :name: base-femis
