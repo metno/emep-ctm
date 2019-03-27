@@ -565,6 +565,20 @@ be changed by the users according to their needs.
 See the  section for details
 
 
+
+Vertical_levels.txt
+~~~~~~~~~~~~~~~~~~~
+
+Defines the vertical model layers. The numbers in Vertical_levels.txt correspond to the "A" and "B" coefficients of the hybrid (eta) coordinates (P=A+B*Psurf).
+
+Close to the surface, A should be small, and higher up we should use pressure levels. Then there is a gradual transition from surface to pressure levels.
+
+For the case of the Vertical_levels20.txt; the levels are identical to the sigma layers we used originally. Sigma levels are a special case of hybrid levels.
+
+If the file is not provided, the meteorological vertical levels are used. In principle the model levels can be completely different, but it is more sensible to define layer boundaries that match the meteorological levels.
+
+NB: it is important not to define a lowest layer thinner than about 45 meters; the deposition scheme will fail if the middle of the lowest layer is smaller than the highest defined vegetation.
+
 Chemical speciation of emissions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
