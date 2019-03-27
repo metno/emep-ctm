@@ -562,7 +562,7 @@ to test the impact of one or more pollutants from a particular country.
 Emission factors are applied to specified countries and emission sectors
 and can be set by changing the ASCII file ``femis.dat``. This file can
 be changed by the users according to their needs.
-See the  section for details
+See the `Source Receptor (SR) Runs`_ section for details
 
 
 
