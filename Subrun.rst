@@ -3,33 +3,16 @@
 Setting the input parameters
 ============================
 
-In this chapter we provide detailed information on how to set the parameters of the regional EMEP/MSC-W model.
+In this chapter we provide detailed information on how to configure the parameters of the regional EMEP/MSC-W model.
 
-In general the parameters and pathes to the input files are all set in the configuration file ``config_emep.nml`` (a fortran namelist).
+In general the parameters and pathes to the input files can all be set in the configuration file ``config_emep.nml`` (a fortran namelist).
 
 ``config_emep.nml``
 -------------------
 
-The model has a namelist system. It is possible to set different
-constants and flags for running the model. The constants and flags
-themselves are defined in ``Config_module.f90``, while they are set in the
-namelist file under ``ModelConstants_config`` parameter. Some of these
-are briefly explained in :numref:`ch-inputfiles`. Model gets information
-about running for special cases from this file. The datasets provided
-are for the EMEP grid EECCA.
+The default parameter, constants and flags are defined in ``Config_module.f90``, and they can be overwritten by ``config_emep.nml`` settings. 
 
-The different parameters for the model run are set in the
-``config_emep.nml`` file. In the very beginning of this, the section
-``INPUT_PARA`` has all these variables including the link to the
-meteorology data. The trendyear can be set to change the boundary
-emissions for earlier and future years, see the modules
-``BoundaryConditions_ml.f90`` to understand
-better what the trendyear setting does. The default setting is the
-meteorological year you are running for, in this case 2015. The
-runlabel1 option sets the name of the different output NetCDF files, see
-:numref:`ch-output`. The ``startdate`` and ``enddate`` parameters are set for the
-time period you want the model to run (YYYY,MM,DD), and you need
-meteorology data for the period, as shown below:
+Here is an example of content:
 
 .. code-block:: text
   :name: config-emep
@@ -41,7 +24,7 @@ meteorology data for the period, as shown below:
     runlabel1 = 'Base',
     runlabel2 = 'Opensource_Setup_2018',
     startdate = 2015,01,01,00,
-    enddate = 2015,12,31,24,
+    enddate = 2015,01,10,24,
   &end
   &Machine_config
    DataPath(1) = '../input', ! define 'DataDir' keyword
@@ -57,8 +40,10 @@ meteorology data for the period, as shown below:
   &end
 
 In the extract above, the model is run for the period 1 January to 10 January
-2014 and the trend year used is 2014. Output files will be stored with
+2015 and the trend year used is 2015. Output files will be stored with
 the name 'Base' and the meteorological correspond to the 'EECCA' grid.
+
+Note the definition of the meteorological input ("meteo"): the keywords, 'YYYY', 'MM', 'DD' and 'GRID' will be replaced on the fly by respectively, year, month, day and grid ('EECCA' here).
 
 It is possible to run the model on a smaller domain than the full
 regional model domain, as defined by indexes :math:`x` and :math:`y`.
