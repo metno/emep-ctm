@@ -562,35 +562,7 @@ to test the impact of one or more pollutants from a particular country.
 Emission factors are applied to specified countries and emission sectors
 and can be set by changing the ASCII file ``femis.dat``. This file can
 be changed by the users according to their needs.
-
-The file contains several columns (the number is flexible).
-The first column represents the country code
-(http://www.emep.int/grid/country_numbers.txt), the second represents
-the sector (http://reports.eea.eu.int/technical_report_2001_3/en) where
-'0' means all sectors, and then in the remaining columns one can specify
-which emissions to reduce. Here 1.0 means no reduction of the given
-pollutant (|SOx|\ , |NOx|\ , VOC, |NH3|\ , CO, |PM25| and |PMco|\ )
-from sectors of specified country. The number following the first text ("Name")
-in line 1 (number 5 in the downloaded file) gives the number of pollutants
-treated in the file.
-
-Instead of country code, reductions can also be specified by coordinates too (and combined with country reductions).
-The line with coordinate corrections must start with the keyword ``lonlat``. Note that the lonlat will not work if you specify the country code. The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
-
-
-.. code-block:: Fortran
-    :name: femis
-    :caption: ``femis.dat`` example.
-    :linenos:
-
-    Name                          7  sox  nox  co   voc  nh3  pm25  pmco
-    17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
-    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
-
-
-In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
-Emissions of |NH3| from country with code 17 only, will be removed from the rectangle with longitudes between
-3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North. Use zero (0) as country code to specify that emissions from all countries should be reduced.
+See the  section for details
 
 
 Chemical speciation of emissions
