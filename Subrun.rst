@@ -178,18 +178,6 @@ which may be changed to allow more or less influence of this variable.
 
 
 
-Input file
-----------
-
-Vertical_levels.txt:
-The number in Vertical_levels.txt correspond to the "A" and "B" coefficients of the hybrid (eta) coordinates (P=A+B*Psurf).
-
-Close to the surface, A should be small, and higher up we should use pressure levels. Then there is a gradual transition from surface to pressure levels.
-
-For the case of the Vertical_levels20.txt; the levels are identical to the sigma layers we used originally. Sigma levels are a special case of hybrid levels.
-
-
-
 Base run
 --------
 
