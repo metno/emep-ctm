@@ -122,6 +122,81 @@ The mask is set for a given position if emissions at that point are larger than 
 There is only one mask. Several emissions files can set and use the mask.
 
 
+Source Receptor (SR) Runs
+-------------------------
+
+The EMEP/MSC-W model can be used to test the impact of reduced emission
+of one or more pollutants from a particular country or a number of
+countries. Such runs are called "Scenario runs". They are used for source-receptor calculations.
+
+Emission factors for reduced emissions of pollutants from different
+sectors and countries can be defined in the input file called
+``femis.dat``, which can be found in the downloaded input data directory,
+see section :numref:`sec-femis`.
+
+.. code-block:: text
+    :name: base-femis
+    :caption: ``femis.dat`` for a base run.
+
+    Name  7  sox  nox  co   voc  nh3  pm25   pmco
+    27    0  1.0  1.0  1.0  1.0  1.0  1.0    1.0
+
+This base run example means that there are (1.0), no emission reductions
+of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the UK.
+
+-  The first column of the second line represents the country code. (27
+   is the code for UK.) The codes for all countries can be found in
+   Fortran module ``Country_ml.f90`` or at (http://www.emep.int/grid/country_numbers.txt). 
+   The country code must be the same as in the emission files for the given country. Some
+   countries and areas are divided into sub-areas in the emission files.
+   In this case, one line for each sub-area has to be included into the
+   ``femis.dat`` file. Countries and areas where emissions are given for
+   sub-areas include the Russian Federation, Germany and all sea areas.
+   "0" means all countries.
+
+-  The second column of the second line represents the sector and "0"
+   means all sectors. Here one can write the appropriate sector code if
+   the emission is reduced only from a specific sector. The description
+   of each sector can also be found in the Fortran module ``EmisDef_ml.f90``.
+
+-  The columns under the pollutant names show the emission factors for
+   the given pollutants. For example, 0.7 would mean 70% of the original
+   emission, thus 30% reduction.
+
+-  The number ("7") following the first text ("Name") in the first line
+   gives the number of pollutants treated in the file.
+
+An example of ``femis.dat`` file describing 50% reduced emission of |NH3|
+from sector 10 (the emission from agriculture) in the UK is shown in
+:numref:`reduction-femis`.
+
+.. code-block:: text
+    :name: reduction-femis
+    :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
+
+    Name  7  sox  nox  co   voc  nh3  pm25   pmco
+    27   10  1.0  1.0  1.0  1.0  0.5  1.0    1.0
+
+
+Instead of entire countries, reductions can also be specified by coordinates (and combined with country reductions).
+The line with coordinate corrections must start with the keyword ``lonlat``. The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
+
+
+.. code-block:: Fortran
+    :name: femis
+    :caption: ``femis.dat`` example.
+    :linenos:
+
+    Name                          7  sox  nox  co   voc  nh3  pm25  pmco
+    17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
+    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+
+
+In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
+Emissions of |NH3| from country with code 17 only, will be removed from the rectangle with longitudes between
+3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North. Use zero (0) as country code to specify that emissions from all countries should be reduced.
+
+
 
 
 Base run
@@ -352,64 +427,6 @@ is defined in the ``ExternalBICs_bc`` namelist.
     &end
 
 
-config: Europe or Global?
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-The EMEP model has traditionally been run on the EMEP grid covering
-Europe, and using meteorology from the ECMWF IFS model. In this environment,
-we typically set several configuration variables to make use of
-Euro-specific data. In other regions it is better to make use of the
-model's 'global' settings, which will ensure better handling of
-vegetation (eg LAI) changes, convection, and various emission
-settings.
-
-.. code-block:: text
-  :caption: Typical European/EMEP settings.
-
-  USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
-  USES%PFT_MAPS = F,
-  USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
-  USES%CONVECTION = F, 
-  USES%EURO_SOILNOX = T, ! diff for global + Euro
-
-.. code-block:: text
-  :caption: Typical non-European/global settings.
-
-  USES%DEGREEDAY_FACTORS = F
-  USES%PFT_MAPS = T,    ! PFT LAI tests
-  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
-  USES%CONVECTION = T
-  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
-  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
-
-The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
-controlling SNAP2 emissions. This requires pre-processed files of heating degree days.
-Such files (DegreeDayFactors.nc) can be produced from any meteorology, but the difference in
-results even for Europe is not too significant. In other regions of the
-world emissions from SNAP2 may not be as dependent on degree-days as in
-Europe, and so this setting should probably be false.
-
-``PFT_MAPS=T`` triggers the use of a global file which provides monthly
-variations in leaf area index (LAI) for different vegetation types. This
-controls deposition and biogenic VOC emission parameters. In Europe, a
-simpler latitude-dependent system is used (based upon DO3SE), and so
-``PFT_MAPS`` should be set F.
-
-``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
-indeed any non-European runs are better off with monthly emissions for
-that particular area.
-
-``CONVECTION`` is difficult. In principle, all models runs should use the T
-setting, but for Europe we find it degrades the model results too much
-and we use F. The problem is likely that the sub-grid processes behind
-convection are so complex and the paramererisation is very uncertain.
-Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
-which may be changed to allow more or less influence of this variable.
-
-The model will test the area covered, and if the area covered regions outside "Europe" (extended), it will automatically set 
-USES%PFT_MAPS=T , USES%DEGREEDAY_FACTORS = F , USES%EURO_SOILNOX = F and USES%GLOBAL_SOILNOX = T
-
 Vertical coordinate
 ___________________
 
@@ -480,80 +497,63 @@ either convert them into one of the above mentioned units in pre-processing
 or add the respective conversion factor in the module ``Units_ml.f90``.
 
 
-Source Receptor (SR) Runs
--------------------------
+config: Europe or Global?
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The EMEP/MSC-W model can be used to test the impact of reduced emission
-of one or more pollutants from a particular country or a number of
-countries. Such runs are called "Scenario runs". They are used for source-receptor calculations.
 
-Emission factors for reduced emissions of pollutants from different
-sectors and countries can be defined in the input file called
-``femis.dat``, which can be found in the downloaded input data directory,
-see section :numref:`sec-femis`.
-
-.. code-block:: text
-    :name: base-femis
-    :caption: ``femis.dat`` for a base run.
-
-    Name  7  sox  nox  co   voc  nh3  pm25   pmco
-    27    0  1.0  1.0  1.0  1.0  1.0  1.0    1.0
-
-This base run example means that there are (1.0), no emission reductions
-of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the UK.
-
--  The first column of the second line represents the country code. (27
-   is the code for UK.) The codes for all countries can be found in
-   Fortran module ``Country_ml.f90`` or at (http://www.emep.int/grid/country_numbers.txt). 
-   The country code must be the same as in the emission files for the given country. Some
-   countries and areas are divided into sub-areas in the emission files.
-   In this case, one line for each sub-area has to be included into the
-   ``femis.dat`` file. Countries and areas where emissions are given for
-   sub-areas include the Russian Federation, Germany and all sea areas.
-   "0" means all countries.
-
--  The second column of the second line represents the sector and "0"
-   means all sectors. Here one can write the appropriate sector code if
-   the emission is reduced only from a specific sector. The description
-   of each sector can also be found in the Fortran module ``EmisDef_ml.f90``.
-
--  The columns under the pollutant names show the emission factors for
-   the given pollutants. For example, 0.7 would mean 70% of the original
-   emission, thus 30% reduction.
-
--  The number ("7") following the first text ("Name") in the first line
-   gives the number of pollutants treated in the file.
-
-An example of ``femis.dat`` file describing 50% reduced emission of |NH3|
-from sector 10 (the emission from agriculture) in the UK is shown in
-:numref:`reduction-femis`.
+The EMEP model has traditionally been run on the EMEP grid covering
+Europe, and using meteorology from the ECMWF IFS model. In this environment,
+we typically set several configuration variables to make use of
+Euro-specific data. In other regions it is better to make use of the
+model's 'global' settings, which will ensure better handling of
+vegetation (eg LAI) changes, convection, and various emission
+settings.
 
 .. code-block:: text
-    :name: reduction-femis
-    :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
+  :caption: Typical European/EMEP settings.
 
-    Name  7  sox  nox  co   voc  nh3  pm25   pmco
-    27   10  1.0  1.0  1.0  1.0  0.5  1.0    1.0
+  USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
+  USES%PFT_MAPS = F,
+  USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = F, 
+  USES%EURO_SOILNOX = T, ! diff for global + Euro
 
+.. code-block:: text
+  :caption: Typical non-European/global settings.
 
-Instead of entire countries, reductions can also be specified by coordinates (and combined with country reductions).
-The line with coordinate corrections must start with the keyword ``lonlat``. The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
+  USES%DEGREEDAY_FACTORS = F
+  USES%PFT_MAPS = T,    ! PFT LAI tests
+  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = T
+  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
+  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
 
+The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
+controlling SNAP2 emissions. This requires pre-processed files of heating degree days.
+Such files (DegreeDayFactors.nc) can be produced from any meteorology, but the difference in
+results even for Europe is not too significant. In other regions of the
+world emissions from SNAP2 may not be as dependent on degree-days as in
+Europe, and so this setting should probably be false.
 
-.. code-block:: Fortran
-    :name: femis
-    :caption: ``femis.dat`` example.
-    :linenos:
+``PFT_MAPS=T`` triggers the use of a global file which provides monthly
+variations in leaf area index (LAI) for different vegetation types. This
+controls deposition and biogenic VOC emission parameters. In Europe, a
+simpler latitude-dependent system is used (based upon DO3SE), and so
+``PFT_MAPS`` should be set F.
 
-    Name                          7  sox  nox  co   voc  nh3  pm25  pmco
-    17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
-    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
+indeed any non-European runs are better off with monthly emissions for
+that particular area.
 
+``CONVECTION`` is difficult. In principle, all models runs should use the T
+setting, but for Europe we find it degrades the model results too much
+and we use F. The problem is likely that the sub-grid processes behind
+convection are so complex and the paramererisation is very uncertain.
+Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
+which may be changed to allow more or less influence of this variable.
 
-In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
-Emissions of |NH3| from country with code 17 only, will be removed from the rectangle with longitudes between
-3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North. Use zero (0) as country code to specify that emissions from all countries should be reduced.
-
+The model will test the area covered, and if the area covered regions outside "Europe" (extended), it will automatically set 
+USES%PFT_MAPS=T , USES%DEGREEDAY_FACTORS = F , USES%EURO_SOILNOX = F and USES%GLOBAL_SOILNOX = T
 
 New emission format
 -------------------
