@@ -121,60 +121,6 @@ There are some details one should take into account: the order of the "set_mask"
 The mask is set for a given position if emissions at that point are larger than 1.0e-20. If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
 There is only one mask. Several emissions files can set and use the mask.
 
-config: Europe or Global?
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-The EMEP model has traditionally been run on the EMEP grid covering
-Europe, and using meteorology from the ECMWF IFS model. In this environment,
-we typically set several configuration variables to make use of
-Euro-specific data. In other regions it is better to make use of the
-model's 'global' settings, which will ensure better handling of
-vegetation (eg LAI) changes, convection, and various emission
-settings.
-
-.. code-block:: text
-  :caption: Typical European/EMEP settings.
-
-  USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
-  USES%PFT_MAPS = F,
-  USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
-  USES%CONVECTION = F, 
-  USES%EURO_SOILNOX = T, ! diff for global + Euro
-
-.. code-block:: text
-  :caption: Typical non-European/global settings.
-
-  USES%DEGREEDAY_FACTORS = F
-  USES%PFT_MAPS = T,    ! PFT LAI tests
-  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
-  USES%CONVECTION = T
-  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
-  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
-
-The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
-controlling SNAP2 emissions. This requires pre-processed files of heating degree days.
-Such files (DegreeDayFactors.nc) can be produced from any meteorology, but the difference in
-results even for Europe is not too significant. In other regions of the
-world emissions from SNAP2 may not be as dependent on degree-days as in
-Europe, and so this setting should probably be false.
-
-``PFT_MAPS=T`` triggers the use of a global file which provides monthly
-variations in leaf area index (LAI) for different vegetation types. This
-controls deposition and biogenic VOC emission parameters. In Europe, a
-simpler latitude-dependent system is used (based upon DO3SE), and so
-``PFT_MAPS`` should be set F.
-
-``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
-indeed any non-European runs are better off with monthly emissions for
-that particular area.
-
-``CONVECTION`` is difficult. In principle, all models runs should use the T
-setting, but for Europe we find it degrades the model results too much
-and we use F. The problem is likely that the sub-grid processes behind
-convection are so complex and the paramererisation is very uncertain.
-Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
-which may be changed to allow more or less influence of this variable.
 
 
 
@@ -405,6 +351,64 @@ is defined in the ``ExternalBICs_bc`` namelist.
         'NO2','NO2_VMR_inst',1.0,T,F,-1,
     &end
 
+
+config: Europe or Global?
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+The EMEP model has traditionally been run on the EMEP grid covering
+Europe, and using meteorology from the ECMWF IFS model. In this environment,
+we typically set several configuration variables to make use of
+Euro-specific data. In other regions it is better to make use of the
+model's 'global' settings, which will ensure better handling of
+vegetation (eg LAI) changes, convection, and various emission
+settings.
+
+.. code-block:: text
+  :caption: Typical European/EMEP settings.
+
+  USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
+  USES%PFT_MAPS = F,
+  USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = F, 
+  USES%EURO_SOILNOX = T, ! diff for global + Euro
+
+.. code-block:: text
+  :caption: Typical non-European/global settings.
+
+  USES%DEGREEDAY_FACTORS = F
+  USES%PFT_MAPS = T,    ! PFT LAI tests
+  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = T
+  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
+  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
+
+The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
+controlling SNAP2 emissions. This requires pre-processed files of heating degree days.
+Such files (DegreeDayFactors.nc) can be produced from any meteorology, but the difference in
+results even for Europe is not too significant. In other regions of the
+world emissions from SNAP2 may not be as dependent on degree-days as in
+Europe, and so this setting should probably be false.
+
+``PFT_MAPS=T`` triggers the use of a global file which provides monthly
+variations in leaf area index (LAI) for different vegetation types. This
+controls deposition and biogenic VOC emission parameters. In Europe, a
+simpler latitude-dependent system is used (based upon DO3SE), and so
+``PFT_MAPS`` should be set F.
+
+``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
+indeed any non-European runs are better off with monthly emissions for
+that particular area.
+
+``CONVECTION`` is difficult. In principle, all models runs should use the T
+setting, but for Europe we find it degrades the model results too much
+and we use F. The problem is likely that the sub-grid processes behind
+convection are so complex and the paramererisation is very uncertain.
+Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
+which may be changed to allow more or less influence of this variable.
+
+The model will test the area covered, and if the area covered regions outside "Europe" (extended), it will automatically set 
+USES%PFT_MAPS=T , USES%DEGREEDAY_FACTORS = F , USES%EURO_SOILNOX = F and USES%GLOBAL_SOILNOX = T
 
 Vertical coordinate
 ___________________
