@@ -508,8 +508,7 @@ Source Receptor (SR) Runs
 
 The EMEP/MSC-W model can be used to test the impact of reduced emission
 of one or more pollutants from a particular country or a number of
-countries. Such runs are called "Scenario runs". They are the basic runs
-for source-receptor calculations.
+countries. Such runs are called "Scenario runs". They are used for source-receptor calculations.
 
 Emission factors for reduced emissions of pollutants from different
 sectors and countries can be defined in the input file called
@@ -528,12 +527,13 @@ of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the U
 
 -  The first column of the second line represents the country code. (27
    is the code for UK.) The codes for all countries can be found in
-   Fortran module ``Country_ml.f90``. Please note that the country code
-   must be the same as in the emission files for the given country. Some
+   Fortran module ``Country_ml.f90`` or at (http://www.emep.int/grid/country_numbers.txt). 
+   The country code must be the same as in the emission files for the given country. Some
    countries and areas are divided into sub-areas in the emission files.
    In this case, one line for each sub-area has to be included into the
    ``femis.dat`` file. Countries and areas where emissions are given for
    sub-areas include the Russian Federation, Germany and all sea areas.
+   "0" means all countries.
 
 -  The second column of the second line represents the sector and "0"
    means all sectors. Here one can write the appropriate sector code if
@@ -547,21 +547,36 @@ of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the U
 -  The number ("7") following the first text ("Name") in the first line
    gives the number of pollutants treated in the file.
 
-An example of ``femis.dat`` file describing 50% reduced emission of |SOx|
+An example of ``femis.dat`` file describing 50% reduced emission of |NH3|
 from sector 10 (the emission from agriculture) in the UK is shown in
 :numref:`reduction-femis`.
 
 .. code-block:: text
     :name: reduction-femis
-    :caption: ``femis.dat`` for 50% |SOx| reduction from sector 10 over UK.
+    :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
 
     Name  7  sox  nox  co   voc  nh3  pm25   pmco
-    27   10  0.5  1.0  1.0  1.0  1.0  1.0    1.0
+    27   10  1.0  1.0  1.0  1.0  0.5  1.0    1.0
 
 
-For a scenario run ``femis.dat`` file should be edited manually depending
-on the level of reduction one would like to test with any pollutant from
-any sector and/or any country. Several lines can be written in the file.
+Instead of entire countries, reductions can also be specified by coordinates (and combined with country reductions).
+The line with coordinate corrections must start with the keyword ``lonlat``. The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
+
+
+.. code-block:: Fortran
+    :name: femis
+    :caption: ``femis.dat`` example.
+    :linenos:
+
+    Name                          7  sox  nox  co   voc  nh3  pm25  pmco
+    17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
+    lonlat 3.3 7.2 50.7 53.5   17 0  1.0  1.0  1.0  1.0  0.0  1.0   1.0
+
+
+In :numref:`femis`, country with code 17 (NL) will reduce |PM25| and |PM10| emissions by half for all sectors.
+Emissions of |NH3| from country with code 17 only, will be removed from the rectangle with longitudes between
+3.3 and 7.2 degrees East, and between 50.7 and 53.5 degrees North. Use zero (0) as country code to specify that emissions from all countries should be reduced.
+
 
 New emission format
 -------------------
