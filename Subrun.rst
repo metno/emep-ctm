@@ -273,7 +273,7 @@ Nesting
 -------
 
 The model can be run in a large domain and all the concentrations of pollutants stored at fixed intervalls (3 hours typically).
-Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stoed concentrations at the domain boundaries. It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outtside the small region. This is called nesting. 
+Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stored concentrations at the domain boundaries. It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outside the small region. This is called nesting. 
 The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain), and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain).
 
 Depending on what is wanted different "Nesting modes" can be defined. The different options are controlled by the ``MODE_READ`` and ``MODE_SAVE`` variables in ``Nest_config`` in ``config_emep.nml`` file. The mode options are:
@@ -286,7 +286,7 @@ Depending on what is wanted different "Nesting modes" can be defined. The differ
     'FORECAST'
         read at the start of run, if the files are found.
     ‘NHOUR’
-        read at given ``NHOURREAD`` hourly intervals.
+        read at given ``NHOURREAD`` hourly intervals, if the file is found.
         ``NHOURREAD`` is set in ``Nest_config`` and should be an integer fraction of 24.
     ‘MONTH’
         read at start of each month.
@@ -307,6 +307,7 @@ Depending on what is wanted different "Nesting modes" can be defined. The differ
 The name of the file to write to is defined by ``template_write`` (also in ``Nest_config``).
 The name of the file to read to IC data from is defined by ``template_read_IC``.
 The name of the file to read to BC data from is defined by ``template_read_BC``; it can be the same file as ``template_read_IC``.
+If for example NHOURSAVE=3, but  NHOURREAD = 1, the data is interpolated in time to get a smooth transition between the 3-hourly values (recommended).
 
 Example write BCs
 ~~~~~~~~~~~~~~~~~
