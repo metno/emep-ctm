@@ -272,26 +272,11 @@ the keyword ```HOURLYFILE_ending    = 'JJJ.nc' ```, in the configuration file. `
 Nesting
 -------
 
-The boundary conditions needed for EMEP MSC-W model is provided with the
-input data. The model can read Boundary conditions data from other
-models as well. These data has to be in NetCDF format. The boundary
-conditions needed for EMEP MSC-W model is provided with the input data.
-The model can read Boundary conditions data from other models as well.
-These data has to be in NetCDF format.
+The model can be run in a large domain and all the concentrations of pollutants stored at fixed intervalls (3 hours typically).
+Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stoed concentrations at the domain boundaries. It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outtside the small region. This is called nesting. 
+The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain), and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain).
 
-Different Nesting modes are:
-
-*  read the external BC data only,
-*  produce EMEP BC data from the simulation,
-*  read the external BC data and produce EMEP BC data,
-*  using the default EMEP BC data from the input data directory and
-   write out EMEP BC at the end of the simulation,
-*  read the external BC data only in the beginning of the simulation,
-*  read external BC at the beginning of the simulation and write out
-   EMEP BC at the end of the simulation.
-
-These options are controlled by the ``MODE_READ`` and ``MODE_SAVE`` variables
-in ``Nest_config`` namelist, in ``config_emep.nml`` file. The mode options are:
+Depending on what is wanted different "Nesting modes" can be defined. The different options are controlled by the ``MODE_READ`` and ``MODE_SAVE`` variables in ``Nest_config`` in ``config_emep.nml`` file. The mode options are:
 
 ``MODE_READ``
     'NONE'
@@ -319,11 +304,12 @@ in ``Nest_config`` namelist, in ``config_emep.nml`` file. The mode options are:
     ‘MONTH’
         write after each month (used for checkpoint/restart for instance).
 
-BC data are read from the file defined by ``template_read_BC`` in ``Nest_config``. 
-In addition, the IC data (entire 3D domain) will be set at start of run from the file defined by ``template_read_3D`` in ``Nest_config`` (except if  ``MODE_READ`` = 'NONE').
+The name of the file to write to is defined by ``template_write`` (also in ``Nest_config``).
+The name of the file to read to IC data from is defined by ``template_read_IC``.
+The name of the file to read to BC data from is defined by ``template_read_BC``; it can be the same file as ``template_read_IC``.
 
-Write BCs from EMEP MSC-W model
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example write BCs
+~~~~~~~~~~~~~~~~~
 
 :numref:`nest-write-config` shows an example to write every 3 hours into
 daily Nest/BC files. Output file name is defined by ``template_write`` ('BC_YYYYMMDD.nc'),
@@ -351,7 +337,7 @@ Reduce the size of BC files
 ___________________________
 
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
-If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC can be stored.
+If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC of the small domain can be stored.
 Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid;
   it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
 
@@ -370,8 +356,8 @@ The NetCDF internal compression will take care of reducing the actual size, as m
 If a BC file has been created using the ``MET_inner`` method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
 
 
-Read BCs from EMEP MSC-W model
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Read BCs produced by a previous EMEP MSC-W model run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :numref:`nest-read-config` shows an example to read every 3 hours from
 the Nest/BC files created previously by running :numref:`nest-write-config`.
@@ -392,9 +378,7 @@ as shown in :numref:`config-emep`.
 Read external BCs
 ~~~~~~~~~~~~~~~~~
 
-Reading BCs from a different model is more involved than the previous example.
-The vertical axis and variables in the file need to be mapped to the
-corresponding model variables.
+So far only BC created by the model itself have been used. Reading external BCs , i.e. produced by other means (another model for example) is more involved. The chemical species may be different and the vertical levels also. The vertical axis and variables in the file need then to be mapped to the corresponding model variables. 
 
 :numref:`nest-mybc-config` shows an example to read every 3 hours from an external
 BC file. The model will read 3 variables from ``MyBC.nc``: |O3|, NO, and |NO2|.
@@ -498,7 +482,7 @@ or add the respective conversion factor in the module ``Units_ml.f90``.
 
 
 config: Europe or Global?
-~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------
 
 
 The EMEP model has traditionally been run on the EMEP grid covering
