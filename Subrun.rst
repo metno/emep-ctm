@@ -548,7 +548,7 @@ In the new format, emissions are organised in a number of files (Emis_sourceFile
 For now the main constraint is that a source is any 2D field (possibly+time).
 The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
-The file and sources can be characterized by a set of variables. In genereal these variable can be set by and in order of increasing priority:
+The file and sources can be characterized by a set of variables. In genereal these variable can be set by, and in order of increasing priority:
   1. Default value
   2. Global attribute read in the netcdf file
   3. Variable attribute read in the netcdf file
@@ -557,7 +557,7 @@ The file and sources can be characterized by a set of variables. In genereal the
   
 Exception to the priority rule are:
   * maskID cannot be set by attributes in the netcdf file
-  * the file and source factor are on top of each other, not replaced
+  * the file and source 'factor' are on top of each other, not replaced
   * boolean parameters (like apply_femis), are used as "and" (i.e. if any is false, the result is false) 
 
 List of file attributes (default in parenthesis):
@@ -566,9 +566,9 @@ List of file attributes (default in parenthesis):
   - grid_resolution (an approximate value is computed from the lon and lat, if no value is given) It does not need to be exact (cannot be exact on a sphere anyway!). This grid_resolution steers the interpolation algorithm; A large value will force the code to subdivide each emission gridcell in large number of pieces, that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
   - periodicity (‘time’) How often the values are updated. Can be ‘yearly’, ‘Monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record. The timestamp must correspond to the end of the time period of validity. For ‘yearly’ monthly timefactors are applied, if a sector is defined. For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
   - factor (1.0) multiplicative factor for all sources in the file
+  - units ('NOTSET') will be used as default for sources units if set.
   - apply_femis (true) whether to apply the femis reductions to the sources of this file.
   - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
-  - units ('NOTSET') will be used as default for sources units if set.
   - country_ISO ('NOTSET') will be used as default for sources units if set.
   - sector (-1) will be used as default for sources sector if set.
   - species ('NOTSET') will be used as default for sources species if set.
@@ -578,8 +578,8 @@ List of file attributes (default in parenthesis):
 List of source attributes:
   - varname (‘NOTSET’) The name as used in the netcdf file
   - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc) 
-  - factor (1.0) multiplicative factor. Can be used to change units to model definitions.
-  - units (‘mg/m2/h’) Units *after* the factor multiplication. Comes on top of the file multiplicative factors and possibly other factors.
+  - factor (1.0) multiplicative factor. Can be used to change units to model definitions.Comes on top of the file multiplicative factors and possibly other factors.
+  - units (‘mg/m2/h’) Units *after* the factor multiplication. 
   - country_ISO (‘N/A’) the country code, as defined in Country_mod.f90 (for example ‘FR’ for France). ‘N/A’ is a valid code, but it does not correspond to any country.
   - apply_femis (true) whether to apply the femis reductions to this source.
   - include_in_local_fractions (true) whether to take this source into account for the local fraction calculations
@@ -660,4 +660,34 @@ For example the mapping "GNFR_sec2hfac_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/)", m
 You can add both more emission heghts in "EmisHeights.txt" and access them by changing the maps. (The maps cannot be set by config_emep.nml for now because it is not guaranteed that everything will work when you change the wrong things).
 You can define a new mapping for example using the "TEST" mapping (also in EmisDef.f90). To switch to "TEST" for those mappings set "USE_SECTOR_NAME='TEST'" in "config_emep.nml".
 
+Local Fractions (under development)
+-----------------------------------
 
+When chosen, the Local Fractions (also called uEMEP) will be outputted in separate files.
+
+config_emep.nml settings:
+
+.. code-block:: Fortran
+    :caption: Local Fractions flag example
+    :linenos:
+
+    USE_uEMEP    = T, !activates Local Fractions
+    
+    uEMEP%poll(1)%emis="pm25" ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
+    uEMEP%poll(1)%sector(1)=0 !0 means sum of all sectors
+    uEMEP%poll(1)%sector(2)=1 !1 means sector 1
+    uEMEP%poll(1)%sector(3)=7 !7 means sector 7
+    uEMEP%poll(2)%emis="nh3 "
+    uEMEP%poll(2)%sector(1)=0
+    uEMEP%poll(2)%sector(2)=10
+    
+    uEMEP%YEAR = T !output for fullrun
+    uEMEP%HOUR_INST = F !output every hour
+    
+    uEMEP%dist = 5  !how far the neighbors can be in each direction (NB: high cost for large dist)
+    uEMEP%Nvert = 7 !How many vertical level to include in treatment 
+    
+    !  uEMEP%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
+
+
+Note that the files can be very large if hourly outputs and/or many neighbors are requested.
