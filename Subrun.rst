@@ -12,7 +12,7 @@ In general the parameters and pathes to the input files can all be set in the co
 
 The default parameter, constants and flags are defined in ``Config_module.f90``, and they can be overwritten by ``config_emep.nml`` settings. 
 
-Here is an example of content:
+Here is an example of content of the most important parameters:
 
 .. code-block:: text
   :name: config-emep
@@ -22,7 +22,7 @@ Here is an example of content:
     GRID = 'EECCA',
     iyr_trend = 2015,
     runlabel1 = 'Base',
-    runlabel2 = 'Opensource_Setup_2018',
+    runlabel2 = 'Opensource_Setup_2019',
     startdate = 2015,01,01,00,
     enddate = 2015,01,10,24,
   &end
@@ -52,76 +52,38 @@ To set a smaller domain, use ``RUNDOMAIN`` variable in the ``ModelConstants_conf
 namelist to indicate the sub-domain indexes. In the config_emep extract above,
 ``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
 
-Using and combining gridded emissions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The gridded emission files are controlled via the ``config_emep.nml``
-file. Each file is assigned as one set of values for ``emis_inputlist``.
-:numref:`emis-config` line 1 includes an ASCII emission file, where the
-keyword ``POLL`` will be replaced by the model by all the
-emitted pollutants (according to the names defined in ``CM_EmisFiles.inc``).
-An additional NetCDF emission is included in line 2.
+Base run
+--------
 
-Now all emissions from both ASCII file and NetCDF file will be used. In
-practice some countries might be counted twice. Therefore some new data
-can be included in the ``emis_inputlist``, to specify which countries to
-keep or to avoid. :numref:`emis-config` lines 3--4
-will include only 'NO', 'SE' and 'FI' from the first file (ASCII), and
-take all countries except 'NO', 'SE' and 'FI' from the second file
-(NetCDF).
+To run the model you need access to the executable (``emepctm``) and the ``config_emep.nml`` files. The path to the other input files are defined by defaults or set in the ``config_emep.nml`` file.
 
-Sets of countries can in principle be defined; for now only the set
-'EUMACC2' is defined.
+To run the model you can either run interactively (mostly for short run), using somthing similar to (it depends on your system):
 
-.. _`emis-config`:
+``mpirun emepctm``
 
-.. code-block:: Fortran
-    :caption: Mixed emission configuration example.
-    :linenos:
+For longer runs you should run the model as a batch job (the details will depend on your system). If the run was successful, a message
 
-    emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
-    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
-    emis_inputlist(1)%incl(1:) = 'NO','SE','FI',
-    emis_inputlist(2)%excl(1:) = 'NO','SE','FI',
-    emis_inputlist(1)%PollName(1:2) = 'voc','sox',
+.. code-block:: text
 
+    programme is finished
 
-It is also possible to restrict the number of pollutants from each of the files.
-If not all pollutants from ``CM_EmisFiles.inc`` are to be read, one can specify a list of pollutants to be included
-using "PollName". For instance in the example above , the last line specifies that emissions will include only VOC 
-and SOx from the file defined by emis_inputlist(1)%name. 
-If PollName is not specified at all, all pollutants are included (therefore all pollutants 
-from emis_inputlist(2)%name will be included).
-The specified pollutants must already be defined in ``CM_EmisFiles.inc``.
-It is possible to disregard the "lonlat" reductions introduced by ``femis.dat`` for specific emissions. To do this use the "use_lonlat_femis" flag.
-Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``
+will be stated at the end of the standard output (screen or some appropriate file for batch jobs).
 
-.. code-block:: Fortran
-    :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(1)%name``.
-    :linenos:
+The model results will be written to the same directory. Please make sure there is enough disk place for the model
+results. For more information about the model result output files,
+see :numref:`ch-output`.
 
-    emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
-    emis_inputlist(1)%use_lonlat_femis = F,
-    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
+If for some reason the model crashed, please check both the log and the
+error file for any clue of the crash. After fixing the problem the job
+can be submitted again. If the model has crashed, then the links to the
+input data are not removed.
+ The
+variables wanted in the output are specified in the
+``OutputConcs_config``, ``OutputDep_config`` and in the ``OutputMisc_config``
+parameters respectively for surface concentrations, depositions and some
+miscellaneous outputs.
 
-
-An alternative way of combining overlapping emissions, is to use a "mask" approach. This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
-The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
-
-.. code-block:: Fortran
-    :caption: Mixed emission using mask configuration example.
-    :linenos:
-
-    emis_inputlist(1)%name = '/MyPathToEmissions/emis_local.POLL',
-    emis_inputlist(1)%set_mask = T,
-    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
-    emis_inputlist(2)%use_mask = T,
-
-There are some details one should take into account: the order of the "set_mask" and "use_mask" matter. The mask should be set before it is used; "before" meaning that the indice of "emis_inputlist" is lower. Also yearly emissions are treated before monthly emissions, therefore one should not use monthly emissions to mask yearly emissions.
-The mask is set for a given position if emissions at that point are larger than 1.0e-20. If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
-There is only one mask. Several emissions files can set and use the mask.
-
-Masks can also be set from any field, see own section below.
 
 
 Source Receptor (SR) Runs
@@ -198,74 +160,85 @@ Emissions of |NH3| from country with code 17 only, will be removed from the rect
 
 
 
-
-Base run
---------
-
-This is an example of a minimum ``modrun.sh`` script to run the model.
-
-.. literalinclude:: modrun.sh
-    :caption: Minimum ``modrun.sh`` example.
-    :language: bash
-
-This bash shell script is designed so that users can easily adapt it to
-fit their needs. It contain the minimum information required to run the
-EMEP/MSC-W model. The script should be self-explanatory. The paths 
-for meteorology and all other input data are defined on the model configuration file,
-``config_emep.nml``. You need to set the right paths for the input directories.
-
-It is possible to run the model on a smaller domain than the full
-regional model domain, as defined by indexes :math:`x` and :math:`y`.
-For the 'EECCA' grid  :math:`x=1,\ldots,132; y=1,\ldots,159`\ .
-To set a smaller domain, use ``RUNDOMAIN`` variable in the ``ModelConstants_config``
-namelist to idicate the sub-domain indexes. In :numref:`config-emep`,
-``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
-
-To run the model, the correct path to the EMEP/MSC-W model code has to
-be set (``mpiexec path_to_the_modelcode/Unimod``).
-
-It is recommended to submit the script as a batch job. Please check the
-submission routine on the computer system you are running on.
-In the newer model versions (since 4.0) the number of nodes is set
-automatically from what is asked for when submitting a job.
-The approximate time and CPU usage is described in :numref:`sec-compinf`.
-
-When the job is no longer running or in the queue, it is either finished
-or has crashed for some reason. If the model run crashed, an error
-message will give information on what was missing or wrong in the
-routine. If the run was successful, a message
-
-.. code-block:: text
-
-    ++++++++++++++++++++++++++++++++++++++++++++++++
-    programme is finished
-
-will be stated at the end of the log file, before printing the
-``Timing.out`` file.
-
-The model results will be written to this same
-directory. Please make sure there is enough disk place for the model
-results. For more information about the model result output files,
-see :numref:`ch-output`.
-
-If for some reason the model crashed, please check both the log and the
-error file for any clue of the crash. After fixing the problem the job
-can be submitted again. If the model has crashed, then the links to the
-input data are not removed.
-
-The script can also be submitted interactively, and either have the
-output written to the screen or to named error and output log files. The
-variables wanted in the output are specified in the
-``OutputConcs_config``, ``OutputDep_config`` and in the ``OutputMisc_config``
-parameters respectively for surface concentrations, depositions and some
-miscellaneous outputs.
-
 Separate hourly outputs
 -----------------------
 
-The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` files can become very lkarge. It is possible to split them into one file per day by adding 
+The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` files can become very large. It is possible to split them into one file per day by adding 
 the keyword ```HOURLYFILE_ending    = 'JJJ.nc' ```, in the configuration file. ```JJJ```, will be automatically replaced by the corresponding day of the year (i.e. a number from 1 to 366 giving for instance
 ``Base_hour_001.nc``). The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```. 
+
+
+Using and combining gridded emissions
+-------------------------------------
+
+The gridded emission files are controlled via the ``config_emep.nml``
+file. Each file is assigned as one set of values for ``emis_inputlist``.
+:numref:`emis-config` line 1 includes an ASCII emission file, where the
+keyword ``POLL`` will be replaced by the model by all the
+emitted pollutants (according to the names defined in ``CM_EmisFiles.inc``).
+An additional NetCDF emission is included in line 2.
+
+Now all emissions from both ASCII file and NetCDF file will be used. In
+practice some countries might be counted twice. Therefore some new data
+can be included in the ``emis_inputlist``, to specify which countries to
+keep or to avoid. :numref:`emis-config` lines 3--4
+will include only 'NO', 'SE' and 'FI' from the first file (ASCII), and
+take all countries except 'NO', 'SE' and 'FI' from the second file
+(NetCDF).
+
+Sets of countries can in principle be defined; for now only the set
+'EUMACC2' is defined.
+
+.. _`emis-config`:
+
+.. code-block:: Fortran
+    :caption: Mixed emission configuration example.
+    :linenos:
+
+    emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
+    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
+    emis_inputlist(1)%incl(1:) = 'NO','SE','FI',
+    emis_inputlist(2)%excl(1:) = 'NO','SE','FI',
+    emis_inputlist(1)%PollName(1:2) = 'voc','sox',
+
+
+It is also possible to restrict the number of pollutants from each of the files.
+If not all pollutants from ``CM_EmisFiles.inc`` are to be read, one can specify a list of pollutants to be included
+using "PollName". For instance in the example above , the last line specifies that emissions will include only VOC 
+and SOx from the file defined by emis_inputlist(1)%name. 
+If PollName is not specified at all, all pollutants are included (therefore all pollutants 
+from emis_inputlist(2)%name will be included).
+The specified pollutants must already be defined in ``CM_EmisFiles.inc``.
+It is possible to disregard the "lonlat" reductions introduced by ``femis.dat`` for specific emissions. To do this use the "use_lonlat_femis" flag.
+Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``
+
+.. code-block:: Fortran
+    :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(1)%name``.
+    :linenos:
+
+    emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
+    emis_inputlist(1)%use_lonlat_femis = F,
+    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
+
+
+An alternative way of combining overlapping emissions, is to use a "mask" approach. This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
+The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
+
+.. code-block:: Fortran
+    :caption: Mixed emission using mask configuration example.
+    :linenos:
+
+    emis_inputlist(1)%name = '/MyPathToEmissions/emis_local.POLL',
+    emis_inputlist(1)%set_mask = T,
+    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
+    emis_inputlist(2)%use_mask = T,
+
+There are some details one should take into account: the order of the "set_mask" and "use_mask" matter. The mask should be set before it is used; "before" meaning that the indice of "emis_inputlist" is lower. Also yearly emissions are treated before monthly emissions, therefore one should not use monthly emissions to mask yearly emissions.
+The mask is set for a given position if emissions at that point are larger than 1.0e-20. If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
+There is only one mask. Several emissions files can set and use the mask.
+
+Masks can also be set from any field, see own section below.
+
 
 .. _`sec-nesting`:
 
