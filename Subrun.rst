@@ -307,28 +307,6 @@ If no ``out_DOMAIN`` is given, the entire model rundomain will be written out.
       out_DOMAIN       = 60,107,11,58,    ! istart,iend,jstart,jend
     &end
     
-Reduce the size of BC files
-___________________________
-
-The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
-If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC of the small domain can be stored.
-Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid;
-  it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
-
-.. code-block:: text
-    :name: nest-write-inner
-    :caption: Inner domain options for nested BC output example.
-
-    &Nest_config
-    [...]
-      MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
-    &end
-        
-Note that the file will have the same dimensions, but zeros are put into the unused parts.
-The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
-
-If a BC file has been created using the ``MET_inner`` method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
-
 
 Read BCs produced by a previous EMEP MSC-W model run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -351,6 +329,30 @@ as shown in :numref:`config-emep`.
 
 
 Note that ``NHOURREAD`` can (and should) be smaller than the value used for ``NHOURSAVE``. The values between saved dates will then be interpolated in time, giving a smoother transition.
+
+
+Reduce the size of BC files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
+If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC of the small domain can be stored.
+Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid;
+  it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
+
+.. code-block:: text
+    :name: nest-write-inner
+    :caption: Inner domain options for nested BC output example.
+
+    &Nest_config
+    [...]
+      MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
+    &end
+        
+Note that the file will have the same dimensions, but zeros are put into the unused parts.
+The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
+
+If a BC file has been created using the ``MET_inner`` method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
+
 
 Read external BCs
 ~~~~~~~~~~~~~~~~~
