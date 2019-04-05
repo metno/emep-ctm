@@ -76,14 +76,19 @@ see :numref:`ch-output`.
 
 If for some reason the model crashed, please check both the log and the
 error file for any clue of the crash. After fixing the problem the job
-can be submitted again. If the model has crashed, then the links to the
-input data are not removed.
- The
-variables wanted in the output are specified in the
+can be submitted again. 
+
+The variables wanted in the output are specified in the
 ``OutputConcs_config``, ``OutputDep_config`` and in the ``OutputMisc_config``
 parameters respectively for surface concentrations, depositions and some
 miscellaneous outputs.
 
+The main ouput files are
+ - Base_fullrun.nc gives values averaged over the entire simulation. This file has always 1 record and the data is an average over the the period startdate to enddate. 
+ - Base_month.nc average over each calendar month (12 records for a yearly run) 
+ - Base_day.nc averages over 24 hours, starting at 06:00 UTC (each record gives average values between 06:00 and 06:00 the next day. The first time step is written out at 06:00 hr on 2Jan (i.e the first 6 hours are “lost”). The last record may also be averaged only until the end of the run, and not at 06:00.)
+ - Base_hour.nc, averaged over 1 hour.
+ - Base_hourInst.nc, instantaneous values every hour.
 
 
 Source Receptor (SR) Runs
