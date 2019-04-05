@@ -274,7 +274,7 @@ Nesting
 
 The model can be run in a large domain and all the concentrations of pollutants stored at fixed intervalls (3 hours typically).
 Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stored concentrations at the domain boundaries. It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outside the small region. This is called nesting. 
-The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain), and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain).
+The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain), and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain, but only for the start date).
 
 Depending on what is wanted different "Nesting modes" can be defined. The different options are controlled by the ``MODE_READ`` and ``MODE_SAVE`` variables in ``Nest_config`` in ``config_emep.nml`` file. The mode options are:
 
@@ -325,7 +325,7 @@ If no ``out_DOMAIN`` is given, the entire model rundomain will be written out.
     :caption: Write BCs configuration example.
 
     &Nest_config
-      MODE_READ        = 'NONE',          ! do not read external BC
+      MODE_READ        = 'NONE',          ! do not read BC
       MODE_SAVE        = 'NHOUR',         ! write BCs
       NHOURSAVE        = 3,               !  every 3 hours
       template_write   = 'BC_YYYYMMDD.nc' !  to your (daily) BC output file
@@ -360,7 +360,7 @@ If a BC file has been created using the ``MET_inner`` method, it cannot be used 
 Read BCs produced by a previous EMEP MSC-W model run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:numref:`nest-read-config` shows an example to read every 3 hours from
+:numref:`nest-read-config` shows an example to read every 1 hours from
 the Nest/BC files created previously by running :numref:`nest-write-config`.
 Please note that the model sub-domain for a nested run is set by ``RUNDOMAIN``,
 as shown in :numref:`config-emep`.
@@ -371,10 +371,13 @@ as shown in :numref:`config-emep`.
 
     &Nest_config
       MODE_READ        = 'NHOUR',         ! read external BC
-      NHOURREAD        = 3,               !   every 3 hours
+      NHOURREAD        = 1,               !   every hour
       template_read_BC = 'BC_YYYYMMDD.nc' !   your (daily) BC input file
       MODE_SAVE        = 'NONE',          ! do not write BCs
     &end
+
+
+Note that ``NHOURREAD`` can (and should) be smaller than the value used for ``NHOURSAVE``. The values between saved dates will then be interpolated in time, giving a smoother transition.
 
 Read external BCs
 ~~~~~~~~~~~~~~~~~
