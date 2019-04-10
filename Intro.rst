@@ -111,13 +111,13 @@ of the EMEP/MSC-W Open Source `github page`__.
 Although the source code is available for download as a single compressed file on
 the release page, the preferred retrieval method is via the `catalog tool`_ as follows:
 
-.. _`catalog tool`: https://github.com/metno/emep-ctm/tree/master/tools
+.. _`catalog tool`: https://github.com/metno/emep-ctm/tree/tools
 
 
 .. code-block:: bash
 
     # download the catalog tool
-    wget https://raw.githubusercontent.com/metno/emep-ctm/master/tools/catalog.py
+    wget https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.py
 
     # make it executable and run it
     chmod +x catalog.py
