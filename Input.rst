@@ -74,7 +74,7 @@ IMPORTANT:
     Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
     Time factors for hourly emissions   & ``HourlyFacs.INERIS``               & ASCII
     Emission heights                    & ``EmisHeights.txt``                 & ASCII
-    Natural |SO2|                       & ``natso2MM.dat`` (12 files)         & ASCII [#YMD]_
+    Natural |SO2|                       & ``DMS.nc``                          & netCDF
     Volcanoes                           & ``columnsource_emission.csv``       & ASCII
                                         & ``columnsource_location.csv``       & ASCII
     Lightning emissions                 & ``lt21-nox.datMM`` (12 files)       & ASCII [#YMD]_
@@ -433,8 +433,7 @@ Natural |SO2|
 ~~~~~~~~~~~~~~~~~~~~
 
 Natural |SO2| emissions (dimethylsulfide (DMS) from sea) are
-provided as monthly gridded files. The values are given at the surface
-in :math:`\mu g/m^2` for each grid cell in the domain.
+provided as monthly gridded files. The values are computed taking into account sea surface temperature and wind speed.
 
 Volcanoes
 ~~~~~~~~~
