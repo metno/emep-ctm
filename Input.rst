@@ -367,6 +367,12 @@ search for 'Emissions for EMEP', which links directly to the ``Readme`` file
 and the emission data file in NetCDF format. Download the emission data
 file and place it in the input folder.
 
+Natural |SO2|
+~~~~~~~~~~~~~~~~~~~~
+
+Natural |SO2| emissions (dimethylsulfide (DMS) from sea) are
+provided as monthly gridded files. The values are computed taking into account sea surface temperature and wind speed.
+
 Surface Pressure
 ~~~~~~~~~~~~~~~~
 
@@ -429,11 +435,6 @@ al. (2012) section 6.10.
 ASCII files
 -----------
 
-Natural |SO2|
-~~~~~~~~~~~~~~~~~~~~
-
-Natural |SO2| emissions (dimethylsulfide (DMS) from sea) are
-provided as monthly gridded files. The values are computed taking into account sea surface temperature and wind speed.
 
 Volcanoes
 ~~~~~~~~~
