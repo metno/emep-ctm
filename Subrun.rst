@@ -100,6 +100,7 @@ countries. Such runs are called "Scenario runs". They are used for source-recept
 
 Emission factors for reduced emissions of pollutants from different
 sectors and countries can be defined in the input file ``femis.dat``.
+The path to this file can be set in config_emep.nml, ``femisFile = /my/path/femis.dat``
 
 .. code-block:: text
     :name: base-femis
