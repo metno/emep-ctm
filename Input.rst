@@ -20,13 +20,13 @@ Download the input via the catalog tool (:numref:`sec-ModelCode`) as follows:
 .. code-block:: bash
 
     # download 2015 meteorology for the EECCA domain
-    catalog.py -R rv4.17 --meteo --met-domain EECCA
+    catalog.py -R rv4_17 --meteo --met-domain EECCA
 
     # download 2015 meteorology for the EMEP01 domain
-    catalog.py -R rv4.17 --meteo --met-domain EMEP01
+    catalog.py -R rv4_15 --meteo --met-domain EMEP01
 
     # download other input files
-    catalog.py -R rv4.17 --input
+    catalog.py -R rv4_17 --input
 
 The meteorology files will be placed under
 ``EMEP_MSC-W_model.rv4.17.OpenSource/meteo2015/``,
