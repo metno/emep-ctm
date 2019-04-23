@@ -351,7 +351,8 @@ Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata 
 
     &Nest_config
     [...]
-      MET_inner = 'inner_domain/wrfout_d03_YYYY-MM-DD_00:00:00'
+      MET_inner = 'inner_domain/wrfout_d03_2015-01-01_00:00:00',
+      RUNDOMAIN_inner = 12, 136, 100, 300,
     &end
         
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
