@@ -355,6 +355,7 @@ Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata 
       RUNDOMAIN_inner = 12, 136, 100, 300,
     &end
         
+You cannot use the implicit dates ("YYYY" etc.); you must put explicit numbers. 
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
 The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
