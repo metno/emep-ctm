@@ -1,4 +1,4 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -1006,14 +1006,16 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     
     !define xm2, xm_i and xm_j now
     !Note that xm is inverse length: interpolate 1/xm rather than xm
+    !for lon lat projection we do not want xm=0.0 at Poles
     do j=0,LJMAX+1
       do i=0,LIMAX+1
-        xm_i(i,j)=xm_i_ext(i,j)
-        xm_j(i,j)=xm_j_ext(i,j)
+        xm_i(i,j)=max(1.0E-5,xm_i_ext(i,j))
+        xm_j(i,j)=max(1.0E-5,xm_j_ext(i,j))
         xm2(i,j) = 4.0*( (xm_i_ext(i,j-1)*xm_i_ext(i,j))/&
         (xm_i_ext(i,j-1)+xm_i_ext(i,j))  )&
         *( (xm_j_ext(i-1,j)*xm_j_ext(i,j))/&
         (xm_j_ext(i-1,j)+xm_j_ext(i,j))  )
+        xm2(i,j)=max(1.E-7,xm2(i,j))
         xmd(i,j) =1.0/xm2(i,j)
         xm2ji(j,i) = xm2(i,j)
         xmdji(j,i) = xmd(i,j)

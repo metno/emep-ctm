@@ -1,4 +1,4 @@
-! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
+! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -558,7 +558,7 @@ end if
            ! Note, xn_2d has no2 in #/cm-3
 
               else if ( .not. USE_SOILNOX .and.  icmp == idcmpNO2 ) then
-if( first_ddep .and. icmp==idcmpNO2 ) write(*,*) 'DBGXNO2 WRONG'
+if( dbg .and. first_ddep .and. icmp==idcmpNO2 ) write(*,*) 'DBGXNO2 WRONG'
   
                  Vg_eff(icmp) = Vg_eff(icmp) * no2fac
                  Vg_ref(icmp) = Vg_ref(icmp) * no2fac

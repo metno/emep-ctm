@@ -1,4 +1,4 @@
-! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
+! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
