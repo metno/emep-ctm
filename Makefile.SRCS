@@ -1,42 +1,48 @@
 #=============================================================================
+# DLETE ChemSpecs_wrapper.o
 FOBJ ?=	\
-	AeroFunctions.o Aero_Vds_ml.o Ammonium_ml.o AOD_PM_ml.o \
-	Advection_ml.o AirEmis_ml.o AllocInit.o \
-	AOTnPOD_ml.o Aqueous_n_WetDep_ml.o \
+	AeroConstants_mod.o AeroFunctions.o Aero_Vds_mod.o \
+	Ammonium_mod.o AOD_PM_mod.o \
+	Advection_mod.o AirEmis_mod.o AllocInit.o \
+	AOTnPOD_mod.o Aqueous_n_WetDep_mod.o \
 	BiDir_emep.o BiDir_module.o \
-	BLPhysics_ml.o Biogenics_ml.o \
-	BoundaryConditions_ml.o CellMet_ml.o CheckStop_ml.o ChemFields_ml.o \
-	ChemSpecs_wrapper.o CoDep_ml.o Country_ml.o \
-	ChemFunctions_ml.o CM_ChemRates_ml.o Convection_ml.o ColumnSource_ml.o \
-	CM_ChemGroups_ml.o CM_ChemSpecs_ml.o  \
+	BLPhysics_mod.o Biogenics_mod.o \
+	BoundaryConditions_mod.o CellMet_mod.o CheckStop_mod.o \
+	ChemFields_mod.o \
+	CoDep_mod.o Country_mod.o \
+	ChemFunctions_mod.o Convection_mod.o ColumnSource_mod.o \
+        CM_ChemDims_mod.o CM_ChemGroups_mod.o CM_ChemRates_mod.o CM_ChemSpecs_mod.o  \
 	Config_module.o  \
-	DefPhotolysis_ml.o Derived_ml.o DerivedFields_ml.o DO3SE_ml.o \
-	DryDep_ml.o DustProd_ml.o EcoSystem_ml.o  \
-	EmisDef_ml.o EmisGet_ml.o Emissions_ml.o ExternalBICs_ml.o \
-	FastJ_ml.o ForestFire_ml.o Functions_ml.o \
-        GasParticleCoeffs_ml.o \
-	Gravset_ml.o GridAllocate_ml.o GridValues_ml.o \
-	InterpolationRoutines_ml.o \
-	Io_ml.o Io_Nums_ml.o Io_Progs_ml.o KeyValueTypes.o  LandDefs_ml.o Landuse_ml.o \
-	LandPFT_ml.o LocalVariables_ml.o MARS_ml.o MARS_Aero_water_ml.o \
-	MassBudget_ml.o Met_ml.o MetFields_ml.o EQSAM_ml.o MicroMet_ml.o \
-	MosaicOutputs_ml.o MPI_Groups_ml.o AerosolCalls.o \
-        My_Derived_ml.o My_Outputs_ml.o NetCDF_ml.o Nest_ml.o NumberConstants.o \
-        Output_hourly.o OutputChem_ml.o OwnDataTypes_ml.o Par_ml.o \
-	PhysicalConstants_ml.o PlumeRise_ml.o PointSource_ml.o \
-	Precision_ml.o Radiation_ml.o Rb_ml.o \
-	ReadField_ml.o Rsurface_ml.o Runchem_ml.o Setup_1d_ml.o \
-	Setup_1dfields_ml.o Sites_ml.o SmallUtils_ml.o SOA_ml.o \
-	SoilWater_ml.o Solver.o SeaSalt_ml.o StoFlux_ml.o \
-	SubMet_ml.o Tabulations_ml.o TimeDate_ml.o TimeDate_ExtraUtil_ml.o \
-	Timefactors_ml.o Timing_ml.o \
-	Trajectory_ml.o uEMEP_ml.o Units_ml.o Unimod.o \
+	Debug_module.o \
+	DefPhotolysis_mod.o Derived_mod.o DerivedFields_mod.o DO3SE_mod.o \
+	DryDep_mod.o DustProd_mod.o EcoSystem_mod.o  \
+ 	emep_Main.o \
+	EmisDef_mod.o EmisGet_mod.o Emissions_mod.o ExternalBICs_mod.o \
+	FastJ_mod.o ForestFire_mod.o Functions_mod.o \
+        GasParticleCoeffs_mod.o \
+	Gravset_mod.o GridAllocate_mod.o GridValues_mod.o \
+	InterpolationRoutines_mod.o \
+	Io_mod.o Io_Nums_mod.o Io_Progs_mod.o KeyValueTypes.o  LandDefs_mod.o Landuse_mod.o \
+	LandPFT_mod.o LocalVariables_mod.o MARS_mod.o MARS_Aero_water_mod.o \
+	MassBudget_mod.o Met_mod.o MetFields_mod.o EQSAM_mod.o MicroMet_mod.o \
+	MosaicOutputs_mod.o MPI_Groups_mod.o AerosolCalls.o \
+        My_Derived_mod.o My_Outputs_mod.o NetCDF_mod.o Nest_mod.o NumberConstants.o \
+        OutputChem_mod.o OwnDataTypes_mod.o Par_mod.o \
+	PhysicalConstants_mod.o PlumeRise_mod.o PointSource_mod.o \
+	Precision_mod.o Radiation_mod.o Rb_mod.o \
+	ReadField_mod.o Rsurface_mod.o Runchem_mod.o Setup_1d_mod.o \
+	Sites_mod.o SmallUtils_mod.o SOA_mod.o \
+	SoilWater_mod.o Solver.o SeaSalt_mod.o StoFlux_mod.o \
+	SubMet_mod.o Tabulations_mod.o TimeDate_mod.o TimeDate_ExtraUtil_mod.o \
+	Timefactors_mod.o Timing_mod.o \
+	Trajectory_mod.o uEMEP_mod.o Units_mod.o \
         YieldModifications_mod.o \
-	global2local.o PhyChem_ml.o My_3DVar_ml.o My_Pollen_ml.o 
+	ZchemData_mod.o \
+	global2local.o PhyChem_mod.o My_3DVar_mod.o My_Pollen_mod.o 
 
 
 # default target
 all:
 
-# ensure pollen_const_ml.mod is updated for `make MACC`
-Pollen_const_ml.o: My_Pollen_ml.o
+# ensure pollen_const_mod.mod is updated for `make MACC`
+Pollen_const_mod.o: My_Pollen_mod.o

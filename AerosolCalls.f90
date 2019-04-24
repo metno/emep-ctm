@@ -1,7 +1,7 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2018 met.no
+!*  Copyright (C) 2007-2019 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,17 +35,19 @@
 
 module AerosolCalls
 
- use Ammonium_ml,          only : Ammonium
- use CheckStop_ml,         only : StopAll, CheckStop
- use ChemGroups_ml,         only : SS_GROUP, RDN_GROUP
- use ChemSpecs
- use Chemfields_ml,        only :  PM25_water, PM25_water_rh50,  & !PMwater 
+ use AeroConstants_mod,     only: AERO
+ use Ammonium_mod,          only: Ammonium
+ use CheckStop_mod,         only: StopAll, CheckStop
+ use ChemDims_mod,          only: NSPEC_SHL
+ use ChemSpecs_mod
+ use Chemfields_mod,        only: PM25_water, PM25_water_rh50,  & !PMwater 
                                    cfac
- use EQSAM_v03d_ml,        only :  eqsam_v03d
- use MARS_ml,              only :  rpmares, rpmares_2900, DO_RPMARES_new
- use Config_module,    only :  KMAX_MID, KCHEMTOP, DEBUG, MasterProc, AERO
- use PhysicalConstants_ml, only :  AVOG
- use Setup_1dfields_ml,    only :  xn_2d, temp, rh, pp
+ use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc
+ use Debug_module,          only: DEBUG   ! -> DEBUG%EQUIB
+ use EQSAM_v03d_mod,        only: eqsam_v03d
+ use MARS_mod,              only: rpmares, rpmares_2900, DO_RPMARES_new
+ use PhysicalConstants_mod, only: AVOG
+ use ZchemData_mod,         only: xn_2d, temp, rh, pp
  implicit none
  private
 

@@ -19,6 +19,8 @@
   DailyFacFile          = 'DataDir/DailyFac.POLL',
   HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
   EMEP_EuroBVOCFile     = 'DataDir/EMEP_EuroBVOC.nc',
+  SitesFile             = 'DataDir/sites.dat',
+  SondesFile            = 'DataDir/sondes.dat',
 !------------------------------
   EXP_NAME              = 'EMEPSTD',
   MY_OUTPUTS            = 'EMEPSTD',
@@ -49,6 +51,8 @@
   EURO_SOILNOX_DEPSCALE = 1.0,        ! Scale, default 1  (see ModelConstants_ml)
   USES%GLOBAL_SOILNOX    = F,          ! diff for global + Euro runs
 !------------------------------
+  USES%PROGRESS_FILES    = F,         ! write to file.msg for each output in file.nc
+  USES%SKIP_INCOMPLETE_OUTPUT = F,    ! skip daily/montly/fullrun output for runs under 1/28/181 days
   USES%POLLEN            = F,
   USES%ROADDUST          = T,
   USES%DUST              = T,
@@ -68,10 +72,9 @@
   EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
 !------------------------------
   SELECT_LEVELS_HOURLY  = F,          ! hourly output flag for 3DPROFILES
-  FORECAST              = F,
   USES%ASH               = T,          ! Ash from historical Volcanic Eruptions
   ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
-  USES%AOD               = F,          ! Used for FORECASTs usually
+  USES%AOD               = F,          ! Used for forcasts usually
   BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
 !--- 'fake' vegetation for ozone POD calculations
@@ -84,7 +87,7 @@
 !------------------------------
   flocdef='DataDir/columnsource_location.csv',
   femsdef='DataDir/columnsource_emission.csv',
-  need_topo=T, ! stop simulation if topo_nc not found
+  need_topo=T, ! do not use column emissions if topo_nc not found
   NMAX_LOC=-1, ! estimate from lines in flocdef
   NMAX_EMS=-1, ! estiamte from lines in femsdef
 &end
@@ -97,11 +100,11 @@
   MODE_READ = 'NONE',         ! do nothing
 ! MODE_READ = 'NHOUR',        ! every NHOURREAD
 ! MODE_READ = 'START',        ! at the start of run
-! MODE_READ = 'FORECAST',     ! at the start of run, if files are found
+! MODE_READ = 'RESTART',      ! at the start of run, if files are found
   MODE_SAVE = 'NONE',         ! do nothing
 ! MODE_SAVE = 'NHOUR',        ! every NHOURSAVE
 ! MODE_SAVE = 'END',          ! at end of run
-! MODE_SAVE = 'FORECAST',     ! every OUTDATE(1:FORECAST_NDUMP)
+! MODE_SAVE = 'OUTDATE',      ! every OUTDATE(1:OUTDATE_NDUMP)
 ! NHOURREAD = 1,              ! hours between reads. Fraction of 24
 ! NHOURSAVE = 3,              ! hours between saves. Fraction of 24
 !-------- File name templates for Nest I/O

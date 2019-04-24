@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2018 met.no
+!*  Copyright (C) 2007-2019 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,7 +29,7 @@
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
 
-                          module Chemsolver_ml
+                          module Chemsolver_mod
 ! MOD OD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -46,31 +46,31 @@
   ! variable timestep (Peter Wind)
   !=======================================================================!
 
-    use Aqueous_ml,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3
-    use CheckStop_ml,      only: CheckStop, StopAll
-    use ChemFunctions_ml,  only: VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
-    use ChemGroups_ml,     only: RO2_POOL, RO2_GROUP
-    use ChemSpecs                  ! => NSPEC_TOT, O3, NO2, etc.
-    use ChemFields_ml,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]
+    use Aqueous_mod,        only: aqrck, ICLOHSO2, ICLRC1, ICLRC2, ICLRC3
+    use CheckStop_mod,      only: CheckStop, StopAll
+    use ChemFunctions_mod,  only: VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
+    use ChemGroups_mod !,     only: RO2_POOL, RO2_GROUP
+    use ChemDims_mod               ! => NSPEC_TOT, O3, NO2, etc.
+    use ChemSpecs_mod              ! => NSPEC_TOT, O3, NO2, etc.
+    use ChemFields_mod,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]
                              ,cell_tinv & ! tmp location, for Yields
                              ,NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
-    use ChemRates_rct_ml,   only: rct
-    use Config_module,     only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv &
-                                ,DebugCell, MasterProc, DEBUG, USES &
-                                ,YieldModifications
-    use DefPhotolysis_ml         ! => IDHNO3, etc.
-    use EmisDef_ml,      only: KEMISTOP
-    use GridValues_ml,     only : GRIDWIDTH_M, i_fdom, j_fdom
-    use Io_ml,             only : IO_LOG, datewrite
-    use Par_ml,            only: me, LIMAX, LJMAX
-    use PhysicalConstants_ml, only:  RGAS_J
-    use Precision_ml, only:  dp
-    use Setup_1dfields_ml, only: rcemis,        & ! photolysis, emissions
-                                 xn_2d,         &
-                                 rh,            &
-                                 Fgas,   & ! fraction in gas-phase, for SOA
-                                 amk
-    use Setup_1dfields_ml,     only : itemp, tinv, rh,  amk
+    use Config_module,      only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv &
+                                ,MasterProc, USES, NATBIO, YieldModifications
+    use Debug_module,       only: DebugCell, DEBUG  ! DEBUG%DRYRUN
+    use DefPhotolysis_mod         ! => IDHNO3, etc.
+    use EmisDef_mod,        only: KEMISTOP
+    use GridValues_mod,     only : GRIDWIDTH_M, i_fdom, j_fdom
+    use Io_mod,             only : IO_LOG, datewrite
+    use Par_mod,            only: me, LIMAX, LJMAX
+    use PhysicalConstants_mod, only:  RGAS_J
+    use Precision_mod, only:  dp
+    use ZchemData_mod, only: rcemis,        & ! photolysis, emissions
+                             rct, rcbio, rcphot,   &
+                             xn_2d,         &
+                             rh,            &
+                             Fgas,   & ! fraction in gas-phase, for SOA
+                             M, itemp, tinv, rh
     use YieldModifications_mod  ! eg YA_ for SOA aerosol. Allows changes with
                                 ! e.g. concentrations
 
@@ -141,11 +141,10 @@ contains
            if(DEBUG%DRYRUN) write(*,*) "DEBUG%DRYRUN Solver"
        end if
 
-       if ( YieldModifications /= '-' ) then
-          ! sets YieldModificationsInUse
-          call doYieldModifications('first')
-       end if
-       first_call = .false.
+       !if ( YieldModifications /= '-' ) then
+       !   ! sets YieldModificationsInUse
+       !   call doYieldModifications('first')
+       !end if
     end if
 
 !======================================================
@@ -169,6 +168,8 @@ contains
 
     do k = 2, KMAX_MID
 
+       DebugCell = debug_flag .and. k==KMAX_MID
+
        xnew(:) = xn_2d(:,k)
 
        x(:)    = xn_2d(:,k) - Dchem(:,k,i,j)*dti(1)*1.5
@@ -178,8 +179,9 @@ contains
        !*************************************
        !     Start of integration loop      *
        !*************************************
-       if ( YieldModificationsInUse ) then
+       if ( first_call .or. YieldModificationsInUse ) then
           cell_tinv = tinv(k)
+          if( DebugCell ) write(*,*) 'YIELD INIT ', me, k, 1/cell_tinv 
           call doYieldModifications('init')
        end if
 
@@ -188,9 +190,10 @@ contains
 
           do n=1,NSPEC_TOT
 
-!if ( x(n) < 0.0 ) then
-!   print *, 'NCHEM', me,  n, species(n)%name, x(n), xnew(n)
-!end if
+if ( x(n) < 0.0  .or. xnew(n) < 0.0 ) then
+   print '(a,3i4,a10,3es12.3)', 'NCHEM', me,  n, ichem, species(n)%name, x(n), xnew(n), Dchem(n,k,i,j)
+   call StopAll('NCHEM')
+end if
              xextrapol = xnew(n) + (xnew(n)-x(n)) *cc(ichem)
              xold(n) = coeff1(ichem)*xnew(n) - coeff2(ichem)*x(n)
              xold(n) = max( xold(n), 0.0 )
@@ -229,27 +232,18 @@ contains
                    include 'CM_Reactions1.inc'
                    !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-                !end if
-                !if(k>=6)then
-                !   include 'My_FastReactions.inc'
-                !end if
-                !if(k>=KEMISTOP)then
-                !   include 'My_FastReactions.inc'
-                !end if
-
-                !Mar-Apr 2017 NEW
-                ! Allows change of gas/aerosol yield
-                ! BUT only takes effect on 2nd iteration
-                ! Still, we have nchem*niter loops
-
-                 if ( YieldModificationsInUse ) then
-                    runlabel='run'
-                    if( iter == toiter(k) ) runlabel='lastFastChem'
-                    call doYieldModifications(runlabel)
-
-                 end if
 
             end do !! End iterations
+
+           !YIELDs  Allows change of gas/aerosol yield, which currently is only used
+           !     for SOA species to be handled in CM_Reactions2
+
+            if ( YieldModificationsInUse ) then
+                !OLD if( DebugCell ) write(*,*) 'YIELD RUN  ', me, k, &
+                !OLD   1/cell_tinv, iter, toiter(k)
+                !OLD: if( iter == toiter(k) ) & ! runlabel='lastFastChem'
+                call doYieldModifications('run')
+           end if
 
           !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
            include 'CM_Reactions2.inc'
@@ -271,6 +265,7 @@ contains
 
     end do ! End of vertical k-loop
 
+   first_call = .false.
   end subroutine chemistry
 
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -364,4 +359,4 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 end subroutine makedt
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-end module Chemsolver_ml
+end module Chemsolver_mod

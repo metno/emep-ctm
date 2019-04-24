@@ -1,61 +1,62 @@
-  integer, public, parameter ::  NWETDEP_ADV  = 58
-  type(depmap), public, dimension(NWETDEP_ADV), parameter:: WDepMap= (/ &
-        depmap( IXADV_HO2NO2, CWDEP_HNO3, -1) & 
-      , depmap( IXADV_N2O5, CWDEP_HNO3, -1) & 
-      , depmap( IXADV_HNO3, CWDEP_HNO3, -1) & 
-      , depmap( IXADV_HONO, CWDEP_HNO3, -1) & 
-      , depmap( IXADV_HCHO, CWDEP_HCHO, -1) & 
-      , depmap( IXADV_H2O2, CWDEP_H2O2, -1) & 
-      , depmap( IXADV_SO2, CWDEP_SO2, -1) & 
-      , depmap( IXADV_SO4, CWDEP_SO4, -1) & 
-      , depmap( IXADV_NH3, CWDEP_NH3, -1) & 
-      , depmap( IXADV_NO3_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NO3_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_NH4_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASH_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASH_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_POM_f_WOOD, CWDEP_PMf, -1) & 
-      , depmap( IXADV_POM_f_FFUEL, CWDEP_PMf, -1) & 
-      , depmap( IXADV_POM_c_FFUEL, CWDEP_PMc, -1) & 
-      , depmap( IXADV_EC_f_WOOD_new, CWDEP_ECfn, -1) & 
-      , depmap( IXADV_EC_f_WOOD_age, CWDEP_PMf, -1) & 
-      , depmap( IXADV_EC_c_WOOD, CWDEP_PMc, -1) & 
-      , depmap( IXADV_EC_f_FFUEL_new, CWDEP_ECfn, -1) & 
-      , depmap( IXADV_EC_f_FFUEL_age, CWDEP_PMf, -1) & 
-      , depmap( IXADV_EC_c_FFUEL, CWDEP_PMc, -1) & 
-      , depmap( IXADV_REMPPM25, CWDEP_PMf, -1) & 
-      , depmap( IXADV_REMPPM_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_FFIRE_OM, CWDEP_PMf, -1) & 
-      , depmap( IXADV_FFIRE_BC, CWDEP_PMf, -1) & 
-      , depmap( IXADV_FFIRE_REMPPM25, CWDEP_PMf, -1) & 
-      , depmap( IXADV_SQT_SOA_NV, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_ASOC_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_ASOA_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_BSOC_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ng100, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug1, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug10, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug1e2, CWDEP_PMf, -1) & 
-      , depmap( IXADV_NON_C_BSOA_ug1e3, CWDEP_PMf, -1) & 
-      , depmap( IXADV_SeaSalt_f, CWDEP_SSf, -1) & 
-      , depmap( IXADV_SeaSalt_c, CWDEP_SSc, -1) & 
-      , depmap( IXADV_DUST_ROAD_F, CWDEP_PMf, -1) & 
-      , depmap( IXADV_DUST_ROAD_C, CWDEP_PMc, -1) & 
-      , depmap( IXADV_Dust_wb_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_Dust_wb_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_Dust_sah_f, CWDEP_PMf, -1) & 
-      , depmap( IXADV_Dust_sah_c, CWDEP_PMc, -1) & 
-      , depmap( IXADV_Pb210, CWDEP_PMf, -1) & 
-  /)
+type(dep_t), public, dimension(NWETDEP_ADV), save :: CM_WDepMap = (/ &
+!        species     surrogate      setrate
+  dep_t("N2O5      ", "HNO3      ", -999.0 ) &
+, dep_t("HNO3      ", "HNO3      ", -999.0 ) &
+, dep_t("HONO      ", "HNO3      ", -999.0 ) &
+, dep_t("HO2NO2    ", "HNO3      ", -999.0 ) &
+, dep_t("HCHO      ", "HCHO      ", -999.0 ) &
+, dep_t("H2O2      ", "H2O2      ", -999.0 ) &
+, dep_t("SO2       ", "SO2       ", -999.0 ) &
+, dep_t("SO4       ", "PMf       ", -999.0 ) &
+, dep_t("NH3       ", "NH3       ", -999.0 ) &
+, dep_t("NO3_f     ", "PMf       ", -999.0 ) &
+, dep_t("NO3_c     ", "PMc       ", -999.0 ) &
+, dep_t("NH4_f     ", "PMf       ", -999.0 ) &
+, dep_t("SQT_SOA_NV", "PMf       ", -999.0 ) &
+, dep_t("POM_f_WOOD", "PMf       ", -999.0 ) &
+, dep_t("POM_f_FFUEL", "PMf       ", -999.0 ) &
+, dep_t("POM_c_FFUEL", "PMc       ", -999.0 ) &
+, dep_t("EC_f_WOOD_new", "ECfn      ", -999.0 ) &
+, dep_t("EC_f_WOOD_age", "PMf       ", -999.0 ) &
+, dep_t("EC_c_WOOD ", "PMc       ", -999.0 ) &
+, dep_t("EC_f_FFUEL_new", "ECfn      ", -999.0 ) &
+, dep_t("EC_f_FFUEL_age", "PMf       ", -999.0 ) &
+, dep_t("EC_c_FFUEL", "PMc       ", -999.0 ) &
+, dep_t("REMPPM25  ", "PMf       ", -999.0 ) &
+, dep_t("REMPPM_c  ", "PMc       ", -999.0 ) &
+, dep_t("ASOC_ng100", "PMf       ", -999.0 ) &
+, dep_t("ASOC_ug1  ", "PMf       ", -999.0 ) &
+, dep_t("ASOC_ug10 ", "PMf       ", -999.0 ) &
+, dep_t("ASOC_ug1e2", "PMf       ", -999.0 ) &
+, dep_t("ASOC_ug1e3", "PMf       ", -999.0 ) &
+, dep_t("NON_C_ASOA_ng100", "PMf       ", -999.0 ) &
+, dep_t("NON_C_ASOA_ug1", "PMf       ", -999.0 ) &
+, dep_t("NON_C_ASOA_ug10", "PMf       ", -999.0 ) &
+, dep_t("NON_C_ASOA_ug1e2", "PMf       ", -999.0 ) &
+, dep_t("NON_C_ASOA_ug1e3", "PMf       ", -999.0 ) &
+, dep_t("BSOC_ng100", "PMf       ", -999.0 ) &
+, dep_t("BSOC_ug1  ", "PMf       ", -999.0 ) &
+, dep_t("BSOC_ug10 ", "PMf       ", -999.0 ) &
+, dep_t("BSOC_ug1e2", "PMf       ", -999.0 ) &
+, dep_t("BSOC_ug1e3", "PMf       ", -999.0 ) &
+, dep_t("NON_C_BSOA_ng100", "PMf       ", -999.0 ) &
+, dep_t("NON_C_BSOA_ug1", "PMf       ", -999.0 ) &
+, dep_t("NON_C_BSOA_ug10", "PMf       ", -999.0 ) &
+, dep_t("NON_C_BSOA_ug1e2", "PMf       ", -999.0 ) &
+, dep_t("NON_C_BSOA_ug1e3", "PMf       ", -999.0 ) &
+, dep_t("FFFUEL_ng10", "PMf       ", -999.0 ) &
+, dep_t("WOODOA_ng10", "PMf       ", -999.0 ) &
+, dep_t("FFIRE_OM  ", "PMf       ", -999.0 ) &
+, dep_t("FFIRE_BC  ", "PMf       ", -999.0 ) &
+, dep_t("FFIRE_REMPPM25", "PMf       ", -999.0 ) &
+, dep_t("SeaSalt_f ", "SSf       ", -999.0 ) &
+, dep_t("SeaSalt_c ", "SSc       ", -999.0 ) &
+, dep_t("Dust_ROAD_f", "PMf       ", -999.0 ) &
+, dep_t("Dust_ROAD_c", "PMc       ", -999.0 ) &
+, dep_t("Dust_WB_f ", "PMf       ", -999.0 ) &
+, dep_t("Dust_WB_c ", "PMc       ", -999.0 ) &
+, dep_t("Dust_SAH_f", "PMf       ", -999.0 ) &
+, dep_t("Dust_SAH_c", "PMc       ", -999.0 ) &
+, dep_t("Ash_f     ", "PMf       ", -999.0 ) &
+, dep_t("Ash_c     ", "PMc       ", -999.0 ) &
+/)

@@ -1,7 +1,7 @@
-! <AeroFunctions.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
+! <AeroFunctions.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2018 met.no
+!*  Copyright (C) 2007-2019 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,10 +28,10 @@
 ! A collection of functions as used in the EMEP model or in some cases
 ! just for testing.
 !*****************************************************************************! 
-module AeroFunctions
+module AeroFunctions_mod
 !____________________________________________________________________
 !
- use PhysicalConstants_ml, only : AVOG, RGAS_J, PI
+ use PhysicalConstants_mod, only : AVOG, RGAS_J, PI
   implicit none
   private
 
@@ -75,7 +75,9 @@ module AeroFunctions
   !========================================
 
   !---------------------------------------------------------------------
-  !> FUNCTION DpgV2DpgN ! from mass/volume Dp to number Dp
+  !> FUNCTION DpgV2DpgN ! from mass/volume Dp median to number median Dp
+  ! NB:  Senfeld & Pandis use \overline{D_{pgV}} for volume median and
+  ! \overline{D_{pg}} for number median
 
   function DpgV2DpgN(DpgV,sigma_g) result (DpgN)
       real, intent(in) :: DpgV,sigma_g
@@ -84,7 +86,7 @@ module AeroFunctions
    end function DpgV2DpgN
 
   !---------------------------------------------------------------------
-  !> FUNCTION DpgN2DpgV  ! from number Dp to mass/volume Dp
+  !> FUNCTION DpgN2DpgV  ! from number Dp to mass/volume median Dp
 
    function DpgN2DpgV(DpgN,sigma_g) result (DpgV)
       real, intent(in) :: DpgN,sigma_g
@@ -132,8 +134,10 @@ module AeroFunctions
    ! Gerber, TAble 2, simplified for ext,. coeffs.
    real, parameter, dimension(4) :: &
      !          R    U     SS2    SS3    ! NAM types, TAble 2, Gerber
-      C7 =  (/ 1.17, 1.28, 1.97, 1.83 /) &
-     ,C8 =  (/ 1.87, 2.41, 5.83, 5.13 /)
+      C7 =  (/ 1.17, 1.28, 1.83, 1.97 /) &
+     ,C8 =  (/ 1.87, 2.41, 5.13, 5.83 /)
+     ! BUG C7 =  (/ 1.17, 1.28, 1.97, 1.83 /) &
+     ! BUG ,C8 =  (/ 1.87, 2.41, 5.83, 5.13 /)
    real, parameter :: THIRD = 1.0/3.0
    real :: f
    integer :: ind  
@@ -370,7 +374,7 @@ module AeroFunctions
   !! Calculates the surface area for a given mass of dry PM, together
   !! with sigma for log-normal
   !! If Dpw provided, calculates surface area of wet aerosol.
-  !! NOTE - unlike Unimod's use of VOLFACs, here we use simple mass (ug/m3) and
+  !! NOTE - unlike emepctm's use of VOLFACs, here we use simple mass (ug/m3) and
   !! density. (rho was anyway species independent, so use of specific mol wts.
   !! for SO4, NO3, SEASALT, etc seems incosistent.)
 
@@ -384,7 +388,7 @@ module AeroFunctions
          ,rho_kgm3        !< density, kg/m3 
 
      real :: S            !< Surface area, m2 per m3 air
-     real :: rho, rdry, rwet, sigFac, dryvol, totvol
+     real :: dryvol, rho, rdry, rwet, sigFac, totvol
      real :: rhod, fwetvol
 
      rho = 1600.0                                  !< kg/m3 default
@@ -437,7 +441,7 @@ module AeroFunctions
   !! Calculates the surface area for a given mass of dry PM, together
   !! with sigma for log-normal
   !! If Dpw provided, calculates surface area of wet aerosol.
-  !! NOTE - unlike Unimod's earlier use of VOLFACs, here we use simple
+  !! NOTE - unlike emepctm's earlier use of VOLFACs, here we use simple
   !! mass (ug/m3) and density. (rho was anyway species independent, so use of
   !! specific mol wts.  for SO4, NO3, SEASALT, etc seems incosistent.)
 
@@ -546,7 +550,6 @@ module AeroFunctions
   !---------------------------------------------------------------------
   ! Gamma functions as mixture of SIA, OM, and other 
 
-  !elemental function GammaN2O5(t,frh,fno3sia,fom,fss,fdust,fbc) result(gam) 
   elemental function GammaN2O5(t,frh,fso4sia,fom,fss,fdust,fbc) result(gam) 
     real, intent(in) :: t, frh   ! t(K), frh(0-1)
    ! fraction of organic matter, sea-salt, dust in aerosol
@@ -632,13 +635,14 @@ module AeroFunctions
    real, parameter :: nm=1.0e9,  um=1.0e6, um2 = m2m3toum2cm3 ! shorthands
    real :: cn2o5, Smono, Spm, Sdry, Swet, rdry, rwet, kd, kw1,kw2,kw3
    real :: DpgN, DpgV, frh, t
-   integer :: ind, iRH, iTK, io1,io2,i
+   integer :: ind, iRH, iTK, i
    real, dimension(10) :: ugPM, S_m2m3, Kn2o5
+   integer, parameter :: io1=20,io2=22 ! TMP stallo gfortran doesn't handle newunit :-(
 
    cn2o5 = cMolSpeed( 298.0, 108.0)
    print *, "Speed N2O5 ", cn2o5
 
-   ! Unimod has MMD=0.33e-6 for PMf, sigma 1.8
+   ! emepctm has MMD=0.33e-6 for PMf, sigma 1.8
    DpgN = DpgV2DpgN(DpgV=0.33e-6,sigma_g=1.8)
    DpgV = DpgN2DpgV(DpgN,sigma_g=1.8) ! test reverse
    print "(2(a,f8.4))", "EMEP DpgV 0.33um -> DpgN ",DpgN*um," ->DpgV ",DpgV*um
@@ -651,7 +655,7 @@ module AeroFunctions
 
    !print *, "Gerber simp", wetradS(rdry=0.5*DpgN, fRH=0.98, pmtype=1) ! m
 
- ! Start with methods based on Unimod-like xn calcs
+ ! Start with methods based on emepctm-like xn calcs
  ! 1 ppb SO4 ~ 4 ug/m3
    Smono = SurfArea_Mono(2.55e10,Dp=DpgV)
    Sdry  = SurfArea_Poly(2.55e10,Dp=DpgV)
@@ -707,8 +711,10 @@ module AeroFunctions
    end do ! iRH
    end do ! ind
 
-   open(newunit=io1,file="AeroSurf.txt")
-   open(newunit=io2,file="AeroRate.txt")
+   !TMP open(newunit=io1,file="AeroSurf.txt")
+   !TMP open(newunit=io2,file="AeroRate.txt")
+   open(io1,file="AeroSurf.txt")
+   open(io2,file="AeroRate.txt")
    ugPM = (/(1.0*i*i, i=1,size(ugPM)) /)
    do iRH = 100, 0, -10
      frh = min(99.9, 0.01*iRH)
@@ -764,9 +770,9 @@ module AeroFunctions
    end do
 
   end subroutine self_test_fracs
-end module AeroFunctions
+end module AeroFunctions_mod
 !TSTEMX program tstr
-!TSTEMX use AeroFunctions, only : self_test, self_test_fracs
+!TSTEMX use AeroFunctions_mod, only : self_test, self_test_fracs
 !TSTEMX implicit none
 !TSTEMX call self_test()
 !TSTEMX !call self_test_fracs()

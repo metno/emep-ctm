@@ -1,7 +1,7 @@
-! <BiDir_emep.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.17>
+! <BiDir_emep.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32beta>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2018 met.no
+!*  Copyright (C) 2007-2019 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
