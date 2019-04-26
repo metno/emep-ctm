@@ -263,8 +263,8 @@ Depending on what is wanted different "Nesting modes" can be defined. The differ
         do nothing (default).
     'START'
         read at the start of run.
-    'FORECAST'
-        read at the start of run, if the files are found.
+    'RESTART'
+        read at the start of run, if the file is found.
     ‘NHOUR’
         read at given ``NHOURREAD`` hourly intervals, if the file is found.
         ``NHOURREAD`` is set in ``Nest_config`` and should be an integer fraction of 24.
@@ -275,9 +275,9 @@ Depending on what is wanted different "Nesting modes" can be defined. The differ
         do nothing (default).
     'END'
         write at end of run.
-    'FORECAST'
-        write every ``OUTDATE(1:FORECAST_NDUMP)``.
-        ``OUTDATE`` and ``FORECAST_NDUMP`` are set in ``Nest_config``.
+    'OUTDATE'
+        write every ``OUTDATE(1:OUTDATE_NDUMP)``.
+        ``OUTDATE`` and ``OUTDATE_NDUMP`` are set in ``Nest_config``.
     'NHOUR'
         write at given `NHOURSAVE` hourly intervals.
         ``NHOURSAVE`` is set in ``Nest_config`` and should be an integer fraction of 24.
