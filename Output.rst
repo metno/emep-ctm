@@ -56,8 +56,8 @@ Output parameters NetCDF files
 ------------------------------
 
 Parameters to be written out into ``Base_hour.nc``, ``Base_day.nc``, ``Base_month.nc`` and
-``Base_year.nc`` are defined in ``My_Derived_ml.f90`` and ``Derived_ml.f90``.
-In ``My_Derived_ml.f90``, the use can specify the output species (air
+``Base_year.nc`` are defined in ``My_Derived_mod.f90`` and ``Derived_ml.f90``.
+In ``My_Derived_mod.f90``, the use can specify the output species (air
 concentrations, depositions, column values), units and temporal
 resolution of the outputs (daily, monthly, yearly).
 
@@ -70,7 +70,7 @@ For surface air concentrations, the general name pattern is
 ``SURF_UNITS_COMPONENT``. Here, ``UNITS`` can e.g. be "ug" (|ugm3|\ ),
 "ugS" (|ugSm3|\ ), "ugN" (|ugNm3|\ ), or "ppb".
 Note that the components are classified either as "SPEC" (species) or "GROUP".
-The content of complex GROUP components can be found in ``CM_ChemGroups_ml.f90``.
+The content of complex GROUP components can be found in ``CM_ChemGroups_mod.f90``.
 
 For column integrated parameters, the names are `COLUMN_COMPONENT_kNLAYERS`,
 where `NLAYERS` is the number of layers from model top included in the integration.
@@ -96,7 +96,7 @@ landuse types, typically in :math:`cm/s`.
 :numref:`tab-outpar` lists most of output parameters, providing additional
 explanation to the complex components. For a complete suit of currently
 selected output parameters, see provided output NetCDF files, or
-``My_Derived_ml.f90`` module.
+``My_Derived_mod.f90`` module.
 
 .. csv-table:: List of output parameters
     :name: tab-outpar
@@ -172,7 +172,7 @@ Add your own fields
 
 Most standard output can be outputted by adding lines and modifying the parameters in the ``config_emep.nml`` file.
 
-The meteorological fields defined in the ``met`` array in the ``MetFields_ml.f90`` file, can be retrieved by using the 'MET2D' or 'MET3D' keywords. If a 3D array is requested with the 'MET2D' keyword, only the lowest level is written out.
+The meteorological fields defined in the ``met`` array in the ``MetFields_mod.f90`` file, can be retrieved by using the 'MET2D' or 'MET3D' keywords. If a 3D array is requested with the 'MET2D' keyword, only the lowest level is written out.
 
 If you want an array that does not fit in any category, or even make your own special field, you can get it in the output using the procedure shown below; this will however require that you write in the code and recompile.
 For instance in config_emep.nml OutputMisc define:
@@ -237,7 +237,7 @@ sondes
     specified locations.
 
 Both sites and sondes are specified and handled in similar ways, in the
-module ``Sites_ml.f90``, so we treat them both together below.
+module ``Sites_mod.f90``, so we treat them both together below.
 Locations are specified in the input files ``sites.dat`` and ``sondes.dat``.
 The files start with a description of its content followed by a list of
 the stations. For example, a sondes.dat input file may look like this:
@@ -266,7 +266,7 @@ Both ``sites.dat`` and ``sondes.dat`` files are optional, but recommended.
 The species and meteorological data requested for site and sonde output are
 specified in ``My_Outputs.f90`` by the use of arrays.
 Only a few met fields are defined so far but more can be added into
-``Sites_ml.f90`` as required.
+``Sites_mod.f90`` as required.
 
 The output files ``sites_2015.csv`` and ``sondes_2015.csv`` are comma
 separated files that can be read by excel.

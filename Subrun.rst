@@ -114,7 +114,7 @@ of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the U
 
 -  The first column of the second line represents the country code. (27
    is the code for UK.) The codes for all countries can be found in
-   Fortran module ``Country_ml.f90`` or at (http://www.emep.int/grid/country_numbers.txt). 
+   Fortran module ``Country_mod.f90`` or at (http://www.emep.int/grid/country_numbers.txt). 
    The country code must be the same as in the emission files for the given country. Some
    countries and areas are divided into sub-areas in the emission files.
    In this case, one line for each sub-area has to be included into the
@@ -125,7 +125,7 @@ of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the U
 -  The second column of the second line represents the sector and "0"
    means all sectors. Here one can write the appropriate sector code if
    the emission is reduced only from a specific sector. The description
-   of each sector can also be found in the Fortran module ``EmisDef_ml.f90``.
+   of each sector can also be found in the Fortran module ``EmisDef_mod.f90``.
 
 -  The columns under the pollutant names show the emission factors for
    the given pollutants. For example, 0.7 would mean 70% of the original
@@ -460,13 +460,13 @@ On each line of `map_bc` contains the 6 elements:
 The fraction is helpful, when one has to map a variable that is explicitly not in the model
 but a fraction of that variable can be mapped to a matching variable in the model.
 
-Unit conversions are delegated to the ``Units_ml.f90`` module.
+Unit conversions are delegated to the ``Units_mod.f90`` module.
 The supported units are: |ugm3|\ , |ugSm3|\ , |ugNm3|\ , |ugCm3|\ , ppb,
 mixing ratio (mol/mol) and mass mixing ratio (kg/kg).
 
 If the BC data has different units,
 either convert them into one of the above mentioned units in pre-processing
-or add the respective conversion factor in the module ``Units_ml.f90``.
+or add the respective conversion factor in the module ``Units_mod.f90``.
 
 
 config: Europe or Global?
@@ -620,7 +620,7 @@ so that each processor has the same share of pole regions.
 The default partitioning can be overrided using the ``DOMAIN_DECOM_MODE`` parameter in ``config_emep.nml``.
 Recognized values are: 
 `'X*Y'`, `'XY'`, `'X*1'`, `'Y=1'`, `'X'`, `'1*Y'`, `'X=1'`, `'Y'`, `'2*Y'`, `'X=2'`, `'X*2'`, `'Y=2'`.
-See also in ``Par_ml.f90`` for details.
+See also in ``Par_mod.f90`` for details.
 
 The main timestep parameter ``dt_advec`` can be set manually in config_emep.nml (in seconds, real number).
 It must be a factor of 3600.

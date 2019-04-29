@@ -92,7 +92,7 @@ IMPORTANT:
 .. rubric:: Footnotes
 .. [#YMD] ``YYYY``: year, ``MM``: month, ``DD``: day.
 .. [#NewO3] New |O3| boundary condition data in 30 levels.
-     Can be used with ``NewLogan=.true.`` in ``BoundaryConditions_ml.f90``.
+     Can be used with ``NewLogan=.true.`` in ``BoundaryConditions_mod.f90``.
 .. [#Optional] Optional, in most cases.
 .. [#POLL] ``POLL``: pollutant type (|NH3|\ , CO, |NOx|\ , |SOx|\ , NMVOC, |PM25| and |PMco|\ ).
 .. [#SEASON] ``SEASON``: seasonal files (jan, apr, jul, oct).
@@ -339,7 +339,7 @@ Road Dust
 ~~~~~~~~~
 
 Road traffic produces dust. These emissions are handled in the
-EMEP/MSC-W model in the ``Emissions_ml.f90`` module. To include road
+EMEP/MSC-W model in the ``Emissions_mod.f90`` module. To include road
 dust, set ``USE_ROADDUST=.true.`` in ``config_emep.nml``. There are two
 files included in input data, ``RoadMap.nc`` and ``AVG_SMI_2005-2010.nc``.
 ``RoadMap.nc`` include gridded roads and PM emissions over Europe,
@@ -398,7 +398,7 @@ emissions set ``USE_FOREST_FIRES=.true.`` in ``config_emep.nml`` and
 download the 2012 GEOS-chem daily data
 http://bai.acom.ucar.edu/Data/fire/. The data needs to be stored with
 units mole/day in a NetCDF file called ``FINN_ForestFireEmis_2015.nc``
-compatible with the ``ForestFire_ml.f90`` module.
+compatible with the ``ForestFire_mod.f90`` module.
 
 Dust files
 ~~~~~~~~~~
@@ -412,12 +412,12 @@ resolution.
 The variables 'sand' and 'clay' gives the fraction (in %) of sand an
 clay in the soil for each grid cell over land.
 
-The files are used by the module ``DustProd_ml.f90``, which calculates
+The files are used by the module ``DustProd_mod.f90``, which calculates
 windblown dust emissions from soil erosion. Note that the
 parametrization is still in the development and testing phase, and is by
 default 'turned off'. To include it in the model calculations, set
 ``USE_DUST=.true.`` in ``config_emep.nml``. The user is recommended to
-read carefully documentation and comments in the module ``DustProd_ml.f90``.
+read carefully documentation and comments in the module ``DustProd_mod.f90``.
 
 There is also a possibility to include boundary and initial conditions
 for dust from Sahara. The input file gives monthly dust mixing ratios
@@ -427,7 +427,7 @@ of Oslo for 2000. To include Saharan dust, set ``USE_SAHARA=.true.`` in
 ``config_emep.nml``.
 
 Another source for dust is an arid surface. This is accounted for by
-soilmosture calculations in ``DustProd_ml.f90``. Together with Soil
+soilmosture calculations in ``DustProd_mod.f90``. Together with Soil
 Water Index from the meteorology files and permanent wilting point (pwp)
 from ``SoilTypes_IFS.nc``. This file is global and NetCDF. See Simpson et
 al. (2012) section 6.10.
@@ -614,7 +614,7 @@ Landuse definitions
 For the vegetative landuse categories where stomatal modelling is
 undertaken, the start and end of the growing season (SGS, EGS, in days)
 must be specified. The calculation of SGS and EGS with respect to
-latitude is done in the module ``LandDefs_ml.f90``. The parameters
+latitude is done in the module ``LandDefs_mod.f90``. The parameters
 needed to specify the development of the leaf area index (LAI) within
 the growing season are given in the ASCII file ``Inputs_LandDefs.csv``.
 For more information, see chapter 5 of the EMEP Status Report 1/2003
