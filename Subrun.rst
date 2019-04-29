@@ -631,6 +631,8 @@ It must be a factor of 3600.
 ``NETCDF_DEFLATE_LEVEL``: The level of compression used in the NetCDF output files (integer).
 Negative values means netcdf3 format.
 
+``END_OF_EMEPDAY``: (integer) Hour when to start and end a "day". For daily averages gives for example averages from 06:00 to 06:00 next day, if value is 6.
+
 Defining own sectors
 --------------------
 
