@@ -74,6 +74,13 @@ Simpson *et al.*, 2012
     chemical transport model – technical description *Atmos. Chem.
     Physics*, 2012, 12, 7825-7865
 
+Simpson *et al.*, 2017
+  Simpson, D., Bergström, R., Imhof, H. and Wind, P.,
+  Updates to the EMEP/MSC-W model, 2016-2017, in 
+  EMEP Status Report 1/2017, pp115-122,
+  The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+  2017
+
 Tuovinen *et al.*, 2004
     Tuovinen, J.-P.; Ashmore, M.; Emberson, L. & Simpson, D. Testing and
     improving the EMEP ozone deposition module Atmos. Environ., 2004,
