@@ -549,7 +549,7 @@ Exception to the priority rule are:
 
 List of file attributes (default in parenthesis):
   - filename (‘NOTSET’) Name of the file (with path)
-  - projection (‘NOTSET’) Only three categories ‘lon lat’, 'native' or any other (for example ‘Lambert ‘or ‘Stereographic’ would give the same result). 'native' means that emissions are given in the same grid as the model grid and the data is not interpolated (use it if you can).
+  - projection (‘lon lat’) Only three categories ‘lon lat’, 'native' or any other (for example ‘Lambert ‘or ‘Stereographic’ would give the same result). 'native' means that emissions are given in the same grid as the model grid and the data is not interpolated (use it if you can).
   - grid_resolution (an approximate value is computed from the lon and lat, if no value is given) It does not need to be exact (cannot be exact on a sphere anyway!). This grid_resolution steers the interpolation algorithm; A large value will force the code to subdivide each emission gridcell in large number of pieces, that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
   - periodicity (‘time’) How often the values are updated. Can be ‘yearly’, ‘Monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record. The timestamp must correspond to the end of the time period of validity. For ‘yearly’ monthly timefactors are applied, if a sector is defined. For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
   - factor (1.0) multiplicative factor for all sources in the file
@@ -558,14 +558,14 @@ List of file attributes (default in parenthesis):
   - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
   - country_ISO ('NOTSET') will be used as default for sources units if set.
   - sector (-1) will be used as default for sources sector if set.
-  - species ('NOTSET') will be used as default for sources species if set.
+  - sectorsName ('SNAPsectors') . Can also be set to 'GNFRsectors. Sectors are mapped automatically, if the emssions file is defined with one category, but the model use another.
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
 
 List of source attributes:
   - varname (‘NOTSET’) The name as used in the netcdf file
   - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc) 
-  - factor (1.0) multiplicative factor. Can be used to change units to model definitions.Comes on top of the file multiplicative factors and possibly other factors.
+  - factor (1.0) multiplicative factor. Can be used to change units to model definitions. Comes on top of the file multiplicative factors and possibly other factors.
   - units (‘mg/m2/h’) Units *after* the factor multiplication. 
   - country_ISO (‘N/A’) the country code, as defined in Country_mod.f90 (for example ‘FR’ for France). ‘N/A’ is a valid code, but it does not correspond to any country.
   - apply_femis (true) whether to apply the femis reductions to this source.
@@ -578,7 +578,7 @@ The idea is that only variables that clearly are required in a specific context 
 Depending of the type of source, not all variables are used.
 
 Note about species: These can be interpreted in one of three categories
-  1. emitted species (nox,sox,pm25 ...) with sector (1...11) (“sector species”)
+  1. emitted species (nox,sox,pm25 ...) with sector (1...11 (or 13)) (“sector species”)
   2. individual species (SO2, NO, NO2, ...) with sector. The species MUST be one of the splitted species. These will be treated as one of the “sector species”  from 1. (but not splitted of course). Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2”.
   3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified). No timefactors, vertical realease heights or splits are applied.
    In this case the emissions are summed up in setup_rcemis (not in EmisSet)
