@@ -40,7 +40,7 @@ Here is an example of content of the most important parameters:
   &end
 
 In the extract above, the model is run for the period 1 January to 10 January
-2015 and the trend year used is 2015. Output files will be stored with
+2015 and the trend year used is 2015. Hours for the startdate must be an existing timestamp, often a multiple of three (hours for enddate can be chosen freely). Output files will be stored with
 the name 'Base' and the meteorological correspond to the 'EECCA' grid.
 
 Note the definition of the meteorological input ("meteo"): the keywords, 'YYYY', 'MM', 'DD' and 'GRID' will be replaced on the fly by respectively, year, month, day and grid ('EECCA' here).
