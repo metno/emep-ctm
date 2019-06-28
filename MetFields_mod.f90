@@ -1,4 +1,4 @@
-! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -26,11 +26,12 @@
 !*****************************************************************************!
 module MetFields_mod
 
-  use Config_module,  only : USES,USE_WRF_MET_NAMES,NPROC, PBL
+  use Config_module,  only : USES,USE_WRF_MET_NAMES,NPROC, PBL, meteo, startdate, TopoFile
   use MPI_Groups_mod     , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
                                  MPI_COMM_CALC, MPI_COMM_WORLD, MPI_COMM_SUB, MPISTATUS, &
                                  IERROR, ME_MPI, NPROC_MPI, largeLIMAX,largeLJMAX, share, share_logical
   use Par_mod            , only : me
+  use TimeDate_ExtraUtil_mod,only: date2string
   implicit none
   private
 
@@ -1091,6 +1092,10 @@ if(USE_WRF_MET_NAMES)then
    met(ix_sdepth)%name            = 'SNOWH'!snowdepth in m
    met(ix_ice_nwp)%name           = 'SEAICE'!flag 0 or 1
    met(ix_rh2m)%name              = 'Q2' ! 2 meter relative humidity
+
+!meteo model topography (assumed constant in time)
+   met(ix_elev)%name             = 'HGT'
+   TopoFile = date2string(meteo,startdate,mode='YMDH')
 
 !... addmore
 end if

@@ -1,4 +1,4 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -35,7 +35,7 @@ module RunChem_mod
 
   use AeroConstants_mod,only: AERO
   use AerosolCalls,     only: AerosolEquilib & !-> My_MARS, My_EQSAM, &
-                             ,Aero_water, Aero_water_MARS 
+                             ,Aero_water, Aero_water_rh50, Aero_water_MARS 
   use My_Timing_mod,     only: Code_timer, Add_2timing,  &
                               tim_before, tim_after
   use AOD_PM_mod,        only: AOD_Ext
@@ -49,8 +49,8 @@ module RunChem_mod
   use ChemSpecs_mod                     ! DEBUG ONLY
   use ColumnSource_mod,  only: Winds, getWinds
   use Config_module,    only: MasterProc, & 
-                              KMAX_MID, END_OF_EMEPDAY, nstep,  &
-                              USE_FASTJ, USES, dt_advec
+                              KMAX_MID, END_OF_EMEPDAY, step_main,  &
+                              USE_FASTJ, USES, AOD_WANTED, dt_advec
   use Debug_module,      only: DebugCell, DEBUG  & ! -> DEBUG%RUNCHEM
                               ,DEBUG_EMISSTACKS ! MKPS
   use DefPhotolysis_mod, only: setup_phot
@@ -255,7 +255,7 @@ subroutine runchem()
                 
       !  Alternating Dry Deposition and Equilibrium chemistry
       !  Check that one and only one eq is chosen
-      if(mod(nstep,2)/=0) then 
+      if(mod(step_main,2)/=0) then 
         call AerosolEquilib(debug_flag)
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
@@ -290,19 +290,19 @@ subroutine runchem()
 
 
       !// Calculate Aerosol Optical Depth
-      if(USES%AOD)  &
-        call AOD_Ext(i,j,debug_flag)
+      if(AOD_WANTED) call AOD_Ext(i,j,debug_flag)
 
       !  Calculates PM water: 1. for ambient Rh and T (3D)
       !!  and for filter equlibration conditions (2D at surface) 
       !  T=20C and Rh=50% for comparability with gravimetric PM
-      call Aero_water_MARS(i,j, debug_flag)
 
-!.. Water from EQSAM .......
-!     ambient = .false.  ! For Rh=50%
-!     call Aero_water(i,j, ambient, debug_flag)                     
-!     ambient = .true.  !  For real conditions (3D) 
-!     call Aero_water(i,j, ambient, debug_flag)
+      if(AERO%EQUILIB_WATER=='EQSAM')then
+         !.. Water from EQSAM .......
+         call Aero_water     (i,j, debug_flag)  !  For real conditions (3D) 
+         call Aero_water_rh50(i,j, debug_flag)  !  Rh=50% T=20C                     
+      else
+         call Aero_water_MARS(i,j, debug_flag)         
+      endif
                    
       call check_negs(i,j,'END')
       if(i>=li0.and.i<=li1.and.j>=lj0.and.j<=lj1) then

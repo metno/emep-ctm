@@ -1,4 +1,4 @@
-! <Country_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Country_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -1318,7 +1318,7 @@ IC_INDI_BENG = ix
 Country(IC_INDI_BENG) = cc( "INDI_BENG",'-',  288 , F,   288 ,288 ,-100, "India:West_Bengal")
 ix=ix+1
 IC_INDI_BIHA = ix
-Country(IC_INDI_BIHA) = cc( "INDI_BIHA",'-',  289 , F,   289 ,-289 ,100, "India:Bihar")
+Country(IC_INDI_BIHA) = cc( "INDI_BIHA",'-',  289 , F,   289 ,289 ,-100, "India:Bihar")
 ix=ix+1
 IC_INDI_CHHA = ix
 Country(IC_INDI_CHHA) = cc( "INDI_CHHA",'-',  290 , F,   290 ,290 ,-100, "India:Chhattisgarh")

@@ -70,7 +70,7 @@
   use ChemSpecs_mod,      only: species,species_adv
   use CheckStop_mod,      only: CheckStop,StopAll
   use Config_module,      only: EPSIL, dt_advec
-  use Config_module, only : KMAX_BND,KMAX_MID,NMET, nstep, nmax, &
+  use Config_module, only : KMAX_BND,KMAX_MID,NMET, step_main, nmax, &
                   dt_advec, dt_advec_inv,  PT,Pref, KCHEMTOP, &
                   NPROCX,NPROCY,NPROC, &
                   USES,USE_uEMEP,uEMEP,ZERO_ORDER_ADVEC
@@ -473,7 +473,7 @@
     ! Start xys advection loop:
     iterxys = 0
     do while (iterxys < niterxys)
-       if(mod(nstep,2) /= 0 .or. iterxys /= 0)then !start a xys sequence
+       if(mod(step_main,2) /= 0 .or. iterxys /= 0)then !start a xys sequence
 
           iterxys = iterxys + 1
           do k = 1,KMAX_MID

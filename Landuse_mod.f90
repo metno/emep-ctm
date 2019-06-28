@@ -1,4 +1,4 @@
-! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -301,7 +301,7 @@ contains
     character(len=200) :: fName, msg
     integer :: ncFileID, nDimensions,nVariables,nAttributes,timeDimID,varid
     integer :: nwords, err, xtype,ndims, status
-    character(len=20) :: ewords(7)    ! LC:CF:EMEP
+    character(len=90) :: ewords(20)    ! LC:CF:EMEP, or /globa.../xxx/yyy
     logical :: fexist=.false.!file exist flag
   
     real, dimension(LIMAX,LJMAX,NLANDUSEMAX):: landuse_in ! tmp, with all data

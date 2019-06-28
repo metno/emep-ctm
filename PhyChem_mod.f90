@@ -1,4 +1,4 @@
-! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -39,7 +39,7 @@ use Chemfields_mod,    only: xn_adv,cfac,xn_shl
 use ChemDims_mod,      only: NSPEC_SHL
 use ChemSpecs_mod,     only: IXADV_SO2, IXADV_NH3, IXADV_O3, species
 use CoDep_mod,         only: make_so2nh3_24hr
-use Config_module,only: MasterProc, KMAX_MID, nmax, nstep,END_OF_EMEPDAY &
+use Config_module,only: MasterProc, KMAX_MID, nmax, step_main,END_OF_EMEPDAY &
                            ,dt_advec       & ! time-step for phyche/advection
                            ,PPBINV, PPTINV  &
                            ,IOU_INST       &
@@ -49,7 +49,7 @@ use Config_module,only: MasterProc, KMAX_MID, nmax, nstep,END_OF_EMEPDAY &
                            ,FREQ_HOURLY    & ! hourly netcdf output frequency
                            ,USE_EtaCOORDINATES,JUMPOVER29FEB&
                            ,USE_uEMEP, IOU_HOUR, IOU_HOUR_INST, IOU_YEAR&
-                           ,fileName_O3_Top
+                           ,fileName_O3_Top,FREQ_SITE, FREQ_SONDE
 use DA_mod,            only: DEBUG_DA_1STEP
 use DA_3DVar_mod,      only: main_3dvar, T_3DVAR
 use Debug_module,      only: DEBUG   ! -> DEBUG%GRIDVALUES
@@ -63,9 +63,8 @@ use Gravset_mod,       only: gravset
 use GridValues_mod,    only: debug_proc,debug_li,debug_lj,&
                             glon,glat,projection,i_local,j_local,i_fdom,j_fdom
 use MetFields_mod,     only: ps,roa,z_bnd,z_mid,cc3dmax, &
-                            PARdbh, PARdif, fCloud, & !WN17
+                            PARdbh, PARdif, fCloud, & !WN17, PAR in W/m2
                             zen,coszen,Idirect,Idiffuse
-use My_Outputs_mod ,   only: NHOURLY_OUT, FREQ_SITE, FREQ_SONDE
 use My_Timing_mod,     only: NTIMING, Code_timer, Add_2timing, &
                              tim_before, tim_before0, tim_after
 use NetCDF_mod,        only: ReadField_CDF,Real4
@@ -112,7 +111,7 @@ subroutine phyche()
   !     physical and  chemical routines.
 
   !     Hours since midnight at any time-step
-  !    using current_date we have already nstep taken into account
+  !    using current_date we have already step_main taken into account
   thour = real(current_date%hour) + current_date%seconds/3600.0
 
   if(DEBUG%PHYCHEM.and.debug_proc ) then
@@ -122,7 +121,7 @@ subroutine phyche()
     if(current_date%hour==12) then
       ndays = day_of_year(current_date%year,current_date%month, &
            current_date%day)
-      write(*,*) 'thour,ndays,nstep,dt', thour,ndays,nstep,dt_advec
+      write(*,*) 'thour,ndays,step_main,dt', thour,ndays,step_main,dt_advec
     end if
   end if
 
@@ -217,7 +216,7 @@ subroutine phyche()
   !/ See if we are calculating any before-after chemistry productions:
 
   !=============================
-  if ( nstep == nmax ) call DerivedProds("Before",dt_advec)
+  if (mod(step_main,nmax) == 0) call DerivedProds("Before",dt_advec)
   !=============================
 
 
@@ -251,7 +250,7 @@ subroutine phyche()
   !/ See if we are calculating any before-after chemistry productions:
 
   !=============================
-  if(nstep==nmax) call DerivedProds("After",dt_advec)
+  if(mod(step_main,nmax) == 0) call DerivedProds("After",dt_advec)
   !=============================
 
   !=============================
@@ -360,7 +359,7 @@ subroutine debug_concs(txt)
       c2=-1.0
     end if
     write(*,"(a,2i3,i5,i3,a12,2g12.4,1x,a4)") "debug_concs:"// &
-      trim(txt), me, current_date%hour, current_date%seconds, nstep,&
+      trim(txt), me, current_date%hour, current_date%seconds, step_main,&
       trim(species(ispec)%name), c1, c2, unit
   end if
 end subroutine debug_concs

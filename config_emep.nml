@@ -1,15 +1,13 @@
-&INPUT_PARA
+&Model_config
   GRID      = 'EECCA',
-  iyr_trend = 2015
+  iyr_trend = 2015,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2018',
+  runlabel2 = 'Opensource_Setup_2019',
   startdate = 2015,01,01,00,
   enddate   = 2015,12,31,24,
-&end
-&Machine_config
+!------------------------------
   DataPath(1) = '../input',
-&end
-&ModelConstants_config
+!------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
   EmisHeightsFile       = 'DataDir/EmisHeights.txt',
@@ -19,11 +17,12 @@
   DailyFacFile          = 'DataDir/DailyFac.POLL',
   HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
   EMEP_EuroBVOCFile     = 'DataDir/EMEP_EuroBVOC.nc',
+  DustFile              = 'DataDir/Dust.nc',
+  TopoFile              = 'DataDir/topoGRID.nc'
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
 !------------------------------
   EXP_NAME              = 'EMEPSTD',
-  MY_OUTPUTS            = 'EMEPSTD',
 !------------------------------
   EmBio%GlobBvocMethod  = 'GLC-CLM', ! default for GLOBAL runs, not used for Europe
   EmBio%CLF             =  0.59,     ! 1/1.7 for CLM
@@ -31,7 +30,7 @@
   LandCoverInputs%Do3seDefs = 'DataDir/Inputs_DO3SE.csv',
   LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
                               'DataDir/glc2000xCLMf18.nc',
-  YieldModifications    = 'VBS', 
+  YieldModifications    = 'VBS-T10',
   PBL%ZiMIN             =  50.0,
 !------------------------------
   USES%testname         = 'EMEPSTD',
@@ -41,87 +40,90 @@
   USES%PlumeMethod      = 'PVDI',    ! default PVDI, possible: NILU, ASMI, PVDI
   USES%PFT_MAPS         = F,         ! PFT LAI tests
 !------------------------------
-  USES%SOILWATER         = T,          ! Uses SMI from meteo data
-  USES%CONVECTION        = F,
-  USES%SEASALT           = T,
-  USES%AIRCRAFT_EMIS     = T,          ! Needs global file, see manual
-  USES%LIGHTNING_EMIS    = T,
+  USES%SOILWATER        = T,         ! Uses SMI from meteo data
+  USES%CONVECTION       = F,
+  USES%SEASALT          = T,
+  USES%AIRCRAFT_EMIS    = T,         ! Needs global file, see manual
+  USES%LIGHTNING_EMIS   = T,
 !------------------------------
-  USES%EURO_SOILNOX      = T,          ! diff for global + Euro runs
-  EURO_SOILNOX_DEPSCALE = 1.0,        ! Scale, default 1  (see ModelConstants_ml)
-  USES%GLOBAL_SOILNOX    = F,          ! diff for global + Euro runs
+  USES%EURO_SOILNOX     = T,         ! diff for global + Euro runs
+  EURO_SOILNOX_DEPSCALE = 1.0,       ! Scale, default 1  (see ModelConstants_ml)
+  USES%GLOBAL_SOILNOX   = F,         ! diff for global + Euro runs
 !------------------------------
-  USES%PROGRESS_FILES    = F,         ! write to file.msg for each output in file.nc
-  USES%SKIP_INCOMPLETE_OUTPUT = F,    ! skip daily/montly/fullrun output for runs under 1/28/181 days
-  USES%POLLEN            = F,
-  USES%ROADDUST          = T,
-  USES%DUST              = T,
-  NETCDF_DEFLATE_LEVEL  = 4,          ! 1-9 GZIP compress, 0 no compress, -1 netcdf3
+  USES%PROGRESS_FILES   = F,         ! write to file.msg for each output in file.nc
+  USES%SKIP_INCOMPLETE_OUTPUT = F,   ! skip daily/montly/fullrun output for runs under 1/28/181 days
+  USES%POLLEN           = F,
+  USES%ROADDUST         = T,
+  USES%DUST             = T,
+  NETCDF_DEFLATE_LEVEL  = 4,         ! 1-9 GZIP compress, 0 no compress, -1 netcdf3
   INERIS_SNAP1          = F,
   INERIS_SNAP2          = F,
 !------------------------------
-  EmisDir               = 'DataDir/EMEP01',
-  emis_inputlist(1)%name= 'EmisDir/GNFRemis_EMEP01_YYYY.nc', ! fractions emiss format
-! One can either include or exclude, not both, as follows
-! emis_inputlist(1)%incl(1:) = 'EU15', ! example take only countries from the 'EUMACC2' list
-! emis_inputlist(2)%name     = 'EmisDir/Emis_GLOB_05.nc', !example of Fractions type
+  emis_inputlist(1)%name= 'DataDir/GNFRemis_EMEP01_2015.nc', ! fractions emiss format
   emis_inputlist(2)%name= 'DataDir/OceanicEmissions_GEIA.nc',
   emis_inputlist(2)%type= 'DMS',
-  emis_inputlist(3)%name= 'DataDir/FMIGlobShip2015mon.nc',
-  emis_inputlist(3)%type= 'Special_ShipEmis',
   EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
+! emissions new format
+  Emis_sourceFiles(1)%filename = 'DataDir/FMI_Ship_Emis2015.nc',
+! EC split into 80% EC_f_ffuel_new, 20% EC_f_ffuel_age
+  Emis_sourceFiles(1)%source(1:2)%varname='EC','EC',
+  Emis_sourceFiles(1)%source(1:2)%species='EC_f_ffuel_new','EC_f_ffuel_age',
+  Emis_sourceFiles(1)%source(1:2)%factor=0.8,0.2, ! 80% new, 20% age
+! rename Ash/REMPPM25 to remPPM25
+  Emis_sourceFiles(1)%source(3)%varname='Ash',
+  Emis_sourceFiles(1)%source(3)%species='remPPM25',
+  Emis_sourceFiles(1)%source(3)%factor=1.0,
+!rename OC/POM_f_FFUEL to POM_f_ffuel
+  Emis_sourceFiles(1)%source(4)%varname='OC',
+  Emis_sourceFiles(1)%source(4)%species='POM_f_ffuel',
+  Emis_sourceFiles(1)%source(4)%factor=1.0,
 !------------------------------
-  SELECT_LEVELS_HOURLY  = F,          ! hourly output flag for 3DPROFILES
-  USES%ASH               = T,          ! Ash from historical Volcanic Eruptions
+  USES%ASH              = T,          ! Ash from historical Volcanic Eruptions
   ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
-  USES%AOD               = F,          ! Used for forcasts usually
   BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
 !--- 'fake' vegetation for ozone POD calculations
-  FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF',
+  FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF','Wheat_Irrigated', 'Wheat_NonIrrig',
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE'   ! Ignore these for FLUX calcs.
-&end
-&ColumnSource_config
 !------------------------------
 ! volcanic emissions from passive degassing and historical eruptions
 !------------------------------
   flocdef='DataDir/columnsource_location.csv',
   femsdef='DataDir/columnsource_emission.csv',
-  need_topo=T, ! do not use column emissions if topo_nc not found
+  need_topo=T, ! do not use column emissions if TopoFile not found
   NMAX_LOC=-1, ! estimate from lines in flocdef
   NMAX_EMS=-1, ! estiamte from lines in femsdef
-&end
-&Fire_config
-  need_poll = F,
-  FINN_PATTERN='../input/FFire_YYYY.nc',
-&end
-&Nest_config
+!-------- ForestFire emissions
+  BBneed_poll = F,
+  BBMAP = 'FINN', ! FINN, GFAS or GFED
+  FINN_PATTERN = 'DataDir/FINN_ForestFireEmis_YYYY.nc',
+  GFAS_PATTERN = 'DataDir/GFAS_ForestFireEmis_YYYY.nc',
+  GFED_PATTERN = 'DataDir/GFED_ForestFireEmis.nc',
+
 !-------- Read/Write MODEs
-  MODE_READ = 'NONE',         ! do nothing
-! MODE_READ = 'NHOUR',        ! every NHOURREAD
-! MODE_READ = 'START',        ! at the start of run
-! MODE_READ = 'RESTART',      ! at the start of run, if files are found
-  MODE_SAVE = 'NONE',         ! do nothing
-! MODE_SAVE = 'NHOUR',        ! every NHOURSAVE
-! MODE_SAVE = 'END',          ! at end of run
-! MODE_SAVE = 'OUTDATE',      ! every OUTDATE(1:OUTDATE_NDUMP)
-! NHOURREAD = 1,              ! hours between reads. Fraction of 24
-! NHOURSAVE = 3,              ! hours between saves. Fraction of 24
+  NEST_MODE_READ = 'NONE',         ! do nothing
+! NEST_MODE_READ = 'NHOUR',        ! every NHOURREAD
+! NEST_MODE_READ = 'START',        ! at the start of run
+! NEST_MODE_READ = 'RESTART',      ! at the start of run, if files are found
+  NEST_MODE_SAVE = 'NONE',         ! do nothing
+! NEST_MODE_SAVE = 'NHOUR',        ! every NHOURSAVE
+! NEST_MODE_SAVE = 'END',          ! at end of run
+! NEST_NHOURREAD = 1,              ! hours between reads. Fraction of 24
+! NEST_NHOURSAVE = 3,              ! hours between saves. Fraction of 24
+! NEST_OUTDATE_NDUMP = 2,          ! dump (save) 2 dates (max 4)
+! NEST_outdate(1)= 2015,1,1,1,0    ! first date to save
+! NEST_outdate(2)= 2015,1,1,7,0    ! second date to save
 !-------- File name templates for Nest I/O
-  template_read_3D = 'EMEP_IN.nc',            ! a different path can be set here
-  template_read_BC = 'EMEP_IN.nc',            ! for each of the IO IC/BC files,
-  template_write   = 'EMEP_OUT.nc',           ! if needed.
+  NEST_template_read_3D = 'EMEP_IN.nc',  ! a different path can be set here
+  NEST_template_read_BC = 'EMEP_IN.nc',  ! for each of the IO IC/BC files,
+  NEST_template_write   = 'EMEP_OUT.nc', ! if needed.
+  NEST_template_dump   =  'EMEP_Dump.nc',! used at NEST_outdate
 !-------- Sub domain for write modes
-! istart =  60,   ! default RUNDOMAIN(1)+1
-! jstart =  11,   ! default RUNDOMAIN(3)+1
-! iend   = 107,   ! default RUNDOMAIN(2)-1
-! jend   =  58,   ! default RUNDOMAIN(4)-1
-&end
-&ExternalBICs_config
+! NEST_out_DOMAIN  = 370, 420, 270, 320, !restrict the save data to this part
+!------------------------------
   USE_EXTERNAL_BIC  = F,
   EXTERNAL_BIC_NAME = 'DUMMY',
-&end
-&OutputConcs_config
+!------------------------------
 OutputConcs=
   'HMIX'                ,'m'   ,'2d','HMIX'     ,'MISC' ,'YM',
   'T2m'                 ,'degC','2d','T2m'      ,'MISC' ,'YMD',
@@ -186,6 +188,7 @@ OutputConcs=
 ! 'O3'                 ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
 ! 'CO'                 ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
 ! 'HCHO'               ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
+
 OutputVegO3=
   'POD1_IAM_DF'    ,'POD', 1.0,'MM','IAM_DF',F,0,999,'YM',
   'POD0_IAM_DF'    ,'POD', 0.0,'MM','IAM_DF',F,0,999,'YM',
@@ -204,8 +207,7 @@ OutputVegO3=
   'EUAOT40_Crops'  ,'AOT',40.0,'EU','IAM_CR',F,0,999,'YM',
   'EUAOT40_Forests','AOT',40.0,'EU','IAM_DF',F,0,999,'YM',
   'MMAOT40_IAM_WH' ,'AOT',40.0,'MM','IAM_WH',F,0,999,'YM',
-&end
-&OutputDep_config
+
 DDEP_ECOS =
   'Grid'     ,'YMD',
   'Conif'    ,'YM',
@@ -213,10 +215,12 @@ DDEP_ECOS =
   'Water_D'  ,'Y',
   'Decid'    ,'Y',
   'Crops'    ,'Y',
+
 DDEP_WANTED =
   'SOX'      ,'GROUP','mgS',
   'OXN'      ,'GROUP','mgN',
   'RDN'      ,'GROUP','mgN',
+
 WDEP_WANTED =
   'PREC'     ,'PREC' ,'mm' ,'YMD',
   'SOX'      ,'GROUP','mgS','YMD',
@@ -224,8 +228,7 @@ WDEP_WANTED =
   'RDN'      ,'GROUP','mgN','YMD',
   'SO2'      ,'SPEC' ,'mgS','YMD',
   'HNO3'     ,'SPEC' ,'mgN','YMD',
-&end
-&OutputSize_config
+
 !restrict size of output files. (Sizes defined with respect to fulldomain)
 !  fullrun_DOMAIN =   1,100, 1,100,
 !  month_DOMAIN   = 100,300, 1,100,

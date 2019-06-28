@@ -1,4 +1,4 @@
-! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -38,10 +38,6 @@ module NetCDF_mod
 !for the lower left corner, the coordinates i_EMEP j_EMEP and long lat will
 !be wrong
 !
-use My_Outputs_mod,     only : NHOURLY_OUT, &        ! No. outputs
-                              Asc2D, hr_out, &      ! Required outputs
-                              LEVELS_HOURLY, NLEVELS_HOURLY
-                              !NML SELECT_LEVELS_HOURLY
 use Chemfields_mod,     only : xn_shl,xn_adv
 use CheckStop_mod,      only : CheckStop,StopAll,check=>CheckNC
 use ChemDims_mod,       only : NSPEC_TOT, NSPEC_ADV, NSPEC_SHL
@@ -50,14 +46,13 @@ use Config_module,       only: KMAX_MID,KMAX_BND, runlabel1, runlabel2&
                              ,MasterProc, NETCDF_DEFLATE_LEVEL &
                              ,NPROC, IIFULLDOM,JJFULLDOM &
                              ,IOU_INST,IOU_YEAR,IOU_MON,IOU_DAY &
-                             ,IOU_HOUR,IOU_HOUR_INST,IOU_HOUR_EXTRA &
+                             ,IOU_HOUR,IOU_HOUR_INST &
                              ,PT,Pref,NLANDUSEMAX, model&
                              ,USE_EtaCOORDINATES,RUNDOMAIN&
                              ,fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,hour_DOMAIN&
                              ,SurfacePressureFile &
-                             ,SELECT_LEVELS_HOURLY&  ! NML
                              , num_lev3d,lev3d&      ! 3D levels on 3D output
-                             , startdate
+                             , startdate, step_main
 use Country_mod,        only : NLAND, Country
 use Debug_module,       only : DEBUG_NETCDF, DEBUG_NETCDF_RF
 use Functions_mod,       only: StandardAtmos_km_2_kPa
@@ -85,7 +80,7 @@ use InterpolationRoutines_mod,  only : grid2grid_coeff
 use MPI_Groups_mod,     only: MPI_LOGICAL, MPI_SUM,MPI_INTEGER, MPI_BYTE,MPISTATUS, &
                                MPI_COMM_IO, MPI_COMM_CALC, IERROR, ME_IO, ME_CALC
 use netcdf
-use OwnDataTypes_mod,   only : Deriv, TXTLEN_NAME
+use OwnDataTypes_mod,   only : Deriv, TXTLEN_NAME, TXTLEN_FILE
 use Par_mod,            only : me,GIMAX,GJMAX,MAXLIMAX, MAXLJMAX, &
                               IRUNBEG,JRUNBEG,limax,ljmax, &
                               gi0,gj0,tgi0,tgi1,tgj0,tgj1,tlimax,tljmax
@@ -96,21 +91,18 @@ use SmallUtils_mod,      only: wordsplit, find_index
 
 implicit none
 
-integer, public, parameter :: &
-  max_filename_length=200 ! large enough to include paths, eg Nest_config namelist
-
-character(len=max_filename_length), save :: &
+character(len=TXTLEN_FILE), save :: &
   fileName      = 'NotSet',&
-  fileName_iou(IOU_INST:IOU_HOUR_EXTRA)=&
+  fileName_iou(IOU_INST:IOU_HOUR_INST)=&
     ['out_inst.nc    ','out_year.nc    ','out_month.nc   ','out_day.nc     ',&
-     'out_hour.nc    ','out_hourInst.nc','out_3Dhour.nc  ']
+     'out_hour.nc    ','out_hourInst.nc']
 character(len=125) :: period_type !TESTHH
 
 integer,parameter ::closedID=-999     !flag for showing that a file is closed
 integer      :: ncFileID_new=closedID  !don't save because should always be
                 !redefined (in case several routines are using ncFileID_new
                 !with different filename_given)
-integer,save :: ncFileID_iou(IOU_INST:IOU_HOUR_EXTRA)=closedID
+integer,save :: ncFileID_iou(IOU_INST:IOU_HOUR_INST)=closedID
 integer,save :: outCDFtag=0
 !CDF types for output:
 integer, public, parameter  :: Int1=1,Int2=2,Int4=3,Real4=4,Real8=5
@@ -560,13 +552,6 @@ case(IOU_HOUR_INST)
   i1=hour_DOMAIN(1);i2=hour_DOMAIN(2);j1=hour_DOMAIN(3);j2=hour_DOMAIN(4)
   IBEGcdf=min(IBEGcdf,i1); JBEGcdf=min(JBEGcdf,j1)
   GIMAXcdf=max(GIMAXcdf,i2-i1+1); GJMAXcdf=max(GJMAXcdf,j2-j1+1)
-case(IOU_HOUR_EXTRA)
-  fileName_iou(iotyp) = trim(fileName)
-  period_type = 'hourly'
-  i1=hour_DOMAIN(1);i2=hour_DOMAIN(2);j1=hour_DOMAIN(3);j2=hour_DOMAIN(4)
-  IBEGcdf=min(IBEGcdf,i1); JBEGcdf=min(JBEGcdf,j1)
-  GIMAXcdf=max(GIMAXcdf,i2-i1+1); GJMAXcdf=max(GJMAXcdf,j2-j1+1)
-  KMAXcdf =min(maxval(hr_out(1:NHOURLY_OUT)%nk),NLEVELS_HOURLY)
 case(IOU_INST)
   fileName_iou(iotyp) = trim(fileName)
   period_type = 'instant'
@@ -576,15 +561,8 @@ end select
 
 if(MasterProc.and.DEBUG_NETCDF)&
   write(*,*) "Creating ", trim(fileName),' ',trim(period_type)
-if(iotyp/=IOU_HOUR_EXTRA)then
-  call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
-                        num_lev3d,KLEVcdf=lev3d,KLEVcdf_from_top=.true.)
-elseif(SELECT_LEVELS_HOURLY)then     ! Output selected model levels
-  call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
-                        KMAXcdf,KLEVcdf=LEVELS_HOURLY)
-else
-  call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,KMAXcdf)
-end if
+call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
+                      num_lev3d,KLEVcdf=lev3d,KLEVcdf_from_top=.true.)
 
 if(MasterProc.and.DEBUG_NETCDF)&
   write(*,*) "Finished Init_new_netCDF", trim(fileName),' ',trim(period_type)
@@ -1190,7 +1168,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
     domain = month_DOMAIN
   case(IOU_DAY)
     domain = day_DOMAIN
-  case(IOU_HOUR:IOU_HOUR_EXTRA)
+  case(IOU_HOUR:IOU_HOUR_INST)
     domain = hour_DOMAIN
   end select
   if(present(out_DOMAIN)) domain = out_DOMAIN
@@ -1342,7 +1320,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
   case(IOU_GIVEN)
     fileName = trim(fileName_given)
     ncFileID = ncFileID_new
-  case(IOU_INST:IOU_HOUR_EXTRA)
+  case(IOU_INST:IOU_HOUR_INST)
     fileName = trim(fileName_iou(iotyp_new))
     ncFileID = ncFileID_iou(iotyp_new)
   case default
@@ -1372,7 +1350,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
       select case(iotyp_new)      ! needed in case iotyp is defined
       case(IOU_GIVEN)
         ncFileID_new  = ncFileID  ! not really needed
-      case(IOU_INST:IOU_HOUR_EXTRA)
+      case(IOU_INST:IOU_HOUR_INST)
         ncFileID_iou(iotyp_new)=ncFileID
       end select
     end if
@@ -1672,8 +1650,30 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
         call date2nctime(date_start,rdaysstart)!start of period                
         call date2nctime(current_date,rdays)!now
         rdays = (rdaysstart+rdays)/2 !middle
+     else if (iotyp==IOU_MON) then
+        !careful month can be incomplete in first month or last month or both
+        if((mod(12+current_date%month-startdate(2),12)==1 .and.&
+             (current_date%day==1 .and. current_date%hour==0)).or.&
+             (mod(12+current_date%month-startdate(2),12)==0).and.&
+             (current_date%day/=1 .or. current_date%hour/=0))then       
+           !first month outputted
+           date_start = startdate!start of period        
+        else
+           !the start is at the start of the current month
+           date_start(1) = current_date%year
+           date_start(3) = 1
+           date_start(4) = 0
+           if(current_date%day==1 .and. current_date%hour==0)then
+              date_start(2) = current_date%month-1
+           else
+              date_start(2) = current_date%month           
+           endif
+        endif
+        call date2nctime(date_start,rdaysstart)!start of period                
+        call date2nctime(current_date,rdays)!now
+        rdays = (rdaysstart+rdays)/2 !middle        
      else
-        call date2nctime(current_date,rdays,iotyp) !routine will subtract half hour, day or month if necessary
+        call date2nctime(current_date,rdays,iotyp) !routine will subtract half hour, day  if necessary
      endif
      call check(nf90_put_var(ncFileID,VarID,rdays,start=(/nrecords/)))
      
@@ -1856,7 +1856,7 @@ subroutine CloseNetCDF
   integer :: i,ncFileID
 
   if(MasterProc)then
-    do i=IOU_INST,IOU_HOUR_EXTRA
+    do i=IOU_INST,IOU_HOUR_INST
       ncFileID=ncFileID_iou(i)
       if(ncFileID/=closedID)then
         call check(nf90_close(ncFileID))
@@ -2034,6 +2034,13 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   i0=0;j0=0!origin, i.e. (i=0,j=0) coordinate
   if(present(i_start))i0=i_start-1
   if(present(j_start))j0=j_start-1
+  if(i0>imax .or. j0>jmax)then
+     if(.not.needed)then
+        if(me==0)write(*,*)'WARNING: '//trim(fileName)//'has incompatible grid. Cannot read '//trim(varname)
+        found=.false.
+        return
+     endif
+  endif
   call CheckStop(i0>imax, "NetCDF_mod i: subdomain not compatible. cannot handle this")
   call CheckStop(j0>jmax, "NetCDF_mod j: subdomain not compatible. cannot handle this")
   if(MasterProc.and.DEBUG_NETCDF)&
@@ -2473,6 +2480,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   real ::Rlatmin,Rlatmax,dRlat,dRlati, Resolution_fac
   integer, allocatable ::ifirst(:),ilast(:),jfirst(:),jlast(:)
   real, allocatable :: fracfirstlon(:),fraclastlon(:),fracfirstlat(:),fraclastlat(:)
+  logical, save :: debug1   ! -> output on 1st step, or when debug set
 
   !_______________________________________________________________________________
   !
@@ -2487,6 +2495,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      debug = debug_flag .and. me==0
      if ( debug ) write(*,*) 'ReadCDF start: ',trim(filename),':', trim(varname)
   end if
+
+  debug1 = ( (MasterProc .and. step_main == 1) .or. debug )
 
   UnDef_local=0.0
   if(present(UnDef))UnDef_local=UnDef
@@ -3515,7 +3525,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      !_________________________________________________________________________________________________________
   elseif(data_projection=="Stereographic")then
      !we assume that data is originally in Polar Stereographic projection
-     if(MasterProc.and.debug)write(*,*)'interpolating from ', trim(data_projection),' to ',trim(projection)
+     if(debug1)write(*,*)'interpolating from ', trim(data_projection),' to ',trim(projection)
 
      !get coordinates
      !check that there are dimensions called i and j
@@ -3608,8 +3618,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         Ndiv=max(1,Ndiv)
         Ndiv2=Ndiv*Ndiv
         Grid_resolution_div=Grid_resolution/Ndiv
-        xp_ext_div=(xp_ext+0.5)*Ndiv-0.5
-        yp_ext_div=(yp_ext+0.5)*Ndiv-0.5
+        xp_ext_div=(xp_ext-0.5)*Ndiv+0.5
+        yp_ext_div=(yp_ext-0.5)*Ndiv+0.5
         an_ext_div=an_ext*Ndiv
 
         if(projection/='Stereographic'.and.projection/='lon lat'.and.projection/='Rotated_Spherical'.and.projection/='lambert')then
@@ -3639,6 +3649,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                     i_ext=(ig-1)*Ndiv+idiv
                     call ij2lb(i_ext,j_ext,lon,lat,fi_ext,an_ext_div,xp_ext_div,yp_ext_div)
                     call lb2ij(lon,lat,i,j)!back to model (fulldomain) coordinates
+
 !                    if(abs(lat-57.0)<0.01 .and. abs(lon-1.3)<0.01)write(*,*)'fullij ',lat,lon,me,i,j
 !                    if(abs(lon-15)<0.02 .and. abs(lat-63)<0.02)write(*,*)jg,ig,lon,lat,i,j,me
                     !convert from fulldomain to local domain
@@ -3725,8 +3736,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
         Ndiv=1
         Grid_resolution_div=Grid_resolution/Ndiv
-        xp_ext_div=(xp_ext+0.5)*Ndiv-0.5
-        yp_ext_div=(yp_ext+0.5)*Ndiv-0.5
+        xp_ext_div=(xp_ext-0.5)*Ndiv+0.5
+        yp_ext_div=(yp_ext-0.5)*Ndiv+0.5
         an_ext_div=an_ext*Ndiv
         if(MasterProc.and.debug)write(*,*)'zero_order interpolation ',an_ext_div,xp_ext_div,yp_ext_div,dims(1),dims(2)
 
@@ -3783,8 +3794,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
   else ! data_projection /="lon lat" .and. data_projection/="Stereographic"
 
-     if(MasterProc.and.debug)write(*,*)'interpolating from ', trim(data_projection),' to ',trim(projection)
-     if(MasterProc)write(*,*)'interpolating from ', trim(data_projection),' to ',trim(projection)
+     if(debug1) write(*,*)'interpolatingL from ', &
+        trim(data_projection), ' to ',trim(projection)
 
      if(interpol_used=='conservative'.or.interpol_used=='mass_conservative')then
 
@@ -3801,7 +3812,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         Ndiv=nint(5*Grid_resolution/GRIDWIDTH_M)
         Ndiv=max(1,Ndiv)
         Ndiv2=Ndiv*Ndiv
-        if(Ndiv>1.and.MasterProc)then
+        if(Ndiv>1.and.MasterProc .and.step_main == 1 )then
            write(*,*)'dividing each gridcell into ',Ndiv2,' pieces'
         end if
 

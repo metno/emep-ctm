@@ -1,4 +1,4 @@
-! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -40,7 +40,8 @@ use ChemGroups_mod,        only: chemgroups
 use ChemSpecs_mod,         only: species
 use Config_module,    only: KCHEMTOP,KMAX_MID,MasterProc,NPROC, &
                                 USES, dt_advec,dt_advec_inv,&
-                                startdate,enddate,DataDir,GRID, TopoFile
+                                startdate,enddate,DataDir,TopoFile,&
+                                NMAX_LOC,NMAX_EMS,flocdef,femsdef,need_topo
 use Debug_module,          only:  DEBUG   ! -> DEBUG%COLSRC
 use EmisDef_mod,           only: VOLCANOES_LL
 use GridValues_mod,        only: xm2,sigma_bnd,GridArea_m2,&
@@ -66,12 +67,9 @@ public :: ColumnRate      ! Emission rate
 public :: getWinds        ! Wind speeds at locations
 
 logical, save ::          &
-  found_source = .true.,  & ! Are sources found on this processor/subdomain?
-  need_topo    = .true.     ! do not use column emissions if topo file is not found
+  found_source = .true. ! Are sources found on this processor/subdomain?
 
-integer, save ::  &
-  NMAX_LOC = 7,   &! Max number of locations on processor/subdomain (increase to 24 for eEMEP)
-  NMAX_EMS = 250   ! Max number of events def per location (increase to 6000 for eEMEP)
+
 
 integer, save ::  &! No. of ... found on processor/subdomain
   nloc    = -1     ! Source locations
@@ -111,9 +109,6 @@ character(len=*),parameter :: &
   mname = "ColumnSource",     &
   MSG_FMT="('"//mname//":',:,1X,A,5(:,1X,I0,':',A),3(:,1X,ES10.3,':',A))"
 
-character(len=TXTLEN_FILE), save :: &
-  flocdef="columnsource_location.csv",  & ! see locdef
-  femsdef="columnsource_emission.csv"     ! see emsdef
 
 character(len=3), parameter :: &  ! Expand variable name for multy sceario runs
 ! EXPAND_SCENARIO_NAME(4)=["ASH","NUC","###","***"] ! e.g. ASH_F --> V1702A02B_F
@@ -158,10 +153,6 @@ subroutine Config_ColumnSource()
   integer,parameter :: read_ok(4)=[0,-1,84,85] ! OK if namelist not found
   integer :: ios=0
   character(len=*), parameter :: dtxt = 'ColSrcConf:'
-  NAMELIST /ColumnSource_config/NMAX_LOC,NMAX_EMS,flocdef,femsdef,need_topo
-  rewind(IO_NML)
-  read(IO_NML,NML=ColumnSource_config,iostat=ios)
-  call CheckStop(all(ios/=read_ok),dtxt//"NML=ColumnSource_config")
 
   if(.not.foundtopo)then
     !call PrintLog(dtxt//"WARNING: "//trim(TopoFile)//" not found",MasterProc)

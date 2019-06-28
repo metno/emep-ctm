@@ -1,20 +1,22 @@
-!-> ASOC_ng100
+!-> ASOC_ng1e2
 
-  P = rct(100,k) * xnew(OH) * xnew(ASOC_ug1)
+  P = rct(78,k) * xnew(OH) * xnew(ASOC_ug1)
   
   ! L = 0.0
   
-  xnew(ASOC_ng100) = xold(ASOC_ng100) + dt2 * P
+  xnew(ASOC_ng1e2) = xold(ASOC_ng1e2) + dt2 * P
 
 
 !-> ASOC_ug1
 
   P = YCOXY(0)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YCALK(0)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YCOLE(0)* rct(82,k) * xnew(OH) * xnew(C3H6)  &
-    + rct(101,k) * xnew(OH) * xnew(ASOC_ug10)
+    + YCBENZ(0)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YCTOL(0)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YCALK(0)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YCOLE(0)* rct(73,k) * xnew(OH) * xnew(C3H6)  &
+    + rct(79,k) * xnew(OH) * xnew(ASOC_ug10)
   
-  L = rct(100,k) * xnew(OH)
+  L = rct(78,k) * xnew(OH)
   
   xnew(ASOC_ug1) = (xold(ASOC_ug1) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -22,11 +24,13 @@
 !-> ASOC_ug10
 
   P = YCOXY(1)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YCALK(1)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YCOLE(1)* rct(82,k) * xnew(OH) * xnew(C3H6)  &
-    + rct(102,k) * xnew(OH) * xnew(ASOC_ug1e2)
+    + YCBENZ(1)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YCTOL(1)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YCALK(1)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YCOLE(1)* rct(73,k) * xnew(OH) * xnew(C3H6)  &
+    + rct(80,k) * xnew(OH) * xnew(ASOC_ug1e2)
   
-  L = rct(101,k) * xnew(OH)
+  L = rct(79,k) * xnew(OH)
   
   xnew(ASOC_ug10) = (xold(ASOC_ug10) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -34,11 +38,13 @@
 !-> ASOC_ug1e2
 
   P = YCOXY(2)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YCALK(2)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YCOLE(2)* rct(82,k) * xnew(OH) * xnew(C3H6)  &
-    + rct(103,k) * xnew(OH) * xnew(ASOC_ug1e3)
+    + YCBENZ(2)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YCTOL(2)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YCALK(2)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YCOLE(2)* rct(73,k) * xnew(OH) * xnew(C3H6)  &
+    + rct(81,k) * xnew(OH) * xnew(ASOC_ug1e3)
   
-  L = rct(102,k) * xnew(OH)
+  L = rct(80,k) * xnew(OH)
   
   xnew(ASOC_ug1e2) = (xold(ASOC_ug1e2) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -46,98 +52,102 @@
 !-> ASOC_ug1e3
 
   P = YCOXY(3)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YCALK(3)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YCOLE(3)* rct(82,k) * xnew(OH) * xnew(C3H6)
+    + YCBENZ(3)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YCTOL(3)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YCALK(3)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YCOLE(3)* rct(73,k) * xnew(OH) * xnew(C3H6)
   
-  L = rct(103,k) * xnew(OH)
+  L = rct(81,k) * xnew(OH)
   
   xnew(ASOC_ug1e3) = (xold(ASOC_ug1e3) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_ASOA_ng100
+!-> non_C_ASOA_ng1e2
 
-  P = 0.9* rct(100,k) * xnew(OH) * xnew(ASOC_ug1)  &
-    + 1.075* rct(104,k) * xnew(OH) * xnew(NON_C_ASOA_ug1)
+  P = 0.9* rct(78,k) * xnew(OH) * xnew(ASOC_ug1)  &
+    + 1.075* rct(82,k) * xnew(OH) * xnew(non_C_ASOA_ug1)
   
   ! L = 0.0
   
-  xnew(NON_C_ASOA_ng100) = xold(NON_C_ASOA_ng100) + dt2 * P
+  xnew(non_C_ASOA_ng1e2) = xold(non_C_ASOA_ng1e2) + dt2 * P
 
 
-!-> NON_C_ASOA_ug1
+!-> non_C_ASOA_ug1
 
   P = YNOXY(0)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YNALK(0)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YNOLE(0)* rct(82,k) * xnew(OH) * xnew(C3H6)  &
-    + 0.9* rct(101,k) * xnew(OH) * xnew(ASOC_ug10)  &
-    + 1.075* rct(105,k) * xnew(OH) * xnew(NON_C_ASOA_ug10)
+    + YNBENZ(0)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YNTOL(0)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YNALK(0)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YNOLE(0)* rct(73,k) * xnew(OH) * xnew(C3H6)  &
+    + 0.9* rct(79,k) * xnew(OH) * xnew(ASOC_ug10)  &
+    + 1.075* rct(83,k) * xnew(OH) * xnew(non_C_ASOA_ug10)
   
-  L = rct(104,k) * xnew(OH)
+  L = rct(82,k) * xnew(OH)
   
-  xnew(NON_C_ASOA_ug1) = (xold(NON_C_ASOA_ug1) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_ASOA_ug1) = (xold(non_C_ASOA_ug1) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_ASOA_ug10
+!-> non_C_ASOA_ug10
 
   P = YNOXY(1)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YNALK(1)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YNOLE(1)* rct(82,k) * xnew(OH) * xnew(C3H6)  &
-    + 0.9* rct(102,k) * xnew(OH) * xnew(ASOC_ug1e2)  &
-    + 1.075* rct(106,k) * xnew(OH) * xnew(NON_C_ASOA_ug1e2)
+    + YNBENZ(1)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YNTOL(1)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YNALK(1)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YNOLE(1)* rct(73,k) * xnew(OH) * xnew(C3H6)  &
+    + 0.9* rct(80,k) * xnew(OH) * xnew(ASOC_ug1e2)  &
+    + 1.075* rct(84,k) * xnew(OH) * xnew(non_C_ASOA_ug1e2)
   
-  L = rct(105,k) * xnew(OH)
+  L = rct(83,k) * xnew(OH)
   
-  xnew(NON_C_ASOA_ug10) = (xold(NON_C_ASOA_ug10) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_ASOA_ug10) = (xold(non_C_ASOA_ug10) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_ASOA_ug1e2
+!-> non_C_ASOA_ug1e2
 
   P = YNOXY(2)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YNALK(2)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YNOLE(2)* rct(82,k) * xnew(OH) * xnew(C3H6)  &
-    + 0.9* rct(103,k) * xnew(OH) * xnew(ASOC_ug1e3)  &
-    + 1.075* rct(107,k) * xnew(OH) * xnew(NON_C_ASOA_ug1e3)
+    + YNBENZ(2)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YNTOL(2)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YNALK(2)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YNOLE(2)* rct(73,k) * xnew(OH) * xnew(C3H6)  &
+    + 0.9* rct(81,k) * xnew(OH) * xnew(ASOC_ug1e3)  &
+    + 1.075* rct(85,k) * xnew(OH) * xnew(non_C_ASOA_ug1e3)
   
-  L = rct(106,k) * xnew(OH)
+  L = rct(84,k) * xnew(OH)
   
-  xnew(NON_C_ASOA_ug1e2) = (xold(NON_C_ASOA_ug1e2) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_ASOA_ug1e2) = (xold(non_C_ASOA_ug1e2) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_ASOA_ug1e3
+!-> non_C_ASOA_ug1e3
 
   P = YNOXY(3)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
-    + YNALK(3)* rct(44,k) * xnew(OH) * xnew(NC4H10)  &
-    + YNOLE(3)* rct(82,k) * xnew(OH) * xnew(C3H6)
+    + YNBENZ(3)* rct(47,k) * xnew(BENZENE) * xnew(OH)  &
+    + YNTOL(3)* rct(48,k) * xnew(TOLUENE) * xnew(OH)  &
+    + YNALK(3)* rct(39,k) * xnew(OH) * xnew(NC4H10)  &
+    + YNOLE(3)* rct(73,k) * xnew(OH) * xnew(C3H6)
   
-  L = rct(107,k) * xnew(OH)
+  L = rct(85,k) * xnew(OH)
   
-  xnew(NON_C_ASOA_ug1e3) = (xold(NON_C_ASOA_ug1e3) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_ASOA_ug1e3) = (xold(non_C_ASOA_ug1e3) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> BSOC_ng100
+!-> BSOC_ng1e2
 
-  P = rct(108,k) * xnew(OH) * xnew(BSOC_ug1)
+  P = rct(86,k) * xnew(OH) * xnew(BSOC_ug1)
   
   ! L = 0.0
   
-  xnew(BSOC_ng100) = xold(BSOC_ng100) + dt2 * P
+  xnew(BSOC_ng1e2) = xold(BSOC_ng1e2) + dt2 * P
 
 
 !-> BSOC_ug1
 
   P = YCISOP(0)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YCTERP(0)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YCTERP(0)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YCTERP(0)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YCTERP(0)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YCTERP(0)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YCTERP(0)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YCTERP(0)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YCTERP(0)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YCTERP(0)* rct(93,k) * xnew(NO3) * xnew(XTERP)  &
-    + rct(109,k) * xnew(OH) * xnew(BSOC_ug10)
+    + YCTERP(0)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YCTERP(0)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YCTERP(0)* rct(77,k) * xnew(NO3) * xnew(APINENE)  &
+    + rct(87,k) * xnew(OH) * xnew(BSOC_ug10)
   
-  L = rct(108,k) * xnew(OH)
+  L = rct(86,k) * xnew(OH)
   
   xnew(BSOC_ug1) = (xold(BSOC_ug1) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -145,18 +155,12 @@
 !-> BSOC_ug10
 
   P = YCISOP(1)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YCTERP(1)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YCTERP(1)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YCTERP(1)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YCTERP(1)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YCTERP(1)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YCTERP(1)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YCTERP(1)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YCTERP(1)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YCTERP(1)* rct(93,k) * xnew(NO3) * xnew(XTERP)  &
-    + rct(110,k) * xnew(OH) * xnew(BSOC_ug1e2)
+    + YCTERP(1)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YCTERP(1)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YCTERP(1)* rct(77,k) * xnew(NO3) * xnew(APINENE)  &
+    + rct(88,k) * xnew(OH) * xnew(BSOC_ug1e2)
   
-  L = rct(109,k) * xnew(OH)
+  L = rct(87,k) * xnew(OH)
   
   xnew(BSOC_ug10) = (xold(BSOC_ug10) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -164,18 +168,12 @@
 !-> BSOC_ug1e2
 
   P = YCISOP(2)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YCTERP(2)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YCTERP(2)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YCTERP(2)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YCTERP(2)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YCTERP(2)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YCTERP(2)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YCTERP(2)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YCTERP(2)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YCTERP(2)* rct(93,k) * xnew(NO3) * xnew(XTERP)  &
-    + rct(111,k) * xnew(OH) * xnew(BSOC_ug1e3)
+    + YCTERP(2)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YCTERP(2)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YCTERP(2)* rct(77,k) * xnew(NO3) * xnew(APINENE)  &
+    + rct(89,k) * xnew(OH) * xnew(BSOC_ug1e3)
   
-  L = rct(110,k) * xnew(OH)
+  L = rct(88,k) * xnew(OH)
   
   xnew(BSOC_ug1e2) = (xold(BSOC_ug1e2) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -183,125 +181,95 @@
 !-> BSOC_ug1e3
 
   P = YCISOP(3)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YCTERP(3)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YCTERP(3)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YCTERP(3)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YCTERP(3)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YCTERP(3)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YCTERP(3)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YCTERP(3)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YCTERP(3)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YCTERP(3)* rct(93,k) * xnew(NO3) * xnew(XTERP)
+    + YCTERP(3)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YCTERP(3)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YCTERP(3)* rct(77,k) * xnew(NO3) * xnew(APINENE)
   
-  L = rct(111,k) * xnew(OH)
+  L = rct(89,k) * xnew(OH)
   
   xnew(BSOC_ug1e3) = (xold(BSOC_ug1e3) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_BSOA_ng100
+!-> non_C_BSOA_ng1e2
 
-  P = 0.9* rct(108,k) * xnew(OH) * xnew(BSOC_ug1)  &
-    + 1.075* rct(112,k) * xnew(OH) * xnew(NON_C_BSOA_ug1)
+  P = 0.9* rct(86,k) * xnew(OH) * xnew(BSOC_ug1)  &
+    + 1.075* rct(90,k) * xnew(OH) * xnew(non_C_BSOA_ug1)
   
   ! L = 0.0
   
-  xnew(NON_C_BSOA_ng100) = xold(NON_C_BSOA_ng100) + dt2 * P
+  xnew(non_C_BSOA_ng1e2) = xold(non_C_BSOA_ng1e2) + dt2 * P
 
 
-!-> NON_C_BSOA_ug1
+!-> non_C_BSOA_ug1
 
   P = YNISOP(0)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YNTERP(0)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YNTERP(0)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YNTERP(0)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YNTERP(0)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YNTERP(0)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YNTERP(0)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YNTERP(0)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YNTERP(0)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YNTERP(0)* rct(93,k) * xnew(NO3) * xnew(XTERP)  &
-    + 0.9* rct(109,k) * xnew(OH) * xnew(BSOC_ug10)  &
-    + 1.075* rct(113,k) * xnew(OH) * xnew(NON_C_BSOA_ug10)
+    + YNTERP(0)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YNTERP(0)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YNTERP(0)* rct(77,k) * xnew(NO3) * xnew(APINENE)  &
+    + 0.9* rct(87,k) * xnew(OH) * xnew(BSOC_ug10)  &
+    + 1.075* rct(91,k) * xnew(OH) * xnew(non_C_BSOA_ug10)
   
-  L = rct(112,k) * xnew(OH)
+  L = rct(90,k) * xnew(OH)
   
-  xnew(NON_C_BSOA_ug1) = (xold(NON_C_BSOA_ug1) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_BSOA_ug1) = (xold(non_C_BSOA_ug1) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_BSOA_ug10
+!-> non_C_BSOA_ug10
 
   P = YNISOP(1)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YNTERP(1)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YNTERP(1)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YNTERP(1)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YNTERP(1)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YNTERP(1)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YNTERP(1)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YNTERP(1)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YNTERP(1)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YNTERP(1)* rct(93,k) * xnew(NO3) * xnew(XTERP)  &
-    + 0.9* rct(110,k) * xnew(OH) * xnew(BSOC_ug1e2)  &
-    + 1.075* rct(114,k) * xnew(OH) * xnew(NON_C_BSOA_ug1e2)
+    + YNTERP(1)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YNTERP(1)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YNTERP(1)* rct(77,k) * xnew(NO3) * xnew(APINENE)  &
+    + 0.9* rct(88,k) * xnew(OH) * xnew(BSOC_ug1e2)  &
+    + 1.075* rct(92,k) * xnew(OH) * xnew(non_C_BSOA_ug1e2)
   
-  L = rct(113,k) * xnew(OH)
+  L = rct(91,k) * xnew(OH)
   
-  xnew(NON_C_BSOA_ug10) = (xold(NON_C_BSOA_ug10) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_BSOA_ug10) = (xold(non_C_BSOA_ug10) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_BSOA_ug1e2
+!-> non_C_BSOA_ug1e2
 
   P = YNISOP(2)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YNTERP(2)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YNTERP(2)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YNTERP(2)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YNTERP(2)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YNTERP(2)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YNTERP(2)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YNTERP(2)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YNTERP(2)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YNTERP(2)* rct(93,k) * xnew(NO3) * xnew(XTERP)  &
-    + 0.9* rct(111,k) * xnew(OH) * xnew(BSOC_ug1e3)  &
-    + 1.075* rct(115,k) * xnew(OH) * xnew(NON_C_BSOA_ug1e3)
+    + YNTERP(2)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YNTERP(2)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YNTERP(2)* rct(77,k) * xnew(NO3) * xnew(APINENE)  &
+    + 0.9* rct(89,k) * xnew(OH) * xnew(BSOC_ug1e3)  &
+    + 1.075* rct(93,k) * xnew(OH) * xnew(non_C_BSOA_ug1e3)
   
-  L = rct(114,k) * xnew(OH)
+  L = rct(92,k) * xnew(OH)
   
-  xnew(NON_C_BSOA_ug1e2) = (xold(NON_C_BSOA_ug1e2) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_BSOA_ug1e2) = (xold(non_C_BSOA_ug1e2) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> NON_C_BSOA_ug1e3
+!-> non_C_BSOA_ug1e3
 
   P = YNISOP(3)* rct(55,k) * xnew(OH) * xnew(C5H8)  &
-    + YNTERP(3)* rct(84,k) * xnew(OH) * xnew(APINENE)  &
-    + YNTERP(3)* rct(85,k) * xnew(OH) * xnew(BPINENE)  &
-    + YNTERP(3)* rct(86,k) * xnew(OH) * xnew(XTERP)  &
-    + YNTERP(3)* rct(89,k) * xnew(O3) * xnew(APINENE)  &
-    + YNTERP(3)* rct(90,k) * xnew(O3) * xnew(BPINENE)  &
-    + YNTERP(3)* rct(91,k) * xnew(O3) * xnew(XTERP)  &
-    + YNTERP(3)* rct(99,k) * xnew(NO3) * xnew(APINENE)  &
-    + YNTERP(3)* 2.51e-12 * xnew(NO3) * xnew(BPINENE)  &
-    + YNTERP(3)* rct(93,k) * xnew(NO3) * xnew(XTERP)
+    + YNTERP(3)* rct(75,k) * xnew(OH) * xnew(APINENE)  &
+    + YNTERP(3)* rct(76,k) * xnew(O3) * xnew(APINENE)  &
+    + YNTERP(3)* rct(77,k) * xnew(NO3) * xnew(APINENE)
   
-  L = rct(115,k) * xnew(OH)
+  L = rct(93,k) * xnew(OH)
   
-  xnew(NON_C_BSOA_ug1e3) = (xold(NON_C_BSOA_ug1e3) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(non_C_BSOA_ug1e3) = (xold(non_C_BSOA_ug1e3) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> FFFUEL_ng10
+!-> ffuel_ng10
 
   ! P = 0.0
   
   ! L = 0.0
   
-  ! Nothing to do for FFFUEL_ng10! xnew(FFFUEL_ng10) = max(0.0, xold(FFFUEL_ng10))
+  ! Nothing to do for ffuel_ng10! xnew(ffuel_ng10) = max(0.0, xold(ffuel_ng10))
 
 
-!-> WOODOA_ng10
+!-> woodOA_ng10
 
   ! P = 0.0
   
   ! L = 0.0
   
-  ! Nothing to do for WOODOA_ng10! xnew(WOODOA_ng10) = max(0.0, xold(WOODOA_ng10))
+  ! Nothing to do for woodOA_ng10! xnew(woodOA_ng10) = max(0.0, xold(woodOA_ng10))
 
 
 !-> SO4
@@ -337,8 +305,8 @@
 
 !-> NO3_c
 
-  P = rct(96,k) * xnew(HNO3)  &
-    + rct(97,k) * xnew(HNO3)
+  P = rct(102,k) * xnew(HNO3)  &
+    + rct(103,k) * xnew(HNO3)
   
   ! L = 0.0
   
@@ -354,114 +322,141 @@
   ! Nothing to do for NH4_f! xnew(NH4_f) = max(0.0, xold(NH4_f))
 
 
-!-> POM_f_WOOD
+!-> POM_f_wood
 
   P = rcemis(POM_F_WOOD,k)
   
   ! L = 0.0
   
-  xnew(POM_f_WOOD) = xold(POM_f_WOOD) + dt2 * P
+  xnew(POM_f_wood) = xold(POM_f_wood) + dt2 * P
 
 
-!-> POM_f_FFUEL
+!-> POM_c_wood
+
+  ! P = 0.0
+  
+  ! L = 0.0
+  
+  ! Nothing to do for POM_c_wood! xnew(POM_c_wood) = max(0.0, xold(POM_c_wood))
+
+
+!-> POM_f_ffuel
 
   P = rcemis(POM_F_FFUEL,k)
   
   ! L = 0.0
   
-  xnew(POM_f_FFUEL) = xold(POM_f_FFUEL) + dt2 * P
+  xnew(POM_f_ffuel) = xold(POM_f_ffuel) + dt2 * P
 
 
-!-> POM_c_FFUEL
+!-> POM_c_ffuel
 
   P = rcemis(POM_C_FFUEL,k)
   
   ! L = 0.0
   
-  xnew(POM_c_FFUEL) = xold(POM_c_FFUEL) + dt2 * P
+  xnew(POM_c_ffuel) = xold(POM_c_ffuel) + dt2 * P
 
 
-!-> EC_f_WOOD_new
+!-> EC_f_wood_new
 
-  P = rcemis(EC_F_WOOD_NEW,k)
+  P = rcemis(EC_F_WOOD_new,k)
   
-  L = rct(116,k)
+  L = rct(94,k)
   
-  xnew(EC_f_WOOD_new) = (xold(EC_f_WOOD_new) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(EC_f_wood_new) = (xold(EC_f_wood_new) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> EC_f_WOOD_age
+!-> EC_f_wood_age
 
-  P = rcemis(EC_F_WOOD_AGE,k)  &
-    + rct(116,k) * xnew(EC_f_WOOD_new)
+  P = rcemis(EC_F_WOOD_age,k)  &
+    + rct(94,k) * xnew(EC_f_wood_new)
   
   ! L = 0.0
   
-  xnew(EC_f_WOOD_age) = xold(EC_f_WOOD_age) + dt2 * P
+  xnew(EC_f_wood_age) = xold(EC_f_wood_age) + dt2 * P
 
 
-!-> EC_c_WOOD
+!-> EC_c_wood
 
   ! P = 0.0
   
   ! L = 0.0
   
-  ! Nothing to do for EC_c_WOOD! xnew(EC_c_WOOD) = max(0.0, xold(EC_c_WOOD))
+  ! Nothing to do for EC_c_wood! xnew(EC_c_wood) = max(0.0, xold(EC_c_wood))
 
 
-!-> EC_f_FFUEL_new
+!-> EC_f_ffuel_new
 
-  P = rcemis(EC_F_FFUEL_NEW,k)
+  P = rcemis(EC_F_FFUEL_new,k)
   
-  L = rct(116,k)
+  L = rct(94,k)
   
-  xnew(EC_f_FFUEL_new) = (xold(EC_f_FFUEL_new) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(EC_f_ffuel_new) = (xold(EC_f_ffuel_new) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> EC_f_FFUEL_age
+!-> EC_f_ffuel_age
 
-  P = rcemis(EC_F_FFUEL_AGE,k)  &
-    + rct(116,k) * xnew(EC_f_FFUEL_new)
+  P = rcemis(EC_F_FFUEL_age,k)  &
+    + rct(94,k) * xnew(EC_f_ffuel_new)
   
   ! L = 0.0
   
-  xnew(EC_f_FFUEL_age) = xold(EC_f_FFUEL_age) + dt2 * P
+  xnew(EC_f_ffuel_age) = xold(EC_f_ffuel_age) + dt2 * P
 
 
-!-> EC_c_FFUEL
+!-> EC_c_ffuel
 
   P = rcemis(EC_C_FFUEL,k)
   
   ! L = 0.0
   
-  xnew(EC_c_FFUEL) = xold(EC_c_FFUEL) + dt2 * P
+  xnew(EC_c_ffuel) = xold(EC_c_ffuel) + dt2 * P
 
 
-!-> REMPPM25
+!-> pSO4f
+
+  P = rcemis(PSO4F,k)
+  
+  ! L = 0.0
+  
+  xnew(pSO4f) = xold(pSO4f) + dt2 * P
+
+
+!-> pSO4c
+
+  P = rcemis(PSO4C,k)
+  
+  ! L = 0.0
+  
+  xnew(pSO4c) = xold(pSO4c) + dt2 * P
+
+
+!-> remPPM25
 
   P = rcemis(REMPPM25,k)
   
   ! L = 0.0
   
-  xnew(REMPPM25) = xold(REMPPM25) + dt2 * P
+  xnew(remPPM25) = xold(remPPM25) + dt2 * P
 
 
-!-> REMPPM_c
+!-> remPPM_c
 
   P = rcemis(REMPPM_C,k)
   
   ! L = 0.0
   
-  xnew(REMPPM_c) = xold(REMPPM_c) + dt2 * P
+  xnew(remPPM_c) = xold(remPPM_c) + dt2 * P
 
 
-!-> OM25_BGND
+!-> OM25_bgnd
 
   ! P = 0.0
   
   ! L = 0.0
   
-  ! Nothing to do for OM25_BGND! xnew(OM25_BGND) = max(0.0, xold(OM25_BGND))
+  ! Nothing to do for OM25_bgnd! xnew(OM25_bgnd) = max(0.0, xold(OM25_bgnd))
 
 
 !-> OM25_p
@@ -471,60 +466,6 @@
   ! L = 0.0
   
   ! Nothing to do for OM25_p! xnew(OM25_p) = max(0.0, xold(OM25_p))
-
-
-!-> FFIRE_CO
-
-  P = rcemis(FFIRE_CO,k)
-  
-  L = rct(117,k) * xnew(OH)
-  
-  xnew(FFIRE_CO) = (xold(FFIRE_CO) + dt2 * P) / (1.0 + dt2 * L)
-
-
-!-> FFIRE_OM
-
-  P = rcemis(FFIRE_OM,k)
-  
-  ! L = 0.0
-  
-  xnew(FFIRE_OM) = xold(FFIRE_OM) + dt2 * P
-
-
-!-> FFIRE_BC
-
-  P = rcemis(FFIRE_BC,k)
-  
-  ! L = 0.0
-  
-  xnew(FFIRE_BC) = xold(FFIRE_BC) + dt2 * P
-
-
-!-> FFIRE_REMPPM25
-
-  P = rcemis(FFIRE_REMPPM25,k)
-  
-  ! L = 0.0
-  
-  xnew(FFIRE_REMPPM25) = xold(FFIRE_REMPPM25) + dt2 * P
-
-
-!-> SeaSalt_f
-
-  P = rcemis(SEASALT_F,K)
-  
-  ! L = 0.0
-  
-  xnew(SeaSalt_f) = xold(SeaSalt_f) + dt2 * P
-
-
-!-> SeaSalt_c
-
-  P = rcemis(SEASALT_C,K)
-  
-  ! L = 0.0
-  
-  xnew(SeaSalt_c) = xold(SeaSalt_c) + dt2 * P
 
 
 !-> Ash_f
@@ -543,5 +484,59 @@
   ! L = 0.0
   
   xnew(Ash_c) = xold(Ash_c) + dt2 * P
+
+
+!-> ffire_CO
+
+  P = rcemis(FFIRE_CO,k)
+  
+  L = rct(105,k) * xnew(OH)
+  
+  xnew(ffire_CO) = (xold(ffire_CO) + dt2 * P) / (1.0 + dt2 * L)
+
+
+!-> ffire_OM
+
+  P = rcemis(FFIRE_OM,k)
+  
+  ! L = 0.0
+  
+  xnew(ffire_OM) = xold(ffire_OM) + dt2 * P
+
+
+!-> ffire_BC
+
+  P = rcemis(FFIRE_BC,k)
+  
+  ! L = 0.0
+  
+  xnew(ffire_BC) = xold(ffire_BC) + dt2 * P
+
+
+!-> ffire_remPPM25
+
+  P = rcemis(FFIRE_REMPPM25,k)
+  
+  ! L = 0.0
+  
+  xnew(ffire_remPPM25) = xold(ffire_remPPM25) + dt2 * P
+
+
+!-> SeaSalt_f
+
+  P = rcemis(SEASALT_F,K)
+  
+  ! L = 0.0
+  
+  xnew(SeaSalt_f) = xold(SeaSalt_f) + dt2 * P
+
+
+!-> SeaSalt_c
+
+  P = rcemis(SEASALT_C,K)
+  
+  ! L = 0.0
+  
+  xnew(SeaSalt_c) = xold(SeaSalt_c) + dt2 * P
 
 

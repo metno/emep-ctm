@@ -1,4 +1,4 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -40,11 +40,12 @@ module AerosolCalls
  use CheckStop_mod,         only: StopAll, CheckStop
  use ChemDims_mod,          only: NSPEC_SHL
  use ChemSpecs_mod
- use Chemfields_mod,        only: PM25_water, PM25_water_rh50,  & !PMwater 
+ use Chemfields_mod,        only: PM25_water, PM25_water_rh50, & !H2O_eqsam, & !PMwater 
                                    cfac
  use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc
  use Debug_module,          only: DEBUG   ! -> DEBUG%EQUIB
- use EQSAM_v03d_mod,        only: eqsam_v03d
+ use EQSAM4clim_ml,        only :  EQSAM4clim
+! use EQSAM_v03d_mod,        only: eqsam_v03d
  use MARS_mod,              only: rpmares, rpmares_2900, DO_RPMARES_new
  use PhysicalConstants_mod, only: AVOG
  use ZchemData_mod,         only: xn_2d, temp, rh, pp
@@ -54,7 +55,7 @@ module AerosolCalls
  !/-- public           !!  true if wanted
 
  public :: AerosolEquilib
- public :: emep2MARS, emep2EQSAM, Aero_Water, Aero_Water_MARS
+ public :: emep2MARS, emep2EQSAM, Aero_Water, Aero_Water_rh50, Aero_Water_MARS
  !FUTURE private :: emep2isorropia
                     
 !    logical, public, parameter :: AERO_DYNAMICS     = .false.  &  
@@ -72,10 +73,12 @@ contains
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
   subroutine AerosolEquilib(debug_flag)
     logical, intent(in) :: debug_flag
+!    integer, intent(in)  :: i, j
     logical, save :: my_first_call=.true.
     
     if( my_first_call .and. MasterProc ) then
        write(*,*) 'AerosolEquilib: chosen: ',AERO%EQUILIB 
+       write(*,*) 'AerosolEquilib water: chosen: ',AERO%EQUILIB_WATER
     end if
     select case ( AERO%EQUILIB )
       case ( 'EMEP' )
@@ -231,13 +234,16 @@ contains
 
       subroutine emep2EQSAM(debug_flag)
  logical, intent(in) :: debug_flag 
+! integer, intent(in)  :: i, j
 
     !..................................................................
-    !EQSAM - Equlibrium Simplified Aerosol Model by Swen Metzger
-    !        version v03d is implemented here
-    ! Metzger, S., Dentener, F., Pandis, S., and Lelieveld, J. (a): 
-    !       Gas/Aerosol Partitioning 1: A computationally efficient model. 
-    !       JGR, 107(D16), 10.1029/2001JD001102, 2002.
+    ! EQSAM4clim - Equlibrium Simplified Aerosol Model by Swen Metzger
+    !             version v10 is implemented here
+    ! Metzger, S., B. Steil, M. Abdelkader, K. Klingmüller, L. Xu, 
+    ! J.E. Penner, C. Fountoukis, A. Nenes, and J. Lelieveld, 2016; 
+    ! Aerosol Water Parameterization: A single parameter framework; 
+    ! Atmos. Chem. Phys., 16, 7213–7237, doi:10.5194/acp-16-7213-2016; 
+    ! https://www.atmos-chem-phys.net/16/7213/2016/acp-16-7213-2016.html
     !..................................................................
 
 
@@ -245,11 +251,13 @@ contains
 
 
  !.. local
+
   real    :: so4in(KCHEMTOP:KMAX_MID),   &
              no3in(KCHEMTOP:KMAX_MID),   &
              nh4in(KCHEMTOP:KMAX_MID),   &
              hno3in(KCHEMTOP:KMAX_MID),  &
              nh3in(KCHEMTOP:KMAX_MID),   &
+             aH2Oin(KCHEMTOP:KMAX_MID),  &
 ! The following input is not in use
              NAin(KCHEMTOP:KMAX_MID),    &
              CLin(KCHEMTOP:KMAX_MID),    &
@@ -274,31 +282,36 @@ contains
   end if
 
 !//.... molec/cm3 -> micromoles/m**3
-    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
+    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
+    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3,KCHEMTOP:KMAX_MID) *1.e12/AVOG
+    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
     no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
     nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-
-    NAin(KCHEMTOP:KMAX_MID)  = 0.0
-    CLin(KCHEMTOP:KMAX_MID)  = 0.0
+!    aH2Oin(KCHEMTOP:KMAX_MID) = H2O_eqsam(i,j,KCHEMTOP:KMAX_MID)
+    NAin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
+    CLin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
 
  !--------------------------------------------------------------------------                
   
-    call eqsam_v03d (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin, rh,temp,pp, &
-                     aSO4out, aNO3out, aNH4out, aNAout, aCLout,             &
-                     gSO4out, gNH3out, gNO3out, gClout, aH2Oout)
- 
+!    call eqsam_v03d (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin, rh,temp,pp, &
+!                     aSO4out, aNO3out, aNH4out, aNAout, aCLout,             &
+!                     gSO4out, gNH3out, gNO3out, gClout, aH2Oout)
+    
+    call EQSAM4clim (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin, rh, temp,  & !aH2Oin, &
+                     aSO4out, aNO3out, aNH4out, aNAout, aCLout,            &
+                     gSO4out, gNH3out, gNO3out, gClout, aH2Oout, KCHEMTOP, KMAX_MID)
+  
  !--------------------------------------------------------------------------
 
 !//.... micromoles/m**3  -> molec/cm3 
 !      xn_2d(NO3,KCHEMTOP:KMAX_MID)  = FLOOR !different for ACID/OZONE
 
-      xn_2d(HNO3,KCHEMTOP:KMAX_MID)  = max(FLOOR,gNO3out(KCHEMTOP:KMAX_MID)*AVOG/1.e12 )
-      xn_2d(NH3,KCHEMTOP:KMAX_MID)   = max(FLOOR,gNH3out(KCHEMTOP:KMAX_MID)*AVOG/1.e12 )
-      xn_2d(NO3_f,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNO3out(KCHEMTOP:KMAX_MID)*AVOG/1.e12 ) 
-      xn_2d(NH4_f,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNH4out(KCHEMTOP:KMAX_MID)*AVOG/1.e12 )
-      xn_2d(SO4,KCHEMTOP:KMAX_MID)   = max(FLOOR,aSO4out(KCHEMTOP:KMAX_MID)*AVOG/1.e12 )
+      xn_2d(HNO3,KCHEMTOP:KMAX_MID)  = max(FLOOR,gNO3out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
+      xn_2d(NH3,KCHEMTOP:KMAX_MID)   = max(FLOOR,gNH3out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
+      xn_2d(NO3_f,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNO3out(KCHEMTOP:KMAX_MID)*AVOG*1.e-12 ) 
+      xn_2d(NH4_f,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNH4out(KCHEMTOP:KMAX_MID)*AVOG*1.e-12 )
+      xn_2d(SO4,KCHEMTOP:KMAX_MID)   = max(FLOOR,aSO4out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
+!      H2O_eqsam(i,j,KCHEMTOP:KMAX_MID) = max(0., aH2Oout(KCHEMTOP:KMAX_MID) )
 
  if ( debug_flag ) then ! Selected debug cell
     write(*,*)'After EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
@@ -312,9 +325,10 @@ contains
 
 
  !water 
- !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-      subroutine Aero_water(i,j, ambient, debug_flag)
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+      subroutine Aero_water_rh50(i,j, debug_flag)
 
   !.....................................................................
   ! EQSAM is called before every daily output to calculate aerosol water 
@@ -328,17 +342,102 @@ contains
  implicit none
 
  integer, intent(in)  :: i, j
- logical, intent(in)  :: ambient
  logical, intent(in)  :: debug_flag
  !.. local
+! integer, parameter    ::  KCHEMTOP = KMAX_MID
+
+!  AerosolCalls.f90(319): error #6592: This symbol must be a defined parameter, an enumerator, or an argument of 
+!  an inquiry function that evaluates to a compile-time constant.   [KMAX_MID]
+!  integer, parameter    ::  KCHEMTOP = KMAX_MID
+!--------------------------------------^
+
+  real    :: so4in(KMAX_MID:KMAX_MID),   &
+             no3in(KMAX_MID:KMAX_MID),   &
+             nh4in(KMAX_MID:KMAX_MID),   &
+             hno3in(KMAX_MID:KMAX_MID),  &
+             nh3in(KMAX_MID:KMAX_MID),   &
+             aH2Oin(KMAX_MID:KMAX_MID),  &
+             NAin(KMAX_MID:KMAX_MID)  ,  &
+             CLin(KMAX_MID:KMAX_MID) ,   &
+!-- output
+             aSO4out(KMAX_MID:KMAX_MID), &
+             aNO3out(KMAX_MID:KMAX_MID), &
+             aH2Oout(KMAX_MID:KMAX_MID), &
+             aNH4out(KMAX_MID:KMAX_MID), & 
+             gNH3out(KMAX_MID:KMAX_MID), &
+             gNO3out(KMAX_MID:KMAX_MID), &
+             aNAout(KMAX_MID:KMAX_MID),  &
+             aCLout(KMAX_MID:KMAX_MID),  &
+             gCLout(KMAX_MID:KMAX_MID),  &
+             gSO4out(KMAX_MID:KMAX_MID), &
+
+             rlhum(KMAX_MID:KMAX_MID),tmpr(KMAX_MID:KMAX_MID)
+
+ !-----------------------------------
+
+
+  if ( debug_flag ) then ! Selected debug cell
+    write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
+               xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
+  end if
+
+
+!//.... molec/cm3 -> micromoles/m**3
+      so4in(KMAX_MID:KMAX_MID)  = xn_2d(SO4,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      hno3in(KMAX_MID:KMAX_MID) = xn_2d(HNO3,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      nh3in(KMAX_MID:KMAX_MID)  = xn_2d(NH3,KMAX_MID:KMAX_MID)*1.e12/AVOG 
+      no3in(KMAX_MID:KMAX_MID)  = xn_2d(NO3_f,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      nh4in(KMAX_MID:KMAX_MID)  = xn_2d(NH4_f,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      NAin(KMAX_MID:KMAX_MID)   = xn_2d(SEASALT_F,KMAX_MID:KMAX_MID)*0.306e12/AVOG
+      CLin(KMAX_MID:KMAX_MID)   = xn_2d(SEASALT_F,KMAX_MID:KMAX_MID)*0.55e12/AVOG
+
+!.. Rh = 50% and T=20C
+      rlhum(KMAX_MID:KMAX_MID) = 0.5
+      tmpr (KMAX_MID:KMAX_MID) = 293.15
+
+
+ !--------------------------------------------------------------------------                
+   
+    call EQSAM4clim (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin, rlhum, tmpr,  & 
+                     aSO4out, aNO3out, aNH4out, aNAout, aCLout,               &
+                     gSO4out, gNH3out, gNO3out, gClout, aH2Oout, KMAX_MID, KMAX_MID)     
+
+ !--------------------------------------------------------------------------
+
+!//....aerosol water (ug/m**3) 
+
+      PM25_water_rh50 (i,j)             = max(0., aH2Oout(KMAX_MID) )
+
+
+ end subroutine  Aero_water_rh50
+!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+ subroutine Aero_water(i,j, debug_flag)
+
+
+    !..................................................................
+    ! EQSAM4clim calculates PM water at ambient conditions
+    !..................................................................
+
+ integer, intent(in)  :: i, j
+ logical, intent(in)  :: debug_flag
+
+ real, parameter ::    FLOOR = 1.0E-30         ! minimum concentration  
+
+
+ !.. local
+
   real    :: so4in(KCHEMTOP:KMAX_MID),   &
              no3in(KCHEMTOP:KMAX_MID),   &
              nh4in(KCHEMTOP:KMAX_MID),   &
              hno3in(KCHEMTOP:KMAX_MID),  &
              nh3in(KCHEMTOP:KMAX_MID),   &
-! fix
-             NAin(KCHEMTOP:KMAX_MID)  ,  &
-             CLin(KCHEMTOP:KMAX_MID) ,   &
+             aH2Oin(KCHEMTOP:KMAX_MID),  &
+             NAin(KCHEMTOP:KMAX_MID),    &
+             CLin(KCHEMTOP:KMAX_MID),    &
+!.. output
              aSO4out(KCHEMTOP:KMAX_MID), &
              aNO3out(KCHEMTOP:KMAX_MID), &
              aH2Oout(KCHEMTOP:KMAX_MID), &
@@ -349,59 +448,46 @@ contains
              aCLout(KCHEMTOP:KMAX_MID),  &
              gCLout(KCHEMTOP:KMAX_MID),  &
              gSO4out(KCHEMTOP:KMAX_MID), &
+
              rlhum(KCHEMTOP:KMAX_MID),tmpr(KCHEMTOP:KMAX_MID)
 
  !-----------------------------------
 
 
-  if ( debug_flag ) then ! Selected debug cell
+  if ( debug_flag  ) then ! Selected debug cell
     write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
                xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
   end if
 
 !//.... molec/cm3 -> micromoles/m**3
-      so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-      hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-      nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
-      no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-      nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
+    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
+    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3,KCHEMTOP:KMAX_MID) *1.e12/AVOG
+    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
+    no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
+    nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
+    NAin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
+    CLin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
 
-!NEEDS WORK: NAin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-      call StopAll("Sea-salt not implemented in eqsam in Nov 2011 plus versions")
-      CLin(:) =  NAin(:)
-!      NAin(KCHEMTOP:KMAX_MID)  = 0.
-!      CLin(KCHEMTOP:KMAX_MID)  = 0.
-
-      if ( ambient ) then               ! real LWC
-                  rlhum(:) = rh(:)
-                  tmpr(:)  = temp(:)
-      else                              ! for gravimetric mass
-                  rlhum(:) = 0.5
-                  tmpr(:)  = 293.15
-      end if
+    rlhum(KCHEMTOP:KMAX_MID) = rh(:)
+    tmpr(KCHEMTOP:KMAX_MID)  = temp(:)
 
  !--------------------------------------------------------------------------                
-  
-   call eqsam_v03d (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin,rlhum,tmpr,pp, &
-                    aSO4out, aNO3out, aNH4out, aNAout, aCLout,               &
-                    gSO4out, gNH3out, gNO3out, gClout, aH2Oout)
  
+    call EQSAM4clim (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin, rlhum, tmpr,  & !aH2Oin, &
+                     aSO4out, aNO3out, aNH4out, aNAout, aCLout,            &
+                     gSO4out, gNH3out, gNO3out, gClout, aH2Oout, KCHEMTOP, KMAX_MID)     
+
  !--------------------------------------------------------------------------
 
 !//....aerosol water (ug/m**3) 
- if (ambient)  then      ! at ambient conditions (3D)
+
       PM25_water(i,j,KCHEMTOP:KMAX_MID) = max(0., aH2Oout(KCHEMTOP:KMAX_MID) )
- else                    ! In gravimetric PM (Rh=50% and t=20C)
-      PM25_water_rh50 (i,j)             = max(0., aH2Oout(KMAX_MID) )
- end if
 
- if ( debug_flag ) then ! Selected debug cell
-    write(*,*)'After EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
-               xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
-  end if
+ end subroutine Aero_water
 
- end subroutine  Aero_water
+
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

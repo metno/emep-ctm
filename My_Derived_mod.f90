@@ -1,4 +1,4 @@
-! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -52,7 +52,7 @@ module My_Derived_mod
 !  moving most definitions to the config namelist system.
 !---------------------------------------------------------------------------
 
-use AOTx_mod,          only: VEGO3_OUTPUTS, nOutputVegO3,OutputVegO3
+use AOTx_mod,          only: VEGO3_OUTPUTS, nOutputVegO3
 use CheckStop_mod,     only: CheckStop
 use Chemfields_mod,    only: xn_adv, xn_shl, cfac
 use ChemDims_mod          ! Use IXADV_ indices...
@@ -64,10 +64,16 @@ use Config_module,     only: MasterProc, SOURCE_RECEPTOR, & !
                             IOU_KEY,      & !'Y'=>IOU_YEAR,..,'I'=>IOU_HOUR_INST
                             KMAX_MID,     & ! =>  z dimension
                             RUNDOMAIN,    &
-                            fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,hour_DOMAIN,&
                             startdate, out_startdate, spinup_enddate,&
-                            num_lev3d,lev3d &! 3D levels on 3D output
-                            , SecEmisOutWanted,EmisSplit_OUT
+                            num_lev3d,lev3d, &! 3D levels on 3D output
+                            SecEmisOutWanted,EmisSplit_OUT, AOD_WANTED,&
+                            OutputMisc,OutputConcs,OutputVegO3,&
+                            DDEP_ECOS, DDEP_WANTED, WDEP_WANTED,SDEP_WANTED,&
+                            NewMosaic, MOSAIC_METCONCS, MET_LCS, Mosaic_timefmt,&
+                            fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,&
+                            hour_DOMAIN, &
+                            lev3d_from_surface,&
+                            MAX_NUM_DERIV2D,OutputVegO3
 use Debug_module,      only: DEBUG ! => DEBUG_MY_DERIVED
 use EmisDef_mod,       only: NSECTORS, EMIS_FILE, Nneighbors
 use EmisGet_mod,       only: nrcemis, iqrc2itot
@@ -103,15 +109,7 @@ public  :: My_DerivFunc ! Miscelleaneous functions of xn_adv for output
 
 !============ parameters for concentration + dep outputs ==================!
 integer, public, parameter ::       &
-  MAX_NUM_DERIV2D = 343,            &
-  MAX_NUM_DERIV3D = 179,            &
-  MAX_NUM_DDEP_ECOS = 9,            & ! Grid, Conif, etc.
-  MAX_NUM_DDEP_WANTED = NSPEC_ADV,  & !plenty big
-  MAX_NUM_WDEP_WANTED = NSPEC_ADV,  & !plenty big
-  MAX_NUM_NEWMOS  = 30,             & !New system.
-  ! Older system
-  MAX_NUM_MOSCONCS  = 10,           & !careful here, we multiply by next:
-  MAX_NUM_MOSLCS    = 10              !careful here, we multiply bY prev:
+  MAX_NUM_DERIV3D = 179
 character(len=TXTLEN_DERIV), public, save :: &
   wanted_deriv2d(MAX_NUM_DERIV2D) = NOT_SET_STRING, &
   wanted_deriv3d(MAX_NUM_DERIV3D) = NOT_SET_STRING
@@ -131,21 +129,9 @@ integer, public, save :: nOutputFields = 0
 integer, public, save :: nOutputWdep   = 0
 
 ! Direct setting of derived fields:
-type(Deriv), public, save, dimension(MAX_NUM_DERIV2D) :: OutputMisc= Deriv()
 integer, save, public :: nOutputMisc = 0
 
-type(typ_s5ind), public, save, dimension(MAX_NUM_DERIV2D) :: &
-  OutputConcs = typ_s5ind("-","-","-","-","-","-")
 
-! Depositions
-type(typ_s1ind), public, save, dimension(MAX_NUM_DDEP_ECOS) :: &
-  DDEP_ECOS = typ_s1ind("-",'-') ! e.g. "Grid","YMD", 
-
-type(typ_s3), public, save, dimension(MAX_NUM_DDEP_WANTED) :: &
-  DDEP_WANTED = typ_s3('-','-','-'), & ! e.g. typ_s3("SO2",SPEC,"mgS"),
-  SDEP_WANTED = typ_s3('-','-','-')    ! Stomatal deposition (for HTAP)
-type(typ_s4), public, save, dimension(MAX_NUM_WDEP_WANTED) :: &
-  WDEP_WANTED = typ_s4('-','-','-','-')
 
 character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
   D2_SR = [character(len=TXTLEN_DERIV):: &
@@ -169,26 +155,8 @@ character(len=TXTLEN_DERIV), public, parameter, dimension(5) :: &
 integer, private, save :: nOutDDep, nOutVEGO3
 integer, private, save :: nOutMET
 
-!- specify some species and land-covers we want to output
-! dep. velocities for in netcdf files. Set in My_DryDep_mod.
-! NewMosaic seems to mean new-style, to avoid  needing all combinations
-! of MET & LC
-type(typ_s5ind), public, save, dimension(MAX_NUM_NEWMOS) :: &
-  NewMosaic = typ_s5ind('-','-','-','-','-','-')
   !A17 =[typ_s5ind('Mosaic','VG','O3','Grid','cms','YM')]
 integer, private, save :: nOutputMosMet, nOutputMosLC, nOutputNewMos
-character(len=10), private, save ::  Mosaic_timefmt='YM'  ! eg 'YMD'
-
-! For met-data and canopy concs/fluxes ...
-character(len=TXTLEN_DERIV), public, save, dimension(MAX_NUM_MOSCONCS) :: &
-  MOSAIC_METCONCS = '-' ! = [character(len=TXTLEN_DERIV):: & 
-     !,"VPD","FstO3","EVAP","Gsto" ,"USTAR","INVL"/)
-! "USTAR","LAI","CanopyO3","FstO3"] ! SKIP CanopyO3
-! "g_sto" needs more work - only set as L%g_sto
-
-character(len=TXTLEN_DERIV), public, save, dimension(MAX_NUM_MOSLCS) :: &
-  MET_LCS = '-' 
-! [character(len=TXTLEN_DERIV)::  "DF","GR","BF","TC","IAM_DF","IAM_CR"]
 
 !----------------------
 ! For some reason having this as a parameter caused problems for PC-gfortran runs.
@@ -215,53 +183,21 @@ subroutine Init_My_Deriv()
   character(len=TXTLEN_SHORT) :: outname, outunit, outdim, outtyp, outclass
   logical :: Is3D,debug0   !  if(DEBUG%MY_DERIVED.and.MasterProc )
   character(len=12), save :: sub='InitMyDeriv:'
-  logical ::  &
-    lev3d_from_surface=.false. ! levels are to be read from surface up
   character(len=2)::  isec_char
   character(len=3)::  neigh_char
-  NAMELIST /OutputConcs_config/OutputMisc,OutputConcs,OutputVegO3
-  NAMELIST /OutputDep_config/DDEP_ECOS, DDEP_WANTED, WDEP_WANTED,SDEP_WANTED,&
-             NewMosaic, MOSAIC_METCONCS, MET_LCS, Mosaic_timefmt
-  NAMELIST /OutputSize_config/fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,&
-              hour_DOMAIN, out_startdate, spinup_enddate,&
-              num_lev3d,lev3d,lev3d_from_surface
 
-! default output sizes
-  fullrun_DOMAIN = RUNDOMAIN
-  month_DOMAIN =   RUNDOMAIN
-  day_DOMAIN =     RUNDOMAIN
-  hour_DOMAIN =    RUNDOMAIN
+! default outputting dates if not set
+  if(spinup_enddate(1)<0)spinup_enddate = startdate! end of spinup. Does not average concentration etc before that date
 
-! default outputting dates
-  spinup_enddate = startdate! end of spinup. Does not average concentration etc before that date
-  out_startdate = (/-1,-1,-1,-1/) ! notset values
-
-! default levels on 3d output: all model levels (top to bottom)
-  num_lev3d=KMAX_MID
-  lev3d(1:KMAX_MID)=[(i,i=1,KMAX_MID)]
-  lev3d_from_surface=.false.
+! default levels if not set by config:
+! on 3d output: all model levels (top to bottom)
+  if(num_lev3d==0)num_lev3d=KMAX_MID
+  do k = 1, KMAX_MID
+     if(lev3d(k)==0)lev3d(k)=k
+  enddo
 
   debug0 = DEBUG%MY_DERIVED.and.MasterProc
 
-  rewind(IO_NML)
-  read(IO_NML,NML=OutputConcs_config,iostat=istat, iomsg=errmsg)
-  if (istat/=0) then
-      backspace(IO_NML)
-      read(IO_NML,fmt='(A)') line
-      call CheckStop(errmsg , errmsg // ": " // trim(line))
-  end if
-  read(IO_NML,NML=OutputDep_config,iostat=istat, iomsg=errmsg)
-  if (istat/=0) then
-      backspace(IO_NML)
-      read(IO_NML,fmt='(A)') line
-      call CheckStop(errmsg , errmsg // ": " // trim(line))
-  end if
-  read(IO_NML,NML=OutputSize_config,iostat=istat, iomsg=errmsg)
-  if (istat/=0) then
-      backspace(IO_NML)
-      read(IO_NML,fmt='(A)') line
-      call CheckStop(errmsg , errmsg // ": " // trim(line))
-  end if
   if(out_startdate(1)<0)then
      ! notset values are not set in config
      out_startdate = spinup_enddate !start to output when spinup period ends.
@@ -484,7 +420,7 @@ subroutine Init_My_Deriv()
         tag_name(1)= "COLUMN_"//trim(outname)//"_"//trim(outdim)
       case('AOD','AOD:TOTAL','AOD:SPEC','AOD:SHL','AOD:GROUP',&
            'EXT','EXT:TOTAL','EXT:SPEC','EXT:SHL','EXT:GROUP')
-        if(.not.USES%AOD)cycle
+        AOD_WANTED = .true.
         if(outname(1:3)/=outtyp(1:3))&
           outname  = outtyp(1:3)//"_"//trim(outname)
         tag_name(1)=            trim(outname)//"_"//trim(outdim)

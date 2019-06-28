@@ -1,4 +1,4 @@
-! <Rsurface_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Rsurface_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -35,12 +35,13 @@ use GasParticleCoeffs_mod, only: nddep, DDspec,  &
 use Io_Progs_mod,       only: datewrite
 use LandDefs_mod,       only: LandDefs, LandType
 ! L (local) provides  t2C, rh, LAI, SAI, hveg, ustar, 
-!      PARsun,PARshade,LAIsunfrac, RgsO, RgsS, is_water, is_forest
+!      PARsun,PARshade,  (in W/m2)
+!      LAIsunfrac, RgsO, RgsS, is_water, is_forest
 ! G (Grid)  provides snow, sdepth so2nh3ratio, 
 use LocalVariables_mod, only : iL, L, G => Grid
 
 use MetFields_mod, only : foundsdepth, foundice
-use MetFields_mod, only : PARdbh, PARdif
+use MetFields_mod, only : PARdbh, PARdif  ! W/m2
 use Par_mod,only :me
 use Radiation_mod, only : CanopyPAR
 use SmallUtils_mod, only: find_index
@@ -233,7 +234,7 @@ contains
   !    g_sto 0 when snow covering canopy
 
    if ( dbg ) then
-      call datewrite(dtxt//"testcan ", iL, (/ G%Idirect, L%PARsun, G%sdepth /) )
+     call datewrite(dtxt//"testcan ", iL, [ G%Idirect, L%PARsun, G%sdepth ] )
    end if
  
    if( leafy_canopy  .and. G%Idirect > 0.001 .and.       &!: daytime
@@ -244,17 +245,15 @@ contains
 
      call g_stomatal(iL, debug_flag )
 
-     if ( DEBUG%RSUR .and. debug_flag ) call datewrite(dtxt//"gstoA ", iL, &
-            (/ G%Idirect+G%Idiffuse, L%PARsun,  L%g_sto, L%f_env /) )
    else
-        L%g_sun = 0.0
-        L%g_sto = 0.0
-        L%f_env = 0.0
-        L%PARsun  = 0.0
-        L%PARshade = 0.0
+     L%g_sun = 0.0
+     L%g_sto = 0.0
+     L%f_env = 0.0
+     L%PARsun  = 0.0
+     L%PARshade = 0.0
    end if ! leafy canopy and daytime
 
-   if ( dbg ) call datewrite(dtxt//"IN RSUR gsto ", iL, &
+   if ( dbg ) call datewrite(dtxt//" gsto ", iL, &
        [ L%LAI, G%Idirect, G%Idiffuse, L%PARsun,  L%g_sto, L%f_env ] )
 
 
@@ -346,8 +345,8 @@ contains
           end if
           Gns(icmp) = min( 0.1, Gns(icmp) ) ! FIX
           if ( Gns(icmp) > 0.1 ) then
-             print *, "BIGGNS-NH3 ", canopy, L%is_veg, Rns_NH3, lowTcorr, RsnowS
-             call StopAll('BIGGNS-NH3')
+            print *, dtxt//"BIGGNS!",canopy,L%is_veg,Rns_NH3,lowTcorr,RsnowS
+            call StopAll('BIGGNS-NH3')
           end if
 
           Rsur(icmp) = 1.0/( Gsto(icmp) + Gns(icmp)  )
@@ -390,18 +389,16 @@ contains
       Rsur(icmp) = 1.0/( Gsto(icmp) + Gns(icmp)  )
 
       if ( dbg ) write(*,"(a,i3,L2,99g10.2)")  &
-        "RSUR Rsur(i):"//trim(DDspec(icmp)%name)//' '//&
+        dtxt//" Rsur(i):"//trim(DDspec(icmp)%name)//' '//&
            trim(LandDefs(iL)%name), icmp, L%is_crop,&
            1.0e-5*Hstar, GnsS, f0, GnsO, Gsto(icmp),Gns(icmp), Rsur(icmp)
 
   end do GASLOOP
 
 
-  if ( dbg ) then 
-    write(*,"(a,a10,i4,2f7.3,5L2)")  "RSURFACE nGas iL, LAI, SAI, LOGIS ", &
-      trim(LandDefs(iL)%name), nddep, L%LAI, L%SAI, L%is_forest,&
-       L%is_water, L%is_veg, canopy, leafy_canopy
-  end if
+  if ( dbg ) write(*,"(a,a10,i4,2f7.3,5L2)") &
+    dtxt//" nGas iL, LAI, SAI, LOGIS ", trim(LandDefs(iL)%name), nddep, L%LAI,&
+       L%SAI, L%is_forest, L%is_water, L%is_veg, canopy, leafy_canopy
  end subroutine Rsurface
 
 !--------------------------------------------------------------------

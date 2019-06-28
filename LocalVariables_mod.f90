@@ -1,4 +1,4 @@
-! <LocalVariables_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <LocalVariables_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -150,8 +150,8 @@ type, public :: SubDat
     ,z_refd    = NOT_SET  & ! z_ref - d (m)
     ,z0        = NOT_SET  & ! roughness length    (m)
 ! Canopy-Associated Radiation
-    ,PARsun    = NOT_SET  & ! photosynthetic active radn. for sun-leaves
-    ,PARshade  = NOT_SET  & !  " " for shade leaves
+    ,PARsun    = NOT_SET  & ! photosynthetic active radn. for sun-leaves, W/m2
+    ,PARshade  = NOT_SET  & !  " " for shade leaves, W/m2
     ,LAIsunfrac= NOT_SET    ! fraction of LAI in sun
 ! outputs from Rsurface will include:
   real ::                 &

@@ -26,7 +26,7 @@ FOBJ ?=	\
 	LandPFT_mod.o LocalVariables_mod.o MARS_mod.o MARS_Aero_water_mod.o \
 	MassBudget_mod.o Met_mod.o MetFields_mod.o EQSAM_mod.o MicroMet_mod.o \
 	MosaicOutputs_mod.o MPI_Groups_mod.o AerosolCalls.o \
-        My_Derived_mod.o My_Outputs_mod.o NetCDF_mod.o Nest_mod.o NumberConstants.o \
+        My_Derived_mod.o NetCDF_mod.o Nest_mod.o NumberConstants.o \
         OutputChem_mod.o OwnDataTypes_mod.o Par_mod.o \
 	PhysicalConstants_mod.o PlumeRise_mod.o PointSource_mod.o \
 	Precision_mod.o Radiation_mod.o Rb_mod.o \

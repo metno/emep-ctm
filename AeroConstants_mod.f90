@@ -1,4 +1,4 @@
-! <AeroConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <AeroConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -39,8 +39,10 @@ module AeroConstants_mod
 
    integer, parameter, public :: NSAREA_DEF = 6 ! skip SIA_F - not needed!
 
-   type, public :: aero_t ! EMEP only
-     character(len=15) :: EQUILIB  = 'MARS ' !aerosol themodynamics
+   type, public :: aero_t
+     ! EMEP only
+     character(len=15) :: EQUILIB  ='MARS'  ! or 'EQSAM' !aerosol thermodynamics 
+     character(len=15) :: EQUILIB_WATER  ='MARS'  ! or 'EQSAM' !aerosol thermodynamics for PM water
      logical          :: DYNAMICS = .false.
      integer          :: NSIZE    = 7
      integer :: PM_F=1,SS_F=2,DU_F=3,SS_C=4,DU_C=5,PM=6  ! Will be set in GasParticleCoeffs_mod

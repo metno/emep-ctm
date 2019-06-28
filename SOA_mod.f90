@@ -1,4 +1,4 @@
-! <SOA_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <SOA_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -49,15 +49,16 @@ module OrganicAerosol_mod
   ! NB- we exclude use of gamma for now, but leave commented out code
   !-----------------------------------------------------------------------------
   !
-  ! Dave Simpson, August 2001 -- 2016
-  ! Robert Bergström     2010 -- 2015
+  ! Dave Simpson, August 2001 -- 2019
+  ! Robert Bergström     2010 -- 2019
   ! 
   !--------------------------------------------------------------------------
 
   ! Functions + GridValues + PT only for BGNDOC
    use CheckStop_mod,  only: StopAll, CheckStop
-   use ChemFields_mod, only: Fgas3d   !  stores 3-d  between time-steps
-   use ChemFields_mod, only: xn_adv   ! J16 for OM25_BGND
+   use ChemDims_mod,   only: NSPEC_SHL
+   use ChemFields_mod, only: Fgas3d   ! stores 3-d  between time-steps
+   use ChemFields_mod, only: xn_adv   ! for OM25_BGND
    use ChemSpecs_mod,  only: species, &   ! for molwts
                         S1 => FIRST_SEMIVOL , S2 => LAST_SEMIVOL
 
@@ -81,9 +82,10 @@ module OrganicAerosol_mod
 
    !/-- subroutines
 
-    public   :: Init_OrganicAerosol
-    public   :: OrganicAerosol
-    public   :: Reset_OrganicAerosol ! resets bgnd and COA after advection
+    public :: Init_OrganicAerosol
+    public :: OrganicAerosol
+    public :: Reset_OrganicAerosol ! resets bgnd and COA after advection
+    public :: Reset_3dOrganicAerosol ! resets bgnd and COA after advection
 
 
    !/-- public
@@ -95,6 +97,7 @@ module OrganicAerosol_mod
    ! are about right. Ensures that very few iterations are needed.
 
   real,public, save, allocatable, dimension(:,:,:) :: Grid_COA ! ug/m3
+  real, private, allocatable,dimension(:,:) :: work
 
   real, private, allocatable, dimension(:), save :: &
         COA           & ! Org. aerosol, ug/m3  
@@ -103,7 +106,7 @@ module OrganicAerosol_mod
        ,BGND_OA         ! Assumed OA/OC=2, -> 0.4 ug/m3
 
    integer, private, save :: itot_bgnd = -999
-   integer, private, save :: itot_om25 = -999
+   integer, private, save :: itot_om25 = -999, iadv_om25 = -999
    integer, private, save :: igrp_om25 = -999
 
   real, parameter, public :: SMALLFN  = 1.0e-20 ! Minimum value of ug allowed
@@ -156,22 +159,22 @@ module OrganicAerosol_mod
    real,allocatable, dimension(:), save :: p_kPa, h_km ! for standard atmosphere 
    real :: CiStar, dH  ! VBS params
    logical :: dbg  ! debug flag
-   character(len=*), parameter :: dtxt = 'InitOrgAero'
+   character(len=*), parameter :: dtxt = 'InitOrgAer:'
 
   ! Indices of Cstar and DeltaH groups in CM_ChemGroups
    integer, save :: igrp_Cstar = -1, igrp_DeltaH = -1
    logical, save :: first_call = .true.
 
-   !dbg = MasterProc .and. DEBUG%SOA > 0
+
    dbg = first_call .and. DEBUG%SOA > 0
-   if(dbg .and. first_call) write(*,*) dtxt // &
-       "ORGANIC_AEROSOLS?", ORGANIC_AEROSOLS, S1, S2
+   if(dbg .and. first_call) write(*,*) dtxt//"begin?", ORGANIC_AEROSOLS, S1, S2
 
    if( .not. ORGANIC_AEROSOLS  ) RETURN
 
    if ( first_call ) then ! =========================================
-      itot_bgnd = find_index( 'OM25_BGND', species(:)%name ) 
+      itot_bgnd = find_index( 'OM25_bgnd', species(:)%name , any_case=.true.) 
       itot_om25 = find_index( 'OM25_p',    species(:)%name )  !NOTE CASE!
+      iadv_om25 = itot_om25 - NSPEC_SHL
       igrp_om25 = find_index( 'OM25',   chemgroups(:)%name ) 
    
       igrp_Cstar  = find_index( 'CSTAR',  chemgroups_factors(:)%name ) 
@@ -217,14 +220,13 @@ module OrganicAerosol_mod
        BGND_OC(:)= 0.2 * 1.005 ! ng/m3 !!! will give 0.2 ugC/m3 at z=0 m
 
        do k = K1, K2
-            BGND_OC(k) = BGND_OC(k) * exp( -h_km(k)/9.1 )
-            if(dbg ) write(*,"(a,i4,2f8.3)") &
-               "BGND_OC ", k, h_km(k),  BGND_OC(k)
+         BGND_OC(k) = BGND_OC(k) * exp( -h_km(k)/9.1 )
+         if(dbg ) write(*,"(a,i4,2f8.3)") dtxt//"BGND_OC",k,h_km(k),BGND_OC(k)
        end do
        BGND_OA(:) = 2*BGND_OC(:)   ! Assume OA/OC = 2 for bgnd
 
        do k = K1, K2
-          Grid_COA(:,:,k) = BGND_OA(k)  ! Use OA, not OC here
+         Grid_COA(:,:,k) = BGND_OA(k)  ! Use OA, not OC here
        end do
 
 
@@ -242,7 +244,7 @@ module OrganicAerosol_mod
       do ispec=S1,S2
          is = is + 1    ! Order
          if ( dbg ) then ! Checks that GenChem worked ok
-            write(*,"(a,2i6,2f10.3,1x,a)") "CSTAR ",  is, ispec, &
+            write(*,"(a,2i6,2f10.3,1x,a)") dtxt//"CSTAR ",  is, ispec, &
               chemgroups_factors(igrp_Cstar)%factors(is), &
               chemgroups_factors(igrp_DeltaH)%factors(is), &
               trim(species(ispec)%name)
@@ -267,7 +269,7 @@ module OrganicAerosol_mod
        if ( dbg ) then 
          do is = S1, S2
             write(6,"(a,i4,1x,a20,f7.1,i3,8es10.2)") &
-             " Tab SOA: MW, Carbons, C*:", is, adjustl(species(is)%name), &
+             dtxt//" Tab: MW, Carbons, C*:", is, adjustl(species(is)%name), &
               species(is)%molwt, nint(species(is)%carbons), & 
               tabCiStar(is,273), tabCiStar(is,303)
          end do
@@ -298,8 +300,8 @@ module OrganicAerosol_mod
       COA(:) = BGND_OA(:)  ! Good starting estimate
       xn(itot_bgnd,:) = COA(:)/(molcc2ugm3*species(itot_bgnd)%molwt)  
       xn(itot_om25,:) = COA(:)/(molcc2ugm3*species(itot_om25)%molwt)  
-      if( dbg) write(*,"(a,3f8.3,2es10.2)") "COA, MW, xn TESTS ", COA(K2),&
-        species(itot_om25)%molwt, species(itot_bgnd)%molwt, &
+      if( dbg) write(*,"(a,3f8.3,2es10.2)") dtxt//"COA, MW, xn TESTS ", &
+        COA(K2), species(itot_om25)%molwt, species(itot_bgnd)%molwt, &
         xn(itot_bgnd,K2), xn(itot_om25,K2)
 
       if ( DEBUG%SOA  >1 ) then ! Invent some concs!
@@ -308,7 +310,7 @@ module OrganicAerosol_mod
         end do
        end if
     else   ! not first_tstep
-       !NOT needed Fgas3d(S1:S2,i,j,:)=Fgas(S1:S2,:)  ! J29
+       !NOT needed Fgas3d(S1:S2,i,j,:)=Fgas(S1:S2,:)
        ! since on 1st call we don't have any of the eg SOA compounds
        ! where Fgas affects reaction rates
  
@@ -329,10 +331,10 @@ module OrganicAerosol_mod
    integer, intent(in) :: i_pos, j_pos
    logical, intent(in) :: first_tstep 
    logical, intent(in) :: debug_flag 
-   character(len=*), parameter :: dtxt = 'RunOrgAero'
+   character(len=*), parameter :: dtxt = 'RunOrgAer:'
    logical  :: dbg0, dbg1 
 
-   integer :: is,  k, nz, iter, ispec   ! loop variables 
+   integer :: is,  k, iter, ispec   ! loop variables 
    real :: Ksoa
    real :: tmpSum
    integer :: nmonth, nday, nhour, seconds
@@ -343,11 +345,12 @@ module OrganicAerosol_mod
    nhour  = current_date%hour
    seconds = current_date%seconds
 
-if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,debug_flag
+   if(first_tstep .and. DebugCell ) write(*,*) dtxt//'DSOA ', me, &
+        debug_proc, DebugCell,debug_flag
+
    dbg0 = DebugCell .and. DEBUG%SOA > 0
-   !dbg0 = debug_proc .and. DEBUG%SOA > 0
    dbg1 = DebugCell .and. DEBUG%SOA > 1
-   if( dbg0 ) write(unit=*,fmt=*) "Into SOA", DEBUG%SOA, S1, S2
+   if( dbg0 ) write(unit=*,fmt=*) dtxt//"Into SOA", DEBUG%SOA, S1, S2
    if( .not. ORGANIC_AEROSOLS ) then
      if(MasterProc) write(*,*) dtxt // "skipped. ORGANIC_AEROSOLS=F"
      RETURN
@@ -374,18 +377,17 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
  ! ============ Non-volatile species first ============================
  ! NVABSOM - Only includes fine OM; That is no EC and no coarse OM!
 
-  nz= K2 ! nzlevels debug for 1=surface for ESX (top for EMEP!)
   tmpSum = 0.0
   do is = 1, NUM_NVABSOM  ! OA/OC for POC about 1.333
     ispec = chemgroups(nvabsom)%specs(is)
 
     ug_nonvol(is,:) = molcc2ugm3 * xn(ispec,:)*species(ispec)%molwt
-    tmpSum = tmpSum  + ug_nonvol(is,nz)
+    tmpSum = tmpSum  + ug_nonvol(is,K2)
 
     if( dbg0 ) write(unit=*,fmt="(2a,f7.1,20es12.3)") &
       "NVABSOM SOA",&
-      species(ispec)%name, species(ispec)%molwt,COA(nz), &
-        xn(ispec,nz)*molcc2ugm3*species(ispec)%molwt, ug_nonvol(is,nz),tmpSum
+      species(ispec)%name, species(ispec)%molwt,COA(K2), &
+        xn(ispec,K2)*molcc2ugm3*species(ispec)%molwt, ug_nonvol(is,K2),tmpSum
 
   end do
 
@@ -403,10 +405,10 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
 
           ug_semivol(ispec,:) = molcc2ugm3 * xn(ispec,:)*species(ispec)%molwt &
                          * Fpart(ispec,:)
-          tmpSum = tmpSum  + ug_semivol(ispec,nz)
+          tmpSum = tmpSum  + ug_semivol(ispec,K2)
 
           if( dbg1) write(unit=*,fmt="(i1, 2a,f7.1,20es12.3)") iter, " ABSOM: ",&
-      species(ispec)%name, species(ispec)%molwt,COA(nz), ug_semivol(ispec,nz), tmpSum
+      species(ispec)%name, species(ispec)%molwt,COA(K2), ug_semivol(ispec,K2), tmpSum
 
        end do ! ispec
 
@@ -434,21 +436,21 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
            do is = 1, NUM_NVABSOM
               ispec = chemgroups(nvabsom)%specs(is)
               write(unit=6,fmt=sfmt) "NVOL", ispec,&
-                species(ispec)%name, xn(ispec,nz),-999.999, &
-                -999.999, ' ', 1.0 , 1000.0*ug_nonvol(is,nz)
+                species(ispec)%name, xn(ispec,K2),-999.999, &
+                -999.999, ' ', 1.0 , 1000.0*ug_nonvol(is,K2)
            end do
 
            do ispec = S1,S2
               !Ksoa = tabRTpL(ispec,K2)*COA(K2)/(avg_mw(K2))
-              Ksoa = 1.0/tabCiStar(ispec,itemp(nz)) !just for printout
+              Ksoa = 1.0/tabCiStar(ispec,itemp(K2)) !just for printout
               write(unit=6,fmt=sfmt) "SOA ",ispec,&
-                species(ispec)%name, xn(ispec,nz), &
-                 tabCiStar(ispec,itemp(nz)),& !VBStabVpsoa(ispec,298),
-                  Ksoa, " => ", Fpart(ispec,nz), 1000.0*ug_semivol(ispec, nz)
+                species(ispec)%name, xn(ispec,K2), &
+                 tabCiStar(ispec,itemp(K2)),& !VBStabVpsoa(ispec,298),
+                  Ksoa, " => ", Fpart(ispec,K2), 1000.0*ug_semivol(ispec, K2)
           end do ! ispec
          end if 
 
-          write(unit=6,fmt="(a,i2,f12.6)")  "COA: ", iter, COA(nz)
+          write(unit=6,fmt="(a,i2,f12.6)")  "COA: ", iter, COA(K2)
 
        end if ! DEBUG
 
@@ -456,13 +458,13 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
 
  ! The above iteration has now given new values to: 
  !
- ! 1) COA(1:nz)
- ! 3) Fgas(FIRST_SEMIVOL:LAST_SEMIVOL,1:nz)
- ! 4) Fpart(FIRST_SEMIVOL:LAST_SEMIVOL,1:nz)
- ! 5) ng(FIRST_SEMIVOL:LAST_SEMIVOL,1:nz)    
+ ! 1) COA(1:K2)
+ ! 3) Fgas(FIRST_SEMIVOL:LAST_SEMIVOL,1:K2)
+ ! 4) Fpart(FIRST_SEMIVOL:LAST_SEMIVOL,1:K2)
+ ! 5) ng(FIRST_SEMIVOL:LAST_SEMIVOL,1:K2)    
  !
- ! Note:     ng(FIRST_NONVOLOC:LAST_NONVOLOC,1:nz)
- !       and xn(1:LAST_SEMIVOL,1:nz)  are unaffected by the
+ ! Note:     ng(FIRST_NONVOLOC:LAST_NONVOLOC,1:K2)
+ !       and xn(1:LAST_SEMIVOL,1:K2)  are unaffected by the
  !       iteration.
  !=========================================================================
 
@@ -479,39 +481,37 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
  ! ensure that OMN25.......
  ! We store OM25_BGND  as a species despite its simple setting above. This makes
  ! makes summation of OM25 and PM25 components easier. Apart from memory increases
- ! the main practuiacl problem is that the advection routine modifies xn_adv values
+ ! the main practical problem is that the advection routine modifies xn_adv values
  ! away from those used to get Fgas. We reset here.
 
  subroutine Reset_OrganicAerosol(i_pos,j_pos,debug_flag)
    integer, intent(in) :: i_pos, j_pos
    logical, intent(in) :: debug_flag
    logical, save :: first_call = .true.
-   integer :: k, n, nz, itot
-   real :: J16tmp
+   integer :: k, n, itot
+   real :: oldval
    logical :: dbg
+   character(len=*), parameter :: dtxt = 'ResetOrgAer:'
 
    dbg = ( DEBUG%SOA>0 .and. debug_flag) 
 
-   if ( debug_flag ) write(*,*) "Skip Reset Organic Aerosol?", itot_bgnd 
+   if ( debug_flag ) write(*,*) dtxt//"Skip Reset?", itot_bgnd 
    if( itot_bgnd < 1 ) then
-     if ( debug_flag ) write(*,*) "Skips Reset Organic Aerosol" 
+     if ( debug_flag ) write(*,*) dtxt//"Skips Reset" 
      RETURN
    end if
 
-
-   nz = 20 ! 1=surface nzlevels for Esx, 20 for emepctm  ! just for brevity
-   if ( first_call .and. debug_flag ) then
-      J16tmp = xn(itot_bgnd,nz)  ! just for printout
-      write(*,*) "Into Reset Organic Aerosol?",&
+   if ( dbg ) then
+      oldval = xn(itot_bgnd,K2)  ! just for printout
+      if(first_call) write(*,*) "Into Reset Organic Aerosol?",&
         itot_bgnd , first_call, size(chemgroups(igrp_om25)%specs)
     end if
 
 
    xn(itot_bgnd,:) = BGND_OC(:)* ugC2xn
 
-   !BOXSOA if( first_call.and. debug_proc ) write(*,"(a,i4,f7.3,9es12.3)") &
-   if( first_call.and. debug_flag ) write(*,"(a,i4,f7.3,9es12.3)") &
-     "itot_bgnd C = ", itot_bgnd, BGND_OC(nz), ugC2xn, xn(itot_bgnd,nz), J16tmp
+   if( first_call.and. debug_flag ) write(*,"(a,i4,f7.3,9es12.3)") dtxt// &
+     "itot_bgnd C: ", itot_bgnd, BGND_OC(K2), ugC2xn, xn(itot_bgnd,K2), oldval
 
    ! With SOA modelling some compounds are semivolatile and others non-volatile. If
    ! in a group XXX which asks for ugPM the latter's mass is correct. If semivolatile,
@@ -519,7 +519,7 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
 
    xn(itot_om25,:) = 0.0
 
-   if(  dbg  ) write(*,*) 'OFSOA scaling ', xn2ug1MW, molcc2ugm3, &
+   if( dbg ) write(*,*) dtxt//'OFSOA scaling ', xn2ug1MW, molcc2ugm3, &
       size(chemgroups(igrp_om25)%specs)
      !cf xn(itot_bgnd,:) = COA(:)/(molcc2ugm3*species(itot_bgnd)%molwt)  
 
@@ -527,13 +527,14 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
 
       itot  = chemgroups(igrp_om25)%specs(n)
 
-       ! NOTE !  Assumes molwt is 1.0 for itot_om25
+     ! NOTE !  Assumes molwt is 1.0 for itot_om25
+
       xn(itot_om25,:) = xn(itot_om25,:) + &
            Fpart(itot,:) * xn(itot,:) * species(itot)%molwt
    
       if(  dbg ) then
         do k = K2, K2  ! K1, K2
-           write(*,"(a,3i4,1x,a15,9es12.3)") "OFSOA fac ", n, itot, k, &
+           write(*,"(a,3i4,1x,a15,9es12.3)") dtxt//"OFSOA fac ", n, itot, k, &
              adjustl(species(itot)%name), Fpart(itot,k), &
              Fpart(itot,k) * xn(itot,k) * species(itot)%molwt*molcc2ugm3,&
              xn(itot_om25,k) * molcc2ugm3,  Grid_COA(i_pos,j_pos,k)
@@ -544,6 +545,53 @@ if(first_tstep .and. DebugCell ) write(*,*) 'DSOA ', me, debug_proc, DebugCell,d
    first_call = .false.
 
  end subroutine Reset_OrganicAerosol
+
+
+ subroutine Reset_3dOrganicAerosol(debug_flag)
+   logical, intent(in) :: debug_flag
+   logical, save :: first_call = .true.
+   integer :: k, n, itot, iadv
+   logical :: dbg
+   character(len=*), parameter :: dtxt = 'Reset3dOrg:'
+
+   dbg = ( DEBUG%SOA>0 .and. debug_flag) 
+
+   if( itot_bgnd < 1 ) RETURN
+
+   if ( dbg ) then
+     if ( first_call) then
+       write(*,*) dtxt//"COMP START:", size(chemgroups(igrp_om25)%specs)
+       allocate(work(LIDIM,LJDIM))
+     end if
+     work   = xn_adv(iadv_om25,:,:,K2)
+   end if
+
+
+   xn_adv(iadv_om25,:,:,:) =  0.0
+
+   ! (use explicit K1:K2 since xn_adv has 1:K2, Fgas3d K1:K2)
+   do n = 1, size(chemgroups(igrp_om25)%specs)
+      itot = chemgroups(igrp_om25)%specs(n)
+      iadv = itot - NSPEC_SHL
+      if ( itot >= S1 .and. itot <= S2 ) then
+        xn_adv(iadv_om25,:,:,K1:K2) = xn_adv(iadv_om25,:,:,K1:K2) + & 
+          (1-Fgas3d(itot,:,:,K1:K2)) * &
+          xn_adv(iadv,:,:,K1:K2) * species(itot)%molwt
+      else
+        xn_adv(iadv_om25,:,:,K1:K2) = xn_adv(iadv_om25,:,:,K1:K2) + & 
+          xn_adv(iadv,:,:,K1:K2) * species(itot)%molwt
+      end if
+   end do
+
+   if ( dbg ) then
+     associate (diffs =>  xn_adv(iadv_om25,:,:,K2) - work(:,:) )
+      write(*,'(a,4es12.3)') dtxt//"COMP:", work(debug_li,debug_lj), &
+       xn_adv(iadv_om25,debug_li,debug_lj,K2), minval(diffs), maxval(diffs)
+     end associate
+    end if
+    first_call = .false.
+
+ end subroutine Reset_3dOrganicAerosol
 
 end module OrganicAerosol_mod
 !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

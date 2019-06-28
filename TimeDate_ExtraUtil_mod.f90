@@ -1,4 +1,4 @@
-! <TimeDate_ExtraUtil_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <TimeDate_ExtraUtil_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -28,7 +28,7 @@ MODULE TimeDate_ExtraUtil_mod
 
 use Par_mod,           only: me
 use Config_module,only: METSTEP, MasterProc, startdate,enddate , &
-                            IOU_MON,IOU_DAY,IOU_HOUR,IOU_HOUR_EXTRA_MEAN,FREQ_HOURLY
+                            IOU_MON,IOU_DAY,IOU_HOUR,FREQ_HOURLY
 use SmallUtils_mod,    only: key2str,to_upper
 use CheckStop_mod,     only: CheckStop
 use TimeDate_mod,      only: max_day,tdif_secs,tdif_days,&
@@ -383,7 +383,7 @@ subroutine ts_to_secs1970(ts,nsecs,iotyp)
       nsecs=nsecs-half_day*max_day(cd%month,cd%year) !#days(jan)=#days(dec)
     case(IOU_DAY)
       nsecs=nsecs-half_day
-    case(IOU_HOUR,IOU_HOUR_EXTRA_MEAN)
+    case(IOU_HOUR)
       nsecs=nsecs-half_hour*FREQ_HOURLY
     end select
   end if
@@ -425,7 +425,7 @@ subroutine ts_to_days1900(ts,ndays,iotyp)
       ndays=ndays-0.5*max_day(cd%month,cd%year) !#days(jan)=#days(dec)
     case(IOU_DAY)
       ndays=ndays-0.5
-    case(IOU_HOUR,IOU_HOUR_EXTRA_MEAN)
+    case(IOU_HOUR)
       ndays=ndays-FREQ_HOURLY/48.0  !1.0/48.0=half hour
     end select
   end if

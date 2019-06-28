@@ -1,4 +1,4 @@
-! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -29,7 +29,7 @@ module EmisGet_mod
 use CheckStop_mod,     only: CheckStop, StopAll, check=>CheckNC
 use ChemDims_mod,      only: NSPEC_ADV, NSPEC_TOT, NEMIS_File, NEMIS_Specs
 use ChemSpecs_mod,     only: species 
-use Config_module,     only: NPROC, MasterProc,USES,&
+use Config_module,     only: NPROC, MasterProc,USES,step_main,&
                              KMAX_MID,KMAX_BND, Pref,&
                              SEAFIX_GEA_NEEDED, & ! only if emission problems over sea
                              IIFULLDOM,JJFULLDOM, SECTORS_NAME, &
@@ -49,14 +49,13 @@ use EmisDef_mod,       only: NSECTORS, ANTROP_SECTORS, NCMAX, &
                             ,cdfemis,sumcdfemis,nGridEmisCodes,GridEmisCodes&
                             ,GridEmis,gridrcemis, Emis_mask, MASK_LIMIT&
                             ,landcode,nlandcode,MAXFEMISLONLAT,N_femis_lonlat &   
-                            ,femis_lonlat_internal & !DSHK
+                            ,femis_lonlat_internal & 
                             ,Emis_field, NEmis_id, Emis_id, NEmis_sources&
                             ,EmisFiles, NEmisFile_sources, Emis_source &
                             ,NEmis_sourcesMAX
 use GridAllocate_mod,  only: GridAllocate
 use GridValues_mod,    only: debug_proc,debug_li,debug_lj,i_fdom,j_fdom,i_local
 use GridValues_mod,    only: glon, glat, A_bnd, B_bnd,j_local
-!DSHK use Io_mod,            only: open_file,IO_LOG, NO_FILE, ios, IO_EMIS, &
 use Io_mod,            only: open_file, NO_FILE, ios, IO_EMIS, &
                              Read_Headers, read_line, PrintLog
 use Io_Progs_mod,      only: datewrite
@@ -148,17 +147,17 @@ contains
     type(date), intent(in) :: date_wanted
     real :: date_wanted_in_days, TimesInDays(1)
     integer :: record
-    logical, save :: dbg= .false., first_call = .true. ! DS
+    logical, save :: dbg= .false., first_call = .true. 
     character(len=*), parameter :: dtxt = 'Emis_GetCdf:'
 
-    if ( first_call ) then ! DS 
+    if ( first_call ) then
       dbg =  ( MasterProc .and. DEBUG%GETEMIS )
       first_call = .false.
     end if
 
     fname = date2string(EmisFile%filename,date_wanted,mode='YMDH')
 
-    if(EmisFile%periodicity == 'yearly')then
+    if(EmisFile%periodicity == 'yearly' .or. EmisFile%periodicity == 'once')then
        !assumes only one record to read
        record = 1
     else if(EmisFile%periodicity == 'monthly')then
@@ -170,12 +169,14 @@ contains
        call ReadTimeCDF(fname,TimesInDays,record,date_wanted_in_days)
        
        call nctime2date(EmisFile%end_of_validity_date, TimesInDays(1))
-       if(me==0)write(*,*)record,'ENDOFVAL ', EmisFile%end_of_validity_date
+       if(me==0 .and. (step_main<10 .or. DEBUG%EMISSIONS))&
+            write(*,*)record,'ENDOFVAL ', EmisFile%end_of_validity_date
     endif
 
     if( dbg ) write(*,*) dtxt//'Reading '//trim(fname)
     if(trim(EmisFile%projection) == 'native')then
-       if(me==0)write(*,*)'reading  new '//trim(Emis_source%varname)//' from native grid, record ',record
+       if(me==0.and. (step_main==1 .or. DEBUG%EMISSIONS))&
+            write(*,*)'reading  new '//trim(Emis_source%varname)//' from native grid, record ',record
        if(Emis_source%is3D)then
           call GetCDF_modelgrid(Emis_source%varname,fname,Emis_XD,&
                             Emis_source%kstart, Emis_source%kend,record,1,&
@@ -187,8 +188,10 @@ contains
                             needed=.true.)
        endif
     else
-       if(me==0)write(*,*)trim(Emis_source%varname)//' reading new emis from '//trim(fname)//', record ',record
-       if(Emis_source%units(1:9) == 'tonnes/m2'  &
+       if(me==0 .and. (step_main==1 .or. DEBUG%EMISSIONS))&
+            write(*,*)trim(Emis_source%varname)//' reading new emis from '//trim(fname)//', record ',record
+       if(Emis_source%units(1:5) == 'kt/m2'  &
+            .or. Emis_source%units(1:9) == 'tonnes/m2'  &
             .or. Emis_source%units(1:5) == 'kg/m2' &
             .or. Emis_source%units(1:4) == 'g/m2'  &
             .or. Emis_source%units(1:5) == 'mg/m2')then
@@ -199,8 +202,10 @@ contains
                Grid_resolution_in = EmisFile%grid_resolution,&
                needed=.true.,UnDef=0.0,&
                debug_flag=.false.)
-       else  if(Emis_source%units == 'tonnes' .or. Emis_source%units == 'tonnes/s' &
-            .or.Emis_source%units == 'tonnes/month' .or. Emis_source%units == 'tonnes/year' &
+       else  if(Emis_source%units == 'kt' .or. Emis_source%units == 'kt/s' &
+            .or. Emis_source%units == 'kt/month' .or. Emis_source%units == 'kt/year' &
+            .or. Emis_source%units == 'tonnes' .or. Emis_source%units == 'tonnes/s' &
+            .or. Emis_source%units == 'tonnes/month' .or. Emis_source%units == 'tonnes/year' &
             .or. Emis_source%units == 'kg' .or. Emis_source%units == 'kg/s' &
             .or. Emis_source%units == 'kg/month' .or. Emis_source%units == 'kg/year' &
             .or. Emis_source%units == 'g' .or. Emis_source%units == 'g/s' &
@@ -209,7 +214,8 @@ contains
             .or. Emis_source%units == 'mg/month' .or. Emis_source%units == 'mg/year' &
             .or. Emis_source%units == 'g/h' .or. Emis_source%units == 'mg/h')then
           !per gridcell unit
-          if(me==0)write(*,*)'reading emis '//trim(Emis_source%varname)//' from '//trim(fname)//', proj ',trim(EmisFile%projection),', res ',EmisFile%grid_resolution
+          if(me==0 .and. (step_main<10 .or. DEBUG%EMISSIONS))&
+               write(*,*)'reading emis '//trim(Emis_source%varname)//' from '//trim(fname)//', proj ',trim(EmisFile%projection),', res ',EmisFile%grid_resolution
          call ReadField_CDF(fname,Emis_source%varname,Emis_XD,record,&
                known_projection=trim(EmisFile%projection),&
                interpol='mass_conservative',&
@@ -226,7 +232,7 @@ contains
   subroutine EmisGetCdf(iem, fname, sumemis_local, &
        Emis, EmisCodes, nEmisCodes, nstart,&
        incl, nin, excl, nex, use_lonlat_femis, &
-       set_mask,use_mask, fractionformat, type)
+       set_mask,use_mask,pollName, fractionformat, type)
 
     !read in emissions in fraction format and add results into
     !Emis, nEmisCodes and nEmisCodes
@@ -234,7 +240,7 @@ contains
 
     implicit none
     integer, intent(in) ::iem, nin, nex,nstart
-    character(len=*),intent(in) :: fname, incl(*),excl(*),type
+    character(len=*),intent(in) :: fname, incl(*),excl(*),pollName(*),type
     real,intent(inout) ::Emis(NSECTORS,LIMAX,LJMAX,NCMAX,NEMIS_FILE)
     integer,intent(inout) ::nEmisCodes(LIMAX,LJMAX)
     integer,intent(inout) ::EmisCodes(LIMAX,LJMAX,NCMAX)
@@ -288,6 +294,7 @@ contains
        foundEmis_id = .false.
        if(.not. fractionformat)then
           call check(nf90_Inquire_Variable(ncFileID,varid,cdfvarname,xtype,ndims))
+          if(me==0)write(*,*)'reading ',trim(cdfvarname)
           ewords=''
           if( index(cdfvarname, "Emis:") >0 )then
              ! Emission terms look like, e.g. Emis:FR:snap:7
@@ -333,6 +340,10 @@ contains
              endif
 
              cdfemis = 0.0 ! safety, shouldn't be needed though
+             if(pollName(1)/='NOTSET')then
+                if(all(pollName(1:20)/=trim(EMIS_FILE(iem_used))))cycle      
+                if(Masterproc)write(*,"(A)")'reading '//trim(EMIS_FILE(iem_used))//' from '//trim(fname)
+             end if             
              call ReadField_CDF(fname,cdfvarname,cdfemis,nstart=nstart,&
                   interpol='mass_conservative',&
                   needed=.false.,UnDef=0.0,&
@@ -359,6 +370,11 @@ contains
              write(varname,"(A,I2.2)")trim(EMIS_FILE(iem_used))//'_sec',isec
           endif
           
+          if(pollName(1)/='NOTSET')then
+             cdfemis = 0.0 ! safety, shouldn't be needed though
+             if(all(pollName(1:20)/=trim(EMIS_FILE(iem_used))))cycle      
+             if(Masterproc.and.isec==1)write(*,"(A)")'reading '//trim(EMIS_FILE(iem_used))//' from '//trim(fname)
+          end if
           Reduc=e_fact(isec,:,iem_used)          
           call ReadField_CDF(trim(fname),varname,cdfemis(1,1),nstart=nstart,&
                interpol='mass_conservative',fractions_out=fractions,&
@@ -423,13 +439,12 @@ contains
                               glon(i,j)<femis_lonmax(i_femis_lonlat).and.&
                               (femis_lonlat_ic(i_femis_lonlat)==0 .or. &
                               femis_lonlat_ic(i_femis_lonlat)==landcode(i,j,n)) )then
-                            !DSHK IN BOX:
-                            if ( femis_lonlat_internal(i_femis_lonlat) ) &    !DSHK
+                            ! IN BOX (DSHK testing):
+                            if ( femis_lonlat_internal(i_femis_lonlat) ) &
                               lonlat_fac=lonlat_fac*e_fact_lonlat(isec,i_femis_lonlat,iem_used) 
-                         else if ( femis_lonlat_internal(i_femis_lonlat ) .eqv. .false. ) then !DSHK
-                              ! DSHK - apply functions outside box
-!print *, 'DSHK here A ', me, N_femis_lonlat, i_femis_lonlat, femis_lonlat_ic(i_femis_lonlat)
-                              lonlat_fac=lonlat_fac*e_fact_lonlat(isec,i_femis_lonlat,iem_used)  !DSHK
+                         else if ( femis_lonlat_internal(i_femis_lonlat ) .eqv. .false. ) then
+                              !HK - apply functions outside box
+                              lonlat_fac=lonlat_fac*e_fact_lonlat(isec,i_femis_lonlat,iem_used)
                          end if
                       end do
                    end if
@@ -518,7 +533,6 @@ contains
    !-------------
     if ( debugm0 ) write(*,*) dtxt//'Start File:',trim(fname)
     
-
     if(EmisFile_in%projection /= 'native')then
        default_projection = 'Unknown'
        status = nf90_get_att(ncFileID, nf90_global,"projection", projection)
@@ -540,6 +554,21 @@ contains
     if(status==nf90_noerr)then
        default_factor = factor
     endif
+    
+    status = nf90_get_att(ncFileID,nf90_global,"sectorsName", name) !SNAPsectors or GNFRsectors
+    if(status==nf90_noerr)EmisFile%sectorsName = trim(name)
+
+!default values for sources
+!species cannot be set global attribute, because it is used to recognize valid variables (sources)
+!    status = nf90_get_att(ncFileID,nf90_global,"species",cdfspecies)
+!    if(status==nf90_noerr)EmisFile%species = trim(cdfspecies)
+    status = nf90_get_att(ncFileID,nf90_global,"units", name)
+    if(status==nf90_noerr)EmisFile%units = trim(name)
+    status = nf90_get_att(ncFileID,nf90_global,"sector", sector)
+    if(status==nf90_noerr)EmisFile%sector = sector
+    status = nf90_get_att(ncFileID,nf90_global,"country_ISO", name)
+    if(status==nf90_noerr)EmisFile%country_ISO = trim(name)
+    
 
     nemis_old = NEmis_sources
     !loop over all variables
@@ -569,8 +598,10 @@ contains
              Emis_source(NEmis_sources)%species = trim(cdfspecies)
              if ( debugm0 ) write(*,*) dtxt//'source add:',&
               trim(cdfvarname)//'->'// trim(cdfspecies),EmisFile_in%apply_femis
+             Emis_source(NEmis_sources)%units = EmisFile%units !default
              status = nf90_get_att(ncFileID,varid,"units", name)
              if(status==nf90_noerr)Emis_source(NEmis_sources)%units = trim(name)
+             Emis_source(NEmis_sources)%sector = EmisFile%sector !default
              status = nf90_get_att(ncFileID,varid,"sector", sector)
              if(status==nf90_noerr)Emis_source(NEmis_sources)%sector = sector
              status = nf90_get_att(ncFileID,varid,"factor", x)
@@ -588,13 +619,14 @@ contains
                    if ( debugm0 ) write(*,*) dtxt//'ISO add:',ix,trim(name)
                 endif
              else
+                Emis_source(NEmis_sources)%country_ISO = EmisFile%country_ISO !default
                 status = nf90_get_att(ncFileID,varid,"country_ISO", name)
                 if(status==nf90_noerr)Emis_source(NEmis_sources)%country_ISO = trim(name)
-                ix = find_index(trim(name) ,Country(:)%code, first_only=.true.)
+                ix = find_index(Emis_source(NEmis_sources)%country_ISO ,Country(:)%code, first_only=.true.)
                 if(ix<0)then
                    if(me==0)write(*,*)dtxt//'WARNING: country_ISO '//trim(name)//&
-                     ' not defined. file'//trim(fname)//&
-                     ' variable '//trim(cdfvarname)
+                        ' not defined. file'//trim(fname)//&
+                        ' variable '//trim(cdfvarname)
                 else
                    Emis_source(NEmis_sources)%country_ix = ix
                    if ( debugm0 ) write(*,*) dtxt//'country_ISO add: ',ix,trim(name)
@@ -615,15 +647,6 @@ contains
            trim(EmisFile_in%filename),trim(default_projection), default_resolution
        status = nf90_get_att(ncFileID,nf90_global,"periodicity", name)
        if(status==nf90_noerr)EmisFile%periodicity = trim(name)
-!default values for sources
-       status = nf90_get_att(ncFileID,varid,"species",cdfspecies)
-       if(status==nf90_noerr)EmisFile%species = trim(cdfspecies)
-       status = nf90_get_att(ncFileID,nf90_global,"units", name)
-       if(status==nf90_noerr)EmisFile%units = trim(name)
-       status = nf90_get_att(ncFileID,nf90_global,"sector", sector)
-       if(status==nf90_noerr)EmisFile%sector = sector
-       status = nf90_get_att(ncFileID,nf90_global,"country_ISO", name)
-       if(status==nf90_noerr)EmisFile%country_ISO = trim(name)
 
     endif
         
@@ -796,7 +819,7 @@ READEMIS: do   ! ************* Loop over emislist files *******************
 !-------------------------------------------------------------------------
 
   !*** local variables ***
-  integer            :: ie, iq, ic, iland1, iland2 & ! loop variables
+  integer            :: ix, ie, iq, ic, iland1, iland2 & ! loop variables
                        ,inland                     & ! Country read from femis
                        ,isec, isec1 , isec2        & ! loop vars: emis sectors
                        ,nwords,ncols, n, oldn       ! No. cols. in "femis" 
@@ -806,7 +829,8 @@ READEMIS: do   ! ************* Loop over emislist files *******************
   real, dimension(NCOLS_MAX):: e_f_lonlat      ! factors read from femis in lonlat format
   character(len=200) :: txt                    ! For read-in 
   character(len=30), dimension(NCOLS_MAX)::  txtinwords ! to read lines
-  character(len=*), parameter :: dtxt = 'femis:' !DS
+  character(len=*), parameter :: dtxt = 'femis:'
+  character(len=30) :: country_ISO, word30
 
  !--------------------------------------------------------
 
@@ -885,19 +909,18 @@ end if
        if ( ios <  0 ) exit READFILE                   ! End of file
        call CheckStop( ios > 0 , "EmisGet: read error in femis" )
 
-!DSHK: Allow comments in femis files:
-       if( txt(1:1) == '#' ) CYCLE ! Comments allowed DSHK
+       if( txt(1:1) == '#' ) CYCLE ! Comments
 
        call wordsplit(txt,NCOLS_MAX,txtinwords,nwords,ios)
        if ( nwords<3 ) cycle READFILE                   ! End of file
 
-       if(MasterProc) call PrintLog(txt) ! DSHK
+       if(MasterProc) call PrintLog(txt)
  
        !lonlat box. reductions defined with coordinates
-       !DSHK if(txtinwords(1)=='lonlat')then xlonlat applies reductions outside
+       ! xlonlat applies reductions outside (in testing)
        if(txtinwords(1)=='lonlat' .or.  txtinwords(1)=='xlonlat')then
           if(debugm0) write(*,*) dtxt//' LONLAT'//trim(txtinwords(1) ), &
-               nwords, ncols !DSHK DEBUG
+               nwords, ncols
           if(nwords<ncols+6)then
              if(me==0)write(*,*)trim(femisFile)//' not understood ',nwords,ncols+5,txt
              call CheckStop( nwords<ncols+5 , "EmisGet: read error in femis lonlat" )
@@ -958,15 +981,24 @@ end if
           call CheckStop(femis_lonmin(N_femis_lonlat)>femis_lonmax(N_femis_lonlat),&
                "femislonlat: crossing 180 degrees longitude not allowed")
        else
-!      read(unit=IO_EMIS,fmt=*,iostat=ios) inland, isec, (e_f(ic),ic=1,ncols)
-!      if ( ios <  0 ) exit READFILE                   ! End of file
-!      call CheckStop( ios > 0 , "EmisGet: read error in femis" )
 
-          read(txt,fmt=*,iostat=ios) inland, isec, (e_f(ic),ic=1,ncols)
-          
+          if(txtinwords(1)=='Country' .or. txtinwords(1)=='country'  .or. txtinwords(1)=='Country_ISO' )then
+             read(txt,fmt=*,iostat=ios) word30, country_ISO, isec, (e_f(ic),ic=1,ncols)
+             ix = find_index(trim(country_ISO),Country(:)%code)!find country array index from ISO
+             if(ix<0)then
+                if(MasterProc)write(*,*)'femis: Country ',trim(country_ISO),' not recognized'
+                CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
+                CALL MPI_FINALIZE(IERROR)
+                stop
+             else
+                if(MasterProc)write(*,*)'femis: reducing Country ',trim(Country(ix)%name)
+             endif
+             inland =  Country(ix)%icode
+          else
+             read(txt,fmt=*,iostat=ios) inland, isec, (e_f(ic),ic=1,ncols)
+          endif
           n = n + 1
           if(debugm0) then
-             !DSwrite(unit=6,fmt=*) dtxt//"FEMIS READ", inland, &
              write(unit=6,fmt='(a,2i5,99f9.4)') dtxt//"FEMIS READ", inland, &
                   isec, (e_f(ic),ic=1,ncols)
              write(unit=6,fmt="(2a,I3,a,i3,a)") &
@@ -1505,7 +1537,7 @@ end if
            end if
                
            do iland = iland1, iland2
-             do i = 1, emis_nsplit(ie) !DSRC do i = 1, EMIS_NSPLIT(isp)
+             do i = 1, emis_nsplit(ie)
 
                 !*** assign and convert from percent to fractions: ***
 
@@ -1575,7 +1607,7 @@ end if
   if(USES%ROADDUST)THEN
      allocate(roaddust_masscorr(NROADDUST),stat=allocerr)
      call CheckStop(allocerr, "Allocation error for emis_masscorr")
-     itot_RDF = find_index( "Dust_ROAD_f", species(:)%name    )
+     itot_RDF = find_index( "Dust_ROAD_f", species(:)%name ,any_case=.true. )
      call CheckStop(itot_RDF<=0, "Asked for road dust but did not find Dust_ROAD_f")
      do ie=1,NROADDUST
         roaddust_masscorr(ie)=1.0/species(itot_RDF)%molwt

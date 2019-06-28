@@ -1,4 +1,4 @@
-! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -39,14 +39,14 @@ module Debug_module
     ,AEROSOL         = .false. & ! ...needed for intended debugs are to work
     ,AQUEOUS         = .false. &
     ,BCS             = .false. & ! BoundaryConditions
-    ,BIO             = .false. & !< Biogenic emissions
-    ,BIDIR           = .false. & !< FUTURE Bi-directional exchange
-    ,COLUMN          = .false. & !  Used in Derived_mod for column integration
-    ,COLSRC          = .false. & !  Volcanic emissions and Emergency scenarios
+    ,BIO             = .false. & ! Biogenic emissions
+    ,BIDIR           = .false. & ! FUTURE Bi-directional exchange
+    ,COLUMN          = .false. & ! Used in Derived_mod for column integration
+    ,COLSRC          = .false. & ! Volcanic emissions and Emergency scenarios
     ,DERIVED         = .false. & !
-    ,DRYDEP          = .false. & ! Skips fast chemistry to save some CPU
+    ,DRYDEP          = .false. & ! 
     ,DRYRUN          = .false. & ! Skips fast chemistry to save some CPU
-    ,EMISSIONS       = .false. & ! DSHK
+    ,EMISSIONS       = .false. & ! 
     ,EQUIB           = .false. &   !MARS, EQSAM etc.
     ,FORESTFIRE      = .false. &
     ,GETEMIS         = .false. &
@@ -64,7 +64,7 @@ module Debug_module
     ,POLLEN          = .false. &
     ,ROADDUST        = .false. &
     ,RSUR            = .false. & ! Surface resistance
-    ,RUNCHEM         = .false. & ! DEBUG%RUNCHEM is SPECIAL
+    ,RUNCHEM         = .false. & ! DEBUG%RUNCHEM is SPECIAL, need for some other debugs
        ,MY_WETDEP    = .false. &
     ,SEASALT         = .false. &
     ,SETUP_1DCHEM    = .false. &
@@ -80,6 +80,7 @@ module Debug_module
      ,LANDUSE   = 0         & !
      ,DO3SE     = 0         & !
      ,SOA       = 0         &
+     ,SUBMET    = 2         & ! Use 999 for all land-cover, otherwise LC index
      ,STOP_HH   = -1          ! If positive, code will quite when hh==STOP_HH
   !----------------------------------------------------------
    integer, dimension(2) :: IJ = [-999,-999]  ! index for debugging print out
@@ -110,10 +111,7 @@ logical, public, parameter ::    &
   ,DEBUG_NH3            = .false. & ! NH3Emis experimental
   ,DEBUG_OUTPUTCHEM     = .false. & ! Output of netcdf results
   ,DEBUG_OUT_HOUR       = .false. & ! Debug Output_hourly.f90
-! ,DEBUG_POLLEN         = .false. &
-!MV  ,DEBUG_RUNCHEM        = .false. & ! DEBUG_RUNCHEM is SPECIAL
     ,DEBUG_DUST           = .false. & ! Skips fast chemistry to save some CPU
-    ,DEBUG_SUBMET         = .false. &
     ,DEBUG_WETDEP       = .false. &
   ,DEBUG_RB             = .false. &
   ,DEBUG_SOILWATER      = .false. 

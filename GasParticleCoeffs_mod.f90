@@ -1,4 +1,4 @@
-! <GasParticleCoeffs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <GasParticleCoeffs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -38,6 +38,7 @@
 !
 ! (EMEP/ESX do not use the Wesely methodology, but makes some use of the H*,
 !   f0 ideas.)
+! May2019 version - adapted from RB emep-mscw-devCRI_R5R1A
 !..............................................................................
 
 module GasParticleCoeffs_mod
@@ -82,8 +83,8 @@ module GasParticleCoeffs_mod
  !OLD DH2O    = 21.0e-6 &! comp old  m2/s at STP, Massman
 
   integer, public, parameter ::&
-        NDRYDEP_GASES = 14+46  &! no. of gases in Wesely tables, DDdefs below
-       ,NDRYDEP_AERO  = 11     &! no. of particles in DDdefs below
+        NDRYDEP_GASES = 14+66  &! no. of gases in Wesely tables, DDdefs below
+       ,NDRYDEP_AERO  = 14     &! no. of particles in DDdefs below
        ,NDRYDEP_DEF   = NDRYDEP_GASES + NDRYDEP_AERO ! gases + aerosol defs
      !mafor ,NDRYDEP_DEF   = 17      ! gases + aerosol defs ! MSK 26.01.2015 start
 
@@ -181,17 +182,18 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'LHISOLOOH', DH2O/4.3, 4.3, 1.6e6, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! Large (C7-C10) High solubility (estimated H* ca 1.6e6 M/atm) multifunctional organic hydroperoxides
  ,DD_t( 'VHISOLOOH', DH2O/3.8, 3.8, 3.5e8, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! Very high solubility (estimated H* > ca 1.2e7 M/atm) multifunctional organic hydroperoxides
  ,DD_t( 'VHISOLNO3', DH2O/4., 4., 1.5E+08, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! perhaps higher f would be better?
- ,DD_t( 'CO2C5OH',DH2O/3.2 , 3.2, 1.1E+06, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)& ![alt H*-estimate 3.1E+05]  similar parameters as RN12OOH in the CRI version
+ ,DD_t( 'CO2C5OH',DH2O/3.2 , 3.2, 1.1E+06, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)& ![alt H*-estimate 3.1E+05]  similar parameters as RN12OOH in the CRI version -- perhaps combine these two!?
  ,DD_t( 'HISOLF0 ',DH2O/3.4, 3.4, 1.3E+10, 9999, 1.0E+04, 0., 0., -1,-1,-1,-1)& ! slightly changed parameters compared to CRI
- ,DD_t( 'EGLYOX',DH2O/2.8 , 2.8, 2.8E+03, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)& ! similar parameters as HOCH2CO3H in the CRI version
+ ,DD_t( 'EGLYOX',DH2O/2.8 , 2.8, 2.8E+03, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)& ! similar parameters as HOCH2CO3H in the CRI version -- perhaps combine these two!?
  ,DD_t( 'HO2C5OOH',DH2O/3.4 , 3.4, 1.3E+06, 9999, 1.0E+04, 0.5, 0., -1,-1,-1,-1)& ! perhaps even higher f?
  ,DD_t( 'DM123OOH',DH2O/3.75 , 3.75, 3.3E+02, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! 
  ,DD_t( 'BZFUONE',DH2O/2.7 , 2.7, 1.E+02, 9999, 1.0E+04, 0.1, 0.,-1,-1,-1,-1)& 
  ,DD_t( 'OCATEC1OOH',DH2O/3.88 , 3.88, 3.1E+06, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! perhaps even higher f?
  ,DD_t( 'HOCH2CO2H',DH2O/2.49 , 2.49, 4.2E+07, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)& 
  ,DD_t( 'OXYCATECH',DH2O/3.76, 3.76, 1.1E+07, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! perhaps even higher f?
- ,DD_t( 'C3PAN1 ',DH2O/3.3 , 3.3, 1.8E+05, 9999, 1.0E+04, 0.3, 0., -1,-1,-1,-1)&
- ,DD_t( 'C5PAN18 ',DH2O/4.1, 4.1, 2.4E+03, 9999, 1.0E+04, 0.5, 0., -1,-1,-1,-1)&
+ ,DD_t( 'C3PAN1',DH2O/3.3, 3.3, 1.8E+05, 9999, 1.0E+04, 0.3, 0., -1,-1,-1,-1)&
+ ,DD_t( 'C5PAN18',DH2O/4.1, 4.1, 2.4E+03, 9999, 1.0E+04, 0.5, 0., -1,-1,-1,-1)&
+ ,DD_t( 'MPAN',DH2O/3.4, 3.4, 3.0E+0, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)&
  ,DD_t( 'NOXYOL1OOH',DH2O/4.1, 4.1, 8.3E+04, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! perhaps even higher f?
  ,DD_t( 'NOXYOLOOH',DH2O/4.57, 4.57, 4.5E+10, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! perhaps even higher f?
  ,DD_t( 'OXNNCATOOH',DH2O/4.95, 4.95, 2.7E+14, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! perhaps even higher f?
@@ -205,13 +207,32 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'HOCH2CHO', DH2O/2.2, 2.2, 4.1e4, 9999, 1.0E+04, 0., 0.,-1,-1,-1,-1)& !glycolaldehyde
  ,DD_t( 'CARB12', DH2O/3.1, 3.1, 3.4e4, 9999, 1.0E+04, 0., 0.,-1,-1,-1,-1)& ! moderately soluble carbonyls (mixed) with estimated H* ca 3.0 - 3.8E4 M/atm
  ,DD_t( 'CH3CO2H', DH2O/2.0, 2.0, 7.0e5, 9999,  1.0E+04, 0, 0.,-1,-1,-1,-1)& !acetic acid
+ ,DD_t( 'HCOCO3H', DH2O/2.6, 2.6, 3.2e6, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'CH3NO3', DH2O/2.3, 2.3, 2.0e0, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& !methyl nitrate (and ethyl nitrate)
+ ,DD_t( 'SMNO3OH', DH2O/2.9, 2.9, 4.0e4, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& !small moderately soluble organic nitrates with an OH or OOH-group
+ ,DD_t( 'RN12OOH', DH2O/3.1, 3.1, 7.2e5, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! NOTE! very similar to CO3C5OH -- should probably be combined!
+ ,DD_t( 'HOCH2CO3H', DH2O/2.6, 2.6, 4.6e3, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! NOTE! very similar to EGLYOX -- should probably be combined!
+ ,DD_t( 'PHENOL', DH2O/3.2, 3.2, 2.8e3, 9999, 1.0E+04, 0, 0.,-1,-1,-1,-1)& 
+ ,DD_t( 'HISOLNO3', DH2O/4.3, 4.3, 5.0e6, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! Fairly high solubility (estimated H* ca 5e6 - 7e6 M/atm) multifunctional organic nitrates
+ ,DD_t( 'MCARB', DH2O/3.45, 3.45, 5.3e4, 9999, 1.0E+04, 0, 0.,-1,-1,-1,-1)& ! moderately soluble (estimated H* ca 4.8 - 6.1 E4 M/atm) carbonyls and dicarbonyls
+ ,DD_t( 'C10H17NO4', DH2O/4.7, 4.7, 5.5e4, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! moderately soluble C10-nitrates with an OH-group
+ ,DD_t( 'PINONALDEHYDE', DH2O/4.4, 4.4, 9.0e3, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)& 
+ ,DD_t( 'PERPINONIC', DH2O/4.5, 4.5, 4.4e5, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'C10NO3OOH', DH2O/4.8, 4.8, 2.2e4, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! moderately soluble C10-organic nitrates with a hydro peroxide group
+ ,DD_t( 'C10PAN2', DH2O/4.8, 4.8, 5.2e3, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'C96OOH', DH2O/4.3, 4.3, 9.0e4, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'CO23C4CHO', DH2O/3.2, 3.2, 5.5e6, 9999, 1.0E+04, 0, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'NOPINAOOH', DH2O/4.2, 4.2, 1.8e5, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'ANHY', DH2O/2.9, 2.9, 2.5e2, 9999, 1.0E+04, 1.0, 0.,-1,-1,-1,-1)& ! Maleic anhydride (2,5-furandione)
+ ,DD_t( 'MACROH', DH2O/3.1, 3.1, 1.5e3, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'CO2C3PAN', DH2O/3.5, 3.5, 1.3e4, 9999, 1.0E+04, 0.5, 0.,-1,-1,-1,-1)& ! CH3C(O)CH2C(O)ONO3
+ ,DD_t( 'PINONIC',DH2O/4.6 , 4.6, 1.3E+07, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! pinonic acid
+ ,DD_t( 'HCC7CO',DH2O/3.7 , 3.7, 3.9E+05, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& 
 ! additions for Hodzic VBS-scheme semivolatile species:
  ,DD_t( 'LVASOA',DH2O/3.9 , 3.9, 1.3E+07, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! LVASOA - to model Hodzics 0.01 anthropogenic VSOA bin
  ,DD_t( 'SVASOA',DH2O/3.1 , 3.1, 1.3E+05, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! SVASOA - to model Hodzics 10, 100 and 1000ug/m3 Anthropogenic VSOA bins
  ,DD_t( 'LSVBSOA',DH2O/4.6 , 4.6, 6.3E+08, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! LSVBSOA - to model Hodzics 0.01, 0.1, 1 and 10 ug/m3 Biogenic VSOA bins
  ,DD_t( 'SVBSOA',DH2O/4.6 , 4.6, 3.2E+07, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! SVBSOA - to model Hodzics 100ug/m3 Biogenic VSOA bin 
- ,DD_t( 'PINONIC',DH2O/4.6 , 4.6, 1.3E+07, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! pinonic acid
- ,DD_t( 'HCC7CO',DH2O/3.7 , 3.7, 3.9E+05, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& 
 !end Hodzic species
 
 ! Particles:
@@ -224,10 +245,13 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'DUf'   ,UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 0.33, 1.8, 2600, -1)& ! NEW?? CHECK
 ! QUERY
  ,DD_t( 'PMc  ',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 3.00,  2.0, 2200,  1)& ! as PM QUERY 20
- ! SSc, DUc and POLLd have dummy values, CHECK!!
+ ! SSc, DUc have dummy values, CHECK!!
  ,DD_t( 'SSc  ',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 4.80,  2.0, 2200,  2)& ! 
  ,DD_t( 'DUc  ',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 5.00,  2.2, 2600, -1)& 
- ,DD_t( 'POLLd',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 3.00,  2.0, 1400, -1)& 
+ ,DD_t( 'POLLb',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0.,22.00,  2.0,  800, -1)& ! birch
+ ,DD_t( 'POLLo',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0.,28.00,  2.0,  800, -1)& ! olive
+ ,DD_t( 'POLLr',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0.,18.00,  2.0,  800, -1)& ! ragweed
+ ,DD_t( 'POLLg',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0.,32.00,  2.0,  800, -1)& ! grass
  ,DD_t( 'nuc  ',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 0.008, 2.0, 1400, -1)&
  ,DD_t( 'ait  ',UNDEF_R  , -1,   -1,   -1,  -1,  -1, 0., 0.06,  2.0, 1200, -1)&
 ]
@@ -560,7 +584,7 @@ if(MasterProc) print *, "DDDEF ", DDdefs(2)%name, DDdefs(2)%Dx
       WDspec(icmp)%name   = WDdefs(idef)%name
       WDspec(icmp)%W_sca  = WDdefs(idef)%W_sca
       WDspec(icmp)%W_sub  = WDdefs(idef)%W_sub
-      if(MasterProc) write(*,fmt) "WD_Coeffs: "//WDspec(icmp)%name
+      if(MasterProc) write(*,fmt) "GasPart:WD_Coeffs: "//WDspec(icmp)%name
     end do
   end subroutine WetCoeffs
 

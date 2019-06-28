@@ -1,4 +1,4 @@
-! <EQSAM_mod.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <EQSAM4clim_ml.f90 - A component of the EMEP MSC-W Unified Eulerian
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
@@ -25,92 +25,94 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************! 
-module EQSAM_v03d_mod
+module EQSAM4clim_ml
 
  implicit none
  private
 
 
  !/- subroutines:
- public   ::  eqsam_v03d
+ public   ::  EQSAM4clim
 
 
  contains
 
-!subroutine eqsam_v03c(yi,yo,nca,nco,iopt,loop,imax,ipunit,in)
+!____________________________________________________________________________________________
+! SUBROUTINE EQSAM4clim(xTT,xAW,xsPM,xaPM,xPMS,xPMT,xRHO,xVOL,xPH,xHp,xGF,xWH2O,&
+!                       xYPa,xYPs,xYMa,xYMs,xYG,imask,neq,nleq,jmeq,Dd)
+!____________________________________________________________________________________________
+!  IMPLICIT NONE
+!  SAVE
+!____________________________________________________________________________________________
+! WRITTEN BY SWEN METZGER (s.metzger@cyi.ac.cy), 2012-2014
+!          The Cyprus Institute, www.cyi.ac.cy
+!               *** COPYRIGHT 2012-2018+ ***
 !
-!implicit none
-!___________________________________________________________________________________________________________________________________
-!      Written by Swen Metzger 3/11/99. Modified October 2002, March 2003.
+! Contact, w.r.t. EQSAM4clim modeling:
+! Swen Metzger <swen.metzger@eco-serve.de>
+! Founder, ResearchConcepts io GmbH, HRB 717519
+! http://www.eco-serve.de/en/Publications.html
+! http://www.researchconcepts.io
 !
-!      Department of Atmospheric Chemistry, Max-Planck-Institute for Chemistry.
-!      email: metzger@mpch-mainz.mpg.de
+! Metzger, S., B. Steil, L. Xu, J. E. Penner, and J. Lelieveld, 
+! New representation of water activity based on a single solute specific constant to 
+! parameterize the hygroscopic growth of aerosols in atmospheric models, 
+! Atmos. Chem. Phys., 12, 5429–5446, doi:10.5194/acp-12-5429-2012, 2012; 
+! http://www.atmos-chem-phys.net/12/5429/2012/acp-12-5429-2012.html
 !
-!      COPYRIGHT 1999-2003
+! Metzger, S., B. Steil, M. Abdelkader, K. Klingmüller, L. Xu, J.E. Penner, C. Fountoukis, 
+! A. Nenes, and J. Lelieveld; Aerosol Water Parameterization: A single parameter framework; 
+! Atmos. Chem. Phys., 16, 7213–7237, doi:10.5194/acp-16-7213-2016, 2016; 
+! https://www.atmos-chem-phys.net/16/7213/2016/acp-16-7213-2016.html
 !
-!      purpose
-!      -------
-!      EQSAM is a new and Simplified Aerosol Model, which allows to calculate the gas/aerosol (EQuilibrium) 
-!      partitioning, including the aerosol water and aerosol composition suffieciently fast and accurate for 
-!      global modeling. EQSAM is based on a parameterization of activcity coefficients (AC), i.e. an AC-RH 
-!      relationship, which holds for atmospheric aerosols in equilibrium with the ambient relative humidity (RH).
-!      Note that EQSAM should be regarded as a starting point for further development. Although not yet perfect, 
-!      it compares rather well with more complex thermodynamic gas/aerosol equilibrium models (EQMs), such as
-!      ISORROPIA, or SCAPE.
-!      
-!      interface
-!      ---------
-!      call  eqsam_v03b(yi,yo,nca,nco,iopt,loop,imax,ipunit,in)
+! EUMETSAT ITT 15/210839 Validation Report, 12/2016: 
+! Comparison of Metop - PMAp Version 2 AOD Products using Model Data
+! http://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=
+! PDF_PMAP_V2_MODEL_COMP&RevisionSelectionMethod=LatestReleased&Rendition=Web
+!____________________________________________________________________________________________
+!  CHARACTER(LEN=*),PARAMETER :: modstr  = 'EQSAM4clim'    ! name of module
+!  CHARACTER(LEN=*),PARAMETER :: modver  = 'v10'           ! module version
+!  CHARACTER(LEN=*),PARAMETER :: moddat  = '15Jan2018'     ! last modification date
+!____________________________________________________________________________________________
+! ' Hydrogen |   H2O           H2SO4          HNO3            HCl            NH3    '
+! '    H+    |    1              2             3               4              5     '
+! '  Index   |  eqh2o          eqhsa          eqhna          eqhca          eqxam   '
+! '----------|----------------------------------------------------------------------'
+! ' Ammonium |(NH4)3H(SO4)2  (NH4)2SO4       NH4HSO4        NH4NO3          NH4Cl   '
+! '   NH4+   |    6              7             8               9             10     '
+! '  Index   |  eqalc          eqasu          eqahs          eqano          eqacl   '
+! '----------|----------------------------------------------------------------------'
+! ' Sodium   | Na3H(SO4)2     Na2SO4          NaHSO4         NaNO3          NaCl    '
+! '   Na+    |   11             12            13              14             15     '
+! '  Index   |  eqslc          eqssu          eqshs          eqsno          eqscl   '
+! '----------|----------------------------------------------------------------------'
+! ' Potassium|  K3H(SO4)2      K2SO4           KHSO4          KNO3           KCl    '
+! '    K+    |   16             17            18              19             20     '
+! '  Index   |  eqplc          eqpsu          eqphs          eqpno          eqpcl   '
+! '----------|----------------------------------------------------------------------'
+! ' Calcium  |   ---           CaSO4          ---           Ca(NO3)2        CaCl2   '
+! '   Ca++   |   21             22            23              24             25     '
+! '  Index   |  eqc01          eqcsu          eqc02          eqcno          eqccl   '
+! '----------|----------------------------------------------------------------------'
+! ' Magnesium|   ---           MgSO4          ---           Mg(NO3)2        MgCl2   '
+! '   Mg++   |   26             27            28              29             30     '
+! '  Index   |  eqm01          eqmsu          eqm02          eqmno          eqmcl   '
+!____________________________________________________________________________________________
 !
-!      yi = input  array (imax, nca)
-!      yo = output array (imax, nco)
-!      imax = max loop (e.g. time steps)
-!      nca >= 11
-!      nc0 >= 35
-!      iopt = 1 metastable 
-!      iopt = 2 solids 
-!      iopt = 3 hysteresis (metastable/solids) for online calculations
-!      iopt = 31 hysteresis lower branch 
-!      iopt = 32 hysteresis upper branch 
-!      ipunit = I/O unit (can be skipped)
-!      in = array        (can be skipped)
-!         
-!      method
-!      ------
-!      equilibrium / internal mixture assumption / aw=rh
-!      System: NH3,NH4+/H2SO4+,HSO4-,SO4--/HNO3,NO3-, HCl,Cl-/Na+, H2O 
-!              (K+,Ca++,Mg++)
-!      external
-!      --------
-!      program    eqmd.f90 (driver)
-!      subroutine gribio.f90  (provides diagnostics output in grib/binary/ascii format)
-!      
-!      reference
-!      ---------
-!      Swen Metzger Ph.D Thesis, University Utrecht, 2000
-!         http://www.mpch-mainz.mpg.de/~metzger
-!
-!      Metzger, S. M., F. J. Dentener, J. Lelieveld, and S. N. Pandis, 
-!         GAS/AEROSOL PARTITIONING I: A COMPUTATIONALLY EFFICIENT MODEL, 
-!         JOURNAL OF GEOPHYSICAL RESEARCH, VOL. 107, NO. D16, 10.1029/2001JD001102, 2002
-!      Metzger, S. M., F. J. Dentener, A. Jeuken, and M. Krol, J. Lelieveld, 
-!         GAS/AEROSOL PARTITIONING II: GLOBAL MODELING RESULTS, 
-!         JOURNAL OF GEOPHYSICAL RESEARCH, VOL. 107, NO. D16, 10.1029/2001JD001103, 2002.
-!___________________________________________________________________________________________________________________________
-
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! Start modification for EMEP
 !>-------------------------------------------------------------------------------<
-subroutine eqsam_v03d (SO4in, HNO3in,NO3in,NH3in,NH4in,NAin,CLin, relh,temp,pa,   &
-                       aSO4out, aNO3out, aNH4out, aNaout, aClout,                 &
-                       gSO4out, gNH3out, gNO3out, gClout, aH2Oout) 
+subroutine EQSAM4clim (SO4in, HNO3in,NO3in,NH3in,NH4in,NAin,CLin, relh,temp,   &
+                       aSO4out, aNO3out, aNH4out, aNaout, aClout,              &
+                       gSO4out, gNH3out, gNO3out, gClout, aH2Oout, KCHEMTOP, KMAX_MID) 
 !>-------------------------------------------------------------------------------<
 
-  use Config_module,  only :  KMAX_MID, KCHEMTOP
+!  use Config_module,  only :  KMAX_MID, KCHEMTOP
 
 implicit none
- real, intent(in):: temp(KCHEMTOP:KMAX_MID),relh(KCHEMTOP:KMAX_MID),  &
-                    pa(KCHEMTOP:KMAX_MID)
+ integer, intent(in):: KCHEMTOP, KMAX_MID
+ real, intent(in)   :: temp(KCHEMTOP:KMAX_MID),relh(KCHEMTOP:KMAX_MID)
 
-!hf real :: c(nx,ny,nz,nspec), ah2o(nx,ny,nz)
   real,intent(in)::   &
              SO4in(KCHEMTOP:KMAX_MID),  &
              NO3in(KCHEMTOP:KMAX_MID),  &
@@ -131,530 +133,916 @@ implicit none
              gNO3out(KCHEMTOP:KMAX_MID), &
              gCLout (KCHEMTOP:KMAX_MID), &
              aH2Oout(KCHEMTOP:KMAX_MID)
+
+!... Swen's comments ....
+! neq = inner loop and should go over your number of grid boxes (e.g., vector loop), 
+!       e.g., certain number of lon or lat, or time. 
+! nleq1 = outer loop and could go via levels, e.g.  nleq1=KCHEMTOP, nleq2=KMAX_MID 
+!         (though the order doesn’t really matter)
+   integer,parameter                          :: nleq1 = 1
+   integer,parameter                          :: nleq2 = 1
+   integer,parameter                          :: nleq = nleq2
+!   integer,parameter                          :: neq1 = KCHEMTOP
+!   integer,parameter                          :: neq2 = KMAX_MID  ! KMAX_MID isn't parameter
+   integer                                    :: neq1, neq2
+!   integer,parameter                          :: neq  = neq2
+!   integer :: neq 
+   integer,parameter                          :: jmeq = 1
+ 
+!
+! End modification for EMEP
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-!.. local ....
- ! mean value for mixture of wet (2) and dry (1) gridboxes (needed for HYSTERESIS)
-real,parameter         :: RH_HIST_DW=1.50                                   
-real,parameter         :: T0=298.15, T1=298.0, &
-                          AVO=6.03e23,R=82.0567e-6        ! in cu.m*atm/deg/mole
-real,parameter         :: RHMAX=0.99, RHMIN=0.0001        ! restrict to max / min RH
-real,parameter         :: MWNH4=18., MWSO4=96.,   &       ! mole mass of species considered
-                          MWNO3=62., MWCl=35.5,   &           
-                          MWNa=23.0, MWH20=55.51*18.01    ! MWCa=40.1,MWN=14.0, MWS=32.1
-real,parameter         :: ZERO=0.0
-real,parameter         :: GF1=0.25,GF2=0.50,GF3=0.40,GF4=1.00   ! exponents of AC-RH functions
-!______________________________________________
-integer,parameter                 :: NPAIR=10
 !
-integer                           :: ii,IHYST, k, iopt
-!integer,intent(in)                :: nca,nco,imax,loop,ipunit
-!integer,intent(inout)             :: iopt
 !______________________________________________
-!integer,dimension(6),intent(in)   :: in
+INTEGER,PARAMETER                             :: dp = SELECTED_REAL_KIND(12,307)
 !______________________________________________
-real                              :: T0T,TT,RH,PX,RHD,KAN,KAC,ZIONIC,RH_HIST,GAMA,GG,GF,GFN
-real                              :: X00,X01,X02,X03,X04,X05,X08,X09,X10,X11
-real                              :: X0,X1,X2,X3,X4,X5,X6,XK10,XK6
-real                              :: ZFLAG,ZKAN,ZKAC,PH,COEF,GAMAAN,HPLUS,AKW,XKW,MOLAL
-real                              :: TNH4,TSO4,TNO3,TNa,TCl,TPo,TCa,TMg
-real                              :: PNH4,PSO4,PNO3,PCl,PNa,GNO3,GNH3,GSO4,GHCl
-real                              :: ASO4,ANO3,ANH4,ACl,ANa,SNH4,SSO4,SNO3,SCl,SNa
-real                              :: WH2O,PMt,RINC,DON,RATIONS,GR,NO3P,NH4P !PM,PMs,
+REAL(dp),PARAMETER                            :: REALZERO=tiny(0._dp),ZERO=0._dp,ONE=1._dp
+REAL(dp),PARAMETER                            :: TINYX=1.e-15_dp,eqT0=298.15_dp ![K]
+REAL(dp),PARAMETER                            :: R=8.314409_dp            ![J/mol/K]
+REAL(dp),PARAMETER                            :: eqR=R/101325._dp   ![atm*m^3/mol/K]
+REAL(dp),PARAMETER                            :: sigma=0.0761_dp    ![J/m^2]
+!______________________________________________
+ LOGICAL,PARAMETER                            :: lke         =.FALSE.
+ LOGICAL,PARAMETER                            :: lvola       =.TRUE.
+ LOGICAL,PARAMETER                            :: lmixs       =.FALSE.
+ LOGICAL,PARAMETER                            :: lrhdm       =.TRUE.
+ LOGICAL,PARAMETER                            :: lHSO4       =.TRUE.
+ LOGICAL,PARAMETER                            :: lH2SO4gas   =.FALSE.
+ LOGICAL,PARAMETER                            :: lmetastable =.TRUE.  !.FALSE.
+!______________________________________________
+INTEGER,PARAMETER :: jMs=1
+INTEGER,PARAMETER :: jDs=2
+INTEGER,PARAMETER :: jZa=3
+INTEGER,PARAMETER :: jWs=4
+INTEGER,PARAMETER :: jNs=5
+INTEGER,PARAMETER :: jNi=6
+INTEGER,PARAMETER :: jRHD=7
+INTEGER,PARAMETER :: jRHDc=8
+INTEGER,PARAMETER :: jSOL=30
+INTEGER,PARAMETER :: jVOL=2
+INTEGER,PARAMETER :: jGAS=4
+INTEGER,PARAMETER :: jKEQ=2
+INTEGER,PARAMETER :: jAP=1
+INTEGER,PARAMETER :: jDP=2
+INTEGER,PARAMETER :: jGP=3
+INTEGER,PARAMETER :: jSP=1
+INTEGER,PARAMETER :: jSM=2
+INTEGER,PARAMETER :: jSS=3
+!______________________________________________
+INTEGER,PARAMETER :: mciam =  1  ! ammonium        -  NH4+
+INTEGER,PARAMETER :: mciso =  2  ! sodium          -  Na+
+INTEGER,PARAMETER :: mcipo =  3  ! potassium       -  K+
+INTEGER,PARAMETER :: mcica =  4  ! calcium         -  Ca++
+INTEGER,PARAMETER :: mcimg =  5  ! magnesium       -  Mg++
+INTEGER,PARAMETER :: mcati =  5
+!______________________________________________
+INTEGER,PARAMETER :: mdumm =  0  ! dummy
+INTEGER,PARAMETER :: maisu =  1  ! sulfate         -  SO4--
+INTEGER,PARAMETER :: maihs =  2  ! bisulfate       -  HSO4-
+INTEGER,PARAMETER :: maino =  3  ! nitrate         -  NO3-
+INTEGER,PARAMETER :: maicl =  4  ! chloride        -  Cl-
+INTEGER,PARAMETER :: manio =  4
+!______________________________________________
+CHARACTER(len= 5), DIMENSION(0:jSOL)   :: ceqsolute
+INTEGER,           DIMENSION(0:jSOL,5) :: ieqsolute
+INTEGER,           DIMENSION(1:jVOL)   :: ieqvola
+INTEGER,           DIMENSION(1:jGAS)   :: ieqgases
+INTEGER,           DIMENSION(KCHEMTOP:KMAX_MID,nleq) :: imask
 !_______________________________________________
-!real,dimension(imax,nca),intent(in)  :: yi
-!real,dimension(imax,nco),intent(out) :: yo
-real,dimension(8)                     :: w1,w2
-real,dimension(8)                     :: RHDA,RHDE,RHDX,RHDZ    ! RHD/MRHD for different aerosol types
-real,dimension(NPAIR)                 :: M0,MW,NW,ZW            ! arrays of ion pairs
-!
-! salt solutes:
-!   1 = NACl,  2 = (NA)2SO4, 3 = NANO3,  4 = (NH4)2SO4,  5 = NH4NO3, 6 = NH4CL,   7 = 2H-SO4
-!   8 = NH4HSO4,   9 = NAHSO4, 10 = (NH4)3H(SO4)2
-!
-! mole mass of the salt solute
-DATA MW(1:NPAIR) / 58.5, 142.0, 88.0, 132.0, 80.0, 53.5, 98.0, 115.0, 120.0, 247.0/
-! square of max.  dissocation number (not consistent)
-DATA NW(1:NPAIR) / 2.0,   2.5,  2.5,   2.5,  3.5,  1.0,  4.5,   2.0,   2.0,   2.5/ 
-! exponents of water activity functions
-DATA ZW(1:NPAIR) / 0.67,   1.0,  1.0,   1.0,  1.0,  1.0,  0.5,   1.0,   1.0,   1.0/ 
-! RHD / MRHD values as of ISORROPIA / SCAPE (T=298.15K)
-DATA RHDA(1:8) / 0.32840, 0.4906, 0.6183, 0.7997, 0.67500, 0.5000, 0.4000, 0.0000/
-! Temp. coeff.
-DATA RHDE(1:8) / -1860.0, -431.0, 852.00, 80.000, 262.000, 3951.0, 384.00, 0.0000/
-
-logical, parameter :: HYSTERESIS_HISTORY = .false.
-!_____________________________________________________________________________________
- IOPT = 1  ! METASTABLE aerosols
-
-IHYST=2
-IF(IOPT.EQ.31) THEN      ! SOLID HYSTORY
-   IHYST=1
-   IOPT=3
-ELSEIF(IOPT.EQ.32) THEN  ! WET   HISTORY
-   IHYST=2
-   IOPT=3
-ENDIF
-
-w1=0.;w2=0.        ! init/reset
-!______________________________________________________________________________________
-
- do k=KCHEMTOP,KMAX_MID
-! get old relative humidity to calculate aerosol hysteresis (online only)
-
-   RH_HIST = 2.                                        ! WET HISTORY (DEFAULT)
-   IF(IHYST.EQ.1.OR.IOPT.EQ.2)  RH_HIST = 1.           ! SET TO SOLIDS
-
-!  meteorology
-   TT = temp(k)    ! yi(il,1)      ! T [K]
-   RH = relh(k)    ! yi(il,2)      ! RH [0-1]
-   PX = pa(k)      ! yi(il,11)     ! p [hPa]
-!
-! gas+aerosol:
-   w1(1) = NAin(k)             !yi(il,6)        ! Na+ (ss  + xsod) (a)   [umol/m^3]
-   w1(2) = SO4in(k)            !yi(il,4)        ! H2SO4    + SO4-- (p)   [umol/m^3]
-   w1(3) = NH3in(k)+NH4in(k)   !yi(il,3)        ! NH3  (g) + NH4+  (p)   [umol/m^3]
-   w1(4) = HNO3in(k)+NO3in(k)  !yi(il,5)        ! HNO3 (g) + NO3-  (p)   [umol/m^3]
-   w1(5) = CLin(k)             !yi(il,7)        ! HCl  (g) + Cl-   (p)   [umol/m^3]
-   w1(6) = 0. !yi(il, 8)                        ! K+   (p) from Dust     [umol/m^3]
-   w1(7) = 0. !yi(il, 9)                        ! Ca++ (p) from Dust     [umol/m^3]
-   w1(8) = 0. !yi(il,10)                        ! Mg++ (p) from Dust     [umol/m^3]
+LOGICAL,           DIMENSION(0:jSOL)   :: leqsolute
+!_______________________________________________
+INTEGER                                :: i,n,m,II,IJ,IK,Jp,Jm,Ip,Im,Is
+!INTEGER                               :: neq,neq1,neq2,nleq,nleq1,nleq2,jmeq ! modified for EMEP
 !______________________________________________
-
-   zflag=1.
-
-   w1=w1*1.0e-6                     ! [mol/m^3 air]
-
-   TNa   = w1(1)                    ! total input sodium   (g+p) 
-   TSO4  = w1(2)                    ! total input sulfate  (g+p) 
-   TNH4  = w1(3)                    ! total input ammonium (g+p)
-   TNO3  = w1(4)                    ! total input nitrate  (g+p) 
-   TCl   = w1(5)                    ! total input chloride (g+p) 
-   TPo   = w1(6)                    ! total input potasium (g+p) 
-   TCa   = w1(7)                    ! total input calcium  (g+p)
-   TMg   = w1(8)                    ! total input magnesium(g+p)
-
-! SULFATE RICH
-
-      if((TNa + TNH4 + TPo +2.*(TCa + TMg)) .le. (2.*TSO4)) then
-          zflag=3.
-      end if
-
-! SULFATE VERY RICH CASE if (NH4+Na+K+2(Ca+Mg))/SO4 < 1
-
-      if((TNa + TNH4 + TPo +2.*(TCa + TMg)) .le. TSO4) then
-          zflag=4.
-      end if
-
-! SULFATE NEUTRAL CASE
-
-      if((TNa + TNH4 + TPo +2.*(TCa + TMg)) .gt. (2.*TSO4)) then
-          zflag=2.
-      end if
-
-! SULFATE POOR AND CATION POOR CASE
-
-      if((TNa + TPo +2.*(TCa + TMg)) .gt. (2.*TSO4)) then       
-          zflag=1.
-      end if
-
-      IF ( RH .LT. RHMIN ) RH=RHMIN
-      IF ( RH .GT. RHMAX ) RH=RHMAX
-
-! CALCULATE TEMPERATURE DEPENDENCY FOR SOME RHDs
-
-      RHDX(:)=RHDA(:)*exp(RHDE(:)*(1./TT-1./T0))
-      RHDZ(:)=RHDX(:)
-      
-! ACCOUNT FOR VARIOUS AMMOMIUM/SODIUM SULFATE SALTS ACCORDING TO MEAN VALUE AS OF ISORROPIA
-      GG=2.0            ! (Na)2SO4/(NH4)2SO4 is PREFFERED SPECIES FOR SULFATE DEFICIENT CASES
-      IF(ZFLAG.EQ.3.) THEN
-         IF(RH.LE.RHDZ(7)) THEN    ! MIXTURE OF (NH4)2SO4(s) & NH4HSO4(s) & (NH4)3H(SO4)2(s) 
-            GG=1.677               !  (Na)2SO4 &  NaHSO4
-!           GG=1.5
-         ELSEIF(RH.GT.RHDZ(7).AND.RH.LE.RHDZ(5)) THEN ! MAINLY (Na)2SO4/(NH4)2SO4(s) & (NH4)3H(SO4)2(s)
-            GG=1.75
-!           GG=1.5
-         ELSEIF(RH.GE.RHDZ(5)) THEN   ! (NH4)2SO4(S) & NH4HSO4(S) & SO4-- & HSO4-
-            GG=1.5                    !  (Na)2SO4 &  NaHSO4
-         ENDIF
-      ENDIF
-      IF(ZFLAG.EQ.4.) GG=1.0          ! IF SO4 NEUTRALIZED, THEN ONLY AS NaHSO4/NH4HSO4(S)
-                                      !OR HSO4- / H2SO4
-      RHD=RH
-      IF(IOPT.EQ.2.OR.RH_HIST.LT.RH_HIST_DW) THEN   ! GET RHD FOR SOLIDS / HYSTERESIS
-!
-! GET LOWEST DELIQUESCENCE RELATIVE HUMIDITIES ACCORDING TO THE CONCENTRATION DOMAIN  
-! (APROXIMATION BASED ON RHD / MRHD ISORROPIA/SCAPE
-!
-      w2(:)=1.
-      do ii=1,8
-         if(w1(ii).le.1.e-12) w2(ii)=0.    ! skip compound in RHD calculation if 
-                end do                      ! concentration is zero or rather small
-
-! GET LOWEST RHD ACCORDING TO THE CONCENTRATION DOMAIN
-
-! zflag=1. (cation rich)  ...
-! 1. sea salt      aerosol          : RHDX(1)=MgCl2
-! 2. mineral dust  aerosol          : RHDX(2)=Ca(NO3)2
-!
-! zflag=2. (sulfate neutral) ...
-! 3. ammonium + nitrate             : RHDX(3)= NH4NO3
-! 4. ammonium + sulfate             : RHDX(4)=(NH4)2SO4        
-! 5. ammonium + sulfate mixed salt  : RHDX(5)=(NH4)3H(SO4)2, (NH4)2SO4        
-! 6. ammonium + nitrate  + sulfate  : RHDX(6)=(NH4)2SO4, NH4NO3, NA2SO4, NH4CL
-!
-! zflag=3. (sulfate poor) ...
-! 7. ammonium + sulfate  (1:1,1.5)  : RHDX(7)= NH4HSO4
-!
-! zflag=4. (sulfate very poor) ...
-! 8. sulfuric acid                  : RHDX(8)= H2SO4       
-
-   IF(ZFLAG.EQ.1.)THEN
-
-      RHD=W2(1)+W2(5)                     ! Na+  dependency
-      IF(RHD.EQ.0.)  RHDX(1)=1. 
-      RHD=W2(6)+W2(7)+W2(8)               ! K+/Ca++/Mg++ dependency (incl. ss)
-      IF(RHD.EQ.0.)  RHDX(2)=1. 
-
-      RHD=MINVAL(RHDX(1:2))
-
-   ELSEIF(ZFLAG.EQ.2.)THEN
-
-      RHD=W2(3)*W2(4)                     ! NH4+ & NO3-  dependency
-      IF(RHD.EQ.0.)  RHDX(3)=1. 
-      RHD=W2(2)+W2(3)                     ! NH4+ & SO4-- dependency
-      IF(GG.NE.2.)   RHD=0.               ! account only for pure (NH4)2SO4
-      IF(RHD.EQ.0.)  RHDX(4)=1. 
-      RHD=W2(2)+W2(3)                     ! NH4+ & SO4-- dependency
-      IF(RHD.EQ.0.)  RHDX(5)=1. 
-      RHD=W2(2)+W2(3)+W2(4)+W2(5)         ! (NH4)2SO4, NH4NO3, NA2SO4, NH4CL dependency
-      IF(RHD.EQ.0.)  RHDX(6)=1. 
-
-!      RHD=MINVAL(RHDX(3:4))
-     RHD=MINVAL(RHDX(3:6))
-
-   ELSEIF(ZFLAG.EQ.3.)THEN
-
-      RHD=W2(2)+W2(3)                     ! NH4+ & SO4-- dependency
-      IF(RHD.EQ.0.)  RHDX(7)=1. 
-      RHD=RHDX(7)                        
-
-   ELSEIF(ZFLAG.EQ.4.)THEN
-
-      RHD=W2(2)                           ! H2SO4 dependency (assume no dry aerosol)
-      IF(RHD.EQ.0.)  RHDX(8)=1. 
-
-      RHD=RHDX(8)
-
-   ENDIF ! ZFLAG
-   ENDIF ! SOLIDS
-
-   
-! GET WATER ACTIVITIES ACCORDING TO METZGER, 2000.
-! FUNCTION DERIVED FROM ZSR RELATIONSHIP DATA (AS USED IN ISORROPIA)
-
-      M0(:) = ((NW(:)*MWH20/MW(:)*(1./RH-1.)))**ZW(:)
-
-! CALCULATE TEMPERATURE DEPENDENT EQUILIBRIUM CONSTANTS
-
-      T0T=T0/TT
-      COEF=1.0+LOG(T0T)-T0T
-
-! EQUILIBRIUM CONSTANT NH4NO3(s) <==> NH3(g) + HNO3(g)[atm^2] (ISORROPIA)
-
-      XK10 = 5.746e-17
-      XK10= XK10 * EXP(-74.38*(T0T-1.0) + 6.120*COEF)
-      KAN = XK10/(R*TT)/(R*TT)
-
-! EQUILIBRIUM CONSTANT  NH4CL(s) <==> NH3(g) + HCL(g) [atm^2] (ISORROPIA)
-
-      XK6 = 1.086e-16
-      XK6 = XK6 * EXP(-71.00*(T0T-1.0) + 2.400*COEF)
-      KAC = XK6/(R*TT)/(R*TT)
-
-! CALCULATE AUTODISSOCIATION CONSTANT (KW) FOR WATER H2O <==> H(aq) + OH(aq) [mol^2/kg^2] (ISORROPIA)
-
-      XKW  = 1.010e-14
-      XKW = XKW *EXP(-22.52*(T0T-1.0) + 26.920*COEF)
-
-! GET MEAN MOLAL IONIC ACTIVITY COEFF ACCORDING TO METZGER, 2002.
-
-      GAMA=0.0
-      IF(RH.GE.RHD)  GAMA=(RH**ZFLAG/(1000./ZFLAG*(1.-RH)+ZFLAG))
-      GAMA = GAMA**GF1            ! ONLY GAMA TYPE OF NH4NO3, NaCl, etc. NEEDED SO FAR
-
-      GAMA=0.0
-      GFN=K*K                      ! K=2, i.e. condensation of 2 water molecules per 1 mole ion pair
-      GF=GFN*GF1                   ! = GFN[=Nw=4] * GF1[=(1*1^1+1*1^1)/2/Nw=1/4] = 1
-                                   ! ONLY GAMA TYPE OF NH4NO3, NH4Cl, etc. needed so far
-
-      IF(RH.GE.RHD) GAMA=RH**GF/((GFN*MWH20*(1./RH-1.)))**GF1
-
-      GAMA = min(GAMA,1.0)        ! FOCUS ON 0-1 SCALE
-      GAMA = max(GAMA,0.0)
-      GAMA = (1.-GAMA)**K          ! transplate into aqueous phase equillibrium and account for 
-                                   ! enhanced uptake of aerosol precursor gases with increasing RH
-                                   ! (to match the results of ISORROPIA)
-
-
-! CALCULATE RHD DEPENDENT EQ: IF RH <  RHD => NH4NO3(s) <==> NH3 (g) + HNO3(g) (ISORROPIA)
-!                             IF RH >> RHD => HNO3  (g)   -> NO3 (aq)
-
-      X00  = MAX(ZERO,MIN(TNa,GG*TSO4))       ! MAX SODIUM   SULFATE
-      X0   = MAX(ZERO,MIN(TNH4,GG*TSO4-X00))  ! MAX AMMOMIUM SULFATE
-      X01  = MAX(ZERO,MIN(TNa-X00, TNO3))     ! MAX SODIUM   NITRATE
-      X1   = MAX(ZERO,MIN(TNH4-X0,TNO3-X01))  ! MAX AMMOMIUM NITRATE
-!
-      X02  = MAX(ZERO,MIN(TNa-X01-X00,TCl))   ! MAX SODIUM   CHLORIDE
-      X03  = MAX(ZERO,MIN(TNH4-X0-X1,TCl-X02))! MAX AMMOMIUM CHLORIDE
-
-      X2   = MAX(TNH4-X1-X0-X03,ZERO)         ! INTERIM RESIDUAL NH3
-      X3   = MAX(TNO3-X1-X01,ZERO)            ! INTERIM RESIDUAL HNO3
-      X04  = MAX(TSO4-(X0+X00)/GG,ZERO)       ! INTERIM RESIDUAL H2SO4
-      X05  = MAX(TCl-X03-X02,ZERO)            ! INTERIM RESIDUAL HCl
-!     X06  = MAX(TNa-X02-X01-X00,ZERO)        ! INTERIM RESIDUAL Na (should be zero for electro-neutrality in input data)
-!
-
-      ZKAN=2.
-      IF(RH.GE.RHD) ZKAN=ZKAN*GAMA
-
-      X4   = X2 + X3
-!corrected SM      X5   = SQRT(X4*X4+KAN*ZKAN)
-      X5   = SQRT(X4*X4+KAN*ZKAN*ZKAN) 
-      X6   = 0.5*(-X4+X5)
-      X6   = MIN(X1,X6)
-      
-      GHCl = X05                              ! INTERIM RESIDUAl HCl
-      GNH3 = X2 + X6                          ! INTERIM RESIDUAl NH3
-      GNO3 = X3 + X6                          ! RESIDUAl HNO3
-      GSO4 = X04                              ! RESIDUAl H2SO4
-      PNa  = X02 + X01 + X00                  ! RESIDUAl Na (neutralized)
-      
-      ZKAC=2.
-      IF(RH.GE.RHD) ZKAC=ZKAC*GAMA
-
-      X08   = GNH3 + GHCl
-      X09   = SQRT(X08*X08+KAC*ZKAC*ZKAC)
-      X10   = 0.5*(-X08+X09)
-      X11   = MIN(X03,X10)
-
-      GHCl = GHCl + X11                       ! RESIDUAL HCl
-      GNH3 = GNH3 + X11                       ! RESIDUAL NH3
-
-! GO SAVE ...
-
-      IF(GHCl.LT.0.)   GHCl=0.
-      IF(GSO4.LT.0.)   GSO4=0.
-      IF(GNH3.LT.0.)   GNH3=0.
-      IF(GNO3.LT.0.)   GNO3=0.
-      IF(PNa.LT.0.)    PNa=0.
-      IF(GSO4.GT.TSO4) GSO4=TSO4
-      IF(GNH3.GT.TNH4) GNH3=TNH4
-      IF(GNO3.GT.TNO3) GNO3=TNO3
-      IF(GHCl.GT.TCl)  GHCl=TCl
-      IF(PNa.GT.TNa)   PNa=TNa
-!     IF(PNa.LT.TNa)   print*,il,' PNa.LT.TNa => no electro-neutrality in input data! ',PNa,TNa
-
-
-! DEFINE AQUEOUSE PHASE (NO SOLID NH4NO3 IF NO3/SO4>1, TEN BRINK, ET AL., 1996, ATMOS ENV, 24, 4251-4261)
-
-!     IF(TSO4.EQ.ZERO.AND.TNO3.GT.ZERO.OR.TNO3/TSO4.GE.1.) RHD=RH
-
-!     IF(IOPT.EQ.2.AND.RH.LT.RHD.OR.IOPT.EQ.2.AND.RH_HIST.LT.RH_HIST_DW) THEN        ! SOLIDS / HYSTERESIS
-      IF(RH_HIST.EQ.1.AND.RH.LT.RHD) THEN        ! SOLIDS / HYSTERESIS
-
-       ! EVERYTHING DRY, ONLY H2SO4 (GSO4) REMAINS IN THE AQUEOUSE PHASE
-
-         ANH4 = 0.
-         ASO4 = 0.
-         ANO3 = 0.
-         ACl  = 0.
-         ANa  = 0.
-
-      ELSE  !  SUPERSATURATED SOLUTIONS NO SOLID FORMATION
-
-         ASO4 = TSO4 - GSO4
-         ANH4 = TNH4 - GNH3
-         ANO3 = TNO3 - GNO3
-         ACl  = TCl  - GHCl
-         ANa  = PNa
-
-      ENDIF ! SOLIDS / HYSTERESIS
-
-! CALCULATE AEROSOL WATER [kg/m^3(air)]
-!
-! salt solutes:
-!   1 = NACl,  2 = (NA)2SO4, 3 = NANO3,  4 = (NH4)2SO4,  5 = NH4NO3, 6 = NH4CL,   7 = 2H-SO4
-!   8 = NH4HSO4,   9 = NAHSO4, 10 = (NH4)3H(SO4)2
-!
-      WH2O = 1.0e-6   !  small initial value 
-      IF(ZFLAG.EQ.1.) WH2O = ASO4/M0( 2) + ANO3/M0(3) +  ACl/M0(6)
-      IF(ZFLAG.EQ.2.) WH2O = ASO4/M0( 4) + ANO3/M0(5) +  ACl/M0(6)
-      IF(ZFLAG.EQ.3.) WH2O = ASO4/M0( 8) + ANO3/M0(5) +  ACl/M0(6)
-      IF(ZFLAG.EQ.4.) WH2O = ASO4/M0( 8) + GSO4/M0(7)
-
-
-! CALCULATE AQUEOUS PHASE PROPERTIES
-
-!     PH    = 9999.
-      PH    = 7.
-      MOLAL = 0.
-      HPLUS = 0.
-      ZIONIC= 0.
-
-!hf&pw      IF(WH2O.GT.0.) THEN            
-      IF(WH2O.GT.1.0e-6) THEN            
-
-         ! CALCULATE AUTODISSOCIATION CONSTANT (KW) FOR WATER
-
-         AKW=XKW*RH*WH2O*WH2O                  ! H2O <==> H+ + OH- with kw [mol^2/kg^2]
-         AKW=AKW**0.5                          ! [OH-] = [H+] [mol]
-
-         ! Calculate hydrogen molality [mol/kg], i.e. H+ of the ions:
-         !           Na+, NH4+, NO3-, Cl-, SO4--, HH-SO4- [mol/kg(water)]
-         !                                   with [OH-] = kw/[H+]
-
-         HPLUS = (-ANa/WH2O-ANH4/WH2O+ANO3/WH2O+ACl/WH2O+GG*ASO4/WH2O+GG*GSO4/WH2O+ & 
-            SQRT(( ANa/WH2O+ANH4/WH2O-ANO3/WH2O-ACl/WH2O-GG*ASO4/WH2O-GG*GSO4/WH2O)**2 &
-                  +XKW/AKW*WH2O))/2.
-
-         ! Calculate pH
-
-         PH=-ALOG10(HPLUS)                             ! aerosol pH 
-
-         ! Calculate ionic strength [mol/kg]
-
-         ZIONIC=0.5*(ANa+ANH4+ANO3+ACl+ASO4*GG*GG+GSO4*GG*GG+XKW/AKW*WH2O*WH2O)
-         ZIONIC=ZIONIC/WH2O                            ! ionic strength [mol/kg]
-!        ZIONIC=min(ZIONIC,200.0)                      ! limit for output
-!        ZIONIC=max(ZIONIC,0.0)
-
-      ENDIF ! AQUEOUS PHASE 
-
-!
-!-------------------------------------------------------
-! calculate diagnostic output consistent with other EQMs ...
-!
-      ASO4 = ASO4 + GSO4                        ! assuming H2SO4 remains aqueous
-
-      TNa   = TNa  * 1.e6                       ! total input sodium   (g+p)  [umol/m^3]
-      TSO4  = TSO4 * 1.e6                       ! total input sulfate  (g+p)  [umol/m^3]
-      TNH4  = TNH4 * 1.e6                       ! total input ammonium (g+p)  [umol/m^3]
-      TNO3  = TNO3 * 1.e6                       ! total input nitrate  (g+p)  [umol/m^3]
-      TCl   = TCl  * 1.e6                       ! total input chloride (g+p)  [umol/m^3]
-      TPo   = TPo  * 1.e6                       ! total input potasium (g+p)  [umol/m^3]
-      TCa   = TCa  * 1.e6                       ! total input calcium  (g+p)  [umol/m^3]
-      TMg   = TMg  * 1.e6                       ! total input magnesium(g+p)  [umol/m^3]
-!
-! residual gas:
-      GNH3 = GNH3 * 1.e6                        ! residual NH3
-      GSO4 = GSO4 * 1.e6                        ! residual H2SO4
-      GNO3 = GNO3 * 1.e6                        ! residual HNO3
-      GHCl = GHCl * 1.e6                        ! residual HCl
-
-! total particulate matter (neutralized)
-      PNH4=TNH4-GNH3                            ! particulate ammonium   [umol/m^3]
-      PNO3=TNO3-GNO3                            ! particulate nitrate    [umol/m^3]
-      PCl =TCl -GHCl                            ! particulate chloride   [umol/m^3]
-      PNa =TNa                                  ! particulate sodium     [umol/m^3]
-      PSO4=TSO4                                 ! particulate sulfate    [umol/m^3]
-
-! liquid matter
-      ANH4 = ANH4 * 1.e6                        ! aqueous phase ammonium [umol/m^3]
-      ANO3 = ANO3 * 1.e6                        ! aqueous phase nitrate  [umol/m^3]
-      ACl  = ACl  * 1.e6                        ! aqueous phase chloride [umol/m^3]
-      ANa  = ANa  * 1.e6                        ! aqueous phase sodium   [umol/m^3]
-      ASO4 = ASO4 * 1.e6                        ! aqueous phase sulfate  [umol/m^3] 
-
-! solid matter
-      SNH4=PNH4-ANH4                            ! solid phase ammonium   [umol/m^3]
-      SSO4=PSO4-ASO4                            ! solid phase sulfate    [umol/m^3]
-      SNO3=PNO3-ANO3                            ! solid phase nitrate    [umol/m^3]
-      SCl =PCl -ACl                             ! solid phase chloride   [umol/m^3]
-      SNa =PNa -ANa                             ! solid phase sodium     [umol/m^3]
-
-! GO SAVE ...
-
-      IF(SNH4.LT.0.)   SNH4=0.
-      IF(SSO4.LT.0.)   SSO4=0.
-      IF(SNO3.LT.0.)   SNO3=0.
-      IF(SCl.LT.0.)    SCl=0.
-      IF(SNa.LT.0.)    SNa=0.
-
- ! PM=SNH4+SSO4+SNO3+SNH4+SCl+SNa+ANH4+ASO4+ANO3+ACl+ANa  ! total PM [umol/m^3]
- ! PMs=SNH4*MWNH4+SSO4*MWSO4+SNO3*MWNO3+SCl*MWCl+SNa*MWNa ! dry PM   [ug/m^3]
- ! PMt=PMs+ANH4*MWNH4+ASO4*MWSO4+ANO3*MWNO3+ACl*MWCl+ ANa*MWNa ! dry+wet PM, excl.H20[ug/m^3]
-
-      WH2O = WH2O * 1.e9                   ! convert aerosol water from [kg/m^3] to [ug/m^3]
-      IF(WH2O.LT.1.e-3) WH2O=0.
-
-! UPDATE HISTORY RH FOR HYSTERESIS (ONLINE CALCULATIONS ONLY) - not tested here!!!!
-     if  (HYSTERESIS_HISTORY) then
-      RH_HIST=2.                                     ! wet
-      IF(WH2O.EQ.0.) RH_HIST=1.                      ! dry
-
-! Approximate the pH (for test purposes only)
-      PH    = 7.
-      HPLUS = 0.
-      IF(WH2O.GT.0.) &
-       HPLUS=(2.*TSO4+ANO3+ACl-ANH4-ANa)/WH2O*1000.  ! hydrogen ion concentration [mol/l]
-      IF(HPLUS.GT.0.) PH=-ALOG10(HPLUS)              ! aerosol pH 
-
-      ZIONIC=0.
-      IF(WH2O.GT.0.) ZIONIC=0.5*(ANa+ANH4+ANO3+ACl+ASO4*4.)  ! ionic strength [moles/kg]
-      ZIONIC=ZIONIC*1.e3/WH2O
-      ZIONIC=min(ZIONIC,200.0)                               ! limit for output
-      ZIONIC=max(ZIONIC,0.0)
-
-      GAMAAN=0.0
-      IF(WH2O.GT.0.) GAMAAN = GAMA**GF1             ! activity coefficient (NH4NO3)
-      GAMAAN=min(GAMAAN,1.0)                        ! focus on 0-1 scale
-      GAMAAN=max(GAMAAN,0.0)
-
-      RINC = 1.
-      IF(PMt.GT.0.)   RINC = (WH2O/PMt+1)**(1./3.)  ! radius increase due to water uptake
-      IF(RINC.EQ.0.)  RINC = 1.
-
-      RATIONS = 0.
-      IF(PSO4.GT.0.) RATIONS = PNO3/PSO4            ! nitrate / sulfate mol ratio
-
-      GR = 0.
-      IF(GNO3.GT.0.) GR = GNH3/GNO3                 ! gas ratio=residual NH3/residual HNO3[-]
-
-      DON = 0.
-      IF((PNO3+2.*PSO4).GT.0.) DON = 100.*PNH4/(PNO3+2.*PSO4) ! degree of neutralization
-                                      ! by ammonia : ammonium / total nitrate + sulfate  [%]
-      NO3P = 0.
-      IF(TNO3.GT.0.) NO3P = 100.*PNO3/TNO3          ! nitrate partitioning=nitrate/total nitrate[%]
-
-      NH4P = 0.
-      IF(TNH4.GT.0.) NH4P = 100.*PNH4/TNH4          ! ammonium partitioning=ammonium/total ammonium[%]
-
-!     KAN   = rks5/(r*temp)**2                      ! Keq of NH3(g)+HNO3(g)---> NH4NO3 (s) 
-                                  ! [mol^2/kg]/(R[m^3*atm/deg/mole]*T[K])**2 = [m^3*atm/kg]
-  end if
-!
-! store aerosol species for diagnostic output:
-!______________________________________________________________
-
-! Output values:
-!//.. aerosols
-      aSO4out(k) = PSO4                    ! particulate sulfate  (p=a+s)     [umol/m^3]
-      aNO3out(k) = PNO3                    ! particulate nitrate  (p=a+s)     [umol/m^3]
-      aNH4out(k) = PNH4                    ! particulate ammonium (p=a+s)     [umol/m^3]
-      aNAout(k)  = PNa                     ! particulate sodium (p=a+s)       [umol/m^3]
-      aClout(k)  = PCl                     ! particulate chloride (p=a+s)     [umol/m^3]
-!//.. gases
-      gSO4out(k) = GSO4                    ! residual H2SO4 (aq)              [umol/m^3]
-      gNO3out(k) = GNO3                    ! residual HNO3  (g)               [umol/m^3]
-      gNH3out(k) = GNH3                    ! residual NH3   (g)               [umol/m^3]
-      gCLout(k)  = GHCL                    ! residual HCl   (g)               [umol/m^3]
-
-!//.. aerosol water
-      aH2Oout(k) = WH2O                    ! aerosol Water  (aq)              [ug/m^3]
-
- end do
-!
- end subroutine eqsam_v03d
-
-end module EQSAM_v03d_mod
+REAL(dp)                               :: T0T,AKW,X1,X2,X3,XZ,KEQ,Mw,Dw,COEF,Dd
+!______________________________________________
+REAL(dp),DIMENSION(0:mcati)  :: eqxpz,eqxpm
+REAL(dp),DIMENSION(0:manio)  :: eqxmz,eqxmm
+REAL(dp),DIMENSION(0:jSOL)   :: eqxyZ,eqxyA,eqxyB,eqxyC
+REAL(dp),DIMENSION(8,0:jSOL) :: eqxy
+!______________________________________________
+LOGICAL :: leqskip_all,lhelp
+!______________________________________________
+LOGICAL, DIMENSION(KCHEMTOP:KMAX_MID) :: leqskip
+!______________________________________________
+INTEGER, DIMENSION(KCHEMTOP:KMAX_MID) :: NZeq,IWATeq,IDeq
+!______________________________________________
+INTEGER, DIMENSION(KCHEMTOP:KMAX_MID,0:jSOL) :: ieqsalt
+!______________________________________________
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID) :: eqTT,eqAW,eqRH,eqsPM,eqPMs,eqaPM,eqPMt,eqWH2O,eqPH,eqGF,YY,YZ
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID) :: eqVOL,eqRHO,eqXPi,eqXMi,eqHPLUS,XRHDMIN,XRHDMAX,XRHDIFF,TSO4
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID) :: eqMolm,eqMs,eqNs,eqWs,eqNZm,eqRHDM
+!_______________________________________________
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,mcati,2)   :: eqyp
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,manio,2)   :: eqym
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,jGAS)      :: eqyg
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,0:jSOL,3)  :: eqys
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,0:jSOL)    :: eqxyRHD
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,0:jSOL)    :: eqxyXS,eqxyMol,eqxyKe,eqxyGF
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,0:mcati)   :: eqxp
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,0:manio)   :: eqxm
+!______________________________________________
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,nleq,4)    :: xYG
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,nleq,4)    :: xYMa,xYMs
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,nleq,5)    :: xYPa,xYPs
+REAL(dp),DIMENSION(KCHEMTOP:KMAX_MID,nleq)      :: xTT,xAW,xsPM,xPMs,xaPM,xPMt,xWH2O,xPH,xVOL,xRHO,xGF,xHp
+!____________________________________________________________________________________________
+! cation name     |            mciam      mciso      mcipo      mcica       mcimg
+DATA eqxpz(0:mcati) / 1._dp,  1.0_dp,    1.0_dp,    1.0_dp,     2.0_dp,     2.0_dp     /
+DATA eqxpm(0:mcati) / 1._dp,0.01805_dp,0.02299_dp,0.039098_dp,0.040080_dp,0.024305_dp /
+!____________________________________________________________________________________________
+! anion  name     |            maisu      maihs      maino      maicl
+DATA eqxmz(0:manio) / 1._dp,  2.0_dp,    1.0_dp,    1.0_dp,    1.0_dp /
+DATA eqxmm(0:manio) / 1._dp,0.09607_dp,0.09708_dp,0.062010_dp,0.03545_dp/
+!____________________________________________________________________________________________
+INTEGER,PARAMETER ::     eqdum =  0, &
+          eqh2o =  1,    eqhsa =  2,    eqhna =  3,    eqhca =  4,    eqxam =  5,&
+          eqalc =  6,    eqasu =  7,    eqahs =  8,    eqano =  9,    eqacl = 10,&
+          eqslc = 11,    eqssu = 12,    eqshs = 13,    eqsno = 14,    eqscl = 15,&
+          eqplc = 16,    eqpsu = 17,    eqphs = 18,    eqpno = 19,    eqpcl = 20,&
+          eqc01 = 21,    eqcsu = 22,    eqc02 = 23,    eqcno = 24,    eqccl = 25,&
+          eqm01 = 26,    eqmsu = 27,    eqm02 = 28,    eqmno = 29,    eqmcl = 30
+!____________________________________________________________________________________________
+DATA ieqvola (1:jVOL)  /eqacl,eqano/
+DATA ieqgases(1:jGAS)  /eqhna,eqhca,eqxam,eqhsa/
+!____________________________________________________________________________________________
+INTEGER                ::     ieqsu(mcati)
+DATA                          ieqsu/eqasu,eqssu,eqpsu,eqcsu,eqmsu/
+INTEGER                ::     ieqhs(mcati)
+DATA                          ieqhs/eqahs,eqshs,eqphs,mdumm,mdumm/
+INTEGER                ::     ieqno(mcati)
+DATA                          ieqno/eqano,eqsno,eqpno,eqcno,eqmno/
+INTEGER                ::     ieqcl(mcati)
+DATA                          ieqcl/eqacl,eqscl,eqpcl,eqccl,eqmcl/
+!____________________________________________________________________________________________
+INTEGER                ::     ieqams(manio)
+DATA                          ieqams/eqasu,eqahs,eqano,eqacl/
+INTEGER                ::     ieqsos(manio)
+DATA                          ieqsos/eqssu,eqshs,eqsno,eqscl/
+INTEGER                ::     ieqpos(manio)
+DATA                          ieqpos/eqpsu,eqphs,eqpno,eqpcl/
+INTEGER                ::     ieqcas(manio)
+DATA                          ieqcas/eqcsu,mdumm,eqcno,eqccl/
+INTEGER                ::     ieqmgs(manio)
+DATA                          ieqmgs/eqmsu,mdumm,eqmno,eqmcl/
+!____________________________________________________________________________________________
+DATA leqsolute(0:jSOL)/.FALSE.,&
+         .FALSE.,       .FALSE.,       .FALSE.,       .FALSE.,       .FALSE.,&
+         .TRUE.,        .TRUE.,        .TRUE.,        .TRUE.,        .TRUE.,&
+         .FALSE.,       .TRUE.,        .TRUE.,        .TRUE.,        .TRUE.,&
+         .FALSE.,       .TRUE.,        .TRUE.,        .TRUE.,        .TRUE.,&
+         .FALSE.,       .TRUE.,        .FALSE.,       .TRUE.,        .TRUE.,&
+         .FALSE.,       .TRUE.,        .FALSE.,       .TRUE.,        .TRUE./
+!____________________________________________________________________________________________
+DATA ieqsolute(0:jSOL,jSS)/mdumm,&
+          eqh2o,         eqhsa,         eqhna,         eqhca,         eqxam,&
+          eqalc,         eqasu,         eqahs,         eqano,         eqacl,&
+          eqslc,         eqssu,         eqshs,         eqsno,         eqscl,&
+          eqplc,         eqpsu,         eqphs,         eqpno,         eqpcl,&
+          eqc01,         eqcsu,         eqc02,         eqcno,         eqccl,&
+          eqm01,         eqmsu,         eqm02,         eqmno,         eqmcl/
+!____________________________________________________________________________________________
+DATA ieqsolute(0:jSOL,jSP)/mdumm,&
+          mdumm,         mdumm,         mdumm,         mdumm,         mciam,&
+          mciam,         mciam,         mciam,         mciam,         mciam,&
+          mciso,         mciso,         mciso,         mciso,         mciso,&
+          mcipo,         mcipo,         mcipo,         mcipo,         mcipo,&
+          mdumm,         mcica,         mcica,         mcica,         mcica,&
+          mdumm,         mcimg,         mdumm,         mcimg,         mcimg/
+!____________________________________________________________________________________________
+DATA ieqsolute(0:jSOL,jSM)/mdumm,&
+          mdumm,         maisu,         maino,         maicl,         mdumm,&
+          maisu,         maisu,         maihs,         maino,         maicl,&
+          maisu,         maisu,         maihs,         maino,         maicl,&
+          maisu,         maisu,         maihs,         maino,         maicl,&
+          mdumm,         maisu,         mdumm,         maino,         maicl,&
+          mdumm,         maisu,         mdumm,         maino,         maicl/
+!____________________________________________________________________________________________
+DATA ceqsolute(0:jSOL)/ 'eqdum',                                             &
+         'eqh2o',       'eqhsa',       'eqhna',       'eqhca',       'eqxam',&
+         'eqalc',       'eqasu',       'eqahs',       'eqano',       'eqacl',&
+         'eqslc',       'eqssu',       'eqshs',       'eqsno',       'eqscl',&
+         'eqplc',       'eqpsu',       'eqphs',       'eqpno',       'eqpcl',&
+         'eqc01',       'eqcsu',       'eqc02',       'eqcno',       'eqccl',&
+         'eqm01',       'eqmsu',       'eqm02',       'eqmno',       'eqmcl'/
+!____________________________________________________________________________________________
+!        Ms   [kg/mol],&
+DATA eqxy(jMs,0:jSOL)/  ZERO, &
+       0.018020_dp,   0.098090_dp,   0.063020_dp,   0.036460_dp,   0.017040_dp,&
+       0.247300_dp,   0.132170_dp,   0.115130_dp,   0.080060_dp,   0.053500_dp,&
+       0.262120_dp,   0.142050_dp,   0.120070_dp,   0.085000_dp,   0.058440_dp,&
+       0.310444_dp,   0.174266_dp,   0.136178_dp,   0.101108_dp,   0.074548_dp,&
+       0.000000_dp,   0.136150_dp,   0.000000_dp,   0.164100_dp,   0.110980_dp,&
+       0.000000_dp,   0.120375_dp,   0.000000_dp,   0.148325_dp,   0.095205_dp/
+!____________________________________________________________________________________________
+!        Ds   [kg/m^3],&
+DATA eqxy(jDs,0:jSOL)/  ZERO, &
+     997.000000_dp,1830.000000_dp,1513.000000_dp,1490.000000_dp, 696.000000_dp,&
+    1775.000000_dp,1770.000000_dp,1780.000000_dp,1720.000000_dp,1519.000000_dp,&
+    2565.000000_dp,2700.000000_dp,2430.000000_dp,2260.000000_dp,2170.000000_dp,&
+    2490.000000_dp,2660.000000_dp,2320.000000_dp,2110.000000_dp,1988.000000_dp,&
+    1700.000000_dp,2960.000000_dp,1700.000000_dp,2500.000000_dp,2150.000000_dp,&
+    1000.000000_dp,2660.000000_dp,1000.000000_dp,2300.000000_dp,2325.000000_dp/
+!____________________________________________________________________________________________
+!        Za        [-],&
+DATA eqxy(jZa,0:jSOL)/  ZERO, &
+       1.000000_dp,   2.000000_dp,   1.000000_dp,   1.000000_dp,   1.000000_dp,&
+       3.000000_dp,   2.000000_dp,   1.000000_dp,   1.000000_dp,   1.000000_dp,&
+       3.000000_dp,   2.000000_dp,   1.000000_dp,   1.000000_dp,   1.000000_dp,&
+       3.000000_dp,   2.000000_dp,   1.000000_dp,   1.000000_dp,   1.000000_dp,&
+       3.000000_dp,   2.000000_dp,   3.000000_dp,   2.000000_dp,   2.000000_dp,&
+       1.000000_dp,   2.000000_dp,   1.000000_dp,   2.000000_dp,   2.000000_dp/
+!____________________________________________________________________________________________
+!        Ws (T_o)  [%],&
+DATA eqxy(jWs,0:jSOL)/  ZERO, &
+       0.000000_dp,  70.000000_dp,  25.000000_dp,  15.000000_dp,  30.000000_dp,&
+      53.300000_dp,  43.310000_dp,  76.000000_dp,  68.050000_dp,  28.340000_dp,&
+      44.060000_dp,  21.940000_dp,  66.180000_dp,  47.700000_dp,  26.470000_dp,&
+       0.000000_dp,  10.710000_dp,  33.600000_dp,  27.690000_dp,  26.230000_dp,&
+       0.000000_dp,   0.210000_dp,   0.000000_dp,  59.020000_dp,  44.840000_dp,&
+       0.000000_dp,  26.310000_dp,   0.000000_dp,  41.590000_dp,  35.900000_dp/
+!____________________________________________________________________________________________
+!        nu_s     [-],&
+DATA eqxy(jNs,0:jSOL)/  ZERO, &
+       2.000000_dp,   3.000000_dp,   2.000000_dp,   2.000000_dp,   1.000000_dp,&
+       5.000000_dp,   3.000000_dp,   2.000000_dp,   2.000000_dp,   2.000000_dp,&
+       5.000000_dp,   3.000000_dp,   2.000000_dp,   2.000000_dp,   2.000000_dp,&
+       5.000000_dp,   3.000000_dp,   2.000000_dp,   2.000000_dp,   2.000000_dp,&
+       5.000000_dp,   2.000000_dp,   5.000000_dp,   3.000000_dp,   3.000000_dp,&
+       1.000000_dp,   2.000000_dp,   1.000000_dp,   3.000000_dp,   3.000000_dp/
+!____________________________________________________________________________________________
+!        nu_i     [-],&
+DATA eqxy(jNi,0:jSOL)/  ZERO, &
+       1.000000_dp,   1.761309_dp,   1.793689_dp,   2.681333_dp,   0.527416_dp,&
+       1.616356_dp,   1.274822_dp,   1.253573_dp,   1.051480_dp,   1.243054_dp,&
+       1.000000_dp,   1.278762_dp,   1.293906_dp,   1.160345_dp,   1.358377_dp,&
+       1.000000_dp,   1.286445_dp,   1.308499_dp,   1.014102_dp,   1.256989_dp,&
+       1.000000_dp,   1.271828_dp,   1.000000_dp,   1.586562_dp,   2.024869_dp,&
+       1.000000_dp,   1.435281_dp,   1.000000_dp,   1.878693_dp,   2.107772_dp/
+!____________________________________________________________________________________________
+!        RHD (T_o) [-],&
+DATA eqxy(jRHD,0:jSOL)/  ZERO, &
+       1.000000_dp,   1.000000_dp,   1.000000_dp,   1.000000_dp,   1.000000_dp,&
+       0.690000_dp,   0.799700_dp,   0.400000_dp,   0.618300_dp,   0.771000_dp,&
+       0.390000_dp,   0.930000_dp,   0.520000_dp,   0.737900_dp,   0.752800_dp,&
+       1.000000_dp,   0.975000_dp,   0.860000_dp,   0.924800_dp,   0.842600_dp,&
+       1.000000_dp,   0.990000_dp,   1.000000_dp,   0.490600_dp,   0.283000_dp,&
+       1.000000_dp,   0.861300_dp,   1.000000_dp,   0.540000_dp,   0.328400_dp/
+!____________________________________________________________________________________________
+!        T-coef.   [-],&
+DATA eqxy(jRHDc,0:jSOL)/  ZERO, &
+       0.000000_dp,   0.000000_dp,   0.000000_dp,   0.000000_dp,   0.000000_dp,&
+     186.000000_dp,  80.000000_dp, 384.000000_dp, 852.000000_dp, 239.000000_dp,&
+       0.000000_dp,  80.000000_dp, -45.000000_dp, 304.000000_dp,  25.000000_dp,&
+       0.000000_dp,  35.600000_dp,   0.000000_dp,   0.000000_dp, 159.000000_dp,&
+       0.000000_dp,   0.000000_dp,   0.000000_dp, 509.400000_dp, 551.100000_dp,&
+       0.000000_dp,-714.450000_dp,   0.000000_dp, 230.200000_dp,  42.230000_dp/
+!____________________________________________________________________________________________
+! GLOBAL INITIALIZATION 
+!    nleq1=1                             ! modified for EMEP
+!    nleq2=nleq                          ! modified for EMEP
+!    neq1=1                              ! modified for EMEP
+!    neq2=neq                            ! modified for EMEP
+
+ neq1 = KCHEMTOP
+ neq2 = KMAX_MID 
+!   neq  = neq2
+!______________________________________
+   DO n=nleq1,nleq2    ! n=1,1
+!______________________________________
+   DO i=neq1,neq2      ! i=KCHEMTOP,KMAX_MID
+      eqXPi(i)=ZERO
+      eqXMi(i)=ZERO
+      eqxp (i,0)=ZERO
+      eqxp (i,1)=ZERO
+      eqxp (i,2)=ZERO
+      eqxp (i,3)=ZERO
+      eqxp (i,4)=ZERO
+      eqxp (i,5)=ZERO
+      eqxm (i,0)=ZERO
+      eqxm (i,1)=ZERO
+      eqxm (i,2)=ZERO
+      eqxm (i,3)=ZERO
+      eqxm (i,4)=ZERO
+      eqyg (i,1)=ZERO
+      eqyg (i,2)=ZERO
+      eqyg (i,3)=ZERO
+      eqyg (i,4)=ZERO
+      leqskip(i)=.TRUE.
+      imask(i,n) = 1    ! comment line for 3-D implementation
+      xYPa (i,n,:)=ZERO ! modified for EMEP
+      xYMa (i,n,:)=ZERO ! modified for EMEP
+      xWH2O(i,n)  =ZERO ! modified for EMEP
+   END DO
+!______________________________________
+! INPUT - modified for EMEP
+!    DO i=neq1,neq2
+!       eqWH2O(i)=xWH2O(i,n)
+!       eqTT  (i)=xTT  (i,n)
+!       eqAW  (i)=xAW  (i,n)
+!       eqRH  (i)=eqAW (i)
+!   END DO
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! Start INPUT for EMEP:
+   DO i=neq1,neq2     ! i = vertikal levels
+      eqWH2O(i)=xWH2O(i,n) ! aerosol water (from previous time step)
+      eqTT  (i)=temp (i)   ! T [K]
+      eqAW  (i)=relh (i)   ! water activity [0-1]
+      eqRH  (i)=eqAW (i)   ! equilibrium assumption (aw=RH)
+      xYPa(i,n,mciam) = (NH3in(i)+NH4in(i))*1.E-6_dp    ! NH3  (g) + NH4+  (p)   [mol/m^3]
+      xYPa(i,n,mciso) =  NAin(i)*1.E-6_dp               ! Na+  (ss + xsod) (p)   [mol/m^3]
+      xYMa(i,n,maisu) =  SO4in(i)*1.E-6_dp              ! H2SO4(g) + SO4- + HSO4-- (p) [mol/m^3]
+      xYMa(i,n,maino) = (HNO3in(i)+NO3in(i))*1.E-6_dp   ! HNO3 (g) + NO3-  (p)   [mol/m^3]
+      xYMa(i,n,maicl) =  CLin(i)*1.E-6_dp               ! HCl  (g) + Cl-   (p)   [mol/m^3]
+   END DO
+!  END INPUT for EMEP
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   ! CATIONS [MOL/M^3(air)]
+   DO IJ=1,mcati
+   DO i=neq1,neq2
+      eqxp (i,IJ)    =xYPa(i,n,IJ)
+      eqXPi(i)=eqXPi(i)+eqxp(i,IJ)*eqxpz(IJ)
+   END DO
+   END DO ! mcati
+   ! ANIONS [MOL/M^3(air)]
+   DO IJ=1,manio
+   DO i=neq1,neq2
+      eqxm (i,IJ)    =xYMa(i,n,IJ)
+      eqXMi(i)=eqXMi(i)+eqxm(i,IJ)*eqxmz(IJ)
+   END DO
+   END DO ! manio
+    leqskip_all=.TRUE.
+   DO i=neq1,neq2
+      IF(eqXPi(i)+eqXMi(i) > TINYX) leqskip(i)=.FALSE.
+      IF(imask (i,n) == 0) leqskip(i) =.TRUE.
+      IF(.NOT.leqskip(i))  leqskip_all=.FALSE.
+   END DO
+!______________________________________
+   IF(leqskip_all) GOTO 1000
+!______________________________________
+! DOMAINS
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      IWATeq(i)=2 ! SOLID+LIQUID AEROSOL
+      IF(lmetastable.OR.eqWH2O(i) > REALZERO) &
+      IWATeq(i)=1 ! METASTABLE AEROSOL
+      TSO4(i) = eqxm(i,maihs)+eqxm(i,maisu)
+      X1 = eqxmz (maihs)*eqxm(i,maihs)
+      X2 = eqxmz (maisu)
+      IF(lHSO4.AND.eqXPi(i)>ZERO.AND.eqXPi(i)<X1+X2) THEN
+         Is=eqasu
+         IF(eqxp(i,mciam) >= eqxm(i,maisu)*0.5_dp) Is=eqahs
+         IF(eqxp(i,mcipo) >= eqxm(i,maisu)*0.5_dp) Is=eqphs
+         IF(eqxp(i,mciso) >= eqxm(i,maisu)*0.5_dp) Is=eqshs
+         IF(eqRH(i) >= eqxy(jRHD,Is)) X2=1.95_dp
+      END IF
+      X2 =            X2*eqxm(i,maisu)
+      X3 = eqxpz (mciam)*eqxp(i,mciam)
+      IDeq(i) = 0 ! SULFATE POOR
+      IF(eqXPi(i) < TINYX .AND. TSO4(i) > TINYX) THEN
+         IDeq(i) = 5 ! ONLY SULFURIC ACID
+         eqxm(i,maisu)=eqxm(i,maihs)+eqxm(i,maisu)
+         eqxm(i,maihs)=ZERO
+      ELSE IF(eqXPi(i) > TINYX .AND. eqXPi(i) < TSO4(i)) THEN
+         IDeq(i) = 4 ! SULFATE VERY RICH
+         eqxm(i,maihs)=eqxm(i,maihs)+eqxm(i,maisu)
+         eqxm(i,maisu)=ZERO
+      ELSE IF(eqXPi(i) >= TSO4(i) .AND. eqXPi(i) < X1+X2) THEN
+         IDeq(i) = 3 ! SULFATE RICH
+         eqxm(i,maisu)=eqxm(i,maihs)+eqxm(i,maisu)
+         eqxm(i,maihs)=ZERO
+         XZ = MAX(ZERO,X1+X2-eqXPi(i))
+         eqxm(i,maihs)=eqxm(i,maihs)+XZ
+         eqxm(i,maisu)=eqxm(i,maisu)-XZ
+      ELSE IF(eqXPi(i) >= X1+X2 .AND. eqXPi(i)-X3 < TSO4(i)) THEN
+         IDeq(i) = 2 ! SULFATE NEUTRAL
+      ELSE IF(eqXPi(i)-X3 >= TSO4(i)) THEN
+         IDeq(i) = 1 ! SULFATE POOR / MINERAL CATION RICH
+      END IF
+      IF(IDeq(i) <= 2) THEN
+         eqxm(i,maisu)=eqxm(i,maisu)+eqxm(i,maihs)
+         eqxm(i,maihs)=ZERO
+      END IF
+   END DO
+!______________________________________
+! LOCAL INITIALIZATION
+   Mw=eqxy(jMs,eqh2o)
+   Dw=eqxy(jDs,eqh2o)
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      YY     (i)=ZERO
+      eqWH2O (i)=ZERO
+      eqMolm (i)=ZERO
+      eqMs   (i)=ZERO
+      eqNs   (i)=ZERO
+      eqWs   (i)=ZERO
+      eqNZm  (i)=ZERO
+      NZeq   (i)=0
+      eqPH   (i)=ZERO
+      eqHPLUS(i)=ZERO
+      eqsPM  (i)=ZERO
+      eqaPM  (i)=ZERO
+      eqPMs  (i)=ZERO
+      eqPMt  (i)=ZERO
+      eqVOL  (i)=ZERO
+      eqGF   (i)=ONE
+      eqRHO  (i)=ONE
+      eqRHDM (i)=ONE
+      eqXPi  (i)=ZERO
+      eqXMi  (i)=ZERO
+      XRHDMAX(i)=ZERO
+      XRHDMIN(i)=ONE
+      XRHDIFF(i)=ONE
+   END DO
+   DO IJ=1,mcati
+      DO i=neq1,neq2
+        eqyp(i,IJ,1) = ZERO
+        eqyp(i,IJ,2) = ZERO
+      END DO
+   END DO
+   DO IJ=1,manio
+      DO i=neq1,neq2
+        eqym(i,IJ,1) = ZERO
+        eqym(i,IJ,2) = ZERO
+      END DO
+   END DO
+   DO IS=0,jSOL
+      eqxyA(Is)=ONE
+      eqxyB(Is)=ZERO
+      eqxyC(Is)=ZERO
+      eqxyZ(Is)=ZERO
+      DO i=neq1,neq2
+         ieqsalt(i,Is)=0
+         eqxyGF (i,Is)=ONE
+         eqxyRHD(i,Is)=ONE
+         eqxyKe  (i,Is)=ONE
+         eqxyXS  (i,Is)=ONE
+         eqxyMol (i,Is)=ZERO
+         eqys(i,Is,jAP)=ZERO
+         eqys(i,Is,jDP)=ZERO
+         eqys(i,Is,jGP)=ZERO
+      END DO
+   END DO
+!______________________________________
+! NEUTRALIZATION/REACTION ORDER
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      IF(IDeq(i) < 3) THEN
+          ieqsalt(i, 1)=eqcsu ; ieqsalt(i, 2)=eqmsu ; ieqsalt(i, 3)=eqpsu
+          ieqsalt(i, 4)=eqssu ; ieqsalt(i, 5)=eqasu ; ieqsalt(i, 6)=eqcno
+          ieqsalt(i, 7)=eqmno ; ieqsalt(i, 8)=eqpno ; ieqsalt(i, 9)=eqsno
+          ieqsalt(i,10)=eqano ; ieqsalt(i,11)=eqccl ; ieqsalt(i,12)=eqmcl
+          ieqsalt(i,13)=eqpcl ; ieqsalt(i,14)=eqscl ; ieqsalt(i,15)=eqacl
+      END IF
+      IF(IDeq(i) == 3) THEN
+          ieqsalt(i, 1)=eqcsu ; ieqsalt(i, 2)=eqmsu
+          ieqsalt(i, 3)=eqpsu ; ieqsalt(i, 4)=eqphs
+          ieqsalt(i, 5)=eqssu ; ieqsalt(i, 6)=eqshs
+          ieqsalt(i, 7)=eqasu ; ieqsalt(i, 8)=eqahs
+      END IF
+      IF(IDeq(i) == 4) THEN
+          ieqsalt(i, 1)=eqcsu ; ieqsalt(i, 2)=eqmsu
+          ieqsalt(i, 3)=eqphs ; ieqsalt(i, 4)=eqshs
+          ieqsalt(i, 5)=eqahs ; ieqsalt(i, 6)=eqhsa
+          ieqsalt(i, 7)=eqalc
+      END IF
+      IF(IDeq(i) == 5) THEN
+          ieqsalt(i, 1)=eqhsa
+          ieqsalt(i, 2)=eqalc
+      END IF
+   END DO
+!______________________________________
+! SOLUTE MOLALITY
+   DO IJ=1,jSOL
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         Is=ieqsalt(i,IJ)
+         IF(.NOT.leqsolute(Is)) CYCLE
+         eqxyB(Is)=ZERO
+         eqxyZ(Is)=eqxy(jNi,Is)
+         eqxyMol(i,Is)=((eqxyKe(i,Is)/eqRH(i)-eqxyA(Is))/MW/eqxyZ(Is))**(ONE/eqxyZ(Is))
+         !1st
+         eqxyGF(i,Is) = (eqxy(jDs,Is)/(eqxy(jMs,Is)*Dw*eqxyMol(i,Is))+1._dp)**(1._dp/3._dp)
+         IF(lke)    eqxyKe(i,Is) = exp(4._dp*Mw*sigma/(R*eqTT(i)*Dw*eqxyGF(i,Is)*Dd))
+         eqxyXS(i,Is) = ONE/(ONE/(eqxy(jMs,Is)*eqxyMol(i,Is))+ONE)
+         eqxyB   (Is) = eqxyXS(i,Is)**(ONE/(ONE+eqxyZ(Is)+eqxyXS(i,Is)))
+         eqxyC   (Is) = ((eqxyKe(i,Is)/eqRH(i)-eqxyA(Is))/MW/eqxyZ(Is))**(ONE/eqxyZ(Is))
+         IF(eqxyB(Is) < eqxyC(Is)) eqxyMol(i,Is) = eqxyC(Is)-eqxyB(Is)
+         !2nd
+         eqxyGF(i,Is) = (eqxy(jDs,Is)/(eqxy(jMs,Is)*Dw*eqxyMol(i,Is))+1._dp)**(1._dp/3._dp)
+         IF(lke)    eqxyKe(i,Is) = exp(4._dp*Mw*sigma/(R*eqTT(i)*Dw*eqxyGF(i,Is)*Dd))
+         eqxyXS(i,Is) = ONE/(ONE/(eqxy(jMs,Is)*eqxyMol(i,Is))+ONE)
+         eqxyB   (Is) = eqxyXS(i,Is)**(ONE/(ONE+eqxyZ(Is)+eqxyXS(i,Is)))
+         eqxyC   (Is) = ((eqxyKe(i,Is)/eqRH(i)-eqxyA(Is))/MW/eqxyZ(Is))**(ONE/eqxyZ(Is))
+         IF(eqxyB(Is) < eqxyC(Is)) eqxyMol(i,Is) = eqxyC(Is)-eqxyB(Is)
+         !3rd
+         eqxyGF(i,Is) = (eqxy(jDs,Is)/(eqxy(jMs,Is)*Dw*eqxyMol(i,Is))+1._dp)**(1._dp/3._dp)
+         IF(lke)    eqxyKe(i,Is) = exp(4._dp*Mw*sigma/(R*eqTT(i)*Dw*eqxyGF(i,Is)*Dd))
+         eqxyXS(i,Is) = ONE/(ONE/(eqxy(jMs,Is)*eqxyMol(i,Is))+ONE)
+         eqxyB   (Is) = eqxyXS(i,Is)**(ONE/(ONE+eqxyZ(Is)+eqxyXS(i,Is)))
+         eqxyC   (Is) = ((eqxyKe(i,Is)/eqRH(i)-eqxyA(Is))/MW/eqxyZ(Is))**(ONE/eqxyZ(Is))
+         IF(eqxyB(Is) < eqxyC(Is)) eqxyMol(i,Is) = eqxyC(Is)-eqxyB(Is)
+         eqxyXS(i,Is) = ONE/(ONE/(eqxy(jMs,Is)*eqxyMol(i,Is))+ONE)
+      END DO
+   END DO
+!______________________________________
+! RELATIVE HUMIDITY OF DELIQUESCENCE
+   DO IJ=1,jSOL
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         Is=ieqsalt(i,IJ)
+         IF(IWATeq(i) == 2) THEN
+            IF(.NOT.leqsolute(Is)) CYCLE
+            IF(eqxy(jRHD,Is) >= ONE) CYCLE
+            eqxyRHD (i,Is)=eqxy(jRHD,Is)*EXP(eqxy(jRHDc,Is)*(ONE/eqTT(i)-ONE/eqT0))
+            eqxyRHD (i,Is)=eqxyRHD(i,Is)*eqxyKe(i,Is)
+            eqxyRHD (i,Is)=MAX(ZERO,MIN(eqxyRHD(i,Is),0.999_dp))
+         ELSE
+            eqxyRHD (i,Is)=eqRH(i)
+         END IF
+      END DO
+   END DO
+!______________________________________
+! EQUILIBRIUM
+   DO IJ=1,jSOL
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         Is=ieqsalt(i,IJ)
+         IF(.NOT.leqsolute(Is)) CYCLE
+         Ip=ieqsolute(Is,jSP)
+         Im=ieqsolute(Is,jSM)
+         IF(Ip == 0 .OR. Im == 0 .OR. IDeq(i)==5) CYCLE
+         IF(eqxp(i,Ip)*eqxm(i,Im) > REALZERO) THEN
+            NZeq(i) = NZeq(i) + 1
+            XZ = MAX(ZERO, MIN(eqxpz(Ip)*eqxp(i,Ip),eqxmz(Im )*eqxm(i,Im)))
+            eqxp(i,Ip)   = MAX(ZERO,eqxp(i,Ip)-XZ/eqxpz(Ip))
+            eqxm(i,Im)   = MAX(ZERO,eqxm(i,Im)-XZ/eqxmz(Im))
+            eqys(i,Is,jAP) = eqys(i,Is,jAP)+XZ/eqxy(jZa,Is)
+            eqNs(i)=eqNs(i)+eqys(i,Is,jAP)
+         ELSE
+            eqxyRHD(i,Is) = ONE
+         END IF
+      END DO
+   END DO
+!______________________________________
+   IF(lrhdm) THEN
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      DO IJ=1,jSOL
+         Is=ieqsalt(i,IJ)
+         IF(.NOT.leqsolute(Is)) CYCLE
+         IF(eqys(i,Is,jAP) > TINYX .AND. IWATeq(i) == 2) THEN
+            eqNZm (i)=eqNZm(i)+ONE
+            eqMs  (i)=eqMs(i)+eqxy(jMs,Is)
+            XZ       =(ONE/(100._dp/eqxy(jWs,Is)-ONE))/eqxy(jMs,Is)
+            eqMolm(i)=eqMolm(i)+XZ
+            eqWs  (i)=MAX(0.1_dp,MIN(ONE,ONE/(ONE/(eqMolm(i)*eqMs(i))+ONE)))
+            YY    (i)=ONE/MAX(ZERO,(0.25_dp*log(eqWs(i))+ONE))
+            eqRHDM(i)=ONE/(ONE+Mw*YY(i)*(eqMolm(i))**YY(i))
+         END IF
+      END DO
+   END DO
+   END IF
+   YY(:)=ONE
+!______________________________________
+! GAS/AEROSOL PARTITIONING OF SEMI-VOLATILES
+   IF(lvola) THEN
+   ! semi-volatiles
+   DO IJ=1,jVOL
+      Is=ieqvola(IJ)
+      IF(.NOT.leqsolute(Is)) CYCLE
+      Ip=ieqsolute(Is,jSP)
+      Im=ieqsolute(Is,jSM)
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         IF(IDeq(i) >2) CYCLE
+         XZ = eqys(i,Is,jAP)
+         IF(XZ > TINYX) THEN
+            YY(i)=ONE
+            ! TEMPERATURE DEPENDENT EQUILIBRIUM CONSTANTS
+            T0T=eqT0/eqTT(i)
+            COEF=ONE+LOG(T0T)-T0T
+            X1=ONE/(ONE/(eqxy(jMs,Is)*eqxyMol(i,Is))+ONE)
+            X2=MAX(ZERO,MIN(2._dp*X1**2._dp,2._dp))
+            XRHDMIN(i)=eqxyRHD(i,Is)
+            IF(Is == eqacl) THEN
+               ! NH4CL(S) <==> NH3(G) + HCL(G)   [ppb^2]
+               X3   = 1.086E-16_dp ! [ppb^2]
+               X3   = X3*EXP(-71.00_dp*(T0T-ONE)+2.400_dp*COEF)
+               KEQ  = X3/(eqR*eqTT(i))/(eqR*eqTT(i)) ! [(mol^2/m^3(air))^2]
+            END IF
+            IF(Is == eqano) THEN
+               ! NH4NO3(S) <==> NH3(G) + HNO3(G)
+               ! ISORROPIA2
+               X3   = 5.746E-17_dp ! [ppb^2]
+               X3   = X3*EXP(-74.38_dp*(T0T-ONE)+6.120_dp*COEF)
+               ! Mozurkewich (1993)
+               !X3   = 4.199E-17_dp ! [ppb^2]
+               !X3   = X3*EXP(-74.7351_dp*(T0T-ONE)+6.025_dp*COEF)
+               ! SEQUILIB
+               !X3   = 2.985e-17_dp ! [ppb^2]
+               !X3   = X3*EXP(-75.11_dp*(T0T-ONE)+13.460_dp*COEF)
+               KEQ   = X3/(eqR*eqTT(i))/(eqR*eqTT(i)) ! [(mol^2/m^3(air))^2]
+            END IF
+            COEF=X2
+            IF(lmixs.AND.TSO4(i)>eqXPi(i)) THEN
+!           IF(lmixs.AND.TSO4(i)>TINYX) THEN
+               YY(i)=(XZ/(XZ+3._dp*TSO4(i)))**0.8_dp
+               IF(lrhdm.AND.IWATeq(i)==2) &
+               XRHDMIN(i)=eqRHDM(i)*YY(i)**0.25_dp+eqxyRHD(i,Is)   *(ONE-YY(i)**0.25_dp)
+!              XRHDMIN(i)=eqRHDM(i)*YY(i)**0.25_dp+eqxyRHD(i,eqasu)*(ONE-YY(i)**0.25_dp)
+               IF(eqRH(i)>=XRHDMIN(i)) THEN
+                  COEF=X2*YY(i)
+                  XZ=XZ*(ONE-COEF)
+               END IF
+            END IF
+            IF(eqRH(i)<XRHDMIN(i)) THEN
+               COEF=ONE
+            ELSE
+               IF(Is==eqacl) KEQ=KEQ*6.0_dp
+            END IF
+            KEQ=KEQ*COEF
+            X1=eqxp(i,Ip)+eqxm(i,Im) ! [mol/m3(air)]
+            X2=SQRT(X1*X1+4._dp*KEQ)
+            X3=0.5_dp*(-X1+X2)
+            X3=MIN(XZ,X3)
+            eqxp(i,Ip)=eqxp(i,Ip)+X3
+            eqxm(i,Im)=eqxm(i,Im)+X3
+            eqys(i,Is,jAP)=MAX(0._dp,eqys(i,Is,jAP)-X3)
+         END IF
+      END DO
+   END DO
+   END IF
+!______________________________________
+! LIQUID/SOLID PARTITIONING
+   DO IJ=1,jSOL
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         Is=ieqsalt(i,IJ)
+         IF(.NOT.leqsolute(Is)) CYCLE
+         IF(eqys(i,Is,jAP) < REALZERO) CYCLE
+         IF(IWATeq(i) == 2) THEN
+            XRHDIFF(i)=ONE
+            XRHDMAX(i)=eqxyRHD(i,Is)
+            IF(lrhdm.AND.eqNZm(i)>ONE.AND.Is/=eqcsu.AND.Is/=eqpsu) THEN
+               XRHDMIN(i)=eqRHDM(i)
+               YZ(i)=eqys(i,Is,jAP)/eqNs(i)
+               XRHDMAX(i)=XRHDMIN(i)*YZ(i)**0.25_dp+XRHDMAX(i)*(ONE-YZ(i)**0.25_dp)
+            ELSE
+               XRHDMIN(i)=XRHDMAX(i)
+            END IF
+            IF(eqRH(i) < XRHDMAX(i)) THEN
+               IF(eqRH(i)> XRHDMIN(i)   .AND.   XRHDMIN(i)<XRHDMAX(i)) &
+               XRHDIFF(i)=(XRHDMAX(i)-eqRH(i))/(XRHDMAX(i)-XRHDMIN(i))
+               eqys(i,Is,jDP) = MAX(0._dp,eqys(i,Is,jDP) + eqys(i,Is,jAP)*XRHDIFF(i))
+               eqys(i,Is,jAP) = MAX(0._dp,eqys(i,Is,jAP) * (ONE-XRHDIFF(i)))
+            END IF
+         END IF
+      END DO
+   END DO
+!______________________________________
+! AEROSOL WATER [KG/M^3(AIR)]
+   DO IJ=1,jSOL
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         Is=ieqsalt(i,IJ)
+         IF(.NOT.leqsolute(Is)) CYCLE
+         IF(eqxyMol(i,Is) > REALZERO) &
+         eqWH2O(i) = eqWH2O(i) + eqys(i,Is,jAP)/eqxyMol(i,Is)
+      END DO
+   END DO
+!______________________________________
+! Remaining H+/OH- [MOL]
+   DO IJ=1,mcati
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         eqXPi(i)=eqXPi(i)+eqxp(i,IJ)*eqxpz(IJ)
+      END DO
+   END DO
+   DO IJ=1,manio
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         eqXMi(i)=eqXMi(i)+eqxm(i,IJ)*eqxmz(IJ)
+      END DO
+   END DO
+!  DO i=neq1,neq2
+!     IF(leqskip(i)) CYCLE
+!     eqHPLUS(i)=eqXPi(i)-eqXMi(i)
+!  END DO
+!______________________________________
+! RESIDUAL GASES
+   DO IJ=1,jGAS
+      Is=ieqgases(IJ)
+      Ip=ieqsolute(Is,jSP)
+      Im=ieqsolute(Is,jSM)
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         XZ=eqxm(i,Im)
+         IF(Is == eqxam) XZ=eqxp(i,Ip)
+         IF(Is == eqhsa) XZ=eqxm(i,maisu)+eqxm(i,maihs)
+         IF(XZ < REALZERO) CYCLE
+         IF(Is == eqhna) THEN
+            eqyg(i,1)  = XZ
+            eqxm(i,Im) = ZERO
+         ELSE IF(Is == eqhca) THEN
+            eqyg(i,2)  = XZ
+            eqxm(i,Im) = ZERO
+         ELSE IF(Is == eqxam) THEN
+            eqyg(i,3)  = XZ
+            eqxp(i,Ip) = ZERO
+         ELSE IF(Is == eqhsa) THEN
+            II=eqalc
+            IF(eqxyMol(i,II) > REALZERO) &
+            eqWH2O(i) = eqWH2O(i) + XZ/eqxyMol(i,II)
+            IF(lH2SO4gas) THEN
+               eqyg(i,4)  = XZ
+               eqxm(i,maisu) = ZERO
+               eqxm(i,maihs) = ZERO
+            END IF
+         END IF
+      END DO
+   END DO
+!______________________________________
+! OUTPUT
+   DO IJ=1,mcati
+      DO i=neq1,neq2
+        IF(leqskip(i)) CYCLE
+        eqyp (i,IJ,1)=eqyp(i,IJ,1)+eqxp(i,IJ)
+        eqaPM(i)=eqaPM(i)+eqxp(i,IJ)
+        eqPMt(i)=eqPMt(i)+eqxp(i,IJ)*eqxpm(IJ)
+      END DO
+   END DO
+   DO IJ=1,manio
+      DO i=neq1,neq2
+        IF(leqskip(i)) CYCLE
+        eqym (i,IJ,1)=eqym(i,IJ,1)+eqxm(i,IJ)
+        eqaPM(i)=eqaPM(i)+eqxm(i,IJ)
+        eqPMt(i)=eqPMt(i)+eqxm(i,IJ)*eqxmm(IJ)
+      END DO
+   END DO
+   DO IJ=1,mcati
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         eqym(i,maisu,1) = eqym(i,maisu,1) + eqys(i,ieqsu(IJ),jAP)*eqxy(jZa,ieqsu(IJ))/eqxmz(ieqsolute(ieqsu(IJ),jSM))
+         eqym(i,maisu,2) = eqym(i,maisu,2) + eqys(i,ieqsu(IJ),jDP)*eqxy(jZa,ieqsu(IJ))/eqxmz(ieqsolute(ieqsu(IJ),jSM))
+         eqym(i,maihs,1) = eqym(i,maihs,1) + eqys(i,ieqhs(IJ),jAP)*eqxy(jZa,ieqhs(IJ))/eqxmz(ieqsolute(ieqhs(IJ),jSM))
+         eqym(i,maihs,2) = eqym(i,maihs,2) + eqys(i,ieqhs(IJ),jDP)*eqxy(jZa,ieqhs(IJ))/eqxmz(ieqsolute(ieqhs(IJ),jSM))
+         eqym(i,maino,1) = eqym(i,maino,1) + eqys(i,ieqno(IJ),jAP)*eqxy(jZa,ieqno(IJ))/eqxmz(ieqsolute(ieqno(IJ),jSM))
+         eqym(i,maino,2) = eqym(i,maino,2) + eqys(i,ieqno(IJ),jDP)*eqxy(jZa,ieqno(IJ))/eqxmz(ieqsolute(ieqno(IJ),jSM))
+         eqym(i,maicl,1) = eqym(i,maicl,1) + eqys(i,ieqcl(IJ),jAP)*eqxy(jZa,ieqcl(IJ))/eqxmz(ieqsolute(ieqcl(IJ),jSM))
+         eqym(i,maicl,2) = eqym(i,maicl,2) + eqys(i,ieqcl(IJ),jDP)*eqxy(jZa,ieqcl(IJ))/eqxmz(ieqsolute(ieqcl(IJ),jSM))
+      END DO
+   END DO
+   DO IJ=1,manio
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         eqyp(i,mciam,1) = eqyp(i,mciam,1) + eqys(i,ieqams(IJ),jAP)*eqxy(jZa,ieqams(IJ))/eqxpz(ieqsolute(ieqams(IJ),jSP))
+         eqyp(i,mciam,2) = eqyp(i,mciam,2) + eqys(i,ieqams(IJ),jDP)*eqxy(jZa,ieqams(IJ))/eqxpz(ieqsolute(ieqams(IJ),jSP))
+         eqyp(i,mciso,1) = eqyp(i,mciso,1) + eqys(i,ieqsos(IJ),jAP)*eqxy(jZa,ieqsos(IJ))/eqxpz(ieqsolute(ieqsos(IJ),jSP))
+         eqyp(i,mciso,2) = eqyp(i,mciso,2) + eqys(i,ieqsos(IJ),jDP)*eqxy(jZa,ieqsos(IJ))/eqxpz(ieqsolute(ieqsos(IJ),jSP))
+         eqyp(i,mcipo,1) = eqyp(i,mcipo,1) + eqys(i,ieqpos(IJ),jAP)*eqxy(jZa,ieqpos(IJ))/eqxpz(ieqsolute(ieqpos(IJ),jSP))
+         eqyp(i,mcipo,2) = eqyp(i,mcipo,2) + eqys(i,ieqpos(IJ),jDP)*eqxy(jZa,ieqpos(IJ))/eqxpz(ieqsolute(ieqpos(IJ),jSP))
+         eqyp(i,mcica,1) = eqyp(i,mcica,1) + eqys(i,ieqcas(IJ),jAP)*eqxy(jZa,ieqcas(IJ))/eqxpz(ieqsolute(ieqcas(IJ),jSP))
+         eqyp(i,mcica,2) = eqyp(i,mcica,2) + eqys(i,ieqcas(IJ),jDP)*eqxy(jZa,ieqcas(IJ))/eqxpz(ieqsolute(ieqcas(IJ),jSP))
+         eqyp(i,mcimg,1) = eqyp(i,mcimg,1) + eqys(i,ieqmgs(IJ),jAP)*eqxy(jZa,ieqmgs(IJ))/eqxpz(ieqsolute(ieqmgs(IJ),jSP))
+         eqyp(i,mcimg,2) = eqyp(i,mcimg,2) + eqys(i,ieqmgs(IJ),jDP)*eqxy(jZa,ieqmgs(IJ))/eqxpz(ieqsolute(ieqmgs(IJ),jSP))
+      END DO
+   END DO
+   ! PARTICULATE MATTER
+   DO Is=1,jSOL
+      IF(.NOT.leqsolute(Is)) CYCLE
+      DO i=neq1,neq2
+         IF(leqskip(i)) CYCLE
+         eqsPM(i)=eqsPM(i)+eqys(i,Is,jDP)*eqxy(jNs,Is)
+         eqaPM(i)=eqaPM(i)+eqys(i,Is,jAP)*eqxy(jNs,Is)
+         eqPMt(i)=eqPMt(i)+eqys(i,Is,jAP)*eqxy(jMs,Is)
+         eqPMs(i)=eqPMs(i)+eqys(i,Is,jDP)*eqxy(jMs,Is)
+         eqVOL(i)=eqVOL(i)+eqys(i,Is,jAP)*eqxy(jMs,Is)/eqxy(jDs,Is)
+         eqVOL(i)=eqVOL(i)+eqys(i,Is,jDP)*eqxy(jMs,Is)/eqxy(jDs,Is)
+      END DO
+   END DO
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      ! TOTAL PM      [KG/M^3(AIR)]
+      eqPMt(i)=eqPMt(i)+eqPMs(i)
+      ! TOTAL VOLUME  [M^3/M^3(AIR)]
+      ! TOTAL DENSITY [KG/M^3]
+      IF(eqVOL(i) > REALZERO) &
+      eqRHO(i)=eqPMt(i)/eqVOL(i)
+      ! AQUEOUS PHASE PROPERTIES
+   END DO
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      eqGF(i) = ONE
+      IF(eqWH2O(i) > 1.e-12_dp) THEN
+         T0T=eqT0/eqTT(i)
+         COEF=ONE+LOG(T0T)-T0T
+         ! AUTODISSOCIATION CONSTANT (KW) OF WATER
+         X1   = 1.010E-14_dp
+         KEQ  = X1*EXP(-22.52_dp*(T0T-ONE) + 26.920_dp*COEF)
+         ! H2O <==> H+ + OH- WITH KW [MOL^2/KG^2]
+         AKW  = KEQ*eqRH(i)*eqWH2O(i)*eqWH2O(i)
+         ! [OH-] = [H+] [MOL]
+         AKW  = AKW**0.5_dp
+         ! H+ PARAMETERIZATION
+         XZ=eqXMi(i)-eqXPi(i)
+         IF(IDeq(i) > 2) THEN
+            eqHPLUS(i)=XZ+eqyg(i,3)-eqyg(i,1)
+            XZ=(eqHPLUS(i)/eqWH2O(i)+AKW)*Dw*1.e-3_dp
+         ELSE IF(IDeq(i) < 3) THEN
+             eqHPLUS(i)=XZ+eqyg(i,3)
+             XZ=(eqHPLUS(i)/eqWH2O(i)+AKW)*Dw*1.e-6_dp
+         END IF
+         ! AEROSOL PH
+         IF (XZ > REALZERO) THEN
+            ! HYDROGEN CONCENTRATION [MOL/L(H2O)]
+            eqPH(i) = -LOG10(XZ)
+         ELSE IF (XZ < REALZERO) THEN
+            ! HYDROXY ION CONCENTRATION [MOL/L(H2O)]
+            eqPH(i) = 14._dp + LOG10(-XZ)
+            eqHPLUS(i)=ZERO
+         END IF
+         ! Growth Factor [-]
+         eqGF(i) =(eqRHO(i)/Dw*eqWH2O(i)/eqPMt(i)+ONE)**(1._dp/3._dp)
+      END IF
+   END DO
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      ! AEROSOL WATER  [UG/M^3]
+      eqWH2O(i) = eqWH2O(i)*1.E9_dp
+      ! TOTAL PM      [UG/M^3(AIR)]
+      eqPMt(i)=eqPMt(i)*1.E9_dp
+      ! DRY PM        [UG/M^3(AIR)]
+      eqPMs(i)=eqPMs(i)*1.E9_dp
+      ! DRY PM        [UMOL/M^3(AIR)]
+      eqsPM(i)=eqsPM(i)*1.E6_dp
+      ! AQUEOUS PM    [UMOL/M^3(AIR)]
+      eqaPM(i)=eqaPM(i)*1.E6_dp
+      ! AQUEOUS H+    [MOL/M^3(AIR)]
+      eqHPLUS(i)=eqHPLUS(i)!*1.E6_dp
+      ! DENSITY [G/CM^3]
+      eqRHO(i)=eqRHO(i)*1.e-3_dp
+      eqVOL(i)=eqPMt(i)/eqRHO(i)
+   END DO
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      xWH2O(i,n)=eqWH2O(i)
+      xPMt (i,n)=eqPMt (i)
+      xPMs (i,n)=eqPMs (i)
+      xsPM (i,n)=eqsPM (i)
+      xaPM (i,n)=eqaPM (i)
+      xRHO (i,n)=eqRHO (i)
+      xVOL (i,n)=eqVOL (i)
+      xPH  (i,n)=eqPH  (i)
+      xGF  (i,n)=eqGF  (i)
+      xHp  (i,n)=eqHPLUS(i)
+   END DO
+   DO IJ=1,mcati
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+       xYPa(i,n,IJ)=eqyp(i,IJ,1)
+       xYPs(i,n,IJ)=eqyp(i,IJ,2)
+   END DO
+   END DO
+   DO IJ=1,manio
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+       xYMa(i,n,IJ)=eqym(i,IJ,1)
+       xYMs(i,n,IJ)=eqym(i,IJ,2)
+   END DO
+   END DO
+   DO IJ=1,jGAS
+   DO i=neq1,neq2
+      IF(leqskip(i)) CYCLE
+      xYG(i,n,IJ)=eqyg(i,IJ)
+   END DO
+   END DO
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+! Start OUTPUT for EMEP:
+   DO i=neq1,neq2
+!//.. aerosols [umol/m^3]
+      aSO4out(i) = (eqym(i,maisu,jAP)+eqym(i,maisu,jDP))*1.E6_dp & ! particulate sulfate  (p=a+s)
+                 + (eqym(i,maihs,jAP)+eqym(i,maihs,jDP))*1.E6_dp   ! particulate bisulfate(p=a+s)
+      aNO3out(i) = (eqym(i,maino,jAP)+eqym(i,maino,jDP))*1.E6_dp   ! particulate nitrate  (p=a+s)
+      aClout (i) = (eqym(i,maicl,jAP)+eqym(i,maicl,jDP))*1.E6_dp   ! particulate chloride (p=a+s)
+      aNH4out(i) = (eqyp(i,mciam,jAP)+eqyp(i,mciam,jDP))*1.E6_dp   ! particulate ammonium (p=a+s)
+      aNAout (i) = (eqyp(i,mciso,jAP)+eqyp(i,mciso,jDP))*1.E6_dp   ! particulate sodium   (p=a+s)
+!//.. gases [umol/m^3]
+      gNO3out(i) = eqyg(i,1)*1.E6_dp       ! residual HNO3  (g)
+      gCLout (i) = eqyg(i,2)*1.E6_dp       ! residual HCl   (g)
+      gNH3out(i) = eqyg(i,3)*1.E6_dp       ! residual NH3   (g)
+      gSO4out(i) = eqyg(i,4)*1.E6_dp       ! residual H2SO4 (g)
+!//.. aerosol water [ug/m^3]
+      aH2Oout(i) = eqWH2O(i)               ! aerosol Water  (aq)
+   END DO
+!  END OUTPUT for EMEP
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!______________________________________
+1000 CONTINUE  ! leqskip_all = .TRUE.
+!______________________________________
+END DO ! nleq1,nleq2
+!____________________________________________________________________________________________
+END SUBROUTINE EQSAM4clim
+!____________________________________________________________________________________________
+
+end module EQSAM4clim_ml

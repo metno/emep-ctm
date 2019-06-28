@@ -1,4 +1,4 @@
-! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -35,22 +35,21 @@ module SubMet_mod
 !  The sub-grid part of this module is also undergoing constant change!!
 !=============================================================================
 
-use CheckStop_mod, only: StopAll
+use BLPhysics_mod, only: MIN_USTAR_LAND
+use CheckStop_mod, only: StopAll, CheckStop
 use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES &
                       , USE_ZREF & ! TEST
                       , Zmix_ref !height at which concentration above different landuse are considered equal 
-use Debug_module,  only: DEBUG_SUBMET  ! Needs DEBUG_RUNCHEM to get debug_flag
+use Debug_module,  only: DEBUG     !Needs DEBUG_RUNCHEM and DEBUG%SUBMET to get debug_flag
 use Functions_mod, only: T_2_Tpot  !needed if FluxPROFILE == Ln95
-use MetFields_mod, only: ps        !needed if FluxPROFILE == Ln95
-
-use BLPhysics_mod, only: MIN_USTAR_LAND
-use CheckStop_mod, only: CheckStop
 use LandDefs_mod,   only: LandType, LandDefs
 use Landuse_mod,    only: LandCover
 use LocalVariables_mod, only: Grid, SubDat
+use MetFields_mod, only: ps        !needed if FluxPROFILE == Ln95
 use MicroMet_mod, only:  PsiM, AerRes    !functions
 use MicroMet_mod, only:  Launiainen1995
 use PhysicalConstants_mod, only: PI, RGAS_KG, CP, GRAV, KARMAN, CHARNOCK, T0
+use TimeDate_mod, only : current_date
 
 implicit none
 private
@@ -106,7 +105,6 @@ contains
     
     logical, save ::  my_first_call = .true.
     integer, parameter ::  NITER = 1           ! no. iterations to be performed
-    !testing integer ::  NITER     ! no. iterations to be performed
 
     integer :: iter                ! iteration variable
 
@@ -120,8 +118,16 @@ contains
     real :: esat    ! saturation vapour pressure  (Pa)
     real :: e       ! vapour pressure at surface
     real :: Ra_2m   ! to get 2m qw
-
     real :: theta2
+    character(len=*), parameter :: dtxt = 'GetSub:' ! debug text
+    logical :: dbg
+
+    dbg=.false.
+    if (  DEBUG%SUBMET > 0 .and. debug_flag ) then
+      if(  DEBUG%SUBMET == iL ) dbg=.true.         ! debug just this iL
+      if(  DEBUG%SUBMET > NLANDUSEMAX ) dbg=.true. ! debug all iL
+    end if
+if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
 
 
     ! initial guesses for u*, t*, 1/L
@@ -138,13 +144,11 @@ contains
         Sub(iL)%is_forest = LandType(iL)%is_forest
         Sub(iL)%is_crop   = LandType(iL)%is_crop   
 
-        !if( USES%SOILWATER )
-          Sub(iL)%fSW    = Grid%fSW ! MAR2013 - not needed, but for safety
-!GMO3
-  if( index( LandDefs(iL)%name , 'Irrigated' ) > 0 ) then
-    Sub(iL)%fSW = 1.0
-  end if
-!GMO3
+        Sub(iL)%fSW    = Grid%fSW ! probably  not needed, but safest
+
+       ! For Mills et al, GCB, 2018 we used irrigated wheat:
+        if( index( LandDefs(iL)%name , 'Irrigated' ) > 0 ) Sub(iL)%fSW = 1.0
+
 
      ! If NWP thinks this is a sea-square, but we anyway have land,
      ! the surface temps will be wrong and so will stability gradients.
@@ -156,6 +160,7 @@ contains
               Grid%is_mainlysea  .and. (.not. Sub(iL)%is_water) ) then
            Sub(iL)%invL = 0.0
            Sub(iL)%Hd   = 0.0
+           if ( dbg) write(*,*) 'SUBB CellH NEUTRAL!', Grid%is_mainlysea, Sub(iL)%is_water
       end if
 
 
@@ -234,29 +239,18 @@ contains
 
      if ( FluxPROFILE == "Ln95") then !TESTING
 
-        call StopAll("Ln95 disabled for ESX testing. Needs more work anyway")
+        call StopAll(dtxt//"Ln95 disabled. Not working well.")
 
-        theta2 = Grid%t2 * T_2_Tpot( Grid%psurf )
-        call Launiainen1995( Grid%u_ref, Sub(iL)%z_refd, Sub(iL)%z0, Sub(iL)%z0, &
-         theta2, Grid%theta_ref, Sub(iL)%invL )
+        !theta2 = Grid%t2 * T_2_Tpot( Grid%psurf )
+        !call Launiainen1995( Grid%u_ref, Sub(iL)%z_refd, Sub(iL)%z0, Sub(iL)%z0, &
+        ! theta2, Grid%theta_ref, Sub(iL)%invL )
 
-        Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
-         (log( Sub(iL)%z_refd/Sub(iL)%z0 ) - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)&
-           + PsiM( Sub(iL)%z0*Sub(iL)%invL ) )
+        !Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
+        ! (log( Sub(iL)%z_refd/Sub(iL)%z0 ) - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)&
+        !   + PsiM( Sub(iL)%z0*Sub(iL)%invL ) )
 
-        if (  DEBUG_SUBMET .and. debug_flag ) then
-            write(6,"(a12,i2,i3,5f8.3,10f12.3)") "VDHH  SUBI", iter,iL, &
-                Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, &
-                  Sub(iL)%z_refd, z_3md, &
-                 Sub(iL)%invL, Sub(iL)%ustar, Grid%invL, Grid%ustar
-            write(6,"(a12,i2,i3,5f8.3,10f12.3)") "VDHH  ZZZZ", iter,iL, &
-                Grid%z_mid, Grid%z_ref, Sub(iL)%z_refd
-        end if
-
-       if( DEBUG_SUBMET .and. &
-            Sub(iL)%invL > 10.0 .or. Sub(iL)%invL < -10.0 ) then
-           call CheckStop("FluxPROFILE STOP")
-        end if
+       !if( DEBUG%SUBMET .and.  (Sub(iL)%invL > 10.0 &
+       !   .or. Sub(iL)%invL < -10.0) ) call CheckStop(dtxt//"Ln95 STOP")
 
    else if ( FluxPROFILE == "Iter" ) then
 
@@ -271,11 +265,9 @@ contains
         !..L=F(u*), since we do not know the EMEP subgrid averaged 
         !..z0-values ...
 
-       if ( DEBUG_SUBMET .and. debug_flag ) then
-            write(6,"(a12,i2,i3,5f8.3,2f12.3)") "SUBMET ITER", iter,iL, &
-                Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, &
-                  Sub(iL)%z_refd, z_3md, Sub(iL)%invL, Sub(iL)%ustar
-       end if
+       if ( dbg ) write(6,"(a12,i2,i3,5f8.3,2f12.3)") dtxt//" ITER", iter,iL,&
+           Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, Sub(iL)%z_refd, z_3md, &
+            Sub(iL)%invL, Sub(iL)%ustar
 
     !  We must use L (the Monin-Obukhov length) to calculate deposition,
     ! Thus, we calculate T* and then L, based on sub-grid data. 
@@ -298,51 +290,48 @@ contains
             - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)  &
             + PsiM( Sub(iL)%z0*Sub(iL)%invL    )) 
 
-          if (  DEBUG_SUBMET .and. debug_flag ) then
-              write(6,"(a12,i2,i3,5f8.3,2f12.3)") "SUBMET ITERi ", iter,iL, &
+           if ( dbg ) then
+              write(6,"(a12,i2,i3,6f7.1,2f12.3)") dtxt//"ITERi ", iter,iL, &
                 Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, &
-                  Sub(iL)%z_refd, z_3md, Sub(iL)%invL, Sub(iL)%ustar
-              write(6,"(a12,i3,3f7.1,20g11.3)") "SUBMET ITERA ",iL, &
-                Sub(iL)%z0, Sub(iL)%d, &
-                Sub(iL)%z_refd, 0.001*Grid%psurf, Sub(iL)%t2, rho_surf, &
-               Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%invL , &
-               log( Sub(iL)%z_refd/Sub(iL)%z0 ), &
-                PsiM( Sub(iL)%z_refd*Sub(iL)%invL )
+                  Sub(iL)%z_refd, z_3md, Sub(iL)%Hd, Sub(iL)%invL, Sub(iL)%ustar
+              !write(6,"(a12,i3,3f7.1,20g11.3)") dtxt//"ITERA ",iL, &
+              !  Sub(iL)%z0, Sub(iL)%d, &
+              !  Sub(iL)%z_refd, 0.001*Grid%psurf, Sub(iL)%t2, rho_surf, &
+              ! Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%invL , &
+              ! log( Sub(iL)%z_refd/Sub(iL)%z0 ), &
+              !  PsiM( Sub(iL)%z_refd*Sub(iL)%invL )
            end if
 
        Sub(iL)%ustar = max( Sub(iL)%ustar, MIN_USTAR_LAND )
     end do ! iter
   else
-     call StopAll("Incorrect FluxPROFILE")
+     call StopAll(dtxt//"Incorrect FluxPROFILE")
 
   end if ! FluxPROFILE
 
  end if ! allsea
 
-    if (  DEBUG_SUBMET .and. debug_flag ) then
-        write(6,"(a12,10f9.3)") "SUBMET" // trim(FluxProfile), Sub(iL)%z0, &
-         Sub(iL)%d, Sub(iL)%z_refd, 0.001*Grid%psurf, Sub(iL)%t2, rho_surf, &
+     if ( dbg ) then ! way too much output ...
+        write(6,"(a12,i3,3L2,5f7.1,5f8.3)") dtxt//"MET" // trim(FluxProfile), iL, &
+         Sub(iL)%is_water, Sub(iL)%is_forest, Grid%is_allsea, &
+         Sub(iL)%z0, Sub(iL)%d, Sub(iL)%z_refd, 0.001*Grid%psurf, &
+         Sub(iL)%t2, rho_surf, &
          Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%t2, Sub(iL)%invL
-        write(*,*) "UKDEP LOGICS ", iL, &
-         Sub(iL)%is_water, Sub(iL)%is_forest, Grid%is_allsea
-
 
         if ( my_first_call ) then ! title line
-
-                write(unit=*, fmt="(a6,3a3, a6, 3a8,2a7, 2a6)") &
-                 "STAB ", "mm", "dd", "hh", "t2_C", "Hd", &
-                 "L_nwp", "L  ", "z/L_nwp", "z/L ", "u*_nwp", "u*"
-                my_first_call = .false.
+            write(unit=*, fmt="(a6,4a3, a6, 3a9,2a8, 2a7)") &
+             "SUBB ", "iL", "mm", "dd", "hh", "t2_C", "Hd", &
+             "L_nwp", "1/L  ", "z/L_nwp", "z/L ", "u*_nwp", "u*"
+            my_first_call = .false.
         end if
 
-        write(unit=*, &
-              fmt="(a6,4i3, f6.1, 3f8.2, 2f7.2, 2f6.2)") "SUBB", iL, &
-              999, & !SUBcurrent_date%month, &
-              999, & !SUBcurrent_date%day, &
-              999, & !SUBcurrent_date%hour, &
-              Sub(iL)%t2C, Sub(iL)%Hd, Grid%invL, Sub(iL)%invL, &
-              Sub(iL)%z_refd*Grid%invL, Sub(iL)%z_refd*Sub(iL)%invL, &
-                 Grid%ustar, Sub(iL)%ustar
+        write(*,"(a6,4i3, f6.1, 3f9.3, 2f8.3, 2f7.3)") "SUBB ", iL, &
+           current_date%month, &
+           current_date%day, &
+           current_date%hour, &
+           Sub(iL)%t2C, Sub(iL)%Hd, Grid%invL, Sub(iL)%invL, &
+           Sub(iL)%z_refd*Grid%invL, Sub(iL)%z_refd*Sub(iL)%invL, &
+              Grid%ustar, Sub(iL)%ustar
     end if
 
 
@@ -361,11 +350,11 @@ contains
         Sub(iL)%Ra_3m  = AerRes(Sub(iL)%z0,z_3md,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)
         Ra_2m  = AerRes(Sub(iL)%z0,1.0+z_1m,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)
 
-    if (  DEBUG_SUBMET .and. debug_flag ) then
+    if (  dbg ) then
        if ( Sub(iL)%Ra_ref < 0 .or. Sub(iL)%Ra_3m < 0 &
-           .or. Ra_2m < 0  ) call CheckStop("RAREF NEG ")
+           .or. Ra_2m < 0  ) call CheckStop(dtxt//"RAREF NEG ")
       if ( Sub(iL)%Ra_3m > Sub(iL)%Ra_ref ) &
-           call CheckStop("ERROR!!! Ra_ref<Ra_3")
+           call CheckStop(dtxt//"ERROR!!! Ra_ref<Ra_3")
     end if
 
 
@@ -398,10 +387,8 @@ contains
 
      esat = ESAT0 * exp(0.622*2.5e6*((1.0/T0) - (1.0/Sub(iL)%t2))/RGAS_KG )
 
-    if (  DEBUG_SUBMET .and. debug_flag ) then
-        print "(a15,2f12.6,2f12.3)", "UKDEP SUB water", Grid%qw_ref, qw, &
-              Sub(iL)%LE, 100.0*e/esat
-    end if
+    if (  dbg ) write(*,"(a15,2f12.6,2f12.3)") dtxt//"water", Grid%qw_ref,&
+      qw, Sub(iL)%LE, 100.0*e/esat
 
    ! Straighforward calculation sometimes gives rh<0 or rh>1.0 -
    ! probably due to mismatches between the assumptions used for the stability
@@ -420,9 +407,7 @@ contains
       Sub(iL)%vpd    =  max(Sub(iL)%vpd,0.0) 
 
 
-    if (  DEBUG_SUBMET .and. debug_flag ) then
-        write(6,"(a22,2f12.4)") "UKDEP SUB7 e/esat, rh", e/esat, Sub(iL)%rh
-    end if
+    if (dbg) write(6,"(a22,2f12.4)") dtxt//" e/esat, rh", e/esat, Sub(iL)%rh
 
   end subroutine Get_Submet
 ! =====================================================================

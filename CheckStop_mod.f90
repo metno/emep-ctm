@@ -1,4 +1,4 @@
-! <CheckStop_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <CheckStop_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -33,10 +33,11 @@ module CheckStop_mod
 !   (a)  errmsg   /= ok
 !   (b)  int      /= 0               (e.g. iostat index after read)
 !   (c)  int1     /= int2
-!   (d)  string1  /= string2
-!   (e)  logical  expression = true  (e.g. lu < 0 for landuse index)
-!   (f)  rangeR   real outside [range(0)..range(1)]
-!   (g)  rangeI   int  outside [range(0)..range(1)]
+!   (d)  real1    /= real2
+!   (e)  string1  /= string2
+!   (f)  logical  expression = true  (e.g. lu < 0 for landuse index)
+!   (g)  rangeR   real outside [range(0)..range(1)]
+!   (h)  rangeI   int  outside [range(0)..range(1)]
 
 use netcdf, only: NF90_NOERR,NF90_STRERROR
 use MPI_Groups_mod  , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_INTEGER&
@@ -55,6 +56,7 @@ interface CheckStop
    module procedure CheckStop_okinfo
    module procedure CheckStop_int1
    module procedure CheckStop_int2
+   module procedure CheckStop_real2
    module procedure CheckStop_str2
    module procedure CheckStop_TF
    module procedure CheckStop_rangeI,CheckStop_rangeR
@@ -113,17 +115,28 @@ subroutine CheckStop_int2(int1,int2, infomsg)   ! Test if int1 /= int2
   character(len=*), intent(in) :: infomsg
 
   if(int1/=int2) then
-    write(*,*) "CheckStopl_int2 Called with: int1 ", int1, " int2 ", int2
+    write(*,*) "CheckStop_int2 Called with: int1 ", int1, " int2 ", int2
    !write(*,*) "                             infomsg ", infomsg
     call StopAll(infomsg)
   end if
 end subroutine CheckStop_int2
 
+subroutine CheckStop_real2(real1,real2, infomsg)   ! Test if real1 /= real2
+  real, intent(in)          :: real1, real2
+  character(len=*), intent(in) :: infomsg
+
+  if(ABS(real1-real2)>EPSILON(real1)) then
+    write(*,*) "CheckStop_real2 Called with: real1 ", real1, " real2 ", real2
+   !write(*,*) "                             infomsg ", infomsg
+    call StopAll(infomsg)
+  end if
+end subroutine CheckStop_real2
+
 subroutine CheckStop_str2(str1,str2, infomsg)   ! Test if str1 /= str2
   character(len=*), intent(in) :: str1, str2, infomsg
 
   if(trim(str1)/=trim(str2)) then
-    write(*,*) "CheckStopl_str2 Called with: str1 ", str1, " str2 ", str2
+    write(*,*) "CheckStop_str2 Called with: str1 ", str1, " str2 ", str2
    !write(*,*) "                             infomsg ", infomsg
     call StopAll(infomsg)
   end if
@@ -134,7 +147,7 @@ subroutine CheckStop_TF(is_error, infomsg)   ! Test expression, e.g. lu<0
   character(len=*), intent(in) :: infomsg
 
   if(is_error) then
-   !write(*,*) "CheckStopl_TF   Called with: logical ", is_error
+   !write(*,*) "CheckStop_TF   Called with: logical ", is_error
    !write(*,*) "                             infomsg ", infomsg
     call StopAll(infomsg)
   end if
@@ -147,7 +160,7 @@ subroutine CheckStop_rangeR(var,vrange,infomsg)  ! test .not.(vrange(0)<=var<=vr
     errfmt="(A,'=',ES12.3,' is out of range ',ES12.3,'..',F6.2)"
 
   if(var<vrange(0).or.var>vrange(1))then
-    write(*,errfmt) "CheckStopl_range: variable",var,vrange
+    write(*,errfmt) "CheckStop_rangeR: variable",var,vrange
    !write(*,*) "                             infomsg ", infomsg
     call StopAll(infomsg)
   end if
@@ -160,7 +173,7 @@ subroutine CheckStop_rangeI(var,vrange,infomsg)  ! test .not.(vrange(0)<=var<=vr
     errfmt="(A,'=',I0,' is out of range ',I0,'..',I0)"
 
   if(var<vrange(0).or.var>vrange(1))then
-    write(*,errfmt) "CheckStopl_range: variable",var,vrange
+    write(*,errfmt) "CheckStop_rangeI: variable",var,vrange
    !write(*,*) "                             infomsg ", infomsg
     call StopAll(infomsg)
   end if

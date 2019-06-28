@@ -1,4 +1,4 @@
-! <ChemFunctions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <ChemFunctions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -42,16 +42,16 @@ module ChemFunctions_mod
 !____________________________________________________________________
  use AeroConstants_mod,     only: AERO
  use AeroFunctions_mod,     only: UptakeRate, GammaN2O5_EJSS, GammaN2O5
- use CheckStop_mod,         only: StopAll
- use ChemSpecs_mod,         only : SO4, NO3_f, NH4_f, NO3_c
-! use Config_module,         only : DebugCell, DEBUG  ! set with DEBUG%RUNCHEM
+ use CheckStop_mod,         only: CheckStop, StopAll
+ use ChemSpecs_mod,         only : SO4, NO3_f, NH4_f, NO3_c, species, species_adv
+ use Config_module,         only : MasterProc
  use LocalVariables_mod,     only : Grid   ! => izen, is_mainlysea
  use Config_module,     only : K1  => KCHEMTOP, K2 => KMAX_MID, USES
  use PhysicalConstants_mod,  only : AVOG, RGAS_J, DAY_ZEN
+use SmallUtils_mod,     only : find_index
  use ZchemData_mod,     only : itemp, tinv, rh, x=> xn_2d, M, &
      aero_fom,aero_fss,aero_fdust, aero_fbc,  &
      gamN2O5, cN2O5, temp, DpgNw, S_m2m3 ! for gammas & surface area
- use ChemSpecs_mod,             only : SO4, NO3_f, NH4_f, NO3_c
   implicit none
   private
 
@@ -66,6 +66,7 @@ module ChemFunctions_mod
   public ::  HydrolysisN2O5
   public ::  ec_ageing_rate
   public ::  kmt3      ! For 3-body reactions, from Robert OCt 2009
+  public :: Chem2Index_adv, Chem2Index
 
 
 ! weighting factor for N2O5 hydrolysis. OLD SCHEME! NOT USED
@@ -595,5 +596,51 @@ module ChemFunctions_mod
     end if
 
   end function ec_ageing_rate
+
+  subroutine Chem2Index_adv(species_names,species_indices,Nfound)
+    !given an array of chemicals species by name ("O3", "MACRO2" etc.)
+    !returns an arrays of species indices for the advected species found (IXADV_O3 etc.)
+    implicit none
+    character(len=*), dimension(:), intent(in) ::   species_names 
+    integer, dimension(:), intent(inout)::species_indices
+    integer, intent(out)::Nfound
+    integer :: i,index
+    Nfound = 0
+    do i = 1, size(species_names)
+       index=find_index(trim(species_names(i)),species_adv(:)%name)
+       if(index>0)then
+          Nfound = Nfound + 1
+          call CheckStop(Nfound>size(species_indices), "Chem2Index: species array too small")
+          species_indices(Nfound) = index
+       else
+          if(MasterProc.and.trim(species_names(i))/='NOTSET')&
+               write(*,*)'Chem2Index: '//trim(species_names(i))//' not found'
+       endif
+    enddo
+  end subroutine Chem2Index_adv
+
+  subroutine Chem2Index(species_names,species_indices,Nfound)
+    !given an array of chemicals species by name ("OH", "MACRO2" etc.)
+    !returns an arrays of species indices found. 
+    !Corresponding to indice in "species" array, or short lived (IXSHL_OH...)
+    implicit none
+    character(len=*), dimension(:), intent(in) ::   species_names 
+    integer, dimension(:), intent(inout)::species_indices
+    integer, intent(out)::Nfound
+    integer :: i,index
+    Nfound = 0
+    do i = 1, size(species_names)
+       index=find_index(trim(species_names(i)),species(:)%name)
+       if(index>0)then
+          Nfound = Nfound + 1
+          call CheckStop(Nfound>size(species_indices), "Chem2Index: species array too small")
+          species_indices(Nfound) = index
+       else
+          if(MasterProc.and.trim(species_names(i))/='NOTSET')&
+               write(*,*)'Chem2Index: '//trim(species_names(i))//' not found'
+       endif
+    enddo
+  end subroutine Chem2Index
+
 
 end module ChemFunctions_mod

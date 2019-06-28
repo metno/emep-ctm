@@ -1,4 +1,4 @@
-! <Precision_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Precision_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no

@@ -1,4 +1,4 @@
-! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -131,10 +131,8 @@ contains
     logical, save :: first_call = .true.
    ! for surface area calcs: 
    ! had: SIA_F=1,PM_F=2,SS_F=3,DU_F=4,SS_C=5,DU_C=6,PM=7 ORIG=8,NSAREA=NSAREA_DEF
-!M24    integer, parameter :: NGERBER = NSAREA_DEF-1  ! Skip PM=7
-!M24    integer, save, dimension(NGERBER) :: iGerber
     integer, parameter :: NSAREA_CALC = NSAREA_DEF-1  ! Skip PM=7
-    integer, save, dimension(NSAREA_CALC) :: aeroDDspec !M24
+    integer, save, dimension(NSAREA_CALC) :: aeroDDspec 
     real :: ugtmp, ugSIApm, ugDustF, ugSSaltF, ugDustC, ugSSaltC
     real, save ::  ugBCf=0.0, ugBCc=0.0 !not always present
     real :: ugSO4, ugNO3f, ugNO3c, ugRemF, ugRemC, ugpmF, ugpmC, rho
@@ -159,8 +157,8 @@ contains
        is_finepm_a,   &  ! 
        is_ssalt_a,    &  ! 
        is_dust_a,     &  ! 
-       is_sia_a,      &  ! M24 not needed?
-       is_bc_a           ! M24 will add soon
+       is_sia_a,      &  ! not needed?
+       is_bc_a           ! will add soon
 
     debug_flag =  ( DEBUG%SETUP_1DCHEM .and. debug_proc .and.  &
       i==debug_li .and. j==debug_lj .and. current_date%seconds == 0 )
@@ -174,14 +172,7 @@ contains
       ! is negative
       !QUERY: Should we then set USES%SURF_AREA False?
 
-!M24       iGerber(AERO%SIA_F)= find_index('PMf',DDspec(:)%name)
-!M24       iGerber(AERO%PM_F)= find_index('PMf',DDspec(:)%name)
-!M24       iGerber(AERO%SS_F)= find_index('SSf',DDspec(:)%name)
-!M24       iGerber(AERO%DU_F)= find_index('DUf',DDspec(:)%name)
-!M24       iGerber(AERO%SS_C)= find_index('SSc',DDspec(:)%name)
-!M24       iGerber(AERO%DU_C)= find_index('DUc',DDspec(:)%name)
-
-!M24 for surface area calculations: Skips SIA. Find indices:
+! for surface area calculations: Skips SIA. Find indices:
 !    Skip PM=5 as mixed 
 
        aeroDDspec(AERO%PM_F)= find_index('PMf',DDspec(:)%name)
@@ -381,7 +372,7 @@ contains
 
           do iw = 1, NSAREA_CALC ! Skips PM=7 which is sum
 
-            ipm= aeroDDspec(iw) !M24 iGerber(iw)
+            ipm= aeroDDspec(iw)
 
             if ( ipm < 1 ) then
                if ( debug_flag .and. k == KMAX_MID) &
@@ -390,7 +381,7 @@ contains
             end if
 
             Ddry(iw) =  DDspec(ipm)%DpgN  ! (m)
-            !JUL2018 BUG !!! if ( DDspec(ipm)%Gb > 1 ) then
+
             if ( DDspec(ipm)%Gb > 0 ) then
               DpgNw(iw,k)  = 2*WetRad( 0.5*Ddry(iw), rh(k), DDspec(ipm)%Gb ) 
             else
@@ -402,10 +393,6 @@ contains
             if ( iw == AERO%DU_F )  ugtmp = ugDustF
             if ( iw == AERO%SS_C )  ugtmp = ugSSaltC
             if ( iw == AERO%DU_C )  ugtmp = ugDustC
-
-            !if ( MasterProc .and. k == KMAX_MID) write(*,"(a,2i5,3es10.3)") &
-
-            !BUG S_m2m3(iw,k) = pmSurfArea(ugpmF,Dp=Ddry(iw), Dpw=DpgNw(iw,k),  &
 
             S_m2m3(iw,k) = pmSurfArea(ugtmp,Dp=Ddry(iw), Dpw=DpgNw(iw,k),  &
                                   rho_kgm3=DDspec(ipm)%rho_p )
@@ -429,7 +416,7 @@ contains
           if( DEBUG%SETUP_1DCHEM ) then ! extra checks 
              if( aero_fom(k) > 1.0 .or. ugRemF < -1.0e-9 ) then
                 print "(a,i4,99es12.3)", dtxt//"AERO-F ", k, &
-                  aero_fom(k), ugRemF,ugpmF, ugSSaltF, ugDustF, ugBCf !M24 skip sia
+                  aero_fom(k), ugRemF,ugpmF, ugSSaltF, ugDustF, ugBCf
                 call CheckStop(dtxt//"AERO-F problem " )
               end if
           end if
@@ -485,7 +472,6 @@ contains
    if( DEBUG%SETUP_1DCHEM ) then ! extra checks 
      call checkValidArray(rcphot(:,KMAX_MID),dtxt//'arrayCheck RCPHOT ')
      call checkValidArray(rct(:,KMAX_MID),dtxt//'arrayCheck RCT ')
-   !if ( debug_flag .and. current_date%hour == 12 ) then
      if ( DebugCell .and. current_date%hour == 12 ) then
        print *, "DBG: RCPHOT SIZE ",  size(rcphot,dim=1)
        do n = 1, size(rcphot,dim=1)
@@ -569,10 +555,10 @@ subroutine setup_rcemis(i,j)
 
 
   if(first_call)then
-    inat_RDF = find_index( "Dust_ROAD_f", EMIS_BioNat(:) )
-    inat_RDC = find_index( "Dust_ROAD_c", EMIS_BioNat(:) )
-    itot_RDF = find_index( "Dust_ROAD_f", species(:)%name    )
-    itot_RDC = find_index( "Dust_ROAD_c", species(:)%name    )
+    inat_RDF = find_index( "Dust_ROAD_f", EMIS_BioNat(:) , any_case=.true. )
+    inat_RDC = find_index( "Dust_ROAD_c", EMIS_BioNat(:) , any_case=.true. )
+    itot_RDF = find_index( "Dust_ROAD_f", species(:)%name  , any_case=.true.  )
+    itot_RDC = find_index( "Dust_ROAD_c", species(:)%name  , any_case=.true.  )
     itot_Rn222=find_index( "RN222", species(:)%name    )
     IC_NH3=find_index( "NH3", species(:)%name    )
     first_call = .false.
@@ -587,7 +573,8 @@ subroutine setup_rcemis(i,j)
                                   *roa(i,j,k,1)/(dA(k)+dB(k)*ps(i,j,1))
 
 
-!add emissions from new format which are "pure", i.e. not defined as one of the splitted or sector species
+   ! add emissions from new format which are "pure", i.e. not defined as one of
+   ! the splitted or sector species
     do n = 1, NEmis_sources      
        itot = Emis_source(n)%species_ix
        if(itot>0 .and. Emis_source(n)%sector<=0)then
@@ -640,7 +627,7 @@ subroutine setup_rcemis(i,j)
   end if
 
   ! Soil NOx
-  if(USES%GLOBAL_SOILNOX)then !NEEDS CHECKING NOV2011
+  if(USES%GLOBAL_SOILNOX)then
     rcemis(NO,KMAX_MID)=rcemis(NO,KMAX_MID)+SoilNOx(i,j)
   end if
 
@@ -770,24 +757,19 @@ subroutine setup_rcemis(i,j)
   if(itot_Rn222>0) &
     rcemis(itot_Rn222,KMAX_MID) = (0.00182*water_fraction(i,j)+eland)&
       /deltaZcm(KMAX_MID) 
-   !!   /((z_bnd(i,j,KMAX_BND-1)-z_bnd(i,j,KMAX_BND))*100.)
-
-!ESX     rc_Rnwater(KMAX_MID) = water_fraction(i,j)  / &
-!ESX            ((z_bnd(i,j,KMAX_BND-1) - z_bnd(i,j,KMAX_BND))*100.)
 
 end subroutine setup_rcemis
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine reset_3d(i,j)
   integer, intent(in) :: i,j
   integer :: k, n, ispec, id    ! loop variables
-! ! XNCOL testing -- sets d_2d for column data from molec/cm3 concs.
+ !! XNCOL testing -- sets d_2d for column data from molec/cm3 concs.
  ! if variables are wanted for d_2d output (via USET), we use these indices:
   character(len=*),parameter :: dtxt='reset3dxncol:'
   character(len=20) :: specname
   integer, dimension(20), save :: d2index, id2col
   logical, save :: first_call = .true.
   integer, save :: nd2d
-!XNCOL  end testing
 
 
   do k = KCHEMTOP, KMAX_MID
@@ -803,7 +785,7 @@ subroutine reset_3d(i,j)
     end do ! ispec
   end do ! k
 
-!XNCOL !======================================================================
+!!======================================================================
 !! If column totals are wanted, we can do those here also since xn_2d are
 !! in molec/cm3, and we want molec/cm2:
 
@@ -811,7 +793,7 @@ subroutine reset_3d(i,j)
 
      nd2d = 0
      do id = 1, size(f_2d)
-           !if(MasterProc) write(*,*) 'USET XNCOL SRCH', id, f_2d(id)%subclass
+
            if ( f_2d(id)%subclass == 'xncol' ) then
              nd2d =  nd2d  + 1
              call CheckStop( nd2d > size(id2col), &
@@ -829,16 +811,17 @@ subroutine reset_3d(i,j)
    end if
 
    do id = 1, nd2d
-        ispec = id2col(id)
-        d_2d(d2index(id),i,j,IOU_INST) = dot_product(xn_2d(ispec,:),deltaZcm(:))
-    if(DEBUG%SETUP_1DCHEM.and.debug_proc.and.i==debug_li.and.j==debug_lj) then
-!    !if( debug_flag ) then
-       write(*,"(a,6i5,a,9es12.3)") dtxt//"OUTXNCOL "//trim(f_2d(d2index(id))%name), me,&
-            i,j,id,d2index(id),ispec, trim(species(ispec)%name) &
-         ,xn_2d(ispec,20), deltaZcm(20), d_2d(d2index(id),i,j,IOU_INST)
-end if
-    end do
-!!XNCOL
+      ispec = id2col(id)
+      d_2d(d2index(id),i,j,IOU_INST) = dot_product(xn_2d(ispec,:),deltaZcm(:))
+      if(DEBUG%SETUP_1DCHEM.and.debug_proc.and. &
+          i==debug_li.and.j==debug_lj) then
+
+        write(*,"(a,6i5,a,9es12.3)") dtxt//"OUTXNCOL "//&
+          trim(f_2d(d2index(id))%name), me, i,j,id,d2index(id),ispec, &
+          trim(species(ispec)%name), xn_2d(ispec,20), deltaZcm(20), &
+           d_2d(d2index(id),i,j,IOU_INST)
+    end if
+   end do
 
 
 end subroutine reset_3d

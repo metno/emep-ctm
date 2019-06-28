@@ -1,4 +1,4 @@
-! <AOTnPOD_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <AOTnPOD_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -32,7 +32,8 @@ module AOTx_mod
   use Chemfields_mod, only : xn_adv, cfac
   use ChemSpecs_mod,  only : IXADV_O3
   use Config_module, only : dt_advec, KMAX_MID & 
-                      ,PPBINV ! 1.0e9, for conversion from mixing ratio to ppb
+                            ,PPBINV& ! 1.0e9, for conversion from mixing ratio to ppb
+                            ,OutputVegO3
   use Debug_module,   only:  DEBUG   ! -> DEBUG%AOT
   use DO3SE_mod
   use GridValues_mod, only : debug_li, debug_lj, debug_proc, i_fdom, j_fdom
@@ -41,7 +42,8 @@ module AOTx_mod
   use LocalVariables_mod, only : Grid, L
   use MetFields_mod, only: zen
   use NumberConstants, only : UNDEF_R, UNDEF_I
-  use OwnDataTypes_mod, only: TXTLEN_DERIV, TXTLEN_SHORT, TXTLEN_IND,TXTLEN_NAME
+  use OwnDataTypes_mod, only: TXTLEN_DERIV, TXTLEN_SHORT, TXTLEN_IND,TXTLEN_NAME,&
+                              O3cl_t
   use Par_mod, only : LIMAX, LJMAX, limax, ljmax, me
   use TimeDate_mod, only : current_date, print_date, jday => effectivdaynumber
   implicit none
@@ -67,23 +69,6 @@ module AOTx_mod
           ! crops)
    !================== 
 
-    type, public:: O3cl_t
-       character(len=TXTLEN_DERIV) :: name = '-'  ! e.g. POD1_IAM_DF
-       character(len=TXTLEN_SHORT) :: class = '-' ! POD or AOT
-       real    :: Threshold = UNDEF_R     ! Threshold or CL, e.f. AOTx or AFstY
-       character(len=TXTLEN_SHORT) :: defn = '-'  !  MM or EU definitions
-       character(len=TXTLEN_SHORT) :: txtLC = '-' !  CF, DF, IAM_CF etc.
-       logical :: RelSGS = .false.  ! true if accumulation period is relative to
-                                    ! start of growing season (SGS)
-                                    ! can be false it fixed, e.g. April 1st
-       integer :: SAccPeriod = UNDEF_I  ! Start of accumulation period, either
-                                    ! rel to SGS or day number, days
-       integer :: EAccPeriod = UNDEF_I  ! End ...., days
-       character(len=TXTLEN_IND)            :: iotype = '-'! .. 'M'=>IOU_MON, 'D'=>IOU_DAY, ...
-    end type 
-
-   integer, parameter, private :: MAXNVO3  = 60
-   type(O3cl_t), public, save, dimension(MAXNVO3) :: OutputVegO3 = O3cl_t()
    integer, save, public :: nOutputVegO3 = 0
 
     type(O3cl_t), public, allocatable, dimension(:) :: &

@@ -1,4 +1,4 @@
-! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -27,25 +27,26 @@
 module Nest_mod
 ! This module performs the reading or writing of data for nested runs
 !
-! The Nesting modes and related setings read from Nest_config nml:
-!  MODE_READ
+! The Nesting modes and related setings read from config nml:
+!  NEST_MODE_READ
 !    'NONE':      do not read (default)
-!    'NHOUR':     read every NHOURREAD
+!    'NHOUR':     read every NEST_NHOURREAD
 !    'START':     read at the start of run
 !    'RESTART:    read at the start of run, if the files are found
-!  MODE_SAVE
+!  NEST_MODE_SAVE
 !    'NONE':      do not write (default)
-!    'NHOUR':     write every NHOURSAVE
+!    'NHOUR':     write every NEST_NHOURSAVE
 !    'END':       write at end of run
-!    'OUTDATE':   write every OUTDATE(1:OUTDATE_NDUMP)
+! In addition the 3D concentrations are outputed at
+!    every NEST_OUTDATE(1:NEST_OUTDATE_NDUMP)
 !
 ! To make a nested run:
-! 1) run with MODE_SAVE='NHOUR' to write out 3d BC (name in filename_write defined below)
+! 1) run with NEST_MODE_SAVE='NHOUR' to write out 3d BC (name in filename_write defined below)
 ! 2) copy or link filename_write to filename_read_BC (for example "ln -s EMEP_OUT.nc EMEP_IN.nc")
-! 3) run (in a smaller domain) with MODE_READ='NHOUR'
+! 3) run (in a smaller domain) with NEST_MODE_READ='NHOUR'
 !
-! Set MODE_SAVE/MODE_READ (in Nest_config nml) and out_DOMAIN (same namelist)
-! Choose NHOURSAVE and NHOURREAD
+! Set NEST_MODE_SAVE/NEST_MODE_READ (in Nest_config nml) and NEST_out_DOMAIN (same namelist)
+! Choose NEST_NHOURSAVE and NEST_NHOURREAD
 ! Also filename_read_BC and filename_read_3D should point to appropriate files
 ! Be careful to remove old BC files before making new ones.
 !
@@ -55,7 +56,6 @@ module Nest_mod
 ! Vertical interpolation is done from hybrid coordinates.
 !
 !To do:
-!  It should be possible to save only xn_adv_bnd if the inner grid is known for the outer grid.
 !  The routines should be thought together with GlobalBC_mod (can it replace it?)
 
 !----------------------------------------------------------------------------!
@@ -64,29 +64,37 @@ module Nest_mod
 !   Experiment specific information must be set on ExternalBICs namelists.
 !   So far coded for CIFS (CAMS50/71) and EnsClimRCA(?) work.
 use ExternalBICs_mod,     only: set_extbic, icbc, ICBC_FMT,&
-      EXTERNAL_BIC_SET, EXTERNAL_BC, EXTERNAL_BIC_NAME, TOP_BC, &
-      iw, ie, js, jn, kt, & ! i West/East bnd; j North/South bnd; k Top
-      filename_eta,BC_DAYS
+      EXTERNAL_BIC_SET, EXTERNAL_BC, &
+      iw, ie, js, jn, kt ! i West/East bnd; j North/South bnd; k Top
+      
 !----------------------------------------------------------------------------!
 use CheckStop_mod,           only: CheckStop,check=>CheckNC
 use Chemfields_mod,          only: xn_adv    ! emep model concs.
 use ChemDims_mod,            only: NSPEC_ADV, NSPEC_SHL
 use ChemSpecs_mod,           only: species_adv
 use GridValues_mod,          only: A_mid,B_mid, glon,glat, i_fdom,j_fdom, RestrictDomain
-use Io_mod,                  only: open_file,IO_TMP,IO_NML,PrintLog
+use Io_mod,                  only: open_file,IO_TMP,PrintLog
 use InterpolationRoutines_mod,  only : grid2grid_coeff,point2grid_coeff
 use MetFields_mod,           only: roa
-use Config_module,           only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,GRID,&
-                                  IOU_INST,RUNDOMAIN,USES
+use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
+     OwnInputDir, GRID,&
+     IOU_INST,RUNDOMAIN,USES,&
+     NEST_MODE_READ,NEST_MODE_SAVE,NEST_NHOURREAD,NEST_NHOURSAVE, &
+     NEST_template_read_3D,NEST_template_read_BC,NEST_template_write,&
+     NEST_template_dump,BC_DAYS,&
+     NEST_native_grid_3D,NEST_native_grid_BC,NEST_omit_zero_write,NEST_out_DOMAIN,&
+     NEST_MET_inner,NEST_RUNDOMAIN_inner,&
+     NEST_WRITE_SPC,NEST_WRITE_GRP,NEST_OUTDATE_NDUMP,NEST_outdate,OUTDATE_NDUMP_MAX,&
+     EXTERNAL_BIC_NAME, TOP_BC, filename_eta
 use Debug_module,           only: DEBUG_NEST,DEBUG_ICBC=>DEBUG_NEST_ICBC
 use MPI_Groups_mod  
 use netcdf,                 only: nf90_open,nf90_write,nf90_close,nf90_inq_dimid,&
-                                  nf90_inquire_dimension,nf90_inq_varid,&
+                                  nf90_inquire,nf90_inquire_dimension,nf90_inq_varid,&
                                   nf90_inquire_variable,nf90_get_var,nf90_get_att,&
                                   nf90_put_att,nf90_noerr,nf90_nowrite,nf90_global
 use netcdf_mod,              only: Out_netCDF,&
-                                  CDFtype=>Real4,ReadTimeCDF,max_filename_length
-use OwnDataTypes_mod,        only: Deriv,TXTLEN_SHORT
+                                  CDFtype=>Real4,ReadTimeCDF
+use OwnDataTypes_mod,        only: Deriv, TXTLEN_SHORT, TXTLEN_FILE
 use Par_mod,                 only: me,li0,li1,lj0,lj1,limax,ljmax,GIMAX,GJMAX,gi0,gj0,gi1,gj1
 use Pollen_const_mod,        only: pollen_check
 use TimeDate_mod,            only: date,current_date,nmdays
@@ -97,14 +105,6 @@ use SmallUtils_mod,          only: find_index,key2str,to_upper
 use ChemGroups_mod,          only: chemgroups
 implicit none
 
-! Nested input/output on OUTDATE mode
-integer,private,parameter :: OUTDATE_NDUMP_MAX = 4  ! Number of nested output
-integer, public, save     :: OUTDATE_NDUMP     = 1  ! Read by emepctm.f90
-! on forecast run (1: start next forecast; 2-4: NMC statistics)
-type(date), public :: outdate(OUTDATE_NDUMP_MAX)=date(-1,-1,-1,-1,-1)
-
-!coordinates of subdomain to write, relative to FULL domain (only used in write mode)
-integer, public, save :: out_DOMAIN(4) ! =[istart,iend,jstart,jend]
 
 !/-- subroutines
 
@@ -115,37 +115,16 @@ private
 
 logical, private, save :: mydebug =  .false.
 
-integer,private,parameter ::  len_mode=20
-character(len=len_mode),private, parameter :: &
-  READ_MODES(5)=[character(len=len_mode)::'NONE','RESTART','NHOUR','START','MONTH'],&
-  SAVE_MODES(5)=[character(len=len_mode)::'NONE','OUTDATE','NHOUR','END','MONTH']
-character(len=len_mode),public, save ::  &
-  MODE_READ='',&  ! read  mode
-  MODE_SAVE=''    ! write mode
-integer, private, save :: NHOURSAVE,NHOURREAD ! write/read frequency
-!if(NHOURREAD<NHOURSAVE) the data is interpolated in time
-
-character(len=max_filename_length),public, save ::  &
-  template_read_3D = 'EMEP_IN.nc',&       ! Different paths can be set here
-  template_read_BC = 'EMEP_IN.nc',&       ! for each of the IO IC/BC files,
-  template_write   = 'EMEP_OUT.nc'        ! on Nest_config namelist, if needed.
-character(len=max_filename_length),private, save ::  &
+character(len=TXTLEN_SHORT),private, parameter :: &
+  READ_MODES(5)=[character(len=TXTLEN_SHORT)::'NONE','RESTART','NHOUR','START','MONTH'],&
+  SAVE_MODES(4)=[character(len=TXTLEN_SHORT)::'NONE','NHOUR','END','MONTH']
+character(len=TXTLEN_FILE),private, save ::  &
   filename_read_3D = 'template_read_3D',& ! Overwritten in readxn and wrtxn.
   filename_read_BC = 'template_read_BC',& ! Filenames are updated according to date
-  filename_write   = 'template_write'     ! following respective templates
-logical,private, save ::  &               ! if IC/BC are in the same model/run
-  native_grid_3D = .false.,&              ! grid, the expensive call to
-  native_grid_BC = .false.,&              ! grid2grid_coeff in init_nest can be avoided
-  omit_zero_write= .false.                ! skip const=0.0 variables
+  filename_write   = 'template_write'  ,& ! following respective templates
+  filename_dump   = 'template_dump'     ! 
 
-character(len=max_filename_length),public, save :: MET_inner ='NOTSET' !path to metdata for inner grid
-integer, save, public :: RUNDOMAIN_inner(4)=-1 ! RUNDOMAIN used for run in inner grid
 
-! Limit output, e.g. for NMC statistics (3DVar)
-character(len=TXTLEN_SHORT), private, save, dimension(NSPEC_ADV) :: &
-  WRITE_SPC = ""  ! If these varables remain ""
-character(len=TXTLEN_SHORT), private, save, dimension(size(chemgroups)) :: &
-  WRITE_GRP = ""  ! all advected species will be written out.
 
 real(kind=8), parameter :: &
   halfsecond=0.5/(24.0*3600.0)! used to avoid rounding errors
@@ -184,69 +163,48 @@ contains
 subroutine Config_Nest()
   integer :: ios,i
   logical, save :: first_call=.true.
-  NAMELIST /Nest_config/ MODE_READ,MODE_SAVE,NHOURREAD,NHOURSAVE, &
-    template_read_3D,template_read_BC,template_write,BC_DAYS,&
-    native_grid_3D,native_grid_BC,omit_zero_write,out_DOMAIN,&
-    MET_inner,RUNDOMAIN_inner,&
-    WRITE_SPC,WRITE_GRP,OUTDATE_NDUMP,outdate
 
   if(.not.first_call)return
+! Ensure out-domain is not larger than rundomain (or rundomain by default)
+  call RestrictDomain(NEST_out_DOMAIN)
+
   mydebug = DEBUG_NEST.and.MasterProc
-! default write/read supported modes: do nothing
-  MODE_READ='NONE'
-  MODE_SAVE='NONE'
-! write/read frequency: Hours between consecutive saves(wrtxn)/reads(readxn)
-  NHOURSAVE=3   ! Between wrtxn calls.  Should be fraction of 24
-  NHOURREAD=1   ! Between readxn calls. Should be fraction of 24
-! Default domain for write modes
-  out_DOMAIN=RUNDOMAIN
-  rewind(IO_NML)
-  read(IO_NML,NML=Nest_config,iostat=ios)
-  call CheckStop(ios,"NML=Nest_config")
-  if(mydebug)then
-    write(*,*) "NAMELIST IS "
-    write(*,NML=Nest_config)
-  end if
-  if(MODE_READ=='')then
-    MODE_READ='NONE'
+
+  NEST_WRITE_SPC = ""  ! If these variables remain ""
+  NEST_WRITE_GRP = ""  ! all advected species will be written out.
+
+  if(NEST_MODE_READ=='')then
+    NEST_MODE_READ='NONE'
   else
-    MODE_READ=to_upper(MODE_READ)
+    NEST_MODE_READ=to_upper(NEST_MODE_READ)
   end if
-  if(MODE_SAVE=='')then
-    MODE_SAVE='NONE'
+  if(NEST_MODE_SAVE=='')then
+    NEST_MODE_SAVE='NONE'
   else
-    MODE_SAVE=to_upper(MODE_SAVE)
+    NEST_MODE_SAVE=to_upper(NEST_MODE_SAVE)
   end if
 ! write/read supported modes
   if(MasterProc)then
-    call CheckStop(.not.any(MODE_READ==READ_MODES),&
-      "Config_Nest: Unsupported MODE_READ='"//trim(MODE_READ))
-    call CheckStop(.not.any(MODE_SAVE==SAVE_MODES),&
-      "Config_Nest: Unsupported MODE_SAVE='"//trim(MODE_SAVE))
+    call CheckStop(.not.any(NEST_MODE_READ==READ_MODES),&
+      "Config_Nest: Unsupported NEST_MODE_READ='"//trim(NEST_MODE_READ))
+    call CheckStop(.not.any(NEST_MODE_SAVE==SAVE_MODES),&
+      "Config_Nest: Unsupported NEST_MODE_SAVE='"//trim(NEST_MODE_SAVE))
   end if
 ! write/read frequency should be fraction of 24
   if(MasterProc)then
-    call CheckStop(mod(24,NHOURSAVE),"Config_Nest: NHOURSAVE should be fraction of 24")
-    call CheckStop(mod(24,NHOURREAD),"Config_Nest: NHOURREAD should be fraction of 24")
+    call CheckStop(mod(24,NEST_NHOURSAVE),"Config_Nest: NEST_NHOURSAVE should be fraction of 24")
+    call CheckStop(mod(24,NEST_NHOURREAD),"Config_Nest: NEST_NHOURREAD should be fraction of 24")
   end if
-! expand DataDir/GRID keyswords
-  template_read_3D=key2str(template_read_3D,'DataDir',DataDir)
-  template_read_3D=key2str(template_read_3D,'GRID',GRID)
-  template_read_BC=key2str(template_read_BC,'DataDir',DataDir)
-  template_read_BC=key2str(template_read_BC,'GRID',GRID)
-  template_write  =key2str(template_write  ,'DataDir',DataDir)
-  template_write  =key2str(template_write  ,'GRID',GRID)
 ! Update filenames according to date following templates defined on Nest_config
   call init_icbc(cdate=current_date)
-! Ensure out-domain is not larger than run-domain
-  if(MODE_SAVE/='NONE')call RestrictDomain(out_DOMAIN)
-! Ensure that only OUTDATE_NDUMP are taking into account
-  if(MODE_SAVE=='OUTDATE')then
-    if(OUTDATE_NDUMP<OUTDATE_NDUMP_MAX)&
-      outdate(OUTDATE_NDUMP+1:OUTDATE_NDUMP_MAX)%day=0
-    if(MasterProc)&
-      write (*,"(1X,A,10(1X,A,:,','))")'OUTDATE nest/dump at:',&
-       (date2string("YYYY-MM-DD hh:mm:ss",outdate(i)),i=1,OUTDATE_NDUMP)
+! Ensure that only NEST_OUTDATE_NDUMP are taking into account
+  if(NEST_OUTDATE_NDUMP>0)then
+     NEST_outdate(:)%seconds=0   ! output only at full hours
+     if(NEST_OUTDATE_NDUMP<OUTDATE_NDUMP_MAX)&
+          NEST_outdate(NEST_OUTDATE_NDUMP+1:OUTDATE_NDUMP_MAX)%day=0
+     if(MasterProc)&
+          write (*,"(1X,A,10(1X,A,:,','))")'OUTDATE nest/dump at:',&
+          (date2string("YYYY-MM-DD hh:mm:ss",NEST_outdate(i)),i=1,NEST_OUTDATE_NDUMP)
   end if
   first_call=.false.
 end subroutine Config_Nest
@@ -264,15 +222,15 @@ subroutine readxn(indate)
   integer, save :: oldmonth=0
 
   call Config_Nest()
-  if(mydebug) write(*,*)'Nest:Read BC, MODE=',MODE_READ
-  if(MODE_READ=='NONE')return
+  if(mydebug) write(*,*)'Nest:Read BC, NEST_MODE=',NEST_MODE_READ
+  if(NEST_MODE_READ=='NONE')return
 
   KMAX_BC=KMAX_MID
   ndate(1:4)=[indate%year,indate%month,indate%day,indate%hour]
   call date2nctime(ndate,ndays_indate)
   if(first_call)date_nextfile=ndate
 
-  select case(MODE_READ)
+  select case(NEST_MODE_READ)
   case('MONTH') ! monthly input file
     if(indate%month==oldmonth)return
     if(MasterProc.and.oldmonth==0) write(*,*)'Nest: Initialzing IC'
@@ -281,22 +239,22 @@ subroutine readxn(indate)
   case('START')
     if(.not.first_call)return
     first_call=.false.
-    filename_read_3D=date2string(template_read_3D,ndate,mode='YMDH',debug=mydebug)
+    filename_read_3D=date2string(NEST_template_read_3D,ndate,mode='YMDH',debug=mydebug)
     if(MasterProc) write(*,*)'Nest RESET ALL XN 3D ',trim(filename_read_3D)
     call reset_3D(ndays_indate)
     return
   case default
    !if(MasterProc) print *,'call to READXN',indate%hour,indate%seconds
-    if(mod(indate%hour,NHOURREAD)/=0.or.indate%seconds/=0)return
+    if(mod(indate%hour,NEST_NHOURREAD)/=0.or.indate%seconds/=0)return
   end select
-  ! never comes to this point if MODE=100, 11 or 12
+  ! never comes to this point if NEST_MODE=100, 11 or 12
 
   if(DEBUG_NEST.and.MasterProc) write(*,*) 'Nest: kt', kt, first_call
 
-! Update filenames according to date following templates defined on Nest_config nml
-  filename_read_3D=date2string(template_read_3D,ndate,&
+! Update filenames according to date following templates defined in config nml
+  filename_read_3D=date2string(NEST_template_read_3D,ndate,&
                                mode='YMDH',debug=mydebug)
-  filename_read_BC=date2file  (template_read_BC,ndate,BC_DAYS,"days",&
+  filename_read_BC=date2file  (NEST_template_read_BC,ndate,BC_DAYS,"days",&
                                mode='YMDH',debug=mydebug)
   inquire(file=filename_read_3D,exist=fexist_3D)
   inquire(file=filename_read_BC,exist=fexist_BC)
@@ -323,7 +281,7 @@ subroutine readxn(indate)
     return
   end if
 
-  if(ndays_indate-rtime_saved(2)>halfsecond.or.MODE_READ=='MONTH')then
+  if(ndays_indate-rtime_saved(2)>halfsecond.or.NEST_MODE_READ=='MONTH')then
     ! look for a new data set
     if(MasterProc) write(*,*)'Nest: READING NEW BC DATA from ',&
           trim(filename_read_BC)
@@ -331,7 +289,7 @@ subroutine readxn(indate)
   end if
 
 !   make weights for time interpolation
-  if(MODE_READ=='MONTH')then  ! don't interpolate for now
+  if(NEST_MODE_READ=='MONTH')then  ! don't interpolate for now
     W1=0.0;  W2=1.0           ! use last read value
   else
     W1=1.0;  W2=0.0           ! default: use first read value
@@ -382,32 +340,31 @@ subroutine wrtxn(indate,WriteNow)
   logical, save :: first_call=.true.
 
   call Config_Nest()
-  if(MODE_SAVE=='NONE')return
+
+  if(NEST_OUTDATE_NDUMP>0)call Dump(indate)
+
+  if(NEST_MODE_SAVE=='NONE')return
 
 ! Check if the file exist already at start of run. Do not wait until first write to stop!
 ! If you know what you are doing you can set paramter APPEND=.true.,
 ! and the new data will be appended to the file
   overwrite=first_call.and..not.APPEND
   if(overwrite.and.MasterProc)then
-    filename_write=date2string(template_write,indate,mode='YMDH',debug=mydebug)
+    filename_write=date2string(NEST_template_write,indate,mode='YMDH',debug=mydebug)
     inquire(file=fileName_write,exist=overwrite)
-    call CheckStop(overwrite.and.MODE_SAVE/='OUTDATE',&
+    call CheckStop(overwrite.and.NEST_MODE_SAVE/='OUTDATE',&
       "Nest: Refuse to overwrite. Remove this file: "//trim(fileName_write))
   end if
 
-  select case(MODE_SAVE)
+  select case(NEST_MODE_SAVE)
   case('END')
     if(.not.WriteNow)return
   case('OUTDATE')
-    outdate(:)%seconds=0   ! output only at full hours
-    if(.not.compare_date(OUTDATE_NDUMP,indate,outdate(:OUTDATE_NDUMP),&
-                         wildcard=-1))return
-    if(MasterProc) write(*,*)&
-      date2string(" Forecast nest/dump at YYYY-MM-DD hh:mm:ss",indate)
+    if(MasterProc) write(*,*)" WARNING THIS OPTION IS NOT USED ANYMORE"
   case('MONTH')
     if(indate%month==1.or.indate%day/=1.or.indate%hour/=0.or.indate%seconds/=0)return
   case default
-    if(mod(indate%hour,NHOURSAVE)/=0.or.indate%seconds/=0)return
+    if(mod(indate%hour,NEST_NHOURSAVE)/=0.or.indate%seconds/=0)return
   end select
 
   iotyp=IOU_INST
@@ -422,9 +379,9 @@ subroutine wrtxn(indate,WriteNow)
   def1%name=''          ! written
   def1%unit='mix_ratio' ! written
 
-! Update filenames according to date following templates defined on Nest_config nml
+! Update filenames according to date following templates defined on config nml
 ! e.g. set template_write="EMEP_BC_MMYYYY.nc" on namelist for different names each month
-  filename_write=date2string(template_write,indate,mode='YMDH',debug=mydebug)
+  filename_write=date2string(NEST_template_write,indate,mode='YMDH',debug=mydebug)
   if(MasterProc)then
     inquire(file=fileName_write,exist=fexist)
     write(*,*)'Nest:write data ',trim(fileName_write)
@@ -435,30 +392,30 @@ subroutine wrtxn(indate,WriteNow)
 ! Limit output, e.g. for NMC statistics (3DVar and restriction to inner grid BC)
   if(first_call)then
     call init_icbc(cdate=indate)
-    if(any([WRITE_GRP,WRITE_SPC]/=""))then
+    if(any([NEST_WRITE_GRP,NEST_WRITE_SPC]/=""))then
       adv_ic(:)%wanted=.false.
-      do n=1,size(WRITE_GRP)
-        if(WRITE_GRP(n)=="")cycle
-        i=find_index(WRITE_GRP(n),chemgroups(:)%name)
+      do n=1,size(NEST_WRITE_GRP)
+        if(NEST_WRITE_GRP(n)=="")cycle
+        i=find_index(NEST_WRITE_GRP(n),chemgroups(:)%name)
         if(i>0)then
           where(chemgroups(i)%specs>NSPEC_SHL) &
             adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.true.
         elseif(MasterProc)then
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
            "Warning (wrtxn)", &
-           "Wanted group",trim(WRITE_GRP(n)),"was not found", &
+           "Wanted group",trim(NEST_WRITE_GRP(n)),"was not found", &
            "Can not be written to file:",trim(filename_write),""
         end if
       end do
-      do n=1,size(WRITE_SPC)
-        if(WRITE_SPC(n)=="")cycle
-        i=find_index(WRITE_SPC(n),species_adv(:)%name)
+      do n=1,size(NEST_WRITE_SPC)
+        if(NEST_WRITE_SPC(n)=="")cycle
+        i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
         if(i>0)then
           adv_ic(i)%wanted=.true.
         elseif((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
            "Warning (wrtxn)", &
-           "Wanted specie",trim(WRITE_SPC(n)),"was not found", &
+           "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
            "Can not be written to file:",trim(filename_write),""
         end if
       end do
@@ -482,7 +439,7 @@ subroutine wrtxn(indate,WriteNow)
             "Nest(wrtxn) DEBUG_ICBC",&
             "Variable",trim(species_adv(n)%name),"is not wanted as IC",&
             "Will not be written to file:",trim(filename_write),""
-      elseif(omit_zero_write)then !  further reduce output
+      elseif(NEST_omit_zero_write)then !  further reduce output
         wanted=any(xn_adv(n,:,:,:)/=0.0)
         CALL MPI_ALLREDUCE(wanted,wanted_out,1,MPI_LOGICAL,MPI_LOR,&
                            MPI_COMM_CALC,IERROR)
@@ -496,10 +453,10 @@ subroutine wrtxn(indate,WriteNow)
       end if
     end do
 
-    if(MET_inner /= "NOTSET")then
+    if(NEST_MET_inner /= "NOTSET")then
        ! find region that is really needed, i.e. boundaries of inner grid
        !find lon and lat of inner grid restricted to BC 
-       call init_mask_restrict(MET_inner,RUNDOMAIN_inner)
+       call init_mask_restrict(NEST_MET_inner,NEST_RUNDOMAIN_inner)
     endif
 
   end if
@@ -512,7 +469,7 @@ subroutine wrtxn(indate,WriteNow)
       def1%name=species_adv(n)%name   ! written
 !!    data=xn_adv(n,:,:,:)
       call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
-            out_DOMAIN=out_DOMAIN,create_var_only=.true.,overwrite=overwrite,&
+            out_DOMAIN=NEST_out_DOMAIN,create_var_only=.true.,overwrite=overwrite,&
             fileName_given=trim(fileName_write),ncFileID_given=ncFileID)
       overwrite=.false.
     end do
@@ -537,11 +494,11 @@ subroutine wrtxn(indate,WriteNow)
        data=xn_adv(n,:,:,:)
     endif
     call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
-         out_DOMAIN=out_DOMAIN,create_var_only=.false.,&
+         out_DOMAIN=NEST_out_DOMAIN,create_var_only=.false.,&
          fileName_given=trim(fileName_write),ncFileID_given=ncFileID)
   end do
 
-  if(first_call .and. MET_inner /= "NOTSET" .and. me==0)then
+  if(first_call .and. NEST_MET_inner /= "NOTSET" .and. me==0)then
      !mark the file as defined in a restricted area only
      call check(nf90_put_att(ncFileID,nf90_global,"restricted","BC_restricted"))
   endif
@@ -550,6 +507,133 @@ subroutine wrtxn(indate,WriteNow)
   if(MasterProc)call check(nf90_close(ncFileID))
 
 end subroutine wrtxn
+
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
+subroutine Dump(indate)
+  type(date), intent(in) :: indate
+  real :: data(LIMAX,LJMAX,KMAX_MID) ! Data array
+  logical, parameter :: APPEND=.false.
+
+  type(Deriv) :: def1 ! definition of fields
+  integer :: n,i,j,k,iotyp,ndim,kmax,ncfileID
+  real :: scale
+  logical :: fexist, wanted, wanted_out, overwrite
+  logical, save :: first_call=.true.
+
+  if(.not.compare_date(NEST_OUTDATE_NDUMP,indate,NEST_outdate(:NEST_OUTDATE_NDUMP),&
+                         wildcard=-1))return
+  if(MasterProc)write(*,*)date2string("Nest dump at YYYY-MM-DD hh:mm:ss",indate)
+
+  overwrite = first_call !always overwrite old files, then append
+
+  iotyp=IOU_INST
+  ndim=3 !3-dimensional
+  kmax=KMAX_MID
+  scale=1.0
+  def1%class='Advected' ! written
+  def1%avg=.false.      ! not used
+  def1%index=0          ! not used
+  def1%scale=scale      ! not used
+  def1%iotype=''        ! not used
+  def1%name=''          ! written
+  def1%unit='mix_ratio' ! written
+
+! Update filenames according to date following templates defined on config nml
+! e.g. set template_dump="EMEP_IC_MMDD.nc" on namelist for different names each month and Day
+  filename_write=date2string(NEST_template_dump,indate,mode='YMDH',debug=mydebug)
+
+! Limit output, e.g. for NMC statistics (3DVar and restriction to inner grid BC)
+  if(first_call)then
+    call init_icbc(cdate=indate)
+    if(any([NEST_WRITE_GRP,NEST_WRITE_SPC]/=""))then
+      adv_ic(:)%wanted=.false.
+      do n=1,size(NEST_WRITE_GRP)
+        if(NEST_WRITE_GRP(n)=="")cycle
+        i=find_index(NEST_WRITE_GRP(n),chemgroups(:)%name)
+        if(i>0)then
+          where(chemgroups(i)%specs>NSPEC_SHL) &
+            adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.true.
+        elseif(MasterProc)then
+          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
+           "Warning (wrtxn)", &
+           "Wanted group",trim(NEST_WRITE_GRP(n)),"was not found", &
+           "Can not be written to file:",trim(filename_write),""
+        end if
+      end do
+      do n=1,size(NEST_WRITE_SPC)
+        if(NEST_WRITE_SPC(n)=="")cycle
+        i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
+        if(i>0)then
+          adv_ic(i)%wanted=.true.
+        elseif((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
+          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
+           "Warning (wrtxn)", &
+           "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
+           "Can not be written to file:",trim(filename_write),""
+        end if
+      end do
+    elseif(USES%POLLEN)then
+      ! POLLEN group members are written to pollen restart/dump file
+      call pollen_check(igrp=i)
+      if(i>0)then
+        where(chemgroups(i)%specs>NSPEC_SHL) &
+          adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.false.
+        if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
+           "Warning (wrtxn)", &
+           "Group","POLLEN","is written to pollen restart/dump file", &
+           "Will not be written to file:",trim(filename_write),""
+      end if
+    end if
+    do n=1,NSPEC_ADV
+      if(.not.adv_ic(n)%wanted)then
+        if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
+            "Nest(wrtxn) DEBUG_ICBC",&
+            "Variable",trim(species_adv(n)%name),"is not wanted as IC",&
+            "Will not be written to file:",trim(filename_write),""
+      elseif(NEST_omit_zero_write)then !  further reduce output
+        wanted=any(xn_adv(n,:,:,:)/=0.0)
+        CALL MPI_ALLREDUCE(wanted,wanted_out,1,MPI_LOGICAL,MPI_LOR,&
+                           MPI_COMM_CALC,IERROR)
+        adv_ic(n)%wanted=wanted_out
+        if(.not.adv_ic(n)%wanted.and.&
+          (DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
+            "Nest(wrtxn) DEBUG_ICBC",&
+            "Variable",trim(species_adv(n)%name),"was found constant=0.0",&
+            "Will not be written to file:",trim(filename_write),""
+      end if
+    end do
+
+  end if
+
+  !do first one loop to define the fields, without writing them (for performance purposes)
+  ncfileID=-1 ! must be <0 as initial value
+  do n=1,NSPEC_ADV
+     if(.not.adv_ic(n)%wanted)cycle
+     def1%name=species_adv(n)%name   ! written
+     !!    data=xn_adv(n,:,:,:)
+     call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
+          out_DOMAIN=NEST_out_DOMAIN,create_var_only=.true.,overwrite=overwrite,&
+          fileName_given=trim(fileName_write),ncFileID_given=ncFileID)
+      overwrite=.false.
+  end do
+
+  do n=1,NSPEC_ADV
+    if(.not.adv_ic(n)%wanted)cycle
+    def1%name=species_adv(n)%name     ! written
+    data=xn_adv(n,:,:,:)
+    call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
+         out_DOMAIN=NEST_out_DOMAIN,create_var_only=.false.,&
+         fileName_given=trim(fileName_write),ncFileID_given=ncFileID)
+  end do
+
+  first_call=.false.
+
+  if(MasterProc)call check(nf90_close(ncFileID))
+
+end subroutine Dump
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
 subroutine init_icbc(idate,cdate,ndays,nsecs)
@@ -577,20 +661,23 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
   call CheckStop(count([present(idate),present(cdate),present(ndays),&
                         present(nsecs)]),1,"init_icbc: wrong date option")
 
-! Update filenames according to date following templates defined on Nest_config nml
+! Update filenames according to date following templates defined on config nml
   if(present(idate)) dat=idate
   if(present(cdate)) dat=[cdate%year,cdate%month,cdate%day,cdate%hour]
   if(present(ndays)) call nctime2date(dat,ndays)
   if(present(nsecs)) call nctime2date(dat,nsecs)
   call set_extbic(dat)  ! set mapping, EXTERNAL_BC, TOP_BC
 
-  if(.not.EXTERNAL_BIC_SET.and.MODE_READ=='NONE'.and.MODE_SAVE=='NONE')return !No nesting
+  if(.not.EXTERNAL_BIC_SET.and.NEST_MODE_READ=='NONE'.and.NEST_MODE_SAVE=='NONE'.and.&
+       NEST_OUTDATE_NDUMP==0)return !No nesting
 
-  filename_read_3D=date2string(template_read_3D,dat,&
+  filename_read_3D=date2string(NEST_template_read_3D,dat,&
                                mode='YMDH',debug=mydebug)
-  filename_read_BC=date2file  (template_read_BC,dat,BC_DAYS,"days",&
+  filename_read_BC=date2file  (NEST_template_read_BC,dat,BC_DAYS,"days",&
                                mode='YMDH',debug=mydebug)
-  filename_write  =date2string(template_write  ,dat,&
+  filename_write  =date2string(NEST_template_write  ,dat,&
+                               mode='YMDH',debug=mydebug)
+  filename_dump  =date2string(NEST_template_dump  ,dat,&
                                mode='YMDH',debug=mydebug)
 
   adv_ic(:)%ixadv=(/(n,n=1,NSPEC_ADV)/)
@@ -603,19 +690,26 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
     adv_bc=>EXTERNAL_BC
     adv_bc(:)%found=find_icbc(filename_read_bc,adv_bc%varname(:))
   else
-    adv_bc=>adv_ic
+     adv_bc(:)%ixadv=(/(n,n=1,NSPEC_ADV)/)
+     adv_bc(:)%spcname=species_adv(:)%name
+     adv_bc(:)%varname=species_adv(:)%name
+     adv_bc(:)%frac=1.0
+     adv_bc(:)%wanted=.true.
+     adv_bc(:)%found=find_icbc(filename_read_bc,adv_bc%varname(:))
   end if
 
   if(MasterProc)then
     do n = 1,size(adv_ic%varname)
       if(.not.adv_ic(n)%found)then
-        call PrintLog("WARNING: IC variable '"//trim(adv_ic(n)%varname)//"' not found")
+        if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
+             call PrintLog("WARNING: IC variable '"//trim(adv_ic(n)%varname)//"' not found")
       elseif(DEBUG_NEST.or.DEBUG_ICBC)then
         write(*,*) "init_icbc filled adv_ic "//trim(adv_ic(n)%varname)
       end if
     end do
     do n = 1,size(adv_bc%varname)
       if(.not.adv_bc(n)%found)then
+        if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
         call PrintLog("WARNING: BC variable '"//trim(adv_bc(n)%varname)//"' not found")
       elseif(DEBUG_NEST.or.DEBUG_ICBC)then
         write(*,*) "init_icbc filled adv_bc "//trim(adv_bc(n)%varname)
@@ -637,9 +731,11 @@ function find_icbc(filename_read,varname) result(found)
 !----------------------------------------------------------------------------!
   implicit none
   character(len=*), intent(in)               :: filename_read
-  character(len=*), dimension(:), intent(in) :: varname
+  character(len=*), dimension(:), intent(inout) :: varname
   logical, dimension(size(varname))          :: found
   integer :: ncFileID,varID,status,n
+  character(len=100), allocatable :: cdfname(:)
+  integer :: xtype,ndims,nDimensions,nVariables,nAttributes
 
   found(:)=.false.
   if(MasterProc)then
@@ -648,11 +744,32 @@ function find_icbc(filename_read,varname) result(found)
       print *,'icbc: not found ',trim(filename_read)
     else
       print *,'icbc: reading ',trim(filename_read)
+      !1) make list of variables in the file
+      call check(nf90_Inquire(ncFileID,nDimensions,nVariables,nAttributes))
+      allocate(cdfname(nVariables))
+      do varid=1,nVariables
+         !could use ndims and possibly xtype to exclude some variables
+         call check(nf90_Inquire_Variable(ncFileID,varid,cdfname(varid),xtype,ndims))
+      enddo
       do n=1,size(varname)
-        if(varname(n)=="") cycle
-        status=nf90_inq_varid(ncFileID,trim(varname(n)),varID)
-        found(n)=(status==nf90_noerr)
+         if(varname(n)=="") cycle
+         !2) first check if the exact same name is found
+         varid=find_index(trim(varname(n)),cdfname(:))
+         found(n)=.false.
+         if(varid<0)then
+            !3) check if a name with any lower/upper case characters is found:
+            varid=find_index(trim(varname(n)),cdfname(:),first_only=.true.,any_case=.true.)
+            if(varid>0)then
+               print *,'icbc: WARNING, reading '//trim(cdfname(varid))//' instead of '//trim(varname(n))
+               !4)replace the requested name with the cdf name (NB: only master has the correct name!)
+               varname(n) = trim(cdfname(varid))
+               found(n)=.true.
+            endif
+         else
+            found(n)=.true.
+         endif
       end do
+      deallocate(cdfname)
       call check(nf90_close(ncFileID))
     end if
   end if
@@ -790,7 +907,7 @@ subroutine init_nest(ndays_indate,filename_read,native_grid,IIij,JJij,Weight,&
       !cannot read time on file. assumes it is correct
       ndays_ext(1)=ndays_indate
     end if
-    if(MODE_READ=='MONTH')then
+    if(NEST_MODE_READ=='MONTH')then
       !asuming 12 monthes for BC, and 12 or 1 values for IC
       ndays_ext(1)=0
       do n=2,N_ext
@@ -1032,7 +1149,7 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
 
   !find lon and lat of boundaries of grid and build mask_restrict
   integer,intent(inout) ::rundomain_ext(4)
-  character(len=*),intent(in) :: filename_read
+  character(len=*),intent(inout) :: filename_read
   integer ::GIMAX_ext,GJMAX_ext
   integer :: ncFileID,varid,status
   integer :: i,j,n
@@ -1050,7 +1167,16 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
   if(me==0)then
      status = nf90_open(trim(filename_read),nf90_nowrite,ncFileID)
      if(status/=nf90_noerr) then
-        print *,'init_mask_restrict: not found',trim(filename_read)      
+        filename_read=key2str(trim(filename_read),'DataDir',DataDir)
+        filename_read=key2str(trim(filename_read),'OwnInputDir',OwnInputDir)
+        status = nf90_open(trim(filename_read),nf90_nowrite,ncFileID)
+        if(status/=nf90_noerr) then
+           filename_read=date2string(filename_read,current_date,mode='YMDH')
+           status = nf90_open(trim(filename_read),nf90_nowrite,ncFileID)
+        endif
+     endif
+     if(status/=nf90_noerr) then
+        call CheckStop('init_mask_restrict: not found: '//trim(filename_read))
      else
         MASK_SET = .true.
         print *,'init_mask_restrict: reading ',trim(filename_read)
@@ -1316,10 +1442,10 @@ subroutine read_newdata_LATERAL(ndays_indate)
 
     call init_icbc(ndays=ndays_indate)
     if(mydebug)write(*,*)'calling init_nest for '//trim(filename_read_BC)
-    call init_nest(ndays_indate,filename_read_BC,native_grid_BC,&
+    call init_nest(ndays_indate,filename_read_BC,NEST_native_grid_BC,&
                    IIij,JJij,Weight,k1_ext,k2_ext,weight_k1,weight_k2,&
                    N_ext_BC,KMAX_ext_BC,GIMAX_ext,GJMAX_ext)
-    if(MODE_READ=='MONTH'.and.N_ext_BC/=12.and.MasterProc)then
+    if(NEST_MODE_READ=='MONTH'.and.N_ext_BC/=12.and.MasterProc)then
       write(*,*)'Nest: WARNING: Expected 12 months in BC file, found ',N_ext_BC
       call CheckStop('Nest BC: wrong number of months')
     end if
@@ -1385,7 +1511,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
       allocate(ndays_ext(N_ext_BC))
     end if
 
-    if(MODE_READ=='MONTH')then
+    if(NEST_MODE_READ=='MONTH')then
       ! only care of the month
       call nctime2date(ndate,ndays_indate,'Nest: BC reading record MM')
       n=ndate(2)
@@ -1464,7 +1590,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
         unitscale=adv_bc(bc)%frac
       end if
       if(unitscale/=1.0) data=data*unitscale
-    end if
+   end if
     CALL MPI_BCAST(data,8*GIMAX_ext*GJMAX_ext*KMAX_ext_BC,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     CALL MPI_BCAST(divbyroa,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
 
@@ -1586,10 +1712,10 @@ subroutine reset_3D(ndays_indate)
     if(mydebug) write(*,*) 'Nest: init-icbc'
     call init_icbc(ndays=ndays_indate)
     if(mydebug) write(*,*)'calling init_nest for 3D '//trim(filename_read_3D)
-    call init_nest(ndays_indate,filename_read_3D,native_grid_3D,&
+    call init_nest(ndays_indate,filename_read_3D,NEST_native_grid_3D,&
                   IIij,JJij,Weight,k1_ext,k2_ext,weight_k1,weight_k2,&
                   N_ext,KMAX_ext,GIMAX_ext,GJMAX_ext)
-    if(MODE_READ=='MONTH'.and.(N_ext/=12.and.N_ext/=1.and.MasterProc))then
+    if(NEST_MODE_READ=='MONTH'.and.(N_ext/=12.and.N_ext/=1.and.MasterProc))then
       write(*,*)'Nest: WARNING: Expected 12 or 1 monthes in IC file, found ',N_ext
       call CheckStop('Nest: IC: wrong number of months')
     end if
@@ -1606,7 +1732,7 @@ subroutine reset_3D(ndays_indate)
      allocate(data(GIMAX_ext,GJMAX_ext,KMAX_ext), stat=status)
      if(MasterProc)then
         call check(nf90_open(trim(fileName_read_3D),nf90_nowrite,ncFileID))
-        if(MODE_READ=='MONTH')then
+        if(NEST_MODE_READ=='MONTH')then
            if(N_ext==1)then
               n=1
            else

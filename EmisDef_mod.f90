@@ -148,8 +148,8 @@ private
    real, public, parameter    ::  ROADDUST_FINE_FRAC = 0.1 ! PM2.5 fraction of PM10-road dust emission  
 
    !Pollen
-   integer, public, parameter ::  NPOL  = 1 &   ! number of dust size modes
-                                 ,QPOL  = 1 
+!  integer, public, parameter ::  NPOL  = 1 &   ! number of dust size modes
+!                                ,QPOL  = 1 
 
    !Volcanos. 
    logical, public, parameter :: VOLCANOES_LL  = .true.  ! Read Volcanoes 
@@ -165,8 +165,8 @@ integer,  public, save :: NEmis_id
 integer,  public :: NEmisMask = 0 !number of masks defined (new format)
 real,  public, allocatable :: EmisMaskValues(:,:,:) ! size will be (LIMAX,LJMAX,NEmisMask)
 type(Emis_id_type), public, save:: Emis_id(10)
-type(EmisFile_id_type), public, save:: EmisFiles(20) !list of emission files after validation
-integer,  public, parameter:: NEmis_sourcesMAX = 500
+type(EmisFile_id_type), public, save:: EmisFiles(10) !list of emission files after validation
+integer,  public, parameter:: NEmis_sourcesMAX = 50
 type(Emis_id_type), public, save:: Emis_source(NEmis_sourcesMAX) !list of valid sources found in the emission files
 integer,  public, save :: NEmis_sources = 0
 integer,  public, save :: NEmis_3Dsources = 0

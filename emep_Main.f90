@@ -1,4 +1,4 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -35,7 +35,6 @@ program emep_Main
   !
   !-----------------------------------------------------------------------!
 
-  use My_Outputs_mod,    only: set_output_defs
   use My_Timing_mod,     only: lastptim, mytimm, Output_timing, &
        Init_timing, Add_2timing, Code_timer, &
        tim_before, tim_before1, tim_before2, &
@@ -56,12 +55,12 @@ program emep_Main
        METSTEP,    &   ! Hours between met input
        runlabel1,  &   ! explanatory text
        runlabel2,  &   ! explanatory text
-       iyr_trend, nmax,nstep , meteo,     &
+       iyr_trend, nmax,step_main , meteo,     &
        IOU_INST,IOU_HOUR,IOU_HOUR_INST, IOU_YEAR,IOU_MON, IOU_DAY, &
        HOURLYFILE_ending, &
        USES, USE_uEMEP,JUMPOVER29FEB,&
        ANALYSIS, & ! forecast in ANALYSIS mode
-       Config_ModelConstants, startdate, enddate
+       Config_Constants, startdate, enddate
   use Country_mod,       only: init_Country
   use DA_3DVar_mod,      only: NTIMING_3DVAR,DA_3DVar_Init, DA_3DVar_Done
   use Debug_module,      only: DEBUG   ! -> DEBUG%MAINCODE
@@ -84,7 +83,7 @@ program emep_Main
                     !          MasterPE,IERROR, MPI_world_init
   use Nest_mod,          only: wrtxn     ! write nested output (IC/BC)
   use NetCDF_mod,        only: Init_new_netCDF
-  use OutputChem_mod,    only: WrtChem, wanted_iou
+  use OutputChem_mod,    only: WrtChem, wanted_iou, set_output_defs 
   use Par_mod,           only: me, GIMAX, GJMAX, Topology_io, Topology, parinit
   use PhyChem_mod,       only: phyche    ! Calls phys/chem routines each dt_advec
   use Sites_mod,         only: sitesdef  ! to get output sites
@@ -148,7 +147,7 @@ program emep_Main
   if(MasterProc) open(IO_LOG,file='RunLog.out')
 !TEST
   call define_chemicals()    ! sets up species details
-  call Config_ModelConstants(IO_LOG)
+  call Config_Constants(IO_LOG)
 
   call assign_startandenddate()
  
@@ -277,7 +276,7 @@ program emep_Main
 
   mm_old = 0
   oldseason = 0
-  nstep=0
+  step_main=0
 
   !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   !
@@ -286,7 +285,7 @@ program emep_Main
   !
   do while(.not.End_of_Run)        ! main time-loop , timestep is dt_advec
 
-    nstep=mod(nstep,nmax)+1 !loops from 1 to nmax, between two meteo read
+    step_main=step_main + 1 !main loop with dt_advec between each step
 
     !FUTURE if (NH3EMIS_VAR) call SetNH3()  ! NH3emis experimental
 

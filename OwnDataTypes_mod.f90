@@ -1,4 +1,4 @@
-! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -194,6 +194,23 @@ type, public :: VBST
 end type VBST
 !==================
 
+
+type, public:: O3cl_t
+   character(len=TXTLEN_DERIV) :: name = '-'  ! e.g. POD1_IAM_DF
+   character(len=TXTLEN_SHORT) :: class = '-' ! POD or AOT
+   real    :: Threshold = UNDEF_R     ! Threshold or CL, e.f. AOTx or AFstY
+   character(len=TXTLEN_SHORT) :: defn = '-'  !  MM or EU definitions
+   character(len=TXTLEN_SHORT) :: txtLC = '-' !  CF, DF, IAM_CF etc.
+   logical :: RelSGS = .false.  ! true if accumulation period is relative to
+   ! start of growing season (SGS)
+   ! can be false it fixed, e.g. April 1st
+   integer :: SAccPeriod = UNDEF_I  ! Start of accumulation period, either
+   ! rel to SGS or day number, days
+   integer :: EAccPeriod = UNDEF_I  ! End ...., days
+   character(len=TXTLEN_IND)            :: iotype = '-'! .. 'M'=>IOU_MON, 'D'=>IOU_DAY, ...
+end type O3cl_t
+
+
 !==================
 ! uEMEP parameters
 integer, public, parameter :: Npoll_uemep_max=7 !max number of uEMEP pollutant
@@ -217,8 +234,6 @@ type, public :: Emis_id_type
    character(len=TXTLEN_NAME) :: units = 'NOTSET'!units AFTER netcdf values are multiplied by factor
    character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' !country name, for example FR for France, as defined in Country_mod
    character(len=TXTLEN_NAME) :: periodicity = 'NOTSET' !how often fresh values must be read from the netcdf file
-   integer :: SNAPsector = -1 !sector defined as SNAP 
-   integer :: GNFRsector = -1 !sector defined as GNFR, not defined yet
    integer :: sector = -1 !sector as defined in current model, according to USE_SECTORS_NAME  
    integer :: species_ix = -1 ! internal index for species
    integer :: injection_k = -1 !which model k level to put emissions into. Only for individual species 
@@ -252,6 +267,7 @@ type, public :: Emis_sourceFile_id_type
    character(len=TXTLEN_NAME) :: species = 'NOTSET' !default emep species
    character(len=TXTLEN_NAME) :: units = 'NOTSET'! default units 
    character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' ! default country name
+   character(len=TXTLEN_NAME) :: sectorsName = 'NOTSET' !
    integer :: sector = -1 !default sector 
    logical :: apply_femis = .true. !whether the general femis.dat should be applied to sources from this file
    logical :: include_in_local_fractions = .true. !if this is to be accounted in the local fractions (uEMEP)
@@ -276,10 +292,11 @@ type, public :: EmisFile_id_type
    integer :: Nsources = 0 !number of valid sources (i.e variables in the netcdf file)
    integer :: source_start = 0
    integer :: source_end = 0
-   character(len=TXTLEN_NAME) :: species = 'NOTSET' !default emep species
+   character(len=TXTLEN_NAME) :: species = 'NOTSET' !default emep species. NB: not read from attributes
    character(len=TXTLEN_NAME) :: units = 'NOTSET'! default units 
    character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' ! default country name
-   integer :: sector = -1 !default sector .NB: not read from attributes
+   character(len=TXTLEN_NAME) :: sectorsName ='NOTSET' !SNAPsectors or GNFRsectors
+   integer :: sector = -1 !default sector 
    character(len=TXTLEN_NAME) :: mask_ID = 'NOTSET' ! set to ID of mask, if to be applied. Will then be default for all sources in file .NB: not read from attributes
    character(len=TXTLEN_NAME) :: mask_ID_reverse = 'NOTSET' ! set to ID of mask, if to be applied as reversed. Will then be default for all sources in file .NB: not read from attributes
 end type EmisFile_id_type
@@ -314,6 +331,7 @@ type, public :: uEMEP_type
   type(poll_type) :: poll(Npoll_uemep_max) !pollutants to include
   logical     :: YEAR =.true.! Output frequency
   logical     :: MONTH =.false.
+  character(len=40)::  MONTH_ENDING = "NOTSET"
   logical     :: DAY =.false.
   logical     :: HOUR =.false.
   logical     :: HOUR_INST =.false.

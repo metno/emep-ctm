@@ -1,4 +1,4 @@
-! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -27,13 +27,13 @@
 ! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 module MosaicOutputs_mod
-use AOTx_mod,          only: Calc_AOTx, Calc_POD, O3cl_t, VEGO3_OUTPUTS,&
-                                nOutputVegO3, OutputVegO3
+use AOTx_mod,          only: Calc_AOTx, Calc_POD, VEGO3_OUTPUTS,&
+                                nOutputVegO3
 use CheckStop_mod,     only: CheckStop
 use ChemDims_mod,      only: NSPEC_ADV,NSPEC_SHL
 use ChemGroups_mod,    only: chemgroups
 use ChemSpecs_mod,     only: species_adv
-use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY
+use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY,OutputVegO3
 use Debug_module,      only: DEBUG   ! -> DEBUG%MOSAICS
 use DerivedFields_mod, only: f_2d, d_2d
 use EcoSystem_mod,     only: NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS, EcoSystemFrac, &
@@ -45,7 +45,7 @@ use Landuse_mod,       only: LandCover ! for POD
 use LocalVariables_mod,only: Grid,SubDat, L
 use MetFields_mod
 use OwnDataTypes_mod,  only: Deriv, print_deriv_type, typ_s5ind, typ_s1ind, typ_s3,&
-                            TXTLEN_DERIV, TXTLEN_SHORT
+                            TXTLEN_DERIV, TXTLEN_SHORT,O3cl_t
 use SmallUtils_mod,    only: find_index, trims
 use SubMet_mod,        only: Sub
 use TimeDate_mod,      only: current_date, effectivdaynumber, print_date

@@ -1,4 +1,4 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -49,7 +49,8 @@ use Config_module,      only: &
      MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN, JUMPOVER29FEB,&
      PT,Pref,NMET,USE_EtaCOORDINATES,MANUAL_GRID,USE_WRF_MET_NAMES,&
      startdate,NPROCX,NPROCY,Vertical_levelsFile,&
-     EUROPEAN_settings, GLOBAL_settings,USES,FORCE_PFT_MAPS_FALSE
+     EUROPEAN_settings, GLOBAL_settings,USES,FORCE_PFT_MAPS_FALSE,&
+     USE_SOILNOx
 use Debug_module, only:  DEBUG   ! -> DEBUG%GRIDVALUES
 
 use MPI_Groups_mod!, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_LOGICAL, &
@@ -108,6 +109,8 @@ public :: RestrictDomain ! mask from full domain to rundomain
 public :: GridRead
 public :: extendarea_N ! returns array which includes neighbours from other subdomains
 public :: set_EuropeanAndGlobal_Config
+public :: remake_vertical_levels_interpolation_coeff
+public :: Meteo_Get_KMAXMET
 
 private :: Alloc_GridFields
 private :: GetFullDomainSize
@@ -361,7 +364,7 @@ subroutine GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,projection)
      status = nf90_open(path=trim(filename),mode=nf90_nowrite,ncid=ncFileID)
      if(status/=nf90_noerr) then
         print *,'not found',trim(filename)
-        call StopAll("GridValues: File not found")
+        call StopAll("GridValues: File not found:"//trim(filename))
      end if
 
      projection=''
@@ -1269,12 +1272,12 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
   Poles=0
   if(North_pole==1)then
     Poles(1)=1
-    write(*,*)me,'Found North Pole'
+    if(MasterProc .or. me==NPROC-1)write(*,*)me,'Found North Pole'
   end if
   
   if(South_pole==1)then
     Poles(2)=1
-    write(*,*)me,'Found South Pole'
+    if(MasterProc .or. me==NPROC-1)write(*,*)me,'Found South Pole'
   end if
   do j=1,LJMAX
     do i=1,LIMAX
@@ -1973,6 +1976,228 @@ subroutine make_vertical_levels_interpolation_coeff
   CALL MPI_BCAST(x_k1_met,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
 
 end subroutine make_vertical_levels_interpolation_coeff
+
+subroutine Meteo_Get_KMAXMET(filename, KMAX, ncfileID_in)
+
+  character(len=*), intent(in)  :: filename 
+  integer, intent(out)  :: KMAX
+  integer, intent(in), optional  :: ncfileID_in
+  integer :: kdimid, ncFileID, status
+
+  if(present(ncfileID_in))then
+     ncfileID = ncfileID_in
+  else
+     status = nf90_open(path=trim(filename),mode=nf90_nowrite,ncid=ncFileID)
+     if(status/=nf90_noerr) then
+        print *,'not found',trim(filename)
+        call CheckStop("GridValues get KMAX: File not found")
+     end if
+  endif
+
+  status=nf90_inq_dimid(ncid=ncFileID, name="k", dimID=kdimID)
+  if(status/=nf90_noerr)then
+     status=nf90_inq_dimid(ncid=ncFileID, name="lev", dimID=kdimID)!hybrid coordinates                                               
+     if(status/=nf90_noerr) then
+        status=nf90_inq_dimid(ncid=ncFileID, name="hybrid", dimID=kdimID)!hybrid coordinates                                         
+        if(status/=nf90_noerr) then ! WRF format                                                                                     
+           call check(nf90_inq_dimid(ncid=ncFileID, name="bottom_top", dimID=kdimID))
+           end if
+     end if
+  end if
+  call check(nf90_inquire_dimension(ncid=ncFileID,dimID=kdimID,len=KMAX))
+
+  if(.not.present(ncfileID_in))call check(nf90_close(ncFileID))  
+
+end subroutine Meteo_Get_KMAXMET
+
+subroutine remake_vertical_levels_interpolation_coeff(filename)
+  ! make again interpolation coefficients to convert the levels defined in meteo
+  ! into the levels defined in Vertical_levelsFile
+  ! this is used if the number of vertical levels has changed from one meteo 
+  ! file to the next
+
+  character(len=*), intent(in)  :: filename 
+  integer ::k,kk,k_met
+  real ::p_met,p_mod,p1,p2
+  real :: P_TOP_MET,P0
+  integer :: status, ncFileID, kdimID, varID, ios
+
+  status = nf90_open(path=trim(filename),mode=nf90_nowrite,ncid=ncFileID)
+  if(status/=nf90_noerr) then
+    print *,'not found',trim(filename)
+    call CheckStop("GridValues: File not found")
+  end if
+  if(MasterProc)print *,'Redefining vertical interpolation parameters for ',trim(filename)
+
+  if(.not. allocated(k1_met))allocate(k1_met(KMAX_MID),k2_met(KMAX_MID),x_k1_met(KMAX_MID))
+  if(allocated(A_bnd_met))then
+    deallocate(A_bnd_met,B_bnd_met)
+  end if
+
+  call Meteo_Get_KMAXMET(filename, KMAX_MET, ncfileID)
+
+  status=nf90_inq_varid(ncid=ncFileID, name="k", varID=varID)
+  if(status/=nf90_noerr)then
+    if(MasterProc)write(*,*)'reading met hybrid levels from ',trim(filename)
+    status=nf90_inq_varid(ncid=ncFileID, name="P0", varID=varID)
+    if(status/=nf90_noerr)&
+      status=nf90_inq_varid(ncid=ncFileID, name="p0", varID=varID)
+    if(status/=nf90_noerr)then
+      status=nf90_inq_varid(ncid=ncFileID, name="P00", varID=varID) !WRF case
+      if(status/=nf90_noerr)then
+          call StopAll('Do not know how to define vertical levels')
+      else
+        ! WRF format
+        ! asuming sigma levels ZNW=(P-P_TOP_MET)/(PS-P_TOP_MET)
+        ! P = A+B*PS = P_TOP_MET*(1-ZNW) + ZNW*PS
+        ! B = ZNW
+        ! A = P_TOP_MET*(1-ZNW)
+        call check(nf90_get_var(ncFileID, varID, P0 ))
+        if(.not.allocated(A_bnd_met))allocate(A_bnd_met(KMAX_MET+1),B_bnd_met(KMAX_MET+1))
+        call check(nf90_inq_varid(ncid=ncFileID, name="P_TOP", varID=varID))
+        call check(nf90_get_var(ncFileID, varID, P_TOP_MET ))
+        call check(nf90_inq_varid(ncid=ncFileID, name="ZNW", varID=varID))
+        call check(nf90_get_var(ncFileID, varID, B_bnd_met ))
+        if(MET_REVERSE_K)then
+          A_bnd_met=B_bnd_met!use A_bnd_met as temporary buffer
+          do k=1,KMAX_MET+1
+            B_bnd_met(k)=A_bnd_met(KMAX_MET+2-k)
+          end do
+        end if
+        A_bnd_met=P_TOP_MET*(1.-B_bnd_met)
+      end if
+      if(MET_REVERSE_K)then
+        if(MasterProc)write(*,*)"Reversed vertical levels from met, P at level boundaries:"
+      else
+        if(MasterProc)write(*,*)"Vertical levels from met, P at level boundaries:"
+      end if
+      do k=1,KMAX_MET+1
+        if(MasterProc)write(*,44)k, A_bnd_met(k)+P0*B_bnd_met(k)
+      end do
+    else
+      call check(nf90_get_var(ncFileID, varID, P0 ))
+      if(MasterProc)write(*,*)'P0 = ',P0
+      if(.not.allocated(A_bnd_met))allocate(A_bnd_met(KMAX_MET+1),B_bnd_met(KMAX_MET+1))
+      status=nf90_inq_varid(ncid=ncFileID, name="hyai", varID=varID)
+      if(status/=nf90_noerr)then
+        call check(nf90_inq_varid(ncid=ncFileID, name="ap", varID=varID))
+        call check(nf90_get_var(ncFileID, varID, A_bnd_met, count=(/KMAX_MET/)))!read mid values!
+        call check(nf90_inq_varid(ncid=ncFileID, name="b", varID=varID))
+        call check(nf90_get_var(ncFileID, varID, B_bnd_met, count=(/KMAX_MET/) )) !read mid values!
+        A_bnd_met(KMAX_MET+1)=0.0
+        B_bnd_met(KMAX_MET+1)=1.0
+        do k=KMAX_MET,1,-1
+          A_bnd_met(k)=A_bnd_met(k+1)-2.0*(A_bnd_met(k+1)-A_bnd_met(k))!from mid to bnd values!
+          B_bnd_met(k)=B_bnd_met(k+1)-2.0*(B_bnd_met(k+1)-B_bnd_met(k))!from mid to bnd values!
+        end do
+        
+        if(MasterProc)write(*,*)'Metdata pressure at level boundaries:'
+        do k=1,KMAX_MET+1
+          if(MasterProc)write(*,44)k, A_bnd_met(k)+P0*B_bnd_met(k)
+        end do
+        
+      else
+        call check(nf90_get_var(ncFileID, varID, A_bnd_met ))
+        A_bnd_met=P0*A_bnd_met!different definition in model and grid_Def
+        call check(nf90_inq_varid(ncid=ncFileID, name="hybi", varID=varID))
+        call check(nf90_get_var(ncFileID, varID, B_bnd_met ))
+      end if
+    end if
+    if(External_Levels_Def)then
+       !model levels defined from external text file
+       if(MasterProc)&
+            write(*,*)'reading external hybrid levels from ',trim(Vertical_levelsFile),&
+            A_bnd_met(kMAX_met+1),B_bnd_met(kMAX_met+1)
+       P0=Pref
+       open(IO_TMP,file=trim(Vertical_levelsFile),action="read",iostat=ios)
+       read(IO_TMP,*)k
+       if(k/=KMAX_MID .and. MasterProc)write(*,*)k,kmax_mid,&
+            'WARNING: unexpected number of levels for '//trim(Vertical_levelsFile)
+       do k=1,KMAX_MID+1
+          read(IO_TMP,*)kk,A_bnd(k),B_bnd(k)
+          if(kk/=k.and.MasterProc)write(*,*)'WARNING: unexpected format for vertical levels ',k,kk
+       end do
+       close(IO_TMP)
+    else
+      !vertical model levels are the same as in meteo
+      A_bnd=A_bnd_met
+      B_bnd=B_bnd_met
+    end if
+    
+    do k=1,KMAX_MID
+      A_mid(k)=0.5*(A_bnd(k)+A_bnd(k+1))
+      B_mid(k)=0.5*(B_bnd(k)+B_bnd(k+1))
+    end do
+    sigma_mid =B_mid!for Hybrid coordinates sigma_mid=B if A*P0=PT-sigma_mid*PT
+    
+    if(MasterProc)write(*,*)"Model pressure at level boundaries:"
+    do k=1,KMAX_MID+1
+44    FORMAT(i4,10F12.2)
+      if(MasterProc)write(*,44)k, A_bnd(k)+P0*B_bnd(k)
+    end do
+    !test if the top is within the height defined in the meteo files
+    if(MasterProc.and.External_Levels_Def.and.(A_bnd(1)+P0*B_bnd(1)+0.01<A_bnd_met(1)+P0*B_bnd_met(1)))then
+      write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+P0*B_bnd(1)
+      write(*,*)'Pressure at top defined in meteo files is ',A_bnd_met(1)+P0*B_bnd_met(1)
+      write(*,*)'Pressure at op must be higher (lower altitude) than top defined in meteo '
+      call StopAll('Top level too high! Change values in '//trim(Vertical_levelsFile))
+    end if
+    
+    !test if the levels can cope with highest mountains (400 hPa)
+    do k=1,KMAX_MID
+      if(MasterProc.and.A_bnd(k+1)+40000*B_bnd(k+1)-(A_bnd(k)+40000*B_bnd(k))<0.0)then
+        write(*,*)'WARNING: hybrid vertical level definition may cause negative level thickness when pressure below 400 hPa '
+        write(*,*)'Pressure at level ',k,' is ',A_bnd(k)+40000*B_bnd(k)
+        write(*,*)'Pressure at level ',k+1,' is ',A_bnd(k+1)+40000*B_bnd(k+1),' (should be higher)'
+        if(External_Levels_Def)call StopAll('GridValues_mod: possible negative level thickness ')
+      end if
+    end do
+    
+    !test if the lowest levels is thick enough (twice height of highest vegetation?) about 550 Pa = about 46m
+    !Deposition scheme is not designes for very thin lowest levels
+    if(MasterProc.and.A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1)-(A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID))<550.0)then
+      write(*,*)'WARNING: lowest level very shallow; ',A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1) -&
+      (A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID)),'Pa'
+!      call StopAll('Lowest level too thin! Change vertical levels definition in '//trim(Vertical_levelsFile))
+    end if
+    
+  end if
+  call check(nf90_close(ncFileID))
+  
+  if(me_mpi==0)then
+    ! only me=0 has the values for A_bnd_met and B_bnd_met
+    do k=1,KMAX_MID
+      P_mod=A_mid(k)+Pref*B_mid(k)
+      !find the lowest met level higher than the model level
+      !do k_met=1,KMAX_MET
+      k_met=KMAX_MET-1
+      p_met=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+      do while(p_met>P_mod.and.k_met>1)
+        !if(MasterProc) write(*,*)P_mod,p_met
+        k_met=k_met-1
+        p_met=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+      end do
+      k1_met(k)=k_met
+      k2_met(k)=k_met+1
+      k_met=k1_met(k)
+      p1=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+      k_met=k2_met(k)
+      p2=0.5*(A_bnd_met(k_met+1)+A_bnd_met(k_met))+Pref*0.5*(B_bnd_met(k_met+1)+B_bnd_met(k_met))
+      x_k1_met(k)=(p_mod-p2)/(p1-p2)
+      write(*,77)k, ' interpolated from levels ', k1_met(k),' and ',k2_met(k),P_mod,p1,p2,x_k1_met(k)
+77    format(I4,A,I3,A,I3,13f11.3)
+      if(x_k1_met(k)<-0.00001 .or. (1.0-x_k1_met(k))<-0.00001)then
+        write(*,*)'WARNING: Extrapolation of data. This is NOT recommended for some metfields'
+      end if
+      
+    end do
+  end if
+  
+  CALL MPI_BCAST(k1_met,4*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
+  CALL MPI_BCAST(k2_met,4*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
+  CALL MPI_BCAST(x_k1_met,8*KMAX_MID,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
+
+end subroutine remake_vertical_levels_interpolation_coeff
 
 subroutine lambert2lb(x,y,gl,gb,lon0,y0,k,F)
   real, intent(in) ::x,y,lon0,y0,k,F
@@ -2828,6 +3053,7 @@ subroutine set_EuropeanAndGlobal_Config()
   
   implicit none
   real:: x1,x2,x3,x4,y1,y2,y3,y4,lon,lat,ir,jr
+  character(len=*), parameter :: dtxt='EurGlobSettings:'
 
   if(EUROPEAN_settings == 'NOTSET')then
      !No value set in config input, use grid to see if it covers Europe
@@ -2837,8 +3063,8 @@ subroutine set_EuropeanAndGlobal_Config()
 
      if(gbacmax>35 .and. glacmin<40 .and. glacmax>-32)then
         
-        if(me==0)write(*,*)'assuming EUROPEAN_settings'
-
+        if(MasterProc)write(*,*) dtxt//'assuming EUROPEAN_settings'
+        EUROPEAN_settings = 'YES' 
      else
         
         ! define middle point of middle subdomain
@@ -2853,16 +3079,16 @@ subroutine set_EuropeanAndGlobal_Config()
 18      format(A,2F6.1,A)
         if(inside_1234(x1,x2,x3,x4,y1,y2,y3,y4,lon,lat))then
            EUROPEAN_settings = 'YES' 
-           if(me==0)write(*,18)'assuming EUROPEAN_settings: lon,lat ',lon,lat,' within Europe'
+           if(MasterProc)write(*,18) dtxt//'assuming EUROPEAN_settings: lon,lat ',lon,lat,' within Europe'
         else
            EUROPEAN_settings = 'NO' !default
-           if(me==0)write(*,18)'Not assuming EUROPEAN_settings: lon,lat ',lon,lat,' outside Europe'
+           if(MasterProc)write(*,18) dtxt//'Not assuming EUROPEAN_settings: lon,lat ',lon,lat,' outside Europe'
         endif
 
      endif 
- else  !DS J2018 added:
-    if(me==0) write(*,*)'settings from config , EUR GLOB ', EUROPEAN_settings, GLOBAL_settings
- endif
+  else
+    if(MasterProc) write(*,*) dtxt//'settings from config , EUR GLOB ', EUROPEAN_settings, GLOBAL_settings
+  endif
 
   if(GLOBAL_settings == 'NOTSET')then
      !No value set in config input, use grid to see if it covers regions outside Extended Europe
@@ -2872,55 +3098,74 @@ subroutine set_EuropeanAndGlobal_Config()
      !find if lat < 19 are included within the domain
      if(gbacmin<19.0)then
         GLOBAL_settings = 'YES' !default
-        if(me==0)write(*,*)'Assuming GLOBAL_settings because rundomain extends below 19 degrees latitudes'
+        if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain extends below 19 degrees latitudes'
      else
         !find if the point with lon = -40 and lat = 45 is within the domain
         call lb2ij(-40.0,45.0,ir,jr)
         if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
            GLOBAL_settings = 'YES' !default
-           if(me==0)write(*,*)'Assuming GLOBAL_settings because rundomain contains lon=-40 at lat=45'
+           if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=-40 at lat=45'
         else 
            !find if the point with lon = 92 and lat = 45 is within the domain
            call lb2ij(92.0,45.0,ir,jr)
            if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
               GLOBAL_settings = 'YES' !default
-              if(me==0)write(*,*)'Assuming GLOBAL_settings because rundomain contains lon=92 at lat=45'
+              if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=92 at lat=45'
            else
-              if(me==0)write(*,*)'Not assuming GLOBAL_settings'
+              if(MasterProc)write(*,*)dtxt//'Not assuming GLOBAL_settings'
            endif           
         endif
      endif
   endif
 
+  if(EUROPEAN_settings == 'YES') then
+     if(USES%MonthlyNH3  == 'NOTSET' .and. GLOBAL_settings /= 'YES')then
+        USES%MonthlyNH3  = 'LOTOS'
+        if(MasterProc)write(*,*)dtxt//' MonthlyNH3 set to '//trim(USES%MonthlyNH3)
+     endif
+  endif
 
   if(GLOBAL_settings == 'YES') then
      if(FORCE_PFT_MAPS_FALSE)then
-        if(me==0)write(*,*)'WARNING: NOT USING PFT_MAPS in a GLOBAL grid'
+        if(MasterProc)write(*,*)dtxt//'WARNING: NOT USING PFT_MAPS in a GLOBAL grid'
         USES%PFT_MAPS = .false. 
      else
         if(USES%PFT_MAPS)then        
            !nothing to change
         else
-           if(me==0)write(*,*)'Using PFT_MAPS because GLOBAL grid'
+           if(MasterProc)write(*,*)dtxt//'Using PFT_MAPS because GLOBAL grid'
            USES%PFT_MAPS = .true. 
         endif
      endif
      if(USES%DEGREEDAY_FACTORS)then        
-        if(me==0)write(*,*)'WARNING: not using DEGREEDAY_FACTORS because GLOBAL grid'
+        if(MasterProc)write(*,*)dtxt//'WARNING: not using DEGREEDAY_FACTORS because GLOBAL grid'
         USES%DEGREEDAY_FACTORS = .false.
      endif
 
      if(.not. USES%GLOBAL_SOILNOX)then
-        if(me==0)write(*,*)'WARNING: setting GLOBAL_SOILNOX because GLOBAL grid'
+        if(MasterProc)write(*,*)dtxt//'WARNING: setting GLOBAL_SOILNOX because GLOBAL grid'
         USES%GLOBAL_SOILNOX = .true.
      endif
 
      if(USES%EURO_SOILNOX)then        
         USES%EURO_SOILNOX = .false. 
-        if(me==0)write(*,*)'Not using EURO_SOILNOX because GLOBAL grid'
+        if(MasterProc)write(*,*)dtxt//'Not using EURO_SOILNOX because GLOBAL grid'
      endif
-     
+
+     if(USES%MonthlyNH3  == 'LOTOS')then
+        if(MasterProc)write(*,*)dtxt//'WARNING: MonthlyNH3=LOTOS is not advised outside Europe'
+     endif
+
   endif
+  if(MasterProc)write(*,'(a,3(a,L))')dtxt//'Final settings, EUR = '//trim(EUROPEAN_settings)&
+       //', GLOB = '//trim(GLOBAL_settings)&
+       //', MonthlyNH3 = '//trim(USES%MonthlyNH3)&
+       ,', E-SNOx = ',USES%EURO_SOILNOX&
+       ,', G-SNOx = ',USES%GLOBAL_SOILNOX&
+       ,', USE_SOILNOx= ',USE_SOILNOX
+
+!  trim(EUROPEAN_settings)//','//&
+!       trim(GLOBAL_settings), USES%EURO_SOILNOX, USES%GLOBAL_SOILNOX, USE_SOILNOX
 
 end subroutine set_EuropeanAndGlobal_Config
 

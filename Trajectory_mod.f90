@@ -38,8 +38,8 @@ module Trajectory_mod
   ! and should be updated before use.                              !
   !----------------------------------------------------------------!
 
-  use My_Outputs_mod,      only : NADV_FLIGHT, FLIGHT_ADV !ds - added
   use Chemfields_mod  ,    only : xn_adv
+  use ChemSpecs_mod,        only: species_adv
   use GridValues_mod ,     only : glon, glat
   use Io_mod,              only : IO_AIRCR
   use MetFields_mod,       only : z_bnd,z_mid
@@ -49,6 +49,8 @@ module Trajectory_mod
                              MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
   use Par_mod   ,          only : gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG,me
   use TimeDate_mod,        only : current_date
+  use SmallUtils_mod,      only : find_index
+
   implicit none
   private
   
@@ -59,6 +61,14 @@ module Trajectory_mod
   integer, private, save :: iimax, iii
   integer, private, save ::  fapos(2,999)
   real, private, save ::  kfalc(999), rhour(999)
+  integer, public, parameter :: &
+       NFLIGHT_MAX =    10         &   ! Max. no sondes allowed
+       ,FREQ_FLIGHT =    12        &   ! Interval (hrs) between outputs (not used?)
+       ,NADV_FLIGHT_MAX = 10   ! Max No.  advected species that can be requested
+  integer, public :: &
+       NADV_FLIGHT = 0    ! No.  advected species requested in  trajectory_init
+
+integer, public, dimension(NADV_FLIGHT_MAX) :: FLIGHT_ADV
 
 contains
 
@@ -66,11 +76,15 @@ contains
 
   subroutine trajectory_init
     implicit none
-    
+    integer ::index
     iii = 1
     rhour(1) = 1.
     rhour(2) = 0.
-    
+    index=find_index("O3",species_adv(:)%name)
+    if(index>0)then
+       FLIGHT_ADV=index
+       NADV_FLIGHT = NADV_FLIGHT + 1
+    endif
   end subroutine trajectory_init
 
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

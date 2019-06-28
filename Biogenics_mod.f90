@@ -1,4 +1,4 @@
-! <Biogenics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.32>
+! <Biogenics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2019 met.no
@@ -118,9 +118,9 @@ module Biogenics_mod
 
   ! We hard-code these indices, but only calculate emissions if needed
   ! Must match order of NATBIO to start with 
-  integer, parameter, public ::  NEMIS_BioNat  = 13
-  character(len=11), save, dimension(NEMIS_BioNat), public:: &
-      EMIS_BioNat =  (/ &
+  integer, parameter, public ::  NEMIS_BioNat  = 17
+  character(len=13), save, dimension(NEMIS_BioNat), public:: &
+      EMIS_BioNat = [character(len=13):: &
              "C5H8       " &
            , "TERP       " &
            , "NO         " &
@@ -133,7 +133,11 @@ module Biogenics_mod
            , "Dust_WB_c  " &
            , "Dust_ROAD_f" &
            , "Dust_ROAD_c" &
-           , "RN222      "  /)
+           , "POLLEN_BIRCH"&
+           , "POLLEN_OLIVE"&
+           , "POLLEN_RWEED"&
+           , "POLLEN_GRASS"&
+           , "RN222      " ]
 
   integer, public, parameter :: &
       N_ECF=2, ECF_ISOP=1, ECF_TERP=2   &! canopy factors, BVOC
@@ -612,9 +616,8 @@ module Biogenics_mod
   !ASSUME C5H8 FOR NOW if ( ibn_C5H8 > 0 ) then
     if ( Grid%izen <= 90) then ! Isoprene in daytime only:
 
-     ! Light effects from Guenther G93
+     ! Light effects from Guenther G93. Need uE:
 
-!WN      par = (Grid%Idirect + Grid%Idiffuse) * PARfrac * Wm2_uE
       par = ( PARdbh(i,j) + PARdif(i,j)  ) * Wm2_uE
 
       cL = ALPHA * CL1 * par/ sqrt( 1 + ALPHA*ALPHA * par*par)
