@@ -63,20 +63,6 @@
   emis_inputlist(2)%name= 'DataDir/OceanicEmissions_GEIA.nc',
   emis_inputlist(2)%type= 'DMS',
   EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
-! emissions new format
-  Emis_sourceFiles(1)%filename = 'DataDir/FMI_Ship_Emis2015.nc',
-! EC split into 80% EC_f_ffuel_new, 20% EC_f_ffuel_age
-  Emis_sourceFiles(1)%source(1:2)%varname='EC','EC',
-  Emis_sourceFiles(1)%source(1:2)%species='EC_f_ffuel_new','EC_f_ffuel_age',
-  Emis_sourceFiles(1)%source(1:2)%factor=0.8,0.2, ! 80% new, 20% age
-! rename Ash/REMPPM25 to remPPM25
-  Emis_sourceFiles(1)%source(3)%varname='Ash',
-  Emis_sourceFiles(1)%source(3)%species='remPPM25',
-  Emis_sourceFiles(1)%source(3)%factor=1.0,
-!rename OC/POM_f_FFUEL to POM_f_ffuel
-  Emis_sourceFiles(1)%source(4)%varname='OC',
-  Emis_sourceFiles(1)%source(4)%species='POM_f_ffuel',
-  Emis_sourceFiles(1)%source(4)%factor=1.0,
 !------------------------------
   USES%ASH              = T,          ! Ash from historical Volcanic Eruptions
   ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
