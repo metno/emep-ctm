@@ -436,7 +436,7 @@ def read_catalog(filename, verbose=1):
         # pack index[r] into a DataSet object
         #   before index[r]:{meteo:DataPoint,source:DataPoint,..}
         #   after  index[r]:DataSet (with search metadata)
-        index[r] = DataSet(v['source'][0].model, r, v['meteo'][0].year,
+        index[r] = DataSet(v['source'][0].model, r, v['meteo'][0].year if v['meteo'] else None,
                            v['source'][0].year, v)
         if verbose > 2:
             print("  index[%s]: %s"%(r, index[r]))
