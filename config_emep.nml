@@ -38,17 +38,15 @@
   USES%EMISSTACKS       = F,         ! Reads PointSources file
   USES%DEGREEDAY_FACTORS = T,
   USES%PlumeMethod      = 'PVDI',    ! default PVDI, possible: NILU, ASMI, PVDI
-  USES%PFT_MAPS         = F,         ! PFT LAI tests
+  USES%n2o5HydrolysisMethod = 'Smix' ! 'Smix', 'SmixTen', 'Gamma:0.002', NOT:'OrigRiemer'
+  USES%WHITECAPS        = 'Callaghan'! 'Callaghan', 'Norris', 'Monahan'
+  USES%MonthlyNH3       = 'LOTOS',   ! Better monthly profile, for Europe only!
 !------------------------------
   USES%SOILWATER        = T,         ! Uses SMI from meteo data
   USES%CONVECTION       = F,
   USES%SEASALT          = T,
   USES%AIRCRAFT_EMIS    = T,         ! Needs global file, see manual
   USES%LIGHTNING_EMIS   = T,
-!------------------------------
-  USES%EURO_SOILNOX     = T,         ! diff for global + Euro runs
-  EURO_SOILNOX_DEPSCALE = 1.0,       ! Scale, default 1  (see ModelConstants_ml)
-  USES%GLOBAL_SOILNOX   = F,         ! diff for global + Euro runs
 !------------------------------
   USES%PROGRESS_FILES   = F,         ! write to file.msg for each output in file.nc
   USES%SKIP_INCOMPLETE_OUTPUT = F,   ! skip daily/montly/fullrun output for runs under 1/28/181 days
@@ -71,9 +69,7 @@
 !--- 'fake' vegetation for ozone POD calculations
   FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF','Wheat_Irrigated', 'Wheat_NonIrrig',
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE'   ! Ignore these for FLUX calcs.
-!------------------------------
-! volcanic emissions from passive degassing and historical eruptions
-!------------------------------
+!-------- volcanic emissions from passive degassing and historical eruptions
   flocdef='DataDir/columnsource_location.csv',
   femsdef='DataDir/columnsource_emission.csv',
   need_topo=T, ! do not use column emissions if TopoFile not found
@@ -85,7 +81,6 @@
   FINN_PATTERN = 'DataDir/FINN_ForestFireEmis_YYYY.nc',
   GFAS_PATTERN = 'DataDir/GFAS_ForestFireEmis_YYYY.nc',
   GFED_PATTERN = 'DataDir/GFED_ForestFireEmis.nc',
-
 !-------- Read/Write MODEs
   NEST_MODE_READ = 'NONE',         ! do nothing
 ! NEST_MODE_READ = 'NHOUR',        ! every NHOURREAD
