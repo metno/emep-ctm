@@ -585,17 +585,6 @@ subroutine checkNewFFrecord(ymdh, ncFileID,fname,new,nstart)
         record_old, nctime2string("(YYYY-MM-DD hh:mm)",fdays(nstart)), &
          fdays(nstart), persistence
     end if
-    if((fdays(nstart)<ncday(0)).or.(fdays(nstart)>=(ncday(1)+1.0)))then
-      if(MasterProc)then
-        write(*,*)"ForestFire: no records between ",&
-          nctime2string("YYYY-MM-DD hh:mm",ncday(0))," and ",&
-          nctime2string("YYYY-MM-DD hh:mm",ncday(1)+1.0)
-        call CheckStop(BBneed_date,"Missing ForestFire records")
-      end if
-      burning(:,:) = .false.
-      new=.false.
-      return
-    end if
 
     if ( .not. monthlyEmis ) then
        if((fdays(nstart)<ncday(0)).or.(fdays(nstart)>=(ncday(1)+1.0)))then
