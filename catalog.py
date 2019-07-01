@@ -15,7 +15,7 @@ import shutil
 _CONST = {
     'VERSION':"0.1.3",                          # script version
     'RELEASE':['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
-               'rv4_10','rv4_15','rv4_17'],     # released model versions
+               'rv4_10','rv4_15','rv4_17','rv4_32','rv4_33'],     # released model versions
     'METYEAR':[2005, 2008] + [year for year in range(2010, 2015+1)],   # released met-years
     'THREDDS':'http://thredds.met.no/thredds/fileServer/data/EMEP',
     'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
@@ -27,7 +27,7 @@ _CONST = {
     'DATADIR':'.'                               # base path for datasets
 }
 
-def parse_arguments():
+def parse_arguments(args):
     """Arguments from command line"""
     from optparse import OptionParser, OptionGroup, SUPPRESS_HELP
 
@@ -113,7 +113,7 @@ Examples:
                      help="Remove ALL temporary (download) files")
     parser.add_option_group(group)
 
-    opts, args = parser.parse_args(sys.argv[1:])
+    opts, args = parser.parse_args(args)
     if all(getattr(opts, attr) is None for attr in ['tag', 'status', 'year']):
         opts.tag = [_CONST['RELEASE'][-1]]
     if opts.data is None:
@@ -515,4 +515,4 @@ def main(opts):
             x.cleanup(opts.verbose)
 
 if __name__ == "__main__":
-    main(parse_arguments()[0])
+    main(parse_arguments(sys.argv[1:] or ['-h'])[0])
