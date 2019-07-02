@@ -545,6 +545,7 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 201802,docs,,rv4_17,{GIT}/releases/download/{MOD}/User_Guide.pdf,,537244,c795cda58224bcc02838f2d4ec5bbb33
 201904,input,2015,rv4_32,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2909759710,d3a654ed573f4d7ad0b36151dd35cf78
 201904,source,2019,rv4_32,{GIT}/archive/{MOD}.tar.gz,,759689,622d45962ff83f7dd865cac33d70f8f1
+201904,output,2019,rv4_32,{FTP}/{REL}/model_results_rv4_32_2015/Base_model_rv4_32_results_EECCA.tar.bz2,,2929467110,333e79bfa659a1487fb10678ad2bbdba
 201904,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201501.tar.bz2,EMEP_MSC-W_model.rv4.33.OpenSource/meteo2015/EECCA/,1927109491,b8c23b105968adcefb91e06e66397cfa
 201904,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201502.tar.bz2,EMEP_MSC-W_model.rv4.33.OpenSource/meteo2015/EECCA/,1748761600,a98e532ebca02a72d40e1971cc24084b
 201904,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201503.tar.bz2,EMEP_MSC-W_model.rv4.33.OpenSource/meteo2015/EECCA/,1922556203,9e158b8c291b32d7916b270b2fd45c74
