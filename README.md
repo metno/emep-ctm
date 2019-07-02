@@ -1,5 +1,6 @@
 # Open Source EMEP/MSC-W model
 [![Documentation Status](https://readthedocs.org/projects/emep-ctm/badge/?version=latest)](http://emep-ctm.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/65725508.svg)](https://zenodo.org/badge/latestdoi/65725508)
 
 
 The EMEP models have been instrumental to the development of
@@ -13,8 +14,10 @@ which supports the development of air quality polices in the European Union.
 [CLRTAP]:   http://www.unece.org/env/lrtap/welcome.html
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
-[guide]:    http://github.com/metno/emep-ctm/releases/download/rv4_17/User_Guide.pdf
-[publ2018]: http://emep.int/publ/emep2018_publications.html
+[guide]:    http://emep-ctm.readthedocs.io/en/latest
+[publ2019]: http://emep.int/publ/emep2019_publications.html
+[rel433]:   http://github.com/metno/emep-ctm/releases/tag/rv4_33
+[rel432]:   http://github.com/metno/emep-ctm/releases/tag/rv4_32
 [rel417]:   http://github.com/metno/emep-ctm/releases/tag/rv4_17
 [rel415]:   http://github.com/metno/emep-ctm/releases/tag/rv4_15
 [rel410]:   http://github.com/metno/emep-ctm/releases/tag/rv4_10
@@ -38,19 +41,21 @@ The Open Source releases are intended to:
 
 ## Releases
 
-The latest Open Source EMEP/MSC-W model version ([rv4.17][rel417])
-will be used on the [EMEP status reporting of the year 2018][publ2018].
+The latest Open Source EMEP/MSC-W model version ([rv4.33][rel433])
+will be used on the [EMEP status reporting of the year 2019][publ2019].
 The source code, together with a set of input data,
 an updated user guide and a full year model results for the year 2015,
 under [GPL license v3][GPLv3].
 
 You can download the source code and input data by following the instructions on the 
-[OpenSource rv4.17 (201802)][rel417] release page.
+[OpenSource rv4.33 (201906)][rel433] release page.
 
 Information on use of the model can be found in the [EMEP/MSC-W model User Guide][guide]
 
 #### Previous releases (YYYYMM - date of release)
 
+* [OpenSource rv4.32 (201904)][rel432].
+* [OpenSource rv4.17 (201802)][rel417].
 * [OpenSource rv4.15 (201709)][rel415].
 * [OpenSource rv4.10 (201609)][rel410].
 * [OpenSource rv4.8 (201510)][rel48].
