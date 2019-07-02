@@ -43,7 +43,7 @@ for a whole year, and sometimes with a smaller test run for e.g. April.
    **Additional files**
    ``RunLog.out``       & Summary log of runs, including total emissions & ASCII
                         & of different air pollutants per country        &
-    ``Timing.out``      & Timing log file                                & ASCII
+   ``Timing.out``       & Timing log file                                & ASCII
 
 .. rubric:: Footnotes
 .. [#YY] ``YYYY``: year.

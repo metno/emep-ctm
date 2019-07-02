@@ -68,8 +68,7 @@ IMPORTANT:
                       & ``SoilTypes_IFS.nc``                          & netCDF [#Optional]_
     Emissions         & ``EECCA/emislist.POLL`` (7 files, EMEP 50km PS grid)             & ASCII [#POLL]_
                       & ``EMEP01/GNFRemis_EMEP01_2015.nc`` (regional, :math:`0.1\times 0.1`  lon-lat) & netCDF [#Optional]_
-    Vertical level distribution         & ``Vertical_levels20.txt`` (for 20lev runs) & ASCII
-                                        & ``Vertical_levels34.txt`` (for 34lev runs) & ASCII
+    Vertical level distribution         & ``Vertical_levels20_EC.txt`` (for 20lev runs) & ASCII
     Time factors for monthly emissions  & ``MonthlyFac.POLL`` (7 files)       & ASCII [#POLL]_
     Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
     Time factors for hourly emissions   & ``HourlyFacs.INERIS``               & ASCII
