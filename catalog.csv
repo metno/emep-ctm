@@ -543,5 +543,7 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 201802,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201512.tar.bz2,EMEP_MSC-W_model.rv4.17.OpenSource/meteo2015/EECCA/,1929643105,a14ff455b75a737b75853a7a2b475ede
 201802,meteo,2015,EECCA,{FTP}/201709/input_data/meteo/meteo201513.tar.bz2,EMEP_MSC-W_model.rv4.17.OpenSource/meteo2015/EECCA/,116011382,22bf5f96f7e428b71159c6dac1e7ff8a
 201802,docs,,rv4_17,{GIT}/releases/download/{MOD}/User_Guide.pdf,,537244,c795cda58224bcc02838f2d4ec5bbb33
+201904,input,2015,rv4_32,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2909759710,d3a654ed573f4d7ad0b36151dd35cf78
 201904,source,2019,rv4_32,{GIT}/archive/{MOD}.tar.gz,,759689,622d45962ff83f7dd865cac33d70f8f1
+201906,input,2015,rv4_33,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2604554769,eb5616cec777865a49d256f27a2d02f0
 201906,source,2019,rv4_33,{GIT}/archive/{MOD}.tar.gz,,771642,7bdf88f8a4bbe4d6d05922b531e2db8d
