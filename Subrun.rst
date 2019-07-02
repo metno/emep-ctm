@@ -28,39 +28,44 @@ Here is an example of content of the most important parameters:
 
     DataPath(1) = '../input', ! define 'DataDir' keyword
 
-   meteo = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
-   DegreeDayFactorsFile = 'MetDir/DegreeDayFactors.nc',
+    meteo = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
+    DegreeDayFactorsFile = 'MetDir/DegreeDayFactors.nc',
   !------------------------------
-   EmisDir = 'DataDir/GRID',
-   emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
+    EmisDir = 'DataDir/GRID',
+    emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
   !--------Sub domain x0, x1, y0, y1
     RUNDOMAIN = 36, 100, 50, 150, ! EECCA sub-domain
   &end
 
 In the extract above, the model is run for the period 1 January to 10 January
-2015 and the trend year used is 2015. Hours for the startdate must be an existing timestamp, often a multiple of three (hours for enddate can be chosen freely). Output files will be stored with
-the name 'Base' and the meteorological correspond to the 'EECCA' grid.
+2015 and the trend year used is 2015. Hours for the startdate must be an existing timestamp, often a multiple of three (hours for enddate can be chosen freely).
+Output files will be stored with the name 'Base' and the meteorological correspond to the 'EECCA' grid.
 
-Note the definition of the meteorological input ("meteo"): the keywords, 'YYYY', 'MM', 'DD' and 'GRID' will be replaced on the fly by respectively, year, month, day and grid ('EECCA' here).
+Note the definition of the meteorological input ("meteo"):
+the keywords, 'YYYY', 'MM', 'DD' and 'GRID' will be replaced on the fly by respectively, year, month, day and grid ('EECCA' here).
 
 It is possible to run the model on a smaller domain than the full
 regional model domain, as defined by indexes :math:`x` and :math:`y`.
 For the 'EECCA' grid  :math:`x=1,\ldots,132; y=1,\ldots,159`\ .
 To set a smaller domain, use ``RUNDOMAIN`` variable in the ``ModelConstants_config``
 namelist to indicate the sub-domain indexes. In the config_emep extract above,
-``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ . The indices refer always to the meteo grid (starting from 1). If the indices are outside the grid, only the portion within the full grid is taken into account. 
+``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
+The indices refer always to the meteo grid (starting from 1).
+If the indices are outside the grid, only the portion within the full grid is taken into account. 
 
 
 Base run
 --------
 
-To run the model you need access to the executable (``emepctm``) and the ``config_emep.nml`` files. The path to the other input files are defined by defaults or set in the ``config_emep.nml`` file.
+To run the model you need access to the executable (``emepctm``) and the ``config_emep.nml`` files.
+The path to the other input files are defined by defaults or set in the ``config_emep.nml`` file.
 
 To run the model you can either run interactively (mostly for short run), using somthing similar to (it depends on your system):
 
 ``mpirun emepctm``
 
-For longer runs you should run the model as a batch job (the details will depend on your system). If the run was successful, a message
+For longer runs you should run the model as a batch job (the details will depend on your system).
+If the run was successful, a message
 
 .. code-block:: text
 
@@ -77,14 +82,16 @@ error file for any clue of the crash. After fixing the problem the job
 can be submitted again. 
 
 The variables wanted in the output are specified in the
-``OutputConcs_config``, ``OutputDep_config`` and in the ``OutputMisc_config``
-parameters respectively for surface concentrations, depositions and some
-miscellaneous outputs.
+``OutputConcs``, ``DDEP_ECOS``, ``DDEP_WANTED``, ``WDEP_WANTED`` and ``OutputVegO3``
+parameters for surface concentrations, depositions and other miscellaneous outputs.
 
 The main ouput files are
- - Base_fullrun.nc gives values averaged over the entire simulation. This file has always 1 record and the data is an average over the the period startdate to enddate. 
+ - Base_fullrun.nc gives values averaged over the entire simulation.
+   This file has always 1 record and the data is an average over the the period startdate to enddate. 
  - Base_month.nc average over each calendar month (12 records for a yearly run) 
- - Base_day.nc averages over 24 hours, starting at 06:00 UTC (each record gives average values between 06:00 and 06:00 the next day. The first time step is written out at 06:00 hr on 2Jan (i.e the first 6 hours are “lost”). The last record may also be averaged only until the end of the run, and not at 06:00.)
+ - Base_day.nc averages over 24 hours, starting at 06:00 UTC (each record gives average values between 06:00 and 06:00 the next day.
+   The first time step is written out at 06:00 hr on 2Jan (i.e the first 6 hours are “lost”).
+   The last record may also be averaged only until the end of the run, and not at 06:00.)
  - Base_hour.nc, averaged over 1 hour.
  - Base_hourInst.nc, instantaneous values every hour.
 
@@ -145,7 +152,9 @@ from sector 10 (the emission from agriculture) in the UK is shown in
 
 
 Instead of entire countries, reductions can also be specified by coordinates (and combined with country reductions).
-The line with coordinate corrections must start with the keyword ``lonlat``. The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested. Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
+The line with coordinate corrections must start with the keyword ``lonlat``.
+The coordinates are given in longitude latitude (min and max and the coordinates of the centre of the gridcells are tested.
+Gridcells are either entirely included or entirely reduced, never cut into smaller parts).
 
 
 .. code-block:: Fortran
@@ -168,8 +177,9 @@ Separate hourly outputs
 -----------------------
 
 The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` files can become very large. It is possible to split them into one file per day by adding 
-the keyword ```HOURLYFILE_ending    = 'JJJ.nc' ```, in the configuration file. ```JJJ```, will be automatically replaced by the corresponding day of the year (i.e. a number from 1 to 366 giving for instance
-``Base_hour_001.nc``). The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```. 
+the keyword ```HOURLYFILE_ending    = 'JJJ.nc' ```, in the configuration file. ```JJJ```,
+will be automatically replaced by the corresponding day of the year (i.e. a number from 1 to 366 giving for instance ``Base_hour_001.nc``).
+The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```. 
 
 
 Using and combining gridded emissions
@@ -226,7 +236,8 @@ Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as sp
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
 
 
-An alternative way of combining overlapping emissions, is to use a "mask" approach. This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
+An alternative way of combining overlapping emissions, is to use a "mask" approach.
+This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
 The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
 
 .. code-block:: Fortran
@@ -238,8 +249,11 @@ The city emissions are used to set the mask, and that mask is then in turn used 
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
     emis_inputlist(2)%use_mask = T,
 
-There are some details one should take into account: the order of the "set_mask" and "use_mask" matter. The mask should be set before it is used; "before" meaning that the indice of "emis_inputlist" is lower. Also yearly emissions are treated before monthly emissions, therefore one should not use monthly emissions to mask yearly emissions.
-The mask is set for a given position if emissions at that point are larger than 1.0e-20. If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
+There are some details one should take into account: the order of the "set_mask" and "use_mask" matter.
+The mask should be set before it is used; "before" meaning that the indice of "emis_inputlist" is lower.
+Also yearly emissions are treated before monthly emissions, therefore one should not use monthly emissions to mask yearly emissions.
+The mask is set for a given position if emissions at that point are larger than 1.0e-20.
+If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
 There is only one mask. Several emissions files can set and use the mask.
 
 Masks can also be set from any field, see own section below.
@@ -251,8 +265,11 @@ Nesting
 -------
 
 The model can be run in a large domain and all the concentrations of pollutants stored at fixed intervalls (3 hours typically).
-Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stored concentrations at the domain boundaries. It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outside the small region. This is called nesting. 
-The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain), and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain, but only for the start date).
+Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stored concentrations at the domain boundaries.
+It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outside the small region.
+This is called nesting. 
+The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain),
+and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain, but only for the start date).
 
 Depending on what is wanted different "Nesting modes" can be defined.
 The different options are controlled by the ``NEST_MODE_READ`` and ``NEST_MODE_SAVE`` variables in ``Model_config`` in ``config_emep.nml`` file.
@@ -344,7 +361,7 @@ Reduce the size of BC files
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
 If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC of the small domain can be stored.
 Define ``NEST_MET_inner`` in ``&Model_config``, which should be a link to any metdata of the inner grid;
-  it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
+it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
 
 .. code-block:: text
     :name: nest-write-inner
@@ -368,7 +385,10 @@ This file can then be used by the inner grid by defining ``NEST_template_read_3D
 Read external BCs
 ~~~~~~~~~~~~~~~~~
 
-So far only BC created by the model itself have been used. Reading external BCs , i.e. produced by other means (another model for example) is more involved. The chemical species may be different and the vertical levels also. The vertical axis and variables in the file need then to be mapped to the corresponding model variables. 
+So far only BC created by the model itself have been used.Reading external BCs,
+i.e. produced by other means (another model for example) is more involved.
+The chemical species may be different and the vertical levels also.
+The vertical axis and variables in the file need then to be mapped to the corresponding model variables. 
 
 :numref:`nest-mybc-config` shows an example to read every 3 hours from an external
 BC file. The model will read 3 variables from ``MyBC.nc``: |O3|, NO, and |NO2|.
@@ -473,7 +493,6 @@ or add the respective conversion factor in the module ``Units_mod.f90``.
 config: Europe or Global?
 -------------------------
 
-
 The EMEP model has traditionally been run on the EMEP grid covering
 Europe, and using meteorology from the ECMWF IFS model. In this environment,
 we typically set several configuration variables to make use of
@@ -497,7 +516,7 @@ settings.
   USES%DEGREEDAY_FACTORS = F
   USES%PFT_MAPS = T,    ! PFT LAI tests
   USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
-  USES%CONVECTION = T
+  USES%CONVECTION = T,
   USES%EURO_SOILNOX = F, ! diff for global + Euro runs
   USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
 
@@ -526,11 +545,13 @@ Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=
 which may be changed to allow more or less influence of this variable.
 
 The model will test the area covered, and if the area covered regions outside "Europe" (extended), it will automatically set 
-USES%PFT_MAPS=T , USES%DEGREEDAY_FACTORS = F , USES%EURO_SOILNOX = F and USES%GLOBAL_SOILNOX = T
+``USES%PFT_MAPS=T``, ``USES%DEGREEDAY_FACTORS=F`` , ``USES%EURO_SOILNOX=F`` and ``USES%GLOBAL_SOILNOX=T``.
 
 New emission format
 -------------------
-A new more general and (hopefully) easy to use format for emissions has been introduced. It is still in a developing phase, so changes and errors may occur.
+
+A new more general and (hopefully) easy to use format for emissions has been introduced.
+It is still in a developing phase, so changes and errors may occur.
 
 In the new format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
 For now the main constraint is that a source is any 2D field (possibly+time).
@@ -550,9 +571,18 @@ Exception to the priority rule are:
 
 List of file attributes (default in parenthesis):
   - filename (‘NOTSET’) Name of the file (with path)
-  - projection (‘lon lat’) Only three categories ‘lon lat’, 'native' or any other (for example ‘Lambert ‘or ‘Stereographic’ would give the same result). 'native' means that emissions are given in the same grid as the model grid and the data is not interpolated (use it if you can).
-  - grid_resolution (an approximate value is computed from the lon and lat, if no value is given) It does not need to be exact (cannot be exact on a sphere anyway!). This grid_resolution steers the interpolation algorithm; A large value will force the code to subdivide each emission gridcell in large number of pieces, that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
-  - periodicity (‘time’) How often the values are updated. Can be ‘yearly’, ‘Monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record. The timestamp must correspond to the end of the time period of validity. For ‘yearly’ monthly timefactors are applied, if a sector is defined. For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
+  - projection (‘lon lat’) Only three categories ‘lon lat’, 'native' or any other (for example ‘Lambert ‘or ‘Stereographic’ would give the same result).
+    'native' means that emissions are given in the same grid as the model grid and the data is not interpolated (use it if you can).
+  - grid_resolution (an approximate value is computed from the lon and lat, if no value is given).
+    It does not need to be exact (cannot be exact on a sphere anyway!).
+    This grid_resolution steers the interpolation algorithm;
+    A large value will force the code to subdivide each emission gridcell in large number of pieces,
+    that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
+  - periodicity (‘time’) How often the values are updated.
+    Can be ‘yearly’, ‘Monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record.
+    The timestamp must correspond to the end of the time period of validity.
+    For ‘yearly’ monthly timefactors are applied, if a sector is defined.
+    For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
   - factor (1.0) multiplicative factor for all sources in the file
   - units ('NOTSET') will be used as default for sources units if set.
   - apply_femis (true) whether to apply the femis reductions to the sources of this file.
@@ -575,14 +605,18 @@ List of source attributes:
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
 
 
-The idea is that only variables that clearly are required in a specific context need to be set; if the value can be inferred from other information, the code should do it.
+The idea is that only variables that clearly are required in a specific context need to be set;
+if the value can be inferred from other information, the code should do it.
 Depending of the type of source, not all variables are used.
 
 Note about species: These can be interpreted in one of three categories
   1. emitted species (nox,sox,pm25 ...) with sector (1...11 (or 13)) (“sector species”)
-  2. individual species (SO2, NO, NO2, ...) with sector. The species MUST be one of the splitted species. These will be treated as one of the “sector species”  from 1. (but not splitted of course). Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2”.
-  3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified). No timefactors, vertical realease heights or splits are applied.
-   In this case the emissions are summed up in setup_rcemis (not in EmisSet)
+  2. individual species (SO2, NO, NO2, ...) with sector. The species MUST be one of the splitted species.
+     These will be treated as one of the “sector species”  from 1. (but not splitted of course).
+     Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2”.
+  3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified).
+     No timefactors, vertical realease heights or splits are applied.
+     In this case the emissions are summed up in setup_rcemis (not in EmisSet)
    
 Masks
 -----
@@ -643,11 +677,17 @@ Emissions can be assigned to a sector. A sector defines three properties:
 2. Split into species
 3. Timefactors
 
-The set of Emission heights available is defined in the file "EmisHeights.txt".  The set of splits in files "emissplit.defaults.POLL" and "emissplit.specials.POLL". The timefactors are defined in "MonthlyFac.POLL" "DailyFac.POLL" and "HourlyFacc.INERIS".
+The set of Emission heights available is defined in the file "EmisHeights.txt".
+The set of splits in files "emissplit.defaults.POLL" and "emissplit.specials.POLL".
+The timefactors are defined in "MonthlyFac.POLL" "DailyFac.POLL" and "HourlyFacc.INERIS".
 
-Which height/split/timefac is chosen for a given sector is defined through a mapping system. There are two predefined mapping you can choose from: SNAP and GNFR. The mapping are simply three tables (one dimensional array). Those mappings are defined in "EmisDef_mod.f90" in the arrays "XXX_sec2hfac_map", "XXX_sec2sfac_map","XXX_sec2tfac_map", where "XXX" is the name of the mapping (SNAP or GNFR).
+Which height/split/timefac is chosen for a given sector is defined through a mapping system.
+There are two predefined mapping you can choose from: SNAP and GNFR.
+The mapping are simply three tables (one dimensional array).
+Those mappings are defined in "EmisDef_mod.f90" in the arrays "XXX_sec2hfac_map", "XXX_sec2sfac_map","XXX_sec2tfac_map", where "XXX" is the name of the mapping (SNAP or GNFR).
 For example the mapping "GNFR_sec2hfac_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/)", means that in the GNFR convention, the sector 13 is mapped to the fifth emission height in "EmisHeights.txt".
-You can add both more emission heights in "EmisHeights.txt" and access them by changing the maps. (The maps cannot be set by config_emep.nml for now because it is not guaranteed that everything will work when you change the wrong things).
+You can add both more emission heights in "EmisHeights.txt" and access them by changing the maps.
+(The maps cannot be set by config_emep.nml for now because it is not guaranteed that everything will work when you change the wrong things).
 You can define a new mapping for example using the "TEST" mapping (also in EmisDef.f90). To switch to "TEST" for those mappings set "USE_SECTOR_NAME='TEST'" in "config_emep.nml".
 
 Local Fractions (under development)
