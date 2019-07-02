@@ -18,18 +18,16 @@ Here is an example of content of the most important parameters:
   :name: config-emep
   :caption: Basic namelist example; ``config_emep.nml`` extract.
 
-  &INPUT_PARA
+  &Model_config
     GRID = 'EECCA',
     iyr_trend = 2015,
     runlabel1 = 'Base',
     runlabel2 = 'Opensource_Setup_2019',
     startdate = 2015,01,01,00,
     enddate = 2015,01,10,24,
-  &end
-  &Machine_config
-   DataPath(1) = '../input', ! define 'DataDir' keyword
-  &end
-  &ModelConstants_config
+
+    DataPath(1) = '../input', ! define 'DataDir' keyword
+
    meteo = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
    DegreeDayFactorsFile = 'MetDir/DegreeDayFactors.nc',
   !------------------------------
@@ -256,9 +254,11 @@ The model can be run in a large domain and all the concentrations of pollutants 
 Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stored concentrations at the domain boundaries. It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outside the small region. This is called nesting. 
 The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain), and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain, but only for the start date).
 
-Depending on what is wanted different "Nesting modes" can be defined. The different options are controlled by the ``MODE_READ`` and ``MODE_SAVE`` variables in ``Nest_config`` in ``config_emep.nml`` file. The mode options are:
+Depending on what is wanted different "Nesting modes" can be defined.
+The different options are controlled by the ``NEST_MODE_READ`` and ``NEST_MODE_SAVE`` variables in ``Model_config`` in ``config_emep.nml`` file.
+The mode options are:
 
-``MODE_READ``
+``NEST_MODE_READ``
     'NONE'
         do nothing (default).
     'START'
@@ -266,52 +266,50 @@ Depending on what is wanted different "Nesting modes" can be defined. The differ
     'RESTART'
         read at the start of run, if the file is found.
     ‘NHOUR’
-        read at given ``NHOURREAD`` hourly intervals, if the file is found.
-        ``NHOURREAD`` is set in ``Nest_config`` and should be an integer fraction of 24.
+        read at given ``NEST_NHOURREAD`` hourly intervals, if the file is found.
+        ``NEST_NHOURREAD`` is set in ``Model_config`` and should be an integer fraction of 24.
     ‘MONTH’
         read at start of each month.
-``MODE_SAVE``
+``NEST_MODE_SAVE``
     'NONE'
         do nothing (default).
     'END'
         write at end of run.
-    'OUTDATE'
-        write every ``OUTDATE(1:OUTDATE_NDUMP)``.
-        ``OUTDATE`` and ``OUTDATE_NDUMP`` are set in ``Nest_config``.
     'NHOUR'
-        write at given `NHOURSAVE` hourly intervals.
-        ``NHOURSAVE`` is set in ``Nest_config`` and should be an integer fraction of 24.
+        write at given `NEST_NHOURSAVE` hourly intervals.
+        ``NEST_NHOURSAVE`` is set in ``Model_config`` and should be an integer fraction of 24.
     ‘MONTH’
         write after each month (used for checkpoint/restart for instance).
 
-The name of the file to write to is defined by ``template_write`` (also in ``Nest_config``).
-The name of the file to read to IC data from is defined by ``template_read_IC``.
-The name of the file to read to BC data from is defined by ``template_read_BC``; it can be the same file as ``template_read_IC``.
-If for example NHOURSAVE=3, but  NHOURREAD = 1, the data is interpolated in time to get a smooth transition between the 3-hourly values (recommended).
+The name of the file to write to is defined by ``NEST_template_write`` (also in ``Model_config``).
+The name of the file to read to IC data from is defined by ``NEST_template_read_IC``.
+The name of the file to read to BC data from is defined by ``NEST_template_read_BC``; it can be the same file as ``NEST_template_read_IC``.
+If for example NEST_NHOURSAVE=3, but  NEST_NHOURREAD = 1, the data is interpolated in time to get a smooth transition between the 3-hourly values (recommended).
 
 Example write BCs
 ~~~~~~~~~~~~~~~~~
 
 :numref:`nest-write-config` shows an example to write every 3 hours into
-daily Nest/BC files. Output file name is defined by ``template_write`` ('BC_YYYYMMDD.nc'),
+daily Nest/BC files. Output file name is defined by ``NEST_template_write`` ('BC_YYYYMMDD.nc'),
 where ‘YYYYMMDD’ is replaced by corresponding date.
 
 All advected model variables will be written out for the sub-domain defined
-by ``out_DOMAIN`` (\ :math:`x=60,\ldots,107; y=11,\ldots,58`\ ).
-If no ``out_DOMAIN`` is given, the entire model rundomain will be written out.
+by ``NEST_out_DOMAIN`` (\ :math:`x=60,\ldots,107; y=11,\ldots,58`\ ).
+If no ``NEST_out_DOMAIN`` is given, the entire model rundomain will be written out.
 
 .. code-block:: text
     :name: nest-write-config
     :caption: Write BCs configuration example.
 
-    &Nest_config
-      MODE_READ        = 'NONE',          ! do not read BC
-      MODE_SAVE        = 'NHOUR',         ! write BCs
-      NHOURSAVE        = 3,               !  every 3 hours
-      template_write   = 'BC_YYYYMMDD.nc' !  to your (daily) BC output file
+    &Model_config
+    [...]
+      NEST_MODE_READ        = 'NONE',          ! do not read BC
+      NEST_MODE_SAVE        = 'NHOUR',         ! write BCs
+      NEST_NHOURSAVE        = 3,               !  every 3 hours
+      NEST_template_write   = 'BC_YYYYMMDD.nc' !  to your (daily) BC output file
                                           !  (8 records per file)
       !-------- Sub domain for write modes
-      out_DOMAIN       = 60,107,11,58,    ! istart,iend,jstart,jend
+      NEST_out_DOMAIN       = 60,107,11,58,    ! istart,iend,jstart,jend
     &end
     
 
@@ -327,15 +325,17 @@ as shown in :numref:`config-emep`.
     :name: nest-read-config
     :caption: Read BCs configuration example.
 
-    &Nest_config
-      MODE_READ        = 'NHOUR',         ! read external BC
-      NHOURREAD        = 1,               !   every hour
-      template_read_BC = 'BC_YYYYMMDD.nc' !   your (daily) BC input file
-      MODE_SAVE        = 'NONE',          ! do not write BCs
+    &Model_config
+    [...]
+      NEST_MODE_READ        = 'NHOUR',         ! read external BC
+      NEST_NHOURREAD        = 1,               !   every hour
+      NEST_template_read_BC = 'BC_YYYYMMDD.nc' !   your (daily) BC input file
+      NEST_MODE_SAVE        = 'NONE',          ! do not write BCs
     &end
 
 
-Note that ``NHOURREAD`` can (and should) be smaller than the value used for ``NHOURSAVE``. The values between saved dates will then be interpolated in time, giving a smoother transition.
+Note that ``NEST_NHOURREAD`` can (and should) be smaller than the value used for ``NEST_NHOURSAVE``.
+The values between saved dates will then be interpolated in time, giving a smoother transition.
 
 
 Reduce the size of BC files
@@ -343,24 +343,26 @@ Reduce the size of BC files
 
 The size of the files obtained in a nesting configuration can be very large if the out_DOMAIN is large.
 If the inner domain is known in advance, only the part matching exactly the part needed to construct the BC of the small domain can be stored.
-Define ``MET_inner`` in ``&Nest_config``, which should be a link to any metdata of the inner grid;
+Define ``NEST_MET_inner`` in ``&Model_config``, which should be a link to any metdata of the inner grid;
   it will only be used to define the projection parameters of the inner grid (i.e. dates and other content do not matter).
 
 .. code-block:: text
     :name: nest-write-inner
     :caption: Inner domain options for nested BC output example.
 
-    &Nest_config
+    &Model_config
     [...]
-      MET_inner = 'inner_domain/wrfout_d03_2015-01-01_00:00:00',
-      RUNDOMAIN_inner = 12, 136, 100, 300,
+      NEST_MET_inner = 'inner_domain/wrfout_d03_2015-01-01_00:00:00',
+      NEST_RUNDOMAIN_inner = 12, 136, 100, 300,
     &end
         
 You cannot use the implicit dates ("YYYY" etc.); you must put explicit numbers. 
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
 The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
-If a BC file has been created using the ``MET_inner`` method, it cannot be used for initializating concentrations at the start of the run. A separate file has to been created for initializations. This file can then be used by the inner grid by defining ``template_read_3D`` in ``config_emep.nml``.
+If a BC file has been created using the ``NEST_MET_inner`` method, it cannot be used for initializating concentrations at the start of the run.
+A separate file has to been created for initializations.
+This file can then be used by the inner grid by defining ``NEST_template_read_3D`` in ``config_emep.nml``.
 
 
 Read external BCs
@@ -377,13 +379,12 @@ is defined in the ``ExternalBICs_bc`` namelist.
     :name: nest-mybc-config
     :caption: External BCs configuration example.
 
-    &Nest_config
-      MODE_READ        = 'NHOUR',         ! read external BC
-      NHOURREAD        = 3,               !   every 3 hours
-      template_read_BC = 'MyBC.nc'        !   from your BC input file
-      MODE_SAVE        = 'NONE',          ! do not write BCs
-    &end
-    &ExternalBICs_config
+    &Model_config
+    [...]
+      NEST_MODE_READ        = 'NHOUR',    ! read external BC
+      NEST_NHOURREAD        = 3,          !   every 3 hours
+      NEST_template_read_BC = 'MyBC.nc'   !   from your BC input file
+      NEST_MODE_SAVE        = 'NONE',     ! do not write BCs
       USE_EXTERNAL_BIC = T,
       EXTERNAL_BIC_NAME= 'MyBICScenario', ! variable mapping, see ExternalBICs_bc
       TOP_BC           = T,               ! use top BC also from your BC file
