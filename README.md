@@ -28,7 +28,7 @@ source activate sphinx
 
 # add modules
 # conda install sphinx-autobuild
-pip install sphinxcontrib-bibtex
+conda install -c conda-forge sphinxcontrib-bibtex
 ```
 
 ### run sphinx
