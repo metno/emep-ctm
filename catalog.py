@@ -18,8 +18,10 @@ _CONST = {
                'rv4_10','rv4_15','rv4_17','rv4_32','rv4_33'],     # released model versions
     'METYEAR':[2005, 2008] + [year for year in range(2010, 2015+1)],   # released met-years
     'THREDDS':'http://thredds.met.no/thredds/fileServer/data/EMEP',
-    'FTP':"ftp://ftp.met.no/projects/emep/OpenSource",
-    'GIT':"https://github.com/metno/emep-ctm/",
+    'FTP':'ftp://ftp.met.no/projects/emep/OpenSource',
+    'GIT':'https://github.com/metno/emep-ctm/',
+    'DOC':'https://emep-ctm.readthedocs.io/',
+    'RTD':'https://buildmedia.readthedocs.org/media/pdf/emep-ctm',
     'CSV':'/catalog.csv',                       # list all files from all releases
     'RAW':'https://raw.githubusercontent.com/metno/emep-ctm/'+
           'tools/catalog.csv',                  # catalog on the repo

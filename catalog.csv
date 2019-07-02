@@ -547,3 +547,5 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 201904,source,2019,rv4_32,{GIT}/archive/{MOD}.tar.gz,,759689,622d45962ff83f7dd865cac33d70f8f1
 201906,input,2015,rv4_33,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2604554769,eb5616cec777865a49d256f27a2d02f0
 201906,source,2019,rv4_33,{GIT}/archive/{MOD}.tar.gz,,771642,7bdf88f8a4bbe4d6d05922b531e2db8d
+201906,output,2019,rv4_33,{FTP}/{REL}/model_results_rv4_33_2015/Base_model_rv4_33_results_EECCA.tar.bz2,,2729179216,7c5727a85d5b4414a5ab915388016c03
+201906,docs,,rv4_33,{RTD}/ug4_33/emep-ctm.pdf,,552654,74baa08290adfc721639b047193567eb
