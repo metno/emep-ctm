@@ -359,8 +359,6 @@ subroutine wrtxn(indate,WriteNow)
   select case(NEST_MODE_SAVE)
   case('END')
     if(.not.WriteNow)return
-  case('OUTDATE')
-    if(MasterProc) write(*,*)" WARNING THIS OPTION IS NOT USED ANYMORE"
   case('MONTH')
     if(indate%month==1.or.indate%day/=1.or.indate%hour/=0.or.indate%seconds/=0)return
   case default
@@ -645,7 +643,7 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
 ! adv_bc            BC detailed description relevant adv species
 ! EXTERNAL_BC       External (non emepctm) BC detailed description/setup
 ! EXTERNAL_BIC_SET  EXTERNAL_BC has been set (adv_bc=>EXTERNAL_BC)
-!        otherwise  Assume emepctm BCs        (adv_bc=>adv_ic)
+!        otherwise  Assume emepctm BCs       (adv_bc:=adv_ic)
 !----------------------------------------------------------------------------!
   integer,   intent(in), optional :: idate(4)
   type(date),intent(in), optional :: cdate
@@ -656,6 +654,9 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
 
   if(.not.first_call)return
   first_call=.false.
+
+  if(NEST_MODE_READ=='NONE'.and.NEST_MODE_SAVE=='NONE'.and.NEST_OUTDATE_NDUMP==0)&
+    return ! No nesting
 
 ! One of the date formats needs to be provided
   call CheckStop(count([present(idate),present(cdate),present(ndays),&
@@ -668,16 +669,13 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
   if(present(nsecs)) call nctime2date(dat,nsecs)
   call set_extbic(dat)  ! set mapping, EXTERNAL_BC, TOP_BC
 
-  if(.not.EXTERNAL_BIC_SET.and.NEST_MODE_READ=='NONE'.and.NEST_MODE_SAVE=='NONE'.and.&
-       NEST_OUTDATE_NDUMP==0)return !No nesting
-
   filename_read_3D=date2string(NEST_template_read_3D,dat,&
                                mode='YMDH',debug=mydebug)
   filename_read_BC=date2file  (NEST_template_read_BC,dat,BC_DAYS,"days",&
                                mode='YMDH',debug=mydebug)
   filename_write  =date2string(NEST_template_write  ,dat,&
                                mode='YMDH',debug=mydebug)
-  filename_dump  =date2string(NEST_template_dump  ,dat,&
+  filename_dump   =date2string(NEST_template_dump  ,dat,&
                                mode='YMDH',debug=mydebug)
 
   adv_ic(:)%ixadv=(/(n,n=1,NSPEC_ADV)/)
@@ -688,15 +686,11 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
   adv_ic(:)%found=find_icbc(filename_read_3D,adv_ic%varname(:))
   if(EXTERNAL_BIC_SET) then
     adv_bc=>EXTERNAL_BC
-    adv_bc(:)%found=find_icbc(filename_read_bc,adv_bc%varname(:))
   else
-     adv_bc(:)%ixadv=(/(n,n=1,NSPEC_ADV)/)
-     adv_bc(:)%spcname=species_adv(:)%name
-     adv_bc(:)%varname=species_adv(:)%name
-     adv_bc(:)%frac=1.0
-     adv_bc(:)%wanted=.true.
-     adv_bc(:)%found=find_icbc(filename_read_bc,adv_bc%varname(:))
+    allocate(adv_bc(NSPEC_ADV))
+    adv_bc(:)=adv_ic(:)
   end if
+  adv_bc(:)%found=find_icbc(filename_read_bc,adv_bc%varname(:))
 
   if(MasterProc)then
     do n = 1,size(adv_ic%varname)
