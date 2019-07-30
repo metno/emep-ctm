@@ -179,3 +179,58 @@ The reports can be found under the following links:
 [EMEP]:           http://www.emep.int/
 [Status Reports]: http://www.emep.int/publ/common_publications.html
 [Country Reports]:http://www.emep.int/mscw/mscw_datanotes.html
+
+## Citation
+
+```bibtex
+@article{emep-mscw_2012,
+  author = {Simpson, D. and Benedictow, A. and Berge, H. and Bergstr\"om, R. and Emberson, L. D. and 
+            Fagerli, H. and Flechard, C. R. and Hayman, G. D. and Gauss, M. and Jonson, J. E. and
+            Jenkin, M. E. and Ny\'{\i}ri, A. and Richter, C. and Semeena, V. S. and Tsyro, S. and
+            Tuovinen, J.-P. and Valdebenito, \'A. and Wind, P.},
+  title = {The EMEP MSC-W chemical transport model &ndash; technical description},
+  journal = {Atmospheric Chemistry and Physics},
+  volume = {12},
+  year = {2012},
+  number = {16},
+  pages = {7825--7865},
+  doi = {10.5194/acp-12-7825-2012},
+  url = {https://www.atmos-chem-phys.net/12/7825/2012/}
+}
+
+@misc{emep-ctm_rv4.33,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model rv4.33 (201906)},
+  month        = jun,
+  year         = 2019,
+  doi          = {10.5281/zenodo.3265912},
+  url          = {https://doi.org/10.5281/zenodo.3265912}
+}
+
+@misc{emep-ctm_rv4.17,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model rv4.17 (201802)},
+  month        = feb,
+  year         = 2018,
+  doi          = {10.5281/zenodo.3355023},
+  url          = {https://doi.org/10.5281/zenodo.3355023}
+}
+
+@misc{emep-ctm_rv4.15,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model rv4.15 (201709)},
+  month        = sep,
+  year         = 2017,
+  doi          = {10.5281/zenodo.3355041},
+  url          = {https://doi.org/10.5281/zenodo.3355041}
+}
+
+@misc{emep-ctm_rv4.10,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model rv4.10 (201609)},
+  month        = sep,
+  year         = 2016,
+  doi          = {10.5281/zenodo.3355083},
+  url          = {https://doi.org/10.5281/zenodo.3355083}
+}
+```
