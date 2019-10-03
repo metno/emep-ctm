@@ -617,6 +617,22 @@ Note about species: These can be interpreted in one of three categories
   3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified).
      No timefactors, vertical realease heights or splits are applied.
      In this case the emissions are summed up in setup_rcemis (not in EmisSet)
+     
+     Example:
+
+.. code-block:: text
+  :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc".
+
+ Emis_sourceFiles(1)%filename = '/nobackup/forsk/sm_petwi/Data/ECLIPSE_V6a_CLE_base_PM25.nc',
+ Emis_sourceFiles(1)%projection = 'lon lat',
+ Emis_sourceFiles(1)%periodicity = 'yearly',  
+ Emis_sourceFiles(1)%source(1)%varname='emis_tra',
+ Emis_sourceFiles(1)%source(1)%species='pm25',
+ Emis_sourceFiles(1)%source(1)%sector=7,
+ Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
+ Emis_sourceFiles(1)%source(1)%units='kg',
+
+
    
 Masks
 -----
