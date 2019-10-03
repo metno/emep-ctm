@@ -622,7 +622,7 @@ Note about species: These can be interpreted in one of three categories
 
 
 .. code-block:: text
-  :caption: TEST.
+  :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc"TEST.
 
   USES%DEGREEDAY_FACTORS = F
   USES%PFT_MAPS = T,    ! PFT LAI tests
