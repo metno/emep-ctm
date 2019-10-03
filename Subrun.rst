@@ -624,6 +624,7 @@ Note about species: These can be interpreted in one of three categories
 .. code-block:: text
   :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc"TEST.
 
+  Emis_sourceFiles(1)%filename = '/nobackup/forsk/sm_petwi/Data/ECLIPSE_V6a_CLE_base_PM25.nc',
   USES%DEGREEDAY_FACTORS = F
   USES%PFT_MAPS = T,    ! PFT LAI tests
   USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
