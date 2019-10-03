@@ -632,26 +632,14 @@ Note about species: These can be interpreted in one of three categories
   Emis_sourceFiles(1)%source(1)%sector=7,
   Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
   Emis_sourceFiles(1)%source(1)%units='kg',
-  USES%DEGREEDAY_FACTORS = F
-  USES%PFT_MAPS = T,    ! PFT LAI tests
-  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
-  USES%CONVECTION = T,
-  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
-  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
 
 
 .. code-block:: Fortran
-    :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc".
+    :caption: TEST.
     :linenos:
     
- Emis_sourceFiles(1)%filename = '/nobackup/forsk/sm_petwi/Data/ECLIPSE_V6a_CLE_base_PM25.nc',
- Emis_sourceFiles(1)%projection = 'lon lat',
- Emis_sourceFiles(1)%periodicity = 'yearly',  
- Emis_sourceFiles(1)%source(1)%varname='emis_tra',
- Emis_sourceFiles(1)%source(1)%species='pm25',
- Emis_sourceFiles(1)%source(1)%sector=7,
- Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
- Emis_sourceFiles(1)%source(1)%units='kg',
+ Why does this not show?
+
 
 
    
