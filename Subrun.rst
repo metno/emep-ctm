@@ -620,6 +620,18 @@ Note about species: These can be interpreted in one of three categories
      
      Example:
 
+
+.. code-block:: text
+  :caption: TEST.
+
+  USES%DEGREEDAY_FACTORS = F
+  USES%PFT_MAPS = T,    ! PFT LAI tests
+  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
+  USES%CONVECTION = T,
+  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
+  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
+
+
 .. code-block:: Fortran
     :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc".
     :linenos:
