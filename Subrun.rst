@@ -621,7 +621,7 @@ Note about species: These can be interpreted in one of three categories
      Example:
 
 .. code-block:: text
-  :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc".
+    :caption: Read a field named "emis_tra" from a file "Data/ECLIPSE_V6a_CLE_base_PM25.nc".
 
  Emis_sourceFiles(1)%filename = '/nobackup/forsk/sm_petwi/Data/ECLIPSE_V6a_CLE_base_PM25.nc',
  Emis_sourceFiles(1)%projection = 'lon lat',
