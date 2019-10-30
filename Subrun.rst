@@ -280,8 +280,6 @@ The mode options are:
         do nothing (default).
     'START'
         read at the start of run.
-    'RESTART'
-        read at the start of run, if the file is found.
     ‘NHOUR’
         read at given ``NEST_NHOURREAD`` hourly intervals, if the file is found.
         ``NEST_NHOURREAD`` is set in ``Model_config`` and should be an integer fraction of 24.
