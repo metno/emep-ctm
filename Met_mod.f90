@@ -678,7 +678,7 @@ subroutine MeteoRead()
      if(write_now)write(*,*)'WARNING: deriving 3D cloud cover (cc3d) from cloud water '
      namefield='cloudwater'
      call Getmeteofield(meteoname,namefield,nrec,3,unit,validity,&
-            cc3d(:,:,:),found=foundcloudwater)
+            cc3d(:,:,:),needed=met(ix_cw_met)%needed,found=foundcloudwater)
      call CheckStop(.not.foundcloudwater,&
             "meteo field not found: 3D_cloudcover and"//trim(namefield))
      cc3d(:,:,:)=0.01*max(0.0,min(100.0,cc3d(:,:,:)*CW2CC))!from kg/kg water to % clouds to fraction
@@ -1024,10 +1024,10 @@ subroutine MeteoRead()
         if((DEBUG_SOILWATER.or.first_call).and.MasterProc) &
                write(*,*) "Met_mod: soil water search ",isw,trim(namefield)
         call Getmeteofield(meteoname,namefield,nrec,ndim,unit,validity,&
-               SoilWater_uppr(:,:,nr),found=foundSoilWater_uppr)
+               SoilWater_uppr(:,:,nr),needed=met(ix_SoilWater_uppr)%needed,found=foundSoilWater_uppr)
         if(foundSoilWater_uppr) then ! found
-          foundSMI1=(index(namefield,"SMI")>0)
-          exit
+           foundSMI1=(index(namefield,"SMI")>0)
+           exit
         end if
       end do
       if(foundSMI1.and.MasterProc.and.first_call) &  ! = 1st call
@@ -1046,7 +1046,7 @@ subroutine MeteoRead()
         if(MasterProc.and.first_call) write(*,*) "Met_mod: ', &
           'deep soil water search ", isw, trim(namefield)
         call Getmeteofield(meteoname,namefield,nrec,ndim,unit,validity,&
-            SoilWater_deep(:,:,nr),found=foundSoilWater_deep)
+            SoilWater_deep(:,:,nr),needed=met(ix_SoilWater_deep)%needed,found=foundSoilWater_deep)
         if(foundSoilWater_deep) then ! found
           foundSMI3=(index(namefield,"SMI")>0)
           if(.not.foundSMI3) &  ! = 1st call
@@ -1162,7 +1162,7 @@ subroutine MeteoRead()
     if(.not.foundws10_met)then
       namefield='V10' !second component of ws_10m
       call Getmeteofield(meteoname,namefield,nrec,ndim,unit,validity,&
-           buff(:,:),found=foundws10_met)
+           buff(:,:),needed=met(ix_ws_10m)%needed,found=foundws10_met)
     end if
     if(foundws10_met)then
       if(write_now)write(*,*)dtxt//' found v component of 10m wind '
