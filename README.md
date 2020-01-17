@@ -103,7 +103,7 @@ Details about the output files are described in Chapter 3 of the User Guide.
 The EMEP MSC-W model is a chemical transport model developed at the
 Meteorological Synthesizing Centre - West (MSC-W)
 at the Norwegian Meteorological Institute (met.no).
-The EMEP model is a limited-area, terrain following sigma coordinate model
+The EMEP model is a limited-area, terrain following hybrid coordinate model
 designed to calculate air concentration and deposition fields for
 
 * acidifying and eutrophying compounds (S, N)
