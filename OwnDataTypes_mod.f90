@@ -1,7 +1,7 @@
-! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -49,22 +49,7 @@ integer, public, parameter :: &
 ! Contains some user-defined data-types, and routine associated
 ! with these. Collecting them here will
 ! avoid some dependencies, and shorten some My type modules.
-!
-! depmap used in DryDep_mod and My_WetDep_mod
-! Deriv used in My_Derived and  Derived_mod
-! VBST from SOA_mod
 
-!MOVED!/-- we define a type to map indices of species to be deposited
-!MOVED   to the lesser number of species where Vg is calculated
-!MOVED
-
-!MOVED type, public :: dep_t
-!MOVED character(len=TXTLEN_SHORT) :: name       ! Species name
-!MOVED character(len=TXTLEN_SHORT) :: surrogate  ! Surrogate species in  calculated dep arrays
-!MOVED    integer :: iadv  ! Index of species in IXADV_ or IX_ arrays
-!MOVED    integer :: idef  ! Index of species in  DryDep_Defs or WetDep_Defs. Set in run
-!MOVED    real    :: setRate   ! if CDDEP_SET, give vg in m/s
-!MOVED  endtype dep_t
 
   !==================
   !/ generic groups for integers
@@ -84,6 +69,14 @@ integer, public, parameter :: &
     character(len=TXTLEN_SHORT) :: txt1='-' ! e.g. POD1_IAM_DF
     character(len=TXTLEN_SHORT) :: txt2='-' ! e.g. POD1_IAM_DF
   end type typ_ss
+  
+  !/ generic group for two (short) strings and float
+  !  currently for CMX boundary conditions
+  type, public :: typ_ssf
+    character(len=TXTLEN_SHORT) :: txt1='-' ! e.g. POD1_IAM_DF
+    character(len=TXTLEN_SHORT) :: txt2='-' ! e.g. POD1_IAM_DF
+    real :: num  = UNDEF_R
+  end type typ_ssf
 
  !/ generic group for name and pointer to arrays
   type, public :: typ_sp

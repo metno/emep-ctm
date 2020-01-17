@@ -1,7 +1,7 @@
-! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -38,7 +38,6 @@ module SubMet_mod
 use BLPhysics_mod, only: MIN_USTAR_LAND
 use CheckStop_mod, only: StopAll, CheckStop
 use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES &
-                      , USE_ZREF & ! TEST
                       , Zmix_ref !height at which concentration above different landuse are considered equal 
 use Debug_module,  only: DEBUG     !Needs DEBUG_RUNCHEM and DEBUG%SUBMET to get debug_flag
 use Functions_mod, only: T_2_Tpot  !needed if FluxPROFILE == Ln95
@@ -217,7 +216,7 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
 
         end if
           
-        if ( USE_ZREF ) then  !EXPERIMENTAL. Not recommended so far
+        if ( USES%ZREF ) then  !EXPERIMENTAL. Not recommended so far
            Sub(iL)%z_refd = Grid%z_ref
         else
            Sub(iL)%z_refd = Grid%z_ref - Sub(iL)%d  !  minus displacement height

@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -303,15 +303,15 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
    call CheckStop(dt_advec<2*DT_INITCHEM, &
         "Error in Solver/makedt: dt_advec too small!")
 
- ! - put special cases here:
+! - put special cases here:
 
 !/ ** For small scales
-  if(dt_advec<620.0) nchem = NUM_INITCHEM +int((dt_advec- dt_init) / dt_init )
+   if(dt_advec<620.0) nchem = NUM_INITCHEM +int((dt_advec- dt_init) / DT_INITCHEM )
 
 !/ Used for >21km resolution and dt_advec>520 seconds:
 !.. timesteps from 6 to nchem
 
-   dt=(dt_advec - dt_init )/(nchem-NUM_INITCHEM)
+   if( nchem > NUM_INITCHEM )dt=(dt_advec - dt_init )/(nchem-NUM_INITCHEM)
 
    dt(1:NUM_INITCHEM)=DT_INITCHEM     !.. first five timesteps
 

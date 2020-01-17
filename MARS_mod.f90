@@ -1,8 +1,8 @@
-! <MARS_mod.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <MARS_mod.f90 - A component of the EMEP MSC-W Eulerian
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute

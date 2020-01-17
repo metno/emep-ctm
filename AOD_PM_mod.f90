@@ -1,7 +1,7 @@
-! <AOD_PM_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <AOD_PM_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -91,11 +91,8 @@ integer, public, parameter :: &
   CEXT_NO3c=9             ! NO3_c sitting on SSc:
                           ! assume rho_dry as SO4, Q and GF as SSc
 integer, private, save :: NUM_EXT=0
-integer, public, save, allocatable :: aod_grp(:)
-type :: ExtEffMap
-  integer :: itot,cext
-end type ExtEffMap
-type(ExtEffMap), private, save, allocatable :: ExtMap(:)
+integer, public, save, pointer :: aod_grp(:)
+integer, private, save, allocatable :: ExtMap(:)
 
 integer, parameter :: NumRH=7
 real, parameter, dimension(NumRH) ::          &
@@ -297,7 +294,7 @@ function Qm(mode,rh,wlen,debug) result(Qm_arr)
   Qm_cext(CEXT_NO3c)=0.3*Qm_cext(CEXT_NO3f)+0.7*Qm_cext(CEXT_NO3c)
 
   !.. mass extinction efficiency [m2/g]
-  Qm_arr(:)=Qm_cext(ExtMap%cext)
+  Qm_arr(:)=Qm_cext(ExtMap)
 
 contains
 function rho_wet(nc)
@@ -338,7 +335,7 @@ function Qm_grp(gtot,rh,debug) result(Qm_arr)
 
   Qm_arr(:)=0
   do n=1,size(gtot)
-    i=find_index(gtot(n),ExtMap(:)%itot,debug=my_debug)
+    i=find_index(gtot(n),aod_grp,debug=my_debug)
     if(i>0)Qm_arr(n)=Qm_aux(i)
   end do
 end function Qm_grp
@@ -361,32 +358,30 @@ subroutine AOD_init(msg,wlen,out3d)
     wanted_ext3d=wanted_ext3d.or.out3d
   end if
 !-----------------------------------------------------------------------!
-! Unpack EXTINC mapping 
-!  ExtMap%itot: species 
-!  ExtMap%cext: extinction prototype
-!  aod_grp: ExtMap%itot for public usage
+! Unpack EXTINC mapping, from chemgroups_maps
+!  aod_grp(public): species; EXTINC_GROUP
+!  ExtMap(private): extinction prototype; from EXTINC_GROUP_MAPBACK
 !-----------------------------------------------------------------------!
-  if(.not.allocated(aod_grp))then
+  if(.not.associated(aod_grp))then
     igrp=find_index('EXTINC',chemgroups_maps%name)
     call CheckStop(igrp<1,trim(msg)//" EXTINC mapping not found")
-    NUM_EXT=size(chemgroups_maps(igrp)%species)
-    allocate(aod_grp(NUM_EXT),ExtMap(NUM_EXT))
+    aod_grp=>chemgroups_maps(igrp)%species
+    NUM_EXT=size(aod_grp)
+    allocate(ExtMap(NUM_EXT))
     do n=1,NUM_EXT
-      aod_grp(n)=chemgroups_maps(igrp)%species(n)
-      ExtMap(n)%itot=aod_grp(n)
       select case(chemgroups_maps(igrp)%maps(n))
-        case('DDf' );ExtMap(n)%cext=CEXT_DDf
-        case('DDc' );ExtMap(n)%cext=CEXT_DDc
-        case('SSf' );ExtMap(n)%cext=CEXT_SSf
-        case('SSc' );ExtMap(n)%cext=CEXT_SSc
-        case('ECn' );ExtMap(n)%cext=CEXT_ECn
-        case('ECa' );ExtMap(n)%cext=CEXT_ECa
-        case('EC'  );ExtMap(n)%cext=CEXT_EC
-        case('OC'  );ExtMap(n)%cext=CEXT_OC
-        case('SO4' );ExtMap(n)%cext=CEXT_SO4
-        case('NH4f');ExtMap(n)%cext=CEXT_NH4f
-        case('NO3f');ExtMap(n)%cext=CEXT_NO3f
-        case('NO3c');ExtMap(n)%cext=CEXT_NO3c
+        case('DDf' );ExtMap(n)=CEXT_DDf
+        case('DDc' );ExtMap(n)=CEXT_DDc
+        case('SSf' );ExtMap(n)=CEXT_SSf
+        case('SSc' );ExtMap(n)=CEXT_SSc
+        case('ECn' );ExtMap(n)=CEXT_ECn
+        case('ECa' );ExtMap(n)=CEXT_ECa
+        case('EC'  );ExtMap(n)=CEXT_EC
+        case('OC'  );ExtMap(n)=CEXT_OC
+        case('SO4' );ExtMap(n)=CEXT_SO4
+        case('NH4f');ExtMap(n)=CEXT_NH4f
+        case('NO3f');ExtMap(n)=CEXT_NO3f
+        case('NO3c');ExtMap(n)=CEXT_NO3c
         case default
           call CheckStop(trim(msg)//" Unknown EXTINC mapping "//&
                          trim(chemgroups_maps(igrp)%maps(n)))
@@ -469,7 +464,7 @@ subroutine AOD_Ext(i,j,debug)
 
       !.. Specific extinction coefficients
       kext(:)=kext(:) &                                             ! [m2/g]
-        *xn_2d(ExtMap%itot,k)*species(ExtMap%itot)%molwt*1.0e6/AVOG ! [g/m3]
+        *xn_2d(aod_grp,k)*species(aod_grp)%molwt*1.0e6/AVOG ! [g/m3]
 
       !.. Extinction coefficients at level:k and wavelength:w
       if(allocated(Extin_coeff))&
@@ -481,7 +476,7 @@ subroutine AOD_Ext(i,j,debug)
       if(debug.and.w==W550)then
         !.. Extinction coefficients for diferent optical groups/types
         do n = 1,NUM_CEXT
-          kext_cext(n)=sum(kext(:),MASK=(ExtMap(:)%cext==n))
+          kext_cext(n)=sum(kext(:),MASK=(ExtMap(:)==n))
         end do
         !.. Aerosol optical depth for individual components
         AOD_cext(:)=AOD_cext(:)+kext_cext(:)*(z_bnd(i,j,k)-z_bnd(i,j,k+1))

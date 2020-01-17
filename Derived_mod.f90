@@ -1,7 +1,7 @@
-! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -58,6 +58,7 @@ use ChemGroups_mod          ! SIA_GROUP, PMCO_GROUP -- use tot indices
 use ChemSpecs_mod           ! IXADV_ indices etc
 use Config_module,     only: &
    KMAX_MID,KMAX_BND  & ! =>  z dimension: layer number,level number
+  ,KCHEMTOP           & ! limit of Fgas3d
   ,NPROC              & ! No. processors
   ,dt_advec           &
   ,PPBINV             & ! 1.0e9, for conversion of units
@@ -68,7 +69,7 @@ use Config_module,     only: &
   ! output types corresponding to instantaneous,year,month,day
   ,IOU_INST,IOU_YEAR,IOU_MON,IOU_DAY,IOU_HOUR,IOU_HOUR_INST,IOU_KEY &
   ,MasterProc, SOURCE_RECEPTOR, AOD_WANTED &
-  ,USES, USE_OCEAN_DMS, USE_OCEAN_NH3, USE_uEMEP, uEMEP, startdate,enddate,&
+  ,USES, uEMEP, startdate,enddate,&
   HourlyEmisOut, SecEmisOutWanted, spinup_enddate, OutputMisc, WDEP_WANTED
 
 use Debug_module,      only: DEBUG   ! -> DEBUG%DERIVED and COLSRC
@@ -85,7 +86,7 @@ use GridValues_mod,    only: debug_li, debug_lj, debug_proc, A_mid, B_mid, &
                             dA,dB,xm2, GRIDWIDTH_M, GridArea_m2,xm_i,xm_j,glon,glat
 use Io_Progs_mod,      only: datewrite
 use MetFields_mod,     only: roa,pzpbl,Kz_m2s,th,zen, ustar_nwp, u_ref,&
-                            met, derivmet,  & !TEST of targets
+                            met, derivmet,  &
                             ws_10m, rh2m, z_bnd, z_mid, u_mid,v_mid,ps, t2_nwp, &
                             SoilWater_deep, SoilWater_uppr, Idirect, Idiffuse
 use MosaicOutputs_mod,     only: nMosaic, MosaicOutput
@@ -185,6 +186,7 @@ character(len=100), private :: errmsg
 ! horizontal line for printouts
 character(len=*), private, parameter :: HORIZ_LINE =repeat('=',78) !f2003://new_line('a') 
 
+! NB global use of these common variables is dangerous!
 integer, private :: i,j,k,l,n, ivoc, iou, isec   ! Local loop variables
 
 ! Avoid hard codded IXADV_SPCS
@@ -207,7 +209,7 @@ subroutine Init_Derived()
   allocate(D2_O3_DAY( LIMAX, LJMAX, NTDAY))
   D2_O3_DAY = 0.0
 
-  if(USE_uEMEP .and. (uEMEP%HOUR_INST.or.uEMEP%HOUR)) HourlyEmisOut = .true.
+  if(USES%uEMEP .and. (uEMEP%HOUR_INST.or.uEMEP%HOUR)) HourlyEmisOut = .true.
 
   if(dbg0) write(*,*) dtxt//"INIT STUFF"
   call Init_My_Deriv()  !-> wanted_deriv2d, wanted_deriv3d
@@ -374,11 +376,6 @@ subroutine Define_Derived()
   !Deriv(name, class,    subc,  txt,           unit
   !Deriv index, f2d, dt_scale, scale, avg? rho Inst Yr Mn Day atw
 
-! NOT YET: Scale pressure by 0.01 to get hPa
-  call AddNewDeriv( "PSURF","PSURF",  "SURF","-",   "hPa", &
-          -99,  -99,  F,  1.0,  T,  'YM' )
-
-!NB: do not remove or change name. PS is part of vertical coordinates definition!!
   call AddNewDeriv( "PS","PSURF",  "SURF","-",   "hPa", &
           -99,  -99,  F,  1.0,  T,  'YMD'//trim(PS_needed) )
 
@@ -443,13 +440,25 @@ subroutine Define_Derived()
         outtyp = "FLYmax6h:GROUP"
         subclass = outdim   ! flxxx-yyy: xxx to yyy 100 feet
         outname = "MAX6h_"//trim(outname)//"_"//trim(subclass)
-      case('COLUMN','COLUMN:SPEC')
-     !COL  'NO2',          'molec/cm2' ,'k20','COLUMN'   ,'MISC' ,4,
+      case('COLUMN','COLUMN:ADV','COLUMN:SPEC')
+        !COL  'NO2',          'molec/cm2' ,'k20','COLUMN'   ,'MISC' ,4,
         iout=find_index(outname, species_adv(:)%name, any_case=.true. )
         call CheckStop(iout<0,dtxt//"OutputFields "//trim(outtyp)//&
                               " not found "//trim(outname))
         call Units_Scale(outunit,iout,unitscale,unittxt)
         outtyp = "COLUMN:SPEC"
+        subclass = outdim   ! k20, k16...
+        outname = "COLUMN_" // trim(outname) // "_" // trim(subclass)
+      case('COLUMN:SHL')
+        !COL   'OH',          'molec/cm2' ,'k20','COLUMN'   ,'MISC' ,4,
+        iout=find_index(outname, species_shl(:)%name, any_case=.true. )
+        call CheckStop(iout<0,dtxt//"OutputFields "//trim(outtyp)//&
+                              " not found "//trim(outname))
+        call CheckStop(outunit, 'molec/cm2',dtxt//"OutputFields "//trim(outtyp)//&
+                              " unsupported unit "//trim(outunit))
+        unitscale = 1e2 ! dZ[m] to dZ[cm]
+        unittxt   = trim(outunit)
+        outtyp = "COLUMN:SHL"
         subclass = outdim   ! k20, k16...
         outname = "COLUMN_" // trim(outname) // "_" // trim(subclass)
       case('COLUMN:GROUP')
@@ -460,21 +469,23 @@ subroutine Define_Derived()
         outtyp = "COLUMN:GROUP"
         subclass = outdim   ! k20, k16...
         outname = "COLUMN_" // trim(outname) // "_" // trim(subclass)
-      case('AOD','AOD:TOTAL','AOD:SPEC','AOD:SHL','AOD:GROUP',&
-           'EXT','EXT:TOTAL','EXT:SPEC','EXT:SHL','EXT:GROUP')
+      case('AOD','AOD:TOTAL','AOD:SPEC','AOD:GROUP',&
+           'EXT','EXT:TOTAL','EXT:SPEC','EXT:GROUP')
         if(.not.AOD_WANTED)cycle
+        ! treat 'AOD:GROUP'/'EXT:GROUP' as 'AOD'/'EXT'
+        if((outname=='AOD'.and.class=='AOD:GROUP').or.&
+           (outname=='EXT'.and.class=='EXT:GROUP'))&
+          class=trim(outname)
         select case(class)
-        case('AOD:GROUP','EXT:GROUP')
-          select case(outname)
-          case('AOD','EXT')  ! take the full aod_group
-            iout=find_index('EXTINC',chemgroups_maps(:)%name, any_case=.true.)
-          case default       ! cherry pick from aod_group
-            iout=find_index(outname,chemgroups(:)%name, any_case=.true.)
-          end select
+        case('AOD','EXT')             ! take the full aod_group
+          iout=find_index('EXTINC',chemgroups_maps(:)%name, any_case=.true.)
+        case('AOD:GROUP','EXT:GROUP') ! cherry pick from aod_group
+          iout=find_index(outname,chemgroups(:)%name, any_case=.true.)
         case('AOD:SPEC','EXT:SPEC' )
-          iout=find_index(outname,species_adv(:)%name, any_case=.true.)
+          iout=find_index(outname,species(:)%name, any_case=.true.)
         case default
-          call CheckStop(dtxt//"OutputFields%class  Unsupported "//&
+          ! should never reach this clause
+          call CheckStop(dtxt//" Unsupported output for "//&
             trim(outtyp)//":"//trim(outname)//":"//trim(outdim))
         end select
         call CheckStop(iout<0,dtxt//"OutputFields%class "//trim(class)//&
@@ -482,9 +493,18 @@ subroutine Define_Derived()
         unitscale = 1.0
         unittxt   = trim(outunit)
         subclass  = outdim   ! 330nm .. 1020nm
-        if(outname(1:3)/=class(1:3))&
-          outname = class(1:3)//"_"//trim(outname)
-        outname   = trim(outname)//"_"//trim(subclass)
+        select case(class)
+        case('AOD','EXT')
+          outname = trim(outname)//"_"//trim(subclass)
+        case('AOD:SPEC','AOD:GROUP' )
+          outname = "AOD_"//trim(outname)//"_"//trim(subclass)
+        case('EXT:SPEC','EXT:GROUP' )
+          outname = "EXT_"//trim(outname)//"_"//trim(subclass)
+        case default
+          ! should never reach this clause
+          call CheckStop(dtxt//" Undefined namaming for "//&
+            trim(outtyp)//":"//trim(outname)//":"//trim(outdim))
+        end select
         Is3D      = (class(1:3)=="EXT")
         call AOD_init("Derived:"//trim(class),wlen=trim(subclass),out3d=Is3D)
       case default
@@ -693,8 +713,8 @@ subroutine Define_Derived()
   do isec=1,NSECTORS
      if(SecEmisOutWanted(isec))then
         do  i = 1, NEMIS_File
-           write(dname,"(A,I0,A)")dtxt//"Sec",isec,"_Emis_mgm2_"//trim(EMIS_FILE(i))
-           isec_poll = (isec-1)*NEMIS_File + i
+           write(dname,"(A,I0,A)")"Sec",isec,"_Emis_mgm2_"//trim(EMIS_FILE(i))
+           isec_poll = (isec)*(NEMIS_File) + i
            if(HourlyEmisOut)then
               call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
                    isec_poll , -99, T,  1.0e6,  F,  'YMH' )
@@ -706,12 +726,12 @@ subroutine Define_Derived()
      endif
   end do
 
-  if(USE_OCEAN_DMS)then
+  if(USES%OCEAN_DMS)then
     dname = "Emis_mgm2_DMS"
     call AddNewDeriv( dname, "Emis_mgm2_DMS", "-", "-", "mg/m2", &
                        ind , -99, T,  1.0,  F,  'YM' )
   end if
-  if(USE_OCEAN_NH3)then
+  if(USES%OCEAN_NH3)then
      dname = "Emis_mgm2_Ocean_NH3"
     call AddNewDeriv( dname, "Emis_mgm2_Ocean_NH3", "-", "-", "mg/m2", &
                        ind , -99, T,  1.0,  F,  'YM' )
@@ -777,11 +797,15 @@ Is3D = .true.
     if(dbg0) write(*,*)dtxt//"CHECK2d",num_deriv2d,i,trim(wanted_deriv2d(i))
     if(MasterProc) call CheckStop(count(f_2d(:i)%name==wanted_deriv2d(i))>0,&
         dtxt//"REQUESTED 2D DERIVED ALREADY DEFINED: "//trim(wanted_deriv2d(i)))
+    ind = find_index( wanted_deriv2d(i), def_2d(:)%name,any_case=.false. )
+    if(ind<=0)then
+       !try with case insensitive
     ind = find_index( wanted_deriv2d(i), def_2d(:)%name,any_case=.true. )
+    endif
     if(ind>0)then
       f_2d(i) = def_2d(ind)
       if(dbg0) write(*,"(2(a,i4),3(1x,a))") "Index f_2d ",i,  &
-        " = def ",ind,trim(def_2d(ind)%name),trim(def_2d(ind)%unit),&
+        " = def "//trim(wanted_deriv2d(i)),ind,trim(def_2d(ind)%name),trim(def_2d(ind)%unit),&
         trim(def_2d(ind)%class)
     elseif(MasterProc)then
       print *,dtxt//"D2IND OOOPS wanted_deriv2d not found: ", wanted_deriv2d(i)
@@ -1477,7 +1501,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d(n,i,j,IOU_INST) = d_2d(ind2d_pm10   ,i,j,IOU_INST) &
                              + d_2d(ind2d_pmwater,i,j,IOU_INST)
 
-    case("AOD:GROUP","AOD:SPEC")  !/ Aerosol Optical Depth (new system)
+    case("AOD","AOD:GROUP","AOD:SPEC")  !/ Aerosol Optical Depth (new system)
       if(first_call)call AOD_init("Derived:"//trim(class))
       wlen=find_index(f_2d(n)%subclass,wavelength)! e.g. search "550nm" on array of wavelengths
       if(first_call)then
@@ -1490,18 +1514,16 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       ngrp = size(aod_grp)
       allocate(ingrp(ngrp))
       select case(class)
+      case("AOD")
+        ingrp(:)=.true.        ! take the full aod_grp
       case("AOD:GROUP")
-        if(name(1:3)=='AOD')then ! take the full aod_grp
-          ingrp(:)=.true.
-        else                     ! cherry pick from aod_grp
-          igrp = f_2d(n)%index
-          do i=1,ngrp
-            ingrp(i)=any(aod_grp(i)==chemgroups(igrp)%specs(:))
-          end do
-        end if
+        igrp = f_2d(n)%index
+        do i=1,ngrp
+          ingrp(i)=any(aod_grp(i)==chemgroups(igrp)%specs(:))
+        end do
       case("AOD:SPEC")
         ispc = f_2d(n)%index
-        ingrp(:)=(aod_grp(:)==(ispc+NSPEC_SHL))
+        ingrp(:)=(aod_grp(:)==ispc)
       end select
       forall ( i=1:limax, j=1:ljmax )&
         d_2d( n, i,j,IOU_INST) = SUM(AOD(:,i,j,wlen),MASK=ingrp)
@@ -1648,7 +1670,8 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         forall(i=1:limax,j=1:ljmax,mask2d(i,j))&  ! use IOU_YEAR as a buffer
           d_2d(n,i,j,IOU_YEAR)=max(d_2d(n,i,j,IOU_YEAR),tmpwork(i,j))
       end do
-    case ("COLUMN","COLUMN:SPEC") ! unit conversion factor stored in f_2d(n)%scale
+
+    case ("COLUMN",'COLUMN:ADV',"COLUMN:SPEC") ! unit conversion factor stored in f_2d(n)%scale
       klow = KMAX_MID + 1 ! initialize too large
       if (f_2d(n)%subclass == "kmax") then
         klow = KMAX_MID
@@ -1678,8 +1701,37 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       end do !j
       if(dbgP) write(*,"(a18,es12.3)") &
         "COLUMN:SPEC d2_2d",d_2d(n,debug_li,debug_lj,IOU_INST)*f_2d(n)%scale
+      case ("COLUMN:SHL") ! unit conversion factor stored in f_2d(n)%scale
+        klow = KMAX_MID + 1 ! initialize too large
+        if (f_2d(n)%subclass == "kmax") then
+          klow = KMAX_MID
+        else
+          read(f_2d(n)%subclass,"(a1,i2)") txt2, klow ! Connvert e.g. k20 to klow=20
+        end if
+        call CheckStop(klow>KMAX_MID, "column definition too large: "// f_2d(n)%subclass)
+        do j = 1, ljmax
+          do i = 1, limax
+            k = 1
+            tmpwork(i,j) =  &
+              xn_shl(ind,i,j,k)*(z_bnd(i,j,k)-z_bnd(i,j,k+1))
+            do k = 2, klow   !!! KMAX_MID
+              tmpwork(i,j) = tmpwork(i,j) + &
+                xn_shl(ind,i,j,k)*(z_bnd(i,j,k)-z_bnd(i,j,k+1))
 
-    case("COLUMN:GROUP")
+              if(DEBUG%COLUMN.and.dbgP.and.&
+                i==debug_li.and.j==debug_lj) &
+                write(*,"(a,3i4,a4,f8.3,f8.1,2es12.3)") &
+                  trim(f_2d(n)%name), n, ind, k, " => ", &
+                    f_2d(n)%scale, z_bnd(i,j,k)-z_bnd(i,j,k+1), &
+                    xn_shl(ind,i,j,k),tmpwork(i,j)
+            end do ! k
+            d_2d(n,i,j,IOU_INST) = tmpwork(i,j) ! unit conversion
+                     ! is completed elsewere by *f_2d(n)%scale
+          end do !i
+        end do !j
+        if(dbgP) write(*,"(a18,es12.3)") &
+          "COLUMN:SHL d2_2d",d_2d(n,debug_li,debug_lj,IOU_INST)*f_2d(n)%scale
+      case("COLUMN:GROUP")
       igrp = f_2d(n)%index
       call CheckStop(igrp<1,"NEG GRP "//trim(f_2d(n)%name))
       call CheckStop(igrp>size(chemgroups(:)%name), &
@@ -1747,7 +1799,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ( "SecEmis" ) !emissions in mg/m2 per sector
 
       iem=mod((f_2d(n)%Index-1),NEMIS_File)+1
-      isec=(f_2d(n)%Index-1)/NEMIS_File+1
+      isec=(f_2d(n)%Index-1)/(NEMIS_File)
       forall ( i=1:limax, j=1:ljmax )
          d_2d(n,i,j,IOU_INST) =  SecEmisOut( i,j, iem, isec2SecOutWanted(isec))
       end forall
@@ -1779,27 +1831,20 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       call CheckStop(igrp>size(chemgroups(:)%name), &
                             "Outside GRP "//trim(f_2d(n)%name))
       ngrp = size(chemgroups(igrp)%specs)
-      ind_tmp = -999
-
-      if(chemgroups(igrp)%name == "PMFINE" .and. ind2d_pmfine<0) then
-        ind2d_pmfine = n
-        ind_tmp = n
-
-      else if(chemgroups(igrp)%name == "SIA" .and. ind2d_sia<0) then
-        ind2d_sia = n
-        ind_tmp = n
-
-      else if(chemgroups(igrp)%name == "PM10" .and. ind2d_pm10<0) then
-        ind2d_pm10 = n
-        ind_tmp = n
+      if(first_call)then
+        select case(chemgroups(igrp)%name)
+          case("PMFINE"); ind2d_pmfine = n
+          case("SIA");    ind2d_sia = n
+          case("PM10");   ind2d_pm10 = n
+        end select
+        if(dbgP) write(*,"(a,3i4,2a15)") &
+          "Deriv: CASEGRP - 2DFOUND "//trim(class), n, igrp, ngrp,&
+          trim(chemgroups(igrp)%name), trim(f_2d(n)%name)
       end if
 
-      if(dbgP.and.first_call) write(*,"(a,4i4,2a15)") &
-         dtxt//"CASEGRP - 2DFOUND "//trim(class), n, ind_tmp, igrp, ngrp,&
-           trim(chemgroups(igrp)%name), trim(f_2d(n)%name)
       if(dbg0) then
-        write(*,"(a,4i5,3(1x,a))")dtxt//"CASEGRP:"//trim(f_2d(n)%name), &
-          n, igrp, ngrp, ind_tmp, trim(class), trim(subclass), &
+        write(*,"(a,3i5,3(1x,a))")dtxt//"CASEGRP:"//trim(f_2d(n)%name), &
+          n, igrp, ngrp, trim(class), trim(subclass), &
             trim(chemgroups(igrp)%name)
         write(*,"(a,88i4)") "CASEGRP:", chemgroups(igrp)%specs
         write(*,*) "CASEGRPunit ", trim(f_2d(n)%unit)
@@ -2072,8 +2117,12 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ("T" ) ! Absolute Temperature
       forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
         d_3d(n,i,j,k,IOU_INST)=th(i,j,lev3d(k),1)&
-            *exp(KAPPA*log((A_mid(lev3d(k)) &
-                          + B_mid(lev3d(k))*ps(i,j,1))*1.e-5))
+            *exp(KAPPA*log((A_mid(lev3d(k))+ B_mid(lev3d(k))*ps(i,j,1))*1.e-5))
+
+    case ("pressure_3D" ) !
+      forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
+        d_3d(n,i,j,k,IOU_INST) = &
+                     (A_mid(lev3d(k)) + B_mid(lev3d(k))*ps(i,j,1))*1.e-2 ! hPa
 
     case ( "MAX3DSHL" ) ! Daily maxima - short-lived
       call CheckStop(f_3d(n)%unit=="ppb","Asked for MAX3DSHL ppb ")
@@ -2126,30 +2175,17 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       call CheckStop(igrp>size(chemgroups(:)%name), &
                             "Outside GRP "//trim(f_3d(n)%name))
       ngrp = size(chemgroups(igrp)%specs)
-      ind_tmp = -333
-
-      if(chemgroups(igrp)%name == "PMFINE" .and. ind3d_pmfine<0) then
-        ind3d_pmfine = n
-        ind_tmp = n
-        if(MasterProc) write(*,"(a,2i4,2a15)") "FOUND FINE 3d FRACTION ",&
-          n, ind3d_pmfine, trim(chemgroups(igrp)%name), trim(f_3d(n)%name)
-      end if
-      if(chemgroups(igrp)%name == "SIA" .and. ind3d_sia<0) then
-        ind3d_sia = n
-        ind_tmp = n
-        if(MasterProc) write(*,"(a,2i4,2a15)") "FOUND SIA 3d FRACTION ",&
-          n, ind3d_sia, trim(chemgroups(igrp)%name), trim(f_3d(n)%name)
+      if(first_call)then
+        select case (chemgroups(igrp)%name)
+          case("PMFINE"); ind3d_pmfine = n
+          case("SIA");    ind3d_sia = n
+          case("PM10");   ind3d_pm10 = n
+        end select
+        if(MasterProc) write(*,"(a,3i4,2a15)") &
+          "Deriv: CASEGRP - 3DFOUND "//trim(class), n, igrp, ngrp,&
+          trim(chemgroups(igrp)%name), trim(f_3d(n)%name)
       end if
 
-      if(chemgroups(igrp)%name == "PM10" .and. ind3d_pm10<0) then
-        ind3d_pm10 = n
-        if(MasterProc) write(*,"(a,2i4,2a15)") "FOUND PM10 3d FRACTION ",&
-          n, ind3d_pm10, trim(chemgroups(igrp)%name), trim(f_3d(n)%name)
-      end if
-
-      if(MasterProc.and.first_call ) write(*,"(a,4i4,2a15)") &
-         dtxt//"CASEGRP - 3DFOUND "//trim(class), n, ind_tmp, igrp, ngrp,&
-           trim(chemgroups(igrp)%name), trim(f_2d(n)%name)
       if(dbg0) then
         write(*,*) "3DCASEGRP ", n, igrp, ngrp, trim(class)
         write(*,*) "3DCASENAM ", trim(f_3d(n)%name)
@@ -2186,7 +2222,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
         d_3d(n,i,j,k,IOU_INST)=z_bnd(i,j,lev3d(k))-z_bnd(i,j,lev3d(k)+1)
 
-    case("EXT:GROUP","EXT:SPEC")  !/ Extinction coefficient (new system)
+    case("EXT","EXT:GROUP","EXT:SPEC")  !/ Extinction coefficient (new system)
       if(first_call)call AOD_init("Derived:"//trim(class))
       wlen=find_index(f_3d(n)%subclass,wavelength)! e.g. search "550nm" on array of wavelengths
       if(first_call)then
@@ -2199,18 +2235,16 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       ngrp = size(aod_grp)
       allocate(ingrp(ngrp))
       select case(class)
-      case("EXT:GROUP")
-        if(name(1:3)=='EXT')then  ! take the full aod_grp
-          ingrp(:) = .true.
-        else                      ! cherry pick from aod_grp
-          igrp = f_3d(n)%index
-          do i=1,ngrp
-            ingrp(i)=any(aod_grp(i)==chemgroups(igrp)%specs(:))
-          end do
-        end if
+      case("EXT")       ! take the full aod_grp
+        ingrp(:) = .true.
+      case("EXT:GROUP") ! cherry pick from aod_grp
+        igrp = f_3d(n)%index
+        do i=1,ngrp
+          ingrp(i)=any(aod_grp(i)==chemgroups(igrp)%specs(:))
+        end do
       case("EXT:SPEC")
         ispc = f_3d(n)%index
-        ingrp(:)=(aod_grp(:)==(ispc+NSPEC_SHL))
+        ingrp(:)=(aod_grp(:)==ispc)
       end select
       forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
         d_3d(n,i,j,k,IOU_INST)=SUM(Extin_coeff(:,i,j,lev3d(k),wlen),MASK=ingrp)
@@ -2275,7 +2309,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   end do
 
   !the uemep fields do not fit in the general d_3d arrays. Use ad hoc routine
-  if(USE_uEMEP .and. .not. present(ONLY_IOU))then
+  if(USES%uEMEP .and. .not. present(ONLY_IOU))then
     call av_uEMEP(dt,End_of_Day)
   endif
 
@@ -2388,7 +2422,7 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
   real :: fac, Fgas                       ! FSOA
   logical ::  semivol_wanted, dbgPt       ! FSOA
   logical ::  first_call    = .true.  ! FSOA
-  logical ::  first_semivol_call = .true.  ! FSOA
+  logical ::  first_semivol_call = .true., ParticlePhaseOutputs   ! FSOA
   character(len=*), parameter :: dtxt = 'DrvGrpCalc:'
 
 !OM25: To solve complications with OM, we need:
@@ -2405,6 +2439,9 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
 
   semivol_wanted=.false.
   if(present(semivol)) semivol_wanted = semivol
+  ! NB global use of n is dangerous!
+  ParticlePhaseOutputs = ( (index(f_2d(n)%name, 'ug_PM' )>0) .or. &
+                           (index(f_2d(n)%name, 'ugC_PM')>0) )
 
   if( dbgP ) &
     write(*,"(a,L1,3i4,2a16,L2,i4)") dtxt//"SGROUP:",debug_proc,me,ik, kk, &
@@ -2443,24 +2480,28 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
         !if(all([semivol_wanted,itot>=FIRST_SEMIVOL,itot<=LAST_SEMIVOL])) then
         if ( dbgPt  ) write(*,'(a,3i4)')dtxt//'IOM_choice '//trim((f_2d(n)%name))//&
              ':'//trim(species(itot)%name), index(f_2d(n)%name, 'ug_PM' ), nspec, size(gspec)
-        !if(all([itot>=FIRST_SEMIVOL,itot<=LAST_SEMIVOL])) then
-        if(itot>=FIRST_SEMIVOL .and. itot<=LAST_SEMIVOL) then
-          Fgas = Fgas3d(itot,i,j,kk)
-          iadvDep= iadv_PMf   ! Gives SO4 dep for OMp
-          if ( dbgPt  ) write(*,'(a,3i4)')dtxt//'IOM_semid '//trim(f_2d(n)%name)
 
-          if ( index(f_2d(n)%name, 'ug_PM' )>0 ) then ! particle phase wanted
-            if(ik==0) fac = (1 - Fgas ) * cfac(iadvDep,i,j)
-            if ( dbgPt  ) write(*,*)dtxt//'IOM_PM ', fac, Fgas, trim(species(itot)%name )
-          else ! mixture of gas and PM with  different gradients
-            if(ik==0) fac = &
-             (1 - Fgas ) * cfac(iadvDep,i,j) + & !  PM term
-                  Fgas   * cfac(iadv,i,j)       ! gas-term
-            if ( dbgPt  ) write(*,'(a,i4,2f8.4,a)')dtxt//'IOM_mix',itot, &
+        if(itot>=FIRST_SEMIVOL .and. itot<=LAST_SEMIVOL) then
+
+          ! Fgas3d only defined for KCHEMTOP down
+           Fgas = Fgas3d(itot,i,j, max(kk,KCHEMTOP) )
+
+           if ( ParticlePhaseOutputs ) then ! particle phase wanted
+             fac = 1 - Fgas
+             !iadvDep= iadv_PMf   ! Gives SO4 dep for OMp
+             if ( ik == 0 ) fac = (1 - Fgas ) * cfac(iadv_PMf,i,j)
+           else  ! keeps fac=1.0, need to consider dry dep of gas vs particle
+              if(ik==0) fac = (1 - Fgas ) * cfac(iadv_PMf,i,j) + & !  PM term
+                                   Fgas   * cfac(iadv,i,j)         ! gas-term
+           end if
+
+           if ( dbgPt  ) write(*,'(a,i4,2f8.4,a)')dtxt//'IOM_mix',itot, &
                 fac, Fgas, trim(species(itot)%name )
-          end if 
-        else
-          if(ik==0) fac = fac * cfac(iadvDep,i,j)
+
+        else ! Simple gas or particle.
+
+            if(ik==0) fac = fac * cfac(iadvDep,i,j)
+        
         end if
 
 

@@ -1,7 +1,7 @@
-! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,7 +52,7 @@ use Config_module,    only:  &
   ,MasterProc                   & 
   ,PPB, PT                      & ! PT-pressure at top
   ,USES                         & ! forest fires, hydrolysis, dergee_days etc.
-  ,USE_OCEAN_NH3,USE_OCEAN_DMS,FOUND_OCEAN_DMS&
+  ,FOUND_OCEAN_DMS&
   ,VOLCANO_SR                   & ! Reduce Volcanic Emissions
   ,emis_inputlist               & ! Used in EEMEP
   ,KMAX_MID ,KMAX_BND, KCHEMTOP & ! Upper layer (k), upper level, and k for 1d fields
@@ -358,10 +358,10 @@ contains
 
           ugRemF = ugRemF  -ugBCf  ! kHet BC added 24/10/2015
 
-          aero_fss(k)     = ugSSaltF/ugpmF
-          aero_fdust(k)   = ugDustF/ugpmF
-          aero_fbc(k)     = ugBCf/ugpmF
-          aero_fom(k)     = max(0.0, ugRemF)/ugpmF
+          aero_fss(k)     = ugSSaltF/(ugpmF+1.E-30)
+          aero_fdust(k)   = ugDustF/(ugpmF+1.E-30)
+          aero_fbc(k)     = ugBCf/(ugpmF+1.E-30)
+          aero_fom(k)     = max(0.0, ugRemF)/(ugpmF+1.E-30)
 
           ! GERBER equations for wet radius
           ! New approach to Gerber. We use masses above. 
@@ -632,7 +632,7 @@ subroutine setup_rcemis(i,j)
   end if
 
   ! Emissions from GEIA, was use for Aerocom NO3 experiment
-  if(USE_OCEAN_NH3)then
+  if(USES%OCEAN_NH3)then
      !keep separated from snapemis/rcemis in order to be able to include more
      ! advanced processes
      k=KMAX_MID
@@ -674,7 +674,7 @@ subroutine setup_rcemis(i,j)
      Kw=Kw/3600!cm/hour -> cm/s
 
 !66% of DMS turns into SO2, Leonor Tarrason (1995)
-     if(USE_OCEAN_DMS)then
+     if(USES%OCEAN_DMS)then
       rcemis(O_DMS%index,k)=rcemis(O_DMS%index,k)+ &
       0.66*O_DMS%emis(i,j)*Kw*0.01*GRAV*roa(i,j,k,1)/ &
                            (dA(k)+dB(k)*ps(i,j,1)) *AVOG 
@@ -713,7 +713,7 @@ subroutine setup_rcemis(i,j)
 
     if(DEBUG%SETUP_1DCHEM.and.debug_proc.and.i==debug_li.and.j==debug_lj) then
        write(*,"(a,i3,9es12.4)") "1DCHEM DZ",  k, deltaZcm(k), &
-        100*(dA(k)+dB(k)*ps(i,j,1))/(GRAV*roa(i,j,k,1))! , &
+        100*(dA(k)+dB(k)*ps(i,j,1))/(GRAV*roa(i,j,k,1)) , z_bnd(i,j,k) ! all match at surface
 !        100*(dA(k)+dB(k)*ps(i,j,1))/(GRAV*M(k)*ATWAIR)!, &
 !        M(k)*ATWAIR/roa(i,j,k,1)
 !       M(k) = roa(i,j,k,1) * to_number_cm3  ! molecules air/cm3
@@ -762,14 +762,8 @@ end subroutine setup_rcemis
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine reset_3d(i,j)
   integer, intent(in) :: i,j
-  integer :: k, n, ispec, id    ! loop variables
- !! XNCOL testing -- sets d_2d for column data from molec/cm3 concs.
- ! if variables are wanted for d_2d output (via USET), we use these indices:
+  integer :: k, n, ispec    ! loop variables
   character(len=*),parameter :: dtxt='reset3dxncol:'
-  character(len=20) :: specname
-  integer, dimension(20), save :: d2index, id2col
-  logical, save :: first_call = .true.
-  integer, save :: nd2d
 
 
   do k = KCHEMTOP, KMAX_MID
@@ -784,46 +778,6 @@ subroutine reset_3d(i,j)
       xn_adv(n,i,j,k) = xn_2d(ispec,k)/M(k)
     end do ! ispec
   end do ! k
-
-!!======================================================================
-!! If column totals are wanted, we can do those here also since xn_2d are
-!! in molec/cm3, and we want molec/cm2:
-
-   if ( first_call ) then
-
-     nd2d = 0
-     do id = 1, size(f_2d)
-
-           if ( f_2d(id)%subclass == 'xncol' ) then
-             nd2d =  nd2d  + 1
-             call CheckStop( nd2d > size(id2col), &
-                 dtxt//"Need bigger id2col array" )
-             specname = trim(f_2d(id)%name(7:))  ! Strip XNCOL_
-             ispec = find_index( specname, species(:)%name )
-             call CheckStop(ispec < 1, dtxt//"XNCOL not found"//specname )
-             d2index(nd2d)= id
-             id2col(nd2d) = ispec
-             if(MasterProc) write(*,*) 'USET XNCOL FOUND', id, ispec, &
-                 trim(specname),nd2d, id2col(nd2d)
-           end if
-     end do
-     first_call = .false.
-   end if
-
-   do id = 1, nd2d
-      ispec = id2col(id)
-      d_2d(d2index(id),i,j,IOU_INST) = dot_product(xn_2d(ispec,:),deltaZcm(:))
-      if(DEBUG%SETUP_1DCHEM.and.debug_proc.and. &
-          i==debug_li.and.j==debug_lj) then
-
-        write(*,"(a,6i5,a,9es12.3)") dtxt//"OUTXNCOL "//&
-          trim(f_2d(d2index(id))%name), me, i,j,id,d2index(id),ispec, &
-          trim(species(ispec)%name), xn_2d(ispec,20), deltaZcm(20), &
-           d_2d(d2index(id),i,j,IOU_INST)
-    end if
-   end do
-
-
 end subroutine reset_3d
 !---------------------------------------------------------------------------
 endmodule Setup_1d_mod

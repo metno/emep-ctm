@@ -1,7 +1,7 @@
-! <Convection_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Convection_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,427 +41,282 @@ module Convection_mod
 use Chemfields_mod,        only: xn_adv
 use ChemDims_mod,          only: NSPEC_ADV
 use Config_module,         only: KMAX_BND,KMAX_MID,PT,Pref
-use MetFields_mod ,        only: ps,SigmaKz,u_xmj,v_xmi,cnvuf,cnvdf
+use MetFields_mod ,        only: ps,cnvuf,cnvdf
 use GridValues_mod,        only: dA, dB, sigma_bnd
 use Par_mod,               only: LIMAX,LJMAX,limax,ljmax,li0,li1,lj0,lj1
 use PhysicalConstants_mod, only: GRAV
 
-public :: convection_pstar!in sigma coordinates
 public :: convection_Eta!in more general hybrid coordinates (Eta)
 
 contains
 
-subroutine convection_pstar(ps3d,dt_conv)
+!_________________________________________________________________________________________
+  subroutine convection_Eta(dt_conv)
+!Pollutants are conserved. We put a lock over top. Pollutants do not move out of the top.
+!Assumes xn_adv in units of mixing ratio
+!See also EMEP technical report MSC-W 1/2010 p. 11-14
 
-  implicit none
-  real ,intent(inout):: ps3d(LIMAX,LJMAX,KMAX_MID),dt_conv
- 
-  real ::xn_in_core(NSPEC_ADV,KMAX_MID+1)
-  real ::mass_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), mass_air_core(KMAX_MID)
-  real ::mass_exchanged,mass
-  real :: mass_air_grid_k_temp,xn_buff(NSPEC_ADV,KMAX_MID)
-  real :: dk(KMAX_MID),dp(KMAX_MID),totdk
-  integer ::k,i,j,k_fill,k1
-  
-
-
-  do k=1,KMAX_MID
-     dk(k)=sigma_bnd(k+1)-sigma_bnd(k)
-  end do
-  totdk=sigma_bnd(KMAX_MID+1)-sigma_bnd(1)!=1 in sigma coordinates
-
-!UPWARD
-
-    do j=lj0,lj1
-      do i=li0,li1
-         xn_in_core = 0.0!concentration null below surface
-         mass=0.0
-!
-!ps3d=PS-PT=dp/dksi if sigma coordinates
-!
-!mass(k)=dp/dksi *dksi/g
-!
-         do k=1,KMAX_MID
-            mass=mass+ps3d(i,j,k)*dk(k)
-         end do
-         mass=mass/totdk
-
-         do k=1,KMAX_MID
-            dp(k)=dA(k)+dB(k)*ps(i,j,1)
-         end do
-
-         mass_air_core=0.0
-         do k=KMAX_MID,1,-1
-            !-- mass_air=(dp/g)*gridarea 
-            
-            mass_air_grid0(k) =mass ! average density (in /dksi unit). Used only if subsidience is included
-            mass_air_grid(k) = ps3d(i,j,k)! start density = dp/dksi where ksi is the vertical coordinate
-
-
-            k1=k+1
-            k1=min(k1,KMAX_MID)
-!mass moves from cell k_1 to k_2:
-!density (mass_air_core and xn_in_core) changes with a factor of dp(k_2)/dp(k_1)
-
-            if(k<KMAX_MID)then
-               mass_air_core(k)=mass_air_core(k1)*dp(k+1)/dp(k)!flux from below
-               mass_air_core(k+1)=0.0
-               xn_in_core(:,k) =xn_in_core(:,k1)*dp(k+1)/dp(k)!flux from below
-               xn_in_core(:,k+1) =0.0
-            end if
-
-!fraction of grid moved to core:
-! df/(dp/g)   df=horizontal flux   dp/g= total mass (/m2) in grid
-
-!fraction og core moved to grid:
-! df/f1  f1=total mass in core df=part which is exchanged horizontally
-
-!horizontal flux
-            if(cnvuf(i,j,k+1)-cnvuf(i,j,k)<=0.0)then
-               !mass from grid to core - horizontal exchange
-               mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))*GRAV*dt_conv/dp(k)*mass_air_grid(k)
-               if(mass_exchanged<-mass_air_grid(k))then
-                  !limit fluxes
-                  cnvuf(i,j,k+1)=0.99*dp(k)/(GRAV*dt_conv)+cnvuf(i,j,k+1)!0.99 to determine
-                  mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))*GRAV*dt_conv/dp(k)*mass_air_grid(k)
-               end if
-            else
-               !mass from core to grid - horizontal exchange
-               mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*mass_air_core(k)
-
-             end if
-
-            !horizontal exchange
-            if(cnvuf(i,j,k+1)-cnvuf(i,j,k)<=0.0)then
-
-               !mass from grid to core - horizontal exchange
-               !NB change xn_in_core before xn_adv
-
-              xn_in_core(:,k) = xn_in_core(:,k)-(cnvuf(i,j,k+1)-cnvuf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_core(k)=mass_air_core(k)-mass_exchanged  
-               xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+(cnvuf(i,j,k+1)-cnvuf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-            else
-               !NB change xn_adv before xn_in_core 
-               xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
-               xn_in_core(:,k) = xn_in_core(:,k)-(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
-               mass_air_core(k)=mass_air_core(k)-mass_exchanged  
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-            end if
-
-        end do
-
-!DOWNWARD
-      if(.true.)then
-
-         mass_air_core=0.0
-         xn_in_core=0.0
-         do k=1,KMAX_MID
-            !-- mass_air=(dp/g)*gridarea 
-            
-            k1=k+1
-            k1=min(k1,KMAX_MID)
-            xn_in_core(:,k) = 0.0
-
-            !vertical exchange
-            if(k>1)then
-               mass_air_core(k)=mass_air_core(k-1)*dp(k-1)/dp(k)!flux from above
-               mass_air_core(k-1)=0.0
-               xn_in_core(:,k) = xn_in_core(:,k-1)*dp(k-1)/dp(k)!flux from above
-               xn_in_core(:,k-1) =0.0
-            end if
-
-            if(cnvdf(i,j,k+1)-cnvdf(i,j,k)<=0.0)then
-               !mass from grid to core - horizontal exchange
-               mass_exchanged=(cnvdf(i,j,k+1)-cnvdf(i,j,k))*mass_air_grid(k)*GRAV*dt_conv/dp(k)
-               if(mass_exchanged<-mass_air_grid(k))then
-               !limit fluxes
-                  cnvdf(i,j,k+1)=-0.99*dp(k)/(GRAV*dt_conv)+cnvdf(i,j,k)!0.99 to determine
-                  mass_exchanged=(cnvdf(i,j,k+1)-cnvdf(i,j,k))*mass_air_grid(k)*GRAV*dt_conv/dp(k)
-               end if
-            else
-!NB: cnvdf < 0
-               mass_exchanged=-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*mass_air_core(k)
-            end if
-
-            !horizontal exchange
-!NB: cnvdf < 0
-            if(cnvdf(i,j,k+1)-cnvdf(i,j,k)<=0.0)then
-               !mass from grid to core - horizontal exchange
-               !NB change xn_in_core before xn_adv
-               xn_in_core(:,k) = xn_in_core(:,k)-(cnvdf(i,j,k+1)-cnvdf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_core(k)=mass_air_core(k)-mass_exchanged  
-               xn_adv(:,i,j,k)= xn_adv(:,i,j,k)+(cnvdf(i,j,k+1)-cnvdf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-            else
-               !mass from core to grid - horizontal exchange
-               !NB change xn_adv before xn_in_core 
-               xn_adv(:,i,j,k) = xn_adv(:,i,j,k)-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
-               xn_in_core(:,k) = xn_in_core(:,k)+(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
-               mass_air_core(k) = mass_air_core(k)-mass_exchanged  
-
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-
-            end if
-
-         end do
-
-         end if
-
-         if(.true.)then
-!diffusion free method
-!distribute mass among level starting from top
-!Allows "CFL number" larger than 1
-
-         k_fill=1
-         do k=1,KMAX_MID
-            mass_air_grid_k_temp=0.0
-            !fill level k with available mass
-            !put new xn_adv in xn_buff because xn_adv should not be changed while still used 
-            xn_buff(:,k) = 0.0
-            do while (mass_air_grid_k_temp +mass_air_grid(k_fill)*dk(k_fill) <mass_air_grid0(k)*dk(k).and.k_fill<KMAX_MID)
-               xn_buff(:,k) =  xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*dk(k_fill)
-               xn_adv(:,i,j,k_fill) =  0.0
-               mass_air_grid_k_temp=mass_air_grid_k_temp+mass_air_grid(k_fill)*dk(k_fill)
-               mass_air_grid(k_fill)=mass_air_grid(k_fill)-mass_air_grid(k_fill)!ZERO
-               k_fill=k_fill+1            
-            end do
-
-            xn_buff(:,k)=xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*dk(k_fill)*&
-                 (mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp)/(mass_air_grid(k_fill)*dk(k_fill))
-
-            xn_adv(:,i,j,k_fill) = xn_adv(:,i,j,k_fill)- xn_adv(:,i,j,k_fill)*&
-                 (mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp)/(mass_air_grid(k_fill)*dk(k_fill))
-
-            mass_air_grid(k_fill)=mass_air_grid(k_fill)-&
-                 (mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp)/dk(k_fill)
-
-            ps3d(i,j,k) = mass_air_grid0(k)!=(mass_air_grid_k_temp+(mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp))/dk(k)
-            
-        end do
-        do k=1,KMAX_MID
-           xn_adv(:,i,j,k)=xn_buff(:,k)/dk(k)
-        end do
-!check that all mass is distributed
-!         if(abs(mass_air_grid(k_fill))>1.0.or.k_fill/=KMAX_MID)then
-!            if(ME==0)write(*,*)'ERRORMASS',ME,i,j,k_fill,mass_air_grid(k_fill),mass_air_grid_k_temp,mass_air_grid0(k)
-!         end if
-         else
-            do k=1,KMAX_MID
-               ps3d(i,j,k) = mass_air_grid(k)
-            end do
-
-         end if
-
-      end do
-   end do
-
- end subroutine convection_pstar
- subroutine convection_Eta(dpdeta,dt_conv)
+!xn*dp(k) = mass in level k (up to a fixed constant *g*gridarea) 
 
     implicit none
-    real ,intent(inout):: dpdeta(LIMAX,LJMAX,KMAX_MID),dt_conv
-   
+    real ,intent(inout):: dt_conv
+
     real ::xn_in_core(NSPEC_ADV,KMAX_MID+1)
-    real ::mass_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), mass_air_core(KMAX_MID)
-    real ::mass_exchanged,mass
+    real ::xn_air_grid(KMAX_MID),mass_air_grid0(KMAX_MID), xn_air_core(KMAX_MID)
+    real ::mass_exchanged, total, totalmass,x
     real :: mass_air_grid_k_temp,xn_buff(NSPEC_ADV,KMAX_MID)
-    real :: dk(KMAX_MID),dp(KMAX_MID),totdk
-    integer ::k,i,j,k_fill,k1
-   INCLUDE 'mpif.h'
-  
+    real :: dp(KMAX_MID)
+    integer ::k,i,j,k_fill,k1,kk,n
+    logical, parameter ::masstest=.false.!normally, the mass should be conserved mathematically. Mostly to make demo.
+    INCLUDE 'mpif.h'
 
-   totdk=0.0
-   do k=1,KMAX_MID
-      dk(k)=dA(k)/Pref+dB(k)
-      totdk=totdk+dk(k)
-   end do
-
-!UPWARD
+    n=3 !IXADV of species to test for mass balance (masstest)
+    !UPWARD
 
     do j=lj0,lj1
-      do i=li0,li1
-         xn_in_core = 0.0!concentration null below surface
-         mass=0.0
-!
-!ps3d=PS-PT=dp/dksi if sigma coordinates
-!
-!mass(k)=dp/dksi *dksi/g
-!
-         do k=1,KMAX_MID
-            mass=mass+dpdeta(i,j,k)*dk(k)
-         end do
-         mass=mass/totdk
+       do i=li0,li1
 
-         do k=1,KMAX_MID
-            dp(k)=dA(k)+dB(k)*ps(i,j,1)
-         end do
+          !-- mass_air=(dp/g)*gridarea 
 
-         mass_air_core=0.0
-         do k=KMAX_MID,1,-1
-            !-- mass_air=(dp/g)*gridarea 
-            
-            mass_air_grid0(k) =mass ! average density (in /dksi unit). Used only if subsidience is included
-            mass_air_grid(k) = dpdeta(i,j,k)! start density = dp/dksi where ksi is the vertical coordinate
+          totalmass = 0.0!total colomn mass of species n
+          do k=1,KMAX_MID
+             dp(k)=dA(k)+dB(k)*ps(i,j,1)
+             xn_air_grid(k) = 1.0 !unit mixing ratio
+             mass_air_grid0(k) =xn_air_grid(k)*dp(k) ! original mass of air 
+             if(masstest)totalmass = totalmass + xn_adv(n,i,j,k)*dp(k)!mass of species n (without g*gridarea factor)
+          end do
 
+!air is moved horizontally between a "core" and the "grid". The air from core moves upward. 
+          xn_air_core = 0.0
+          xn_in_core = 0.0
+          do k=KMAX_MID,1,-1
 
-            k1=k+1
-            k1=min(k1,KMAX_MID)
-!mass moves from cell k_1 to k_2:
-!density (mass_air_core and xn_in_core) changes with a factor of dp(k_2)/dp(k_1)
+             !mass moves from cell k_1 to k_2:
+             !mixing ratios (xn_air_core and xn_in_core) change with a factor of dp(k_1)/dp(k_2)
 
-            if(k<KMAX_MID)then
-               mass_air_core(k)=mass_air_core(k1)*dp(k+1)/dp(k)!flux from below
-               mass_air_core(k+1)=0.0
-               xn_in_core(:,k) =xn_in_core(:,k1)*dp(k+1)/dp(k)!flux from below
-               xn_in_core(:,k+1) =0.0
-            end if
-
-!fraction of grid moved to core:
-! df/(dp/g)   df=horizontal flux   dp/g= total mass (/m2) in grid
-
-!fraction og core moved to grid:
-! df/f1  f1=total mass in core df=part which is exchanged horizontally
-
-!horizontal flux
-            if(cnvuf(i,j,k+1)-cnvuf(i,j,k)<=0.0)then
-               !mass from grid to core - horizontal exchange
-               mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))*GRAV*dt_conv/dp(k)*mass_air_grid(k)
-               if(mass_exchanged<-mass_air_grid(k))then
-                  !limit fluxes
-                  cnvuf(i,j,k+1)=0.99*dp(k)/(GRAV*dt_conv)+cnvuf(i,j,k+1)!0.99 to determine
-                  mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))*GRAV*dt_conv/dp(k)*mass_air_grid(k)
-               end if
-            else
-               !mass from core to grid - horizontal exchange
-               mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*mass_air_core(k)
-
+             if(k<KMAX_MID)then
+                !xn_air_core(k+1) is defined at the preceding k
+                xn_air_core(k)=xn_air_core(k+1)*dp(k+1)/dp(k)!flux from below
+                xn_air_core(k+1)=0.0
+                xn_in_core(:,k) =xn_in_core(:,k+1)*dp(k+1)/dp(k)!flux from below
+                xn_in_core(:,k+1) =0.0
              end if
 
-            !horizontal exchange
-            if(cnvuf(i,j,k+1)-cnvuf(i,j,k)<=0.0)then
+             !fraction of grid moved to core:
+             ! df/(dp/g)   df=horizontal flux   dp/g= total mass (/m2) in grid
 
-               !mass from grid to core - horizontal exchange
-               !NB change xn_in_core before xn_adv
+             !fraction og core moved to grid:
+             ! df/f1  f1=total mass in core df=part which is exchanged horizontally
 
-              xn_in_core(:,k) = xn_in_core(:,k)-(cnvuf(i,j,k+1)-cnvuf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_core(k)=mass_air_core(k)-mass_exchanged  
-               xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+(cnvuf(i,j,k+1)-cnvuf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-            else
-               !NB change xn_adv before xn_in_core 
-               xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
-               xn_in_core(:,k) = xn_in_core(:,k)-(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
-               mass_air_core(k)=mass_air_core(k)-mass_exchanged  
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-            end if
+             !horizontal flux
+             if(cnvuf(i,j,k+1)-cnvuf(i,j,k)<=0.0)then
+                !mass from grid to core - horizontal exchange
+                mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))*GRAV*dt_conv/dp(k)*xn_air_grid(k)!in units of fraction of cell content
+                if(mass_exchanged<-xn_air_grid(k))then
+                   !limit fluxes
+                   cnvuf(i,j,k+1)=-0.9*dp(k)/(GRAV*dt_conv)+cnvuf(i,j,k)!0.9 to determine
+                   mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))*GRAV*dt_conv/dp(k)*xn_air_grid(k)
+                end if
+             else
+                !mass from core to grid - horizontal exchange
+                mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_air_core(k)               
+             end if
 
-        end do
+             !horizontal exchange
+             if(cnvuf(i,j,k+1)-cnvuf(i,j,k)<=0.0)then
+                !mass from grid to core - horizontal exchange
+                !NB change xn_in_core before xn_adv
+                xn_in_core(:,k) = xn_in_core(:,k)-mass_exchanged*xn_adv(:,i,j,k)
+                xn_air_core(k)=xn_air_core(k)-mass_exchanged  
+                xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+mass_exchanged*xn_adv(:,i,j,k)
+                xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
+             else
+                !NB change xn_adv before xn_in_core 
+                xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
+                xn_in_core(:,k) = xn_in_core(:,k)-(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
+                xn_air_core(k)=xn_air_core(k)-mass_exchanged  
+                xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
+             end if
 
-!DOWNWARD
-      if(.true.)then
+          end do
 
-         mass_air_core=0.0
-         xn_in_core=0.0
-         do k=1,KMAX_MID
-            !-- mass_air=(dp/g)*gridarea 
-            
-            k1=k+1
-            k1=min(k1,KMAX_MID)
-            xn_in_core(:,k) = 0.0
+          !we put the air left in xn_in_core(:,k=2) into the top level:
+          xn_adv(:,i,j,1)=xn_adv(:,i,j,1)+xn_in_core(:,1)
+          xn_in_core(:,1)=0.0
 
-            !vertical exchange
-            if(k>1)then
-               mass_air_core(k)=mass_air_core(k-1)*dp(k-1)/dp(k)!flux from above
-               mass_air_core(k-1)=0.0
-               xn_in_core(:,k) = xn_in_core(:,k-1)*dp(k-1)/dp(k)!flux from above
-               xn_in_core(:,k-1) =0.0
-            end if
+          if(masstest)then
+             !check that total mass of air is unchanged
+             total = 0.0
+             do k=1,KMAX_MID
+                total = total + xn_adv(n,i,j,k)*dp(k)
+                if(k>1 .and. abs(xn_in_core(n,k))>1.E-20)write(*,*)'ERROR CORE',i,j,k,xn_in_core(n,k)
+             enddo
+             if(abs(total - totalmass)>1.E-8)write(*,*)'ERROR MASS up',i,j,total, totalmass
+          end if
 
-            if(cnvdf(i,j,k+1)-cnvdf(i,j,k)<=0.0)then
-               !mass from grid to core - horizontal exchange
-               mass_exchanged=(cnvdf(i,j,k+1)-cnvdf(i,j,k))*mass_air_grid(k)*GRAV*dt_conv/dp(k)
-               if(mass_exchanged<-mass_air_grid(k))then
-               !limit fluxes
-                  cnvdf(i,j,k+1)=-0.99*dp(k)/(GRAV*dt_conv)+cnvdf(i,j,k)!0.99 to determine
-                  mass_exchanged=(cnvdf(i,j,k+1)-cnvdf(i,j,k))*mass_air_grid(k)*GRAV*dt_conv/dp(k)
-               end if
-            else
-!NB: cnvdf < 0
-               mass_exchanged=-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*mass_air_core(k)
-            end if
 
-            !horizontal exchange
-!NB: cnvdf < 0
-            if(cnvdf(i,j,k+1)-cnvdf(i,j,k)<=0.0)then
-               !mass from grid to core - horizontal exchange
-               !NB change xn_in_core before xn_adv
-               xn_in_core(:,k) = xn_in_core(:,k)-(cnvdf(i,j,k+1)-cnvdf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_core(k)=mass_air_core(k)-mass_exchanged  
-               xn_adv(:,i,j,k)= xn_adv(:,i,j,k)+(cnvdf(i,j,k+1)-cnvdf(i,j,k))*xn_adv(:,i,j,k)*GRAV*dt_conv/dp(k)
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
-            else
-               !mass from core to grid - horizontal exchange
-               !NB change xn_adv before xn_in_core 
-               xn_adv(:,i,j,k) = xn_adv(:,i,j,k)-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
-               xn_in_core(:,k) = xn_in_core(:,k)+(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
-               mass_air_core(k) = mass_air_core(k)-mass_exchanged  
+          !DOWNWARD
+          xn_air_core = 0.0
+          xn_in_core = 0.0
+          do k=1,KMAX_MID
+             !-- mass_air=(dp/g)*gridarea             
 
-               mass_air_grid(k) = mass_air_grid(k)+mass_exchanged
+             xn_in_core(:,k) = 0.0
 
-            end if
+             !vertical exchange
+             if(k>1)then
+                xn_air_core(k)=xn_air_core(k-1)*dp(k-1)/dp(k)!flux from above
+                xn_air_core(k-1)=0.0
+                xn_in_core(:,k) = xn_in_core(:,k-1)*dp(k-1)/dp(k)!flux from above
+                xn_in_core(:,k-1) =0.0
+             end if
 
-         end do
+             if(cnvdf(i,j,k+1)-cnvdf(i,j,k)<=0.0)then
+                !mass from grid to core - horizontal exchange
+                mass_exchanged=(cnvdf(i,j,k+1)-cnvdf(i,j,k))*xn_air_grid(k)*GRAV*dt_conv/dp(k)
+                if(mass_exchanged<-xn_air_grid(k))then
+                   !limit fluxes
+                   cnvdf(i,j,k) = cnvdf(i,j,k+1)+0.9*dp(k)/(GRAV*dt_conv)!0.9 to determine
+                   mass_exchanged=(cnvdf(i,j,k+1)-cnvdf(i,j,k))*xn_air_grid(k)*GRAV*dt_conv/dp(k)
+                end if
+             else
+                !NB: cnvdf < 0
+                mass_exchanged=-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_air_core(k)
+             end if
 
-         end if
+             !horizontal exchange
+             !NB: cnvdf < 0
+             if(cnvdf(i,j,k+1)-cnvdf(i,j,k)<=0.0)then
+                !mass from grid to core - horizontal exchange
+                !NB change xn_in_core before xn_adv
+                xn_in_core(:,k) = xn_in_core(:,k)-mass_exchanged*xn_adv(:,i,j,k)
+                xn_air_core(k)=xn_air_core(k)-mass_exchanged  
+                xn_adv(:,i,j,k)= xn_adv(:,i,j,k)+mass_exchanged*xn_adv(:,i,j,k)
+                xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
+             else
+                !mass from core to grid - horizontal exchange
+                !NB change xn_adv before xn_in_core 
+                xn_adv(:,i,j,k) = xn_adv(:,i,j,k)-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
+                xn_in_core(:,k) = xn_in_core(:,k)+(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
+                xn_air_core(k) = xn_air_core(k)-mass_exchanged  
+                xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
+             end if
 
-         if(.true.)then
-!diffusion free method
-!distribute mass among level starting from top
-!Allows "CFL number" larger than 1
+          end do
+          if(masstest)then
+             !check that total mass of air is unchanged
+             total = 0.0
+             do k=1,KMAX_MID
+                total = total + xn_adv(n,i,j,k)*dp(k)
+                if(k>1 .and. abs(xn_in_core(n,k))>1.E-20)write(*,*)'ERROR CORE down',i,j,k,xn_in_core(n,k)
+             enddo
+             if(abs(total - totalmass)>1.E-8)write(*,*)'ERROR MASS down',i,j,total, totalmass
+          endif
+!end DOWNWARD
 
-         k_fill=1
-         do k=1,KMAX_MID
-            mass_air_grid_k_temp=0.0
-            !fill level k with available mass
-            !put new xn_adv in xn_buff because xn_adv should not be changed while still used 
-            xn_buff(:,k) = 0.0
-            do while (mass_air_grid_k_temp +mass_air_grid(k_fill)*dk(k_fill) <mass_air_grid0(k)*dk(k).and.k_fill<KMAX_MID)
-               xn_buff(:,k) =  xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*dk(k_fill)
-               xn_adv(:,i,j,k_fill) =  0.0
-               mass_air_grid_k_temp=mass_air_grid_k_temp+mass_air_grid(k_fill)*dk(k_fill)
-               mass_air_grid(k_fill)=mass_air_grid(k_fill)-mass_air_grid(k_fill)!ZERO
-               k_fill=k_fill+1            
-            end do
+!Air have been moved between vertical levels, but the net quantity of air in each level has changed.
+!the air is "relaxed" -> subsidence
 
-            xn_buff(:,k)=xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*dk(k_fill)*&
-                 (mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp)/(mass_air_grid(k_fill)*dk(k_fill))
+!SUBSIDENCE:
 
-            xn_adv(:,i,j,k_fill) = xn_adv(:,i,j,k_fill)- xn_adv(:,i,j,k_fill)*&
-                 (mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp)/(mass_air_grid(k_fill)*dk(k_fill))
+          !diffusion free method
+          !distribute mass among levels starting from top
+          !Allows "CFL number" larger than 1
 
-            mass_air_grid(k_fill)=mass_air_grid(k_fill)-&
-                 (mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp)/dk(k_fill)
+          ! we go from top to bottom, and stop when the mass_air_grid_k_temp = mass_air_grid0(k)
+          ! when xn_air_grid is moved vertically, a factor dp(k1)/dp(k2) must be applied to take into account difference in pressure and thickness
 
-            dpdeta(i,j,k) = mass_air_grid0(k)!=(mass_air_grid_k_temp+(mass_air_grid0(k)*dk(k)-mass_air_grid_k_temp))/dk(k)
-            
-        end do
-        do k=1,KMAX_MID
-           xn_adv(:,i,j,k)=xn_buff(:,k)/dk(k)
-        end do
-!check that all mass is distributed
-!         if(abs(mass_air_grid(k_fill))>1.0.or.k_fill/=KMAX_MID)then
-!            if(ME==0)write(*,*)'ERRORMASS',ME,i,j,k_fill,mass_air_grid(k_fill),mass_air_grid_k_temp,mass_air_grid0(k)
-!         end if
-         else
-            do k=1,KMAX_MID
-               dpdeta(i,j,k) = mass_air_grid(k)
-            end do
+          !we take air from xn_air_grid and put into mass_air_grid_k_temp
+          !we take pollutants from xn_adv and put into xn_buff
 
-         end if
+          k_fill = 1
+          xn_buff = 0.0
+          do k=1,KMAX_MID
+             mass_air_grid_k_temp=0.0
+             !fill level k with available mass
+             !put new xn_adv in xn_buff because xn_adv should not be changed while still used 
+             if(masstest)then
+                total = 0.0
+                do kk=1,KMAX_MID
+                   total = total + xn_adv(n,i,j,kk)*dp(kk)+ xn_buff(n,kk)*dp(kk)
+                enddo
+                if(abs(total - totalmass)>1.E-8)then
+                   write(*,*)'ERROR MASS subsidence',i,j,k,total, totalmass
+                   stop
+                endif
+             endif
+             do while (mass_air_grid_k_temp +xn_air_grid(k_fill)*dp(k_fill) <mass_air_grid0(k).and.k_fill<KMAX_MID)
+                !fill with entire level k_fill
+                mass_air_grid_k_temp=mass_air_grid_k_temp+xn_air_grid(k_fill)*dp(k_fill) !
+                xn_air_grid(k_fill)=xn_air_grid(k_fill)-xn_air_grid(k_fill)!ZERO remove all air from level 
+                xn_buff(:,k) =  xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*dp(k_fill)/dp(k)
+                xn_adv(:,i,j,k_fill) =  0.0 !now the pollutants have been removed from xn_adv, and stored into xn_buff
+                k_fill=k_fill+1
+             end do
 
-      end do
-   end do
+             !fill with part of the level, just enough so that  xn_air_grid(k)=mass_air_grid0(k)
+             mass_exchanged = mass_air_grid0(k)-mass_air_grid_k_temp
 
- end subroutine convection_Eta
+             mass_air_grid_k_temp = mass_air_grid_k_temp + mass_exchanged !just to show fluxes
+
+             !fraction of mass from level k_fill that is moved to level k:
+             !  (mass_air_grid0(k)-mass_air_grid_k_temp)/(xn_air_grid(k_fill)*dp(k_fill))
+             !must apply a factor dp(k_fill)/dp(k) when moving mixing ratios
+             ! -> (mass_air_grid0(k)-mass_air_grid_k_temp)/(xn_air_grid(k_fill)* dp(k))
+
+             xn_buff(:,k)=xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*&
+                  mass_exchanged/(xn_air_grid(k_fill)*dp(k))
+
+             xn_adv(:,i,j,k_fill) = xn_adv(:,i,j,k_fill)- xn_adv(:,i,j,k_fill)*&
+                  mass_exchanged/(xn_air_grid(k_fill)*dp(k_fill))
+
+             !(next line must be set at end, since xn_air_grid is used just above)
+             xn_air_grid(k_fill)=xn_air_grid(k_fill)-mass_exchanged/dp(k_fill)
+
+             if(masstest)then
+                total = 0.0
+                do kk=1,KMAX_MID
+                   total = total + xn_adv(n,i,j,kk)*dp(kk)+ xn_buff(n,kk)*dp(kk)
+                enddo
+                if(abs(total - totalmass)>1.E-8)then
+                   write(*,*)'ERROR AIRMASS subsidence',i,j,k,k_fill,total, totalmass,x
+                   stop
+                endif
+             endif
+          end do
+          
+          if(masstest)then
+             !check that all mass is distributed into xn_buff. xn_air_grid and xn_adv should be empty
+             if(abs(xn_air_grid(k_fill))>1.0E-12.or.k_fill/=KMAX_MID )then
+                write(*,*)'ERROR AIR MASS',i,j,k_fill,xn_air_grid(k_fill),mass_air_grid_k_temp,mass_air_grid0(k_fill)
+                stop
+             end if
+             do k=1,KMAX_MID
+                if(xn_adv(n,i,j,k)>1.E-8)then
+                   write(*,*)'ERROR MASS',i,j,k,xn_adv(n,i,j,k),xn_buff(n,k)
+                   stop
+                end if
+             end do
+          endif
+          
+!copy the end results in xn_adv          
+          do k=1,KMAX_MID
+             xn_adv(:,i,j,k)=xn_buff(:,k)
+          end do
+          
+          if(masstest)then
+             total = 0.0
+             do k=1,KMAX_MID
+                total = total + xn_adv(n,i,j,k)*dp(k)
+             enddo
+             if(abs(total - totalmass)>1.E-8)then
+                write(*,*)'ERROR MASS final',i,j,total, totalmass
+                stop
+             endif
+          end if
+          
+       end do
+    end do
+
+  end subroutine convection_Eta
 end module Convection_mod

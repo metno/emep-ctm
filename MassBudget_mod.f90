@@ -1,7 +1,7 @@
-! <MassBudget_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <MassBudget_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,7 +37,7 @@ use Config_module,    only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d field
                               MasterProc,       & ! Master processor
                               dt_advec,         & ! time-step
                               PT,               & ! Pressure at top
-                              USE_OCEAN_NH3,USE_OCEAN_DMS,FOUND_OCEAN_DMS,&
+                              USES, FOUND_OCEAN_DMS,&
                               EXTENDEDMASSBUDGET
 use Debug_module,     only: DEBUG_MASS
 use EmisDef_mod,      only: O_NH3, O_DMS
@@ -375,7 +375,7 @@ subroutine massbudget()
     ! SUMMARY TABLE:
      open(newunit=iomb,file="MassBudgetSummary.txt")
      write(iomb,'(a)') ' # Mass Budget. Units are kg with MW used here. ADJUST! if needed' 
-     write(iomb,'(a3,1x,a14,a7,99a12)') '#n', 'Spec       ', &
+     write(iomb,'(a3,1x,a20,a7,99a12)') '#n', 'Spec       ', &
        'usedMW', 'emis', 'ddep', 'wdep', 'init', 'sum_mass', &
        'fluxout', 'fluxin', 'frac_mass'
 
@@ -401,7 +401,7 @@ subroutine massbudget()
              write(*,*)'++++++++++++++++++++++++++++++++++++++++++++++++'
         end if ! EXTENDED
 
-        write(iomb,'(i3,1x,a14,f7.1,99es12.4)') n,adjustl(species_adv(n)%name), &
+        write(iomb,'(i3,1x,a20,f7.1,99es12.4)') n,adjustl(species_adv(n)%name), &
           species_adv(n)%molwt, &  ! REMEMBER. Sometimes a dummy value, e.g. 1.0
           gtotem(n)*wgt_fac, gtotddep(n)*wgt_fac*ATWAIR, &
           gtotwdep(n)*wgt_fac*ATWAIR, sumini(n)*wgt_fac, sum_mass(n)*wgt_fac,&
@@ -430,7 +430,7 @@ subroutine massbudget()
      end if
   end if
   if(MasterProc)then
-     if(USE_OCEAN_NH3)then
+     if(USES%OCEAN_NH3)then
         write(*,59)'NH3 emisions from ocean cdf file (Gg)',O_NH3%sum_year
      end if
   end if

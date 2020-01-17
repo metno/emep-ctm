@@ -1,7 +1,7 @@
-! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -60,7 +60,7 @@ use ChemGroups_mod        ! Allow all groups to ease compilation
                           !  eg. OXN_GROUP, DDEP_OXNGROUP, BVOC_GROUP
 use ChemSpecs_mod         ! Use IXADV_ indices...
 use Config_module,     only: MasterProc, SOURCE_RECEPTOR, & !
-                            USES, USE_SOILNOX, USE_OCEAN_DMS, USE_OCEAN_NH3, &
+                            USES,  &
                             IOU_KEY,      & !'Y'=>IOU_YEAR,..,'I'=>IOU_HOUR_INST
                             KMAX_MID,     & ! =>  z dimension
                             RUNDOMAIN,    &
@@ -137,7 +137,7 @@ character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
   D2_SR = [character(len=TXTLEN_DERIV):: &
     ! all array members will have len=TXTLEN_DERIV
     ! Surface pressure used for crosssection
-    "SURF_MAXO3","SURF_PM25water","SOMO35","PSURF"] 
+    "SURF_MAXO3","SURF_PM25water","SOMO35","PS"] 
 
 !============ Extra parameters for model evaluation: ===================!
 !character(len=TXTLEN_DERIV), public, parameter, dimension(13) :: &
@@ -305,7 +305,7 @@ subroutine Init_My_Deriv()
      end do
   end do ! 
 
-  if(USE_SOILNOX) then
+  if(USES%SOILNOX) then
     tag_name(1) = "Emis_mgm2_BioNatNO"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
   end if
@@ -319,11 +319,11 @@ subroutine Init_My_Deriv()
     tag_name(1) = "Emis_mgm2_BioNatNH3"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
   end if
-  if(USE_OCEAN_DMS)then
+  if(USES%OCEAN_DMS)then
     tag_name(1) = "Emis_mgm2_DMS"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
   end if
-  if(USE_OCEAN_NH3)then
+  if(USES%OCEAN_NH3)then
     tag_name(1) = "Emis_mgm2_Ocean_NH3"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
   end if
@@ -416,10 +416,10 @@ subroutine Init_My_Deriv()
       select case(outtyp)
       case('FLYmax6h','FLYmax6h:SPEC','FLYmax6h:GROUP')
         tag_name(1)= "MAX6h_" //trim(outname)//"_"//trim(outdim)
-      case('COLUMN','COLUMN:SPEC','COLUMN:GROUP')
+      case('COLUMN','COLUMN:ADV','COLUMN:SPEC','COLUMN:SHL','COLUMN:GROUP')
         tag_name(1)= "COLUMN_"//trim(outname)//"_"//trim(outdim)
-      case('AOD','AOD:TOTAL','AOD:SPEC','AOD:SHL','AOD:GROUP',&
-           'EXT','EXT:TOTAL','EXT:SPEC','EXT:SHL','EXT:GROUP')
+      case('AOD','AOD:TOTAL','AOD:SPEC','AOD:GROUP',&
+           'EXT','EXT:TOTAL','EXT:SPEC','EXT:GROUP')
         AOD_WANTED = .true.
         if(outname(1:3)/=outtyp(1:3))&
           outname  = outtyp(1:3)//"_"//trim(outname)

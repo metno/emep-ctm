@@ -1,4 +1,4 @@
-! <global2local.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <global2local.f90 - A component of the EMEP MSC-W Eulerian
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
@@ -212,10 +212,10 @@
              ,diml    &    ! 3rd dimension, possibly = 1 (= NCMAX for landcode)&
              ,ibeg    &    ! start point of the array in longitude, = 1 for dimi = GIMAX or = IRUNBEG for dimi = IIFULLDOM&
              ,jbeg        ! start point of the array in latitude, = 1 for dimj = GJMAX or = JRUNBEG for dimj = JJFULLDOM
-        integer*2 gloarr(dimi,dimj,diml)        ! Global array
+        integer(kind=2) gloarr(dimi,dimj,diml)        ! Global array
 !
 !    output
-        integer*2 locarr(MAXLIMAX,MAXLJMAX,diml)    ! Local array
+        integer(kind=2) locarr(MAXLIMAX,MAXLJMAX,diml)    ! Local array
 !
 !    local
     integer i,j,d,nl
@@ -261,3 +261,4 @@
 !
     return
     end
+

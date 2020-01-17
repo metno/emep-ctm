@@ -1,7 +1,7 @@
-! <OutputChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <OutputChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -31,7 +31,7 @@ use Config_module,     only: num_lev3d, MasterProc, runlabel1,&
                              FREQ_HOURLY, END_OF_EMEPDAY, METSTEP, &
                              IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_HOUR, &
                              IOU_HOUR_INST, IOU_MAX_MAX, HOURLYFILE_ending, &
-                             startdate, enddate, out_startdate, USE_uEMEP, USES&
+                             startdate, enddate, out_startdate, USES&
                              ,SITE_XTRA_D2D
 use Debug_module,       only: DEBUG => DEBUG_OUTPUTCHEM
 use Derived_mod,        only: LENOUT2D, nav_2d, num_deriv2d  &
@@ -229,7 +229,7 @@ subroutine Output_fields(iotyp)
   call CloseNetCDF
 
   !uemep use own outputting for now, since it has several extra dimensions
-  if(USE_uEMEP)then
+  if(USES%uEMEP)then
     call out_uEMEP(iotyp)
   endif
 

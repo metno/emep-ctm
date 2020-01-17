@@ -38,11 +38,8 @@ FOBJ ?=	\
 	Trajectory_mod.o uEMEP_mod.o Units_mod.o \
         YieldModifications_mod.o \
 	ZchemData_mod.o \
-	global2local.o PhyChem_mod.o My_3DVar_mod.o My_Pollen_mod.o 
+	global2local.o PhyChem_mod.o My_3DVar_mod.o Pollen_mod.o Pollen_const_mod.o
 
 
 # default target
 all:
-
-# ensure pollen_const_mod.mod is updated for `make MACC`
-Pollen_const_mod.o: My_Pollen_mod.o

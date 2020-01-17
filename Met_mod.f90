@@ -1,7 +1,7 @@
-! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -77,7 +77,7 @@ use Config_module,    only: PASCAL, PT, Pref, METSTEP  &
      ,KMAX_BND, KMAX_MID, MasterProc, nmax  &
      ,GRID & !HIRHAM,EMEP,EECCA etc.
      ,TEGEN_DATA, USES &
-     ,step_main,USE_EtaCOORDINATES,USE_FASTJ &
+     ,step_main&
      ,CONVECTION_FACTOR &
      ,LANDIFY_MET,MANUAL_GRID  &
      ,CW_THRESHOLD,RH_THRESHOLD, CW2CC, JUMPOVER29FEB, meteo, startdate&
@@ -318,8 +318,7 @@ subroutine MeteoRead()
        ,"deep_soil_water_content" /)
    ! Hmix ditto:
   character(len=*),  parameter :: &
-    possible_HmixNames(2) =  [ "pblh", &
-      "blh " ] ! GLOBAL05
+    possible_HmixNames(3) =  [ "pblh", "PBLH", "blh "]
 
   logical :: write_now
 
@@ -1000,12 +999,14 @@ subroutine MeteoRead()
     foundHmix=.false.
     do isw = 1, size(possible_HmixNames)
       namefield=possible_HmixNames(isw)
-      if(first_call.and.MasterProc) &
-            write(*,*) "Met_mod: HMIX search ",isw,trim(namefield)
       call Getmeteofield(meteoname,namefield,nrec,ndim,unit,validity,&
-               pbl_nwp(:,:,nr),found=foundHmix)
+               pbl_nwp(:,:,nr),needed=met(ix_pblnwp)%needed,found=foundHmix)
+      if(first_call.and.MasterProc) &
+            write(*,*) "Met_mod: HMIX search ",isw,trim(namefield)," found=",foundHmix
       if(foundHmix) then ! found
-          exit
+         if(MasterProc)write(*,*)"using "//trim(namefield)//" for Hmix in meteo"
+         met(ix_pblnwp)%name=trim(namefield)
+         exit
       end if
     end do
   end if ! PBL Hmix
@@ -1341,7 +1342,7 @@ subroutine MeteoRead()
   end if
 
   if(met(ix_Etadot)%found)then
-    call CheckStop(.not.USE_EtaCOORDINATES,&
+    call CheckStop(.not.USES%EtaCOORDINATES,&
         "Conflict: requested etadot, but does not use eta coordinates")
     !convert from mid values to boundary values
     if(write_now)write(*,*)'interpolating etadot from mid to boundary levels'
@@ -1442,7 +1443,7 @@ subroutine MeteoRead()
     CALL MPI_WAIT(request_s, MPISTATUS, IERROR)
   end if
 
-  if(USE_FASTJ)then
+  if(USES%FASTJ)then
     !compute photolysis rates from FastJ
     if(nr==2)rcphot_3D(:,:,:,:,1)=rcphot_3D(:,:,:,:,2)
     do j = 1,ljmax
@@ -2720,8 +2721,11 @@ subroutine Getmeteofield(meteoname,namefield,nrec,&
 
   real :: scalefactors(2)
   integer :: KMAX,ijk,i,k,j,nfetch,k1,k2,istart,jstart,Nlevel,kstart,kend
-  logical :: reverse_k
+  logical :: reverse_k, needed_local
   real, allocatable,save ::meteo_3D(:,:,:)
+
+  needed_local=.true.
+  if(present(needed))needed_local = needed
 
   validity=''
   call_msg = "GetMeteofield" // trim(namefield)
@@ -2741,16 +2745,16 @@ subroutine Getmeteofield(meteoname,namefield,nrec,&
           call ReadField_CDF(meteoname,namefield,meteo_3D,nstart=nrec,kstart=1,kend=Nlevel,interpol='conservative', &
 !               use_lat_name='lat_u', use_lon_name='lon_u', &
                 stagg='stagg_u',&
-                needed=needed,found=found,unit=unit,debug_flag=.false.)
+                needed=needed_local,found=found,unit=unit,debug_flag=.false.)
         elseif(trim(namefield)=='v_wind') then
 !         call ReadField_CDF(meteoname,namefield,meteo_3D,nstart=nrec,kstart=1,kend=Nlevel,interpol='zero_order', &
           call ReadField_CDF(meteoname,namefield,meteo_3D,nstart=nrec,kstart=1,kend=Nlevel,interpol='conservative', &
 !               use_lat_name='lat_v', use_lon_name='lon_v', &
                 stagg='stagg_v',&
-                needed=needed,found=found,unit=unit,debug_flag=.false.)
+                needed=needed_local,found=found,unit=unit,debug_flag=.false.)
         else
           call ReadField_CDF(meteoname,namefield,meteo_3D,nstart=nrec,kstart=1,kend=Nlevel,interpol='zero_order', &
-                  needed=needed,found=found,unit=unit,debug_flag=.false.)
+                  needed=needed_local,found=found,unit=unit,debug_flag=.false.)
         end if
         validity='not set'
         ! CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
@@ -2760,7 +2764,7 @@ subroutine Getmeteofield(meteoname,namefield,nrec,&
 
       elseif(ndim==2)then
         call ReadField_CDF(meteoname,namefield,field(1),nstart=nrec,interpol='zero_order', &
-               needed=needed,found=found,unit=unit,debug_flag=.false.)
+               needed=needed_local,found=found,unit=unit,debug_flag=.false.)
         ! write(*,*)'METVAL ',trim(namefield),me,field(40),nrec
         ! NB: need to fix validity
         validity='not set'
@@ -2769,7 +2773,7 @@ subroutine Getmeteofield(meteoname,namefield,nrec,&
       if(MasterProc)then
         nfetch=1
         call GetCDF_short(namefield,meteoname,var_global,GIMAX,IRUNBEG,GJMAX, &
-               JRUNBEG,KMAX,nrec,nfetch,scalefactors,unit,validity,needed=needed)
+               JRUNBEG,KMAX,nrec,nfetch,scalefactors,unit,validity,needed=needed_local)
       end if
 
       !note: var_global is defined only for me=0
@@ -2857,7 +2861,7 @@ subroutine Getmeteofield(meteoname,namefield,nrec,&
 
       call GetCDF_modelgrid(namefield_met,meteoname,meteo_3D,kstart,kend,nrec,&
             nfetch,i_start=istart,j_start=jstart,reverse_k=reverse_k,&
-            needed=needed,found=found)
+            needed=needed_local,found=found)
 
       if(KMAX==1)then
         ijk=0

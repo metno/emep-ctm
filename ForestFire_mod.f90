@@ -1,7 +1,7 @@
-! <ForestFire_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <ForestFire_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -64,21 +64,24 @@ module ForestFire_mod
 !  emissions are needed, and keeps all forest-fire logic here
 !----------------------------------------------------------------
 use CheckStop_mod,         only: CheckStop,CheckNC
-use ChemDims_mod ,         only: NSPEC_TOT
+use ChemDims_mod ,         only: NSPEC_TOT, NSPEC_SHL
 use ChemSpecs_mod
 use Config_module,         only: MasterProc, DataDir, KMAX_MID, &
                                 IOU_INST,BBMODE,BBverbose,persistence,&
                                 fire_year,&
+                                cmxBiomassBurning_FINNv1p5, &
+                                cmxBiomassBurning_GFASv1, &
                                 BBneed_file,BBneed_date,BBneed_poll,&
                                 BBMAP,GFED_PATTERN,FINN_PATTERN,GFAS_PATTERN
 use Debug_module,          only: DEBUG   ! -> DEBUG%FORESTFIRES
 use GridValues_mod,        only: i_fdom, j_fdom, debug_li, debug_lj, &
                                 debug_proc,xm2,GRIDWIDTH_M, A_bnd,B_bnd
-use Io_mod,                only: PrintLog, datewrite, IO_NML
+use Io_mod,                only: PrintLog, datewrite, IO_NML, IO_TMP, open_file, ios
 use MetFields_mod,         only: z_bnd
 use netcdf,                only: nf90_open, nf90_nowrite, nf90_close
 use NetCDF_mod,            only: ReadTimeCDF,ReadField_CDF,Out_netCDF,Real4,&
                                 closedID
+use NumberConstants,       only: UNDEF_I, UNDEF_R
 use OwnDataTypes_mod,      only: Deriv, TXTLEN_SHORT, TXTLEN_FILE
 use Par_mod,               only: LIMAX, LJMAX, me,limax,ljmax
 use PhysicalConstants_mod, only: AVOG
@@ -90,7 +93,16 @@ use ZchemData_mod,         only: rcemis
 
 implicit none
 private
-public :: Fire_Emis, Fire_rcemis, burning
+
+public  :: Fire_Emis
+public  :: Fire_rcemis
+public  :: burning
+
+private :: Config_Fire
+private :: make_mapping   ! chooses FINN or GFAS 
+private :: readCMXmapping ! reads CMX_BiomassBurning_xxx.txt mapping files
+private :: checkNewFFrecord
+private :: Export_FireNc  ! not working?
 
 logical, allocatable, dimension(:,:), save :: burning
 real,  allocatable, dimension(:,:,:), save :: BiomassBurningEmis
@@ -116,7 +128,34 @@ integer :: iemep
 !
 
 ! =======================================================================
-!  Mapping to EMEP species
+!/ - 2019 update for GenChem -  CMX  system 
+! list of possible species names from the FINN and GFAS inputs.
+! Note: not all species are needed (some names change for different years and
+! versions), but only species from these lists are allowed.
+character(len=TXTLEN_SHORT), dimension(23) :: &
+  POSSIBLE_FINNv1p5_SPECS  = [ character(len=TXTLEN_SHORT):: &
+   'CO', 'NO' ,'NO2' ,'SO2' ,'NH3' , &
+   'ACET' ,'ALD2' ,'ALK4' ,'C2H6' ,'C3H8', &
+   'CH2O', 'MEK','PRPE' ,'PM25' ,'OC' ,&
+   'BC' ,'C2H4' ,'GLYC' ,'HAC' ,'BENZ' ,&
+   'TOLU','XYLE' ,'MGLY' ]
+
+character(len=TXTLEN_SHORT), dimension(22) :: &
+  POSSIBLE_GFASv1_SPECS  = [ character(len=TXTLEN_SHORT):: &
+   'cofire', 'ch4fire', 'h2fire', 'noxfire', 'pm2p5fire', &
+   'tpmfire', 'ocfire', 'bcfire', 'so2fire', &
+   'ch3ohfire', 'c2h5ohfire', 'c2h4fire', 'c3h6fire', 'c5h8fire', &
+   'toluenefire', 'hialkenesfire', 'hialkanesfire', 'ch2ofire','c2h4ofire', &
+   'nh3fire', 'c2h6fire', 'c4h10fire' ]
+
+type, private :: cmxmap_t
+  character(len=TXTLEN_SHORT) :: bbSpec = "NOTSET"
+  real :: unitsfac = 1.0
+  real :: frac     = 1.0
+  character(len=TXTLEN_SHORT) :: emSpec = "NOTSET"
+end type cmxmap_t
+type(cmxmap_t), dimension(100), private, save :: cmxmapping = cmxmap_t()
+
 !
 type :: bbtype
   character(len=TXTLEN_SHORT) :: BBname = "NOTSET"
@@ -125,14 +164,7 @@ type :: bbtype
   integer :: emep = -1
 end type bbtype
 
-! Here we include the relevant mapping file, which depends on
-! the source of ffire data and the chemical mechanism (CM)
 !----------------------------------------------
-!=> NBB_DEFS, NEMEPSPECS, FF_defs(NBB_DEFS)
-
-!  include 'BiomassBurningMapping_CM.inc' 
-!  include 'BiomassBurningMapping_CM_GFAS.inc' 
-!  include 'BiomassBurningMapping_CM_FINN.inc' 
 
   character(len=200), public, save :: &
     BiomassBurningMapping
@@ -194,7 +226,7 @@ subroutine Config_Fire()
       call CheckStop(dtxt//"Unknown Mapping")
   end select
 
-  call make_mapping !mapping definitions between forestfire species and emep species
+  call make_mapping() !mapping definitions between forestfire species and emep species
 
   call PrintLog(dtxt//" Mapping: "//trim(BiomassBurningMapping),MasterProc)
 
@@ -259,22 +291,37 @@ subroutine Config_Fire()
 end subroutine Config_Fire
 
 subroutine make_mapping()
-  ! define the mapping between names and species defined in the forest fire input file, and emep species.
-  ! must be compatible for different chemistry schemes, i.e. all the emep species are not necessarily defined.
+  ! define the mapping between names and species defined in the forest fire
+  ! input file, and emep species. Must be compatible for different chemistry
+  ! mechanisms (CMs), i.e. all the emep species are not necessarily defined.
   
   integer :: emep_used(NSPEC_TOT)
+  integer :: ncmx_defs,ncmx_emep
+  type(bbtype), dimension(100) :: tmpFF_defs
   
   integer i,n
 
-  if(BBMAP=='FINN')call read_FINNinc(BiomassBurningMapping, NBB_DEFS, NEMEPSPECS)
-  if(BBMAP=='GFAS')call read_GFASinc(BiomassBurningMapping, NBB_DEFS, NEMEPSPECS)
+  if(BBMAP=='FINN') &
+     call readCMXmapping(cmxBiomassBurning_FINNv1p5, POSSIBLE_FINNv1p5_SPECS,&
+        NBB_DEFS,NEMEPSPECS,tmpFF_defs)
 
-  if(masterproc)write(*,fmt='(A,I5,A,I5,A)')&
-       'Forest Fire will read ',NBB_DEFS,' species, mapped into ',NEMEPSPECS,' emep species'
+  if(BBMAP=='GFAS') &
+     call readCMXmapping(cmxBiomassBurning_GFASv1, POSSIBLE_GFASv1_SPECS,&
+        NBB_DEFS,NEMEPSPECS,tmpFF_defs)
+
+  if(.not.allocated(FF_defs_BB))allocate(FF_defs_BB(NBB_DEFS))
+
+  FF_defs_BB = tmpFF_defs(1:NBB_DEFS) !CMX FF_defs
+
+
+  if(MasterProc) then
+     write(*,fmt='(A,I5,A,I5,A)') 'Forest Fire will read ',NBB_DEFS,&
+        ' species, mapped into ',NEMEPSPECS,' emep species'
+  end if
   
   do i = 1, NBB_DEFS
-        if(masterproc)write(*,*)i,'ForestFire: '//trim(FF_defs_BB(i)%BBName)&
-             //' mapped to '//species(FF_defs_BB(i)%emep)%name
+     if(masterproc)write(*,*)i,'ForestFire: '//trim(FF_defs_BB(i)%BBName)&
+           //' maps to '//species(FF_defs_BB(i)%emep)%name
   enddo
 
 end subroutine make_mapping
@@ -299,7 +346,8 @@ subroutine Fire_Emis(daynumber)
   integer :: loc_maxemis(2) ! debug
 
   character(len=TXTLEN_FILE), save :: fname='new'
-  logical :: debug_me=.false., debug_ff=.false.,debug_nc=.false., newFFrecord=.false.
+  logical :: debug_me=.false., debug_ff=.false.,debug_nc=.false.,&
+              newFFrecord=.false., BBfound
   real :: xrdemis(LIMAX,LJMAX) ! MODE=*_AVG
   integer :: dn1, dn2, ndn          ! MODE=*_AVG
   integer :: yyyy, mm, dd, hh
@@ -395,7 +443,7 @@ subroutine Fire_Emis(daynumber)
    ! if(.not.need_file|time|poll) continue if file|time|poll is not found
     rdemis(:,:)=0.0
 
-!--------- Aug 2017: methods merged. Keep UnDef=0 for future safety
+    !---------  read data:
 
     if(dn1<dn2)then
         rdemis = 0.0
@@ -406,7 +454,7 @@ subroutine Fire_Emis(daynumber)
                 ncFileID, fname, newFFrecord, nstart)
           if(newFFrecord) then
             call ReadField_CDF(fname,FF_poll,xrdemis,nstart,interpol=bbinterp,&
-             needed=BBneed_poll,UnDef=0.0,debug_flag=debug_nc,&
+             needed=BBneed_poll,found=BBfound,UnDef=0.0,debug_flag=debug_nc,&
              ncFileID_given=ncFileID)
           end if
           rdemis = rdemis + xrdemis                 ! month total
@@ -415,53 +463,58 @@ subroutine Fire_Emis(daynumber)
     else
         ndn=1
         call ReadField_CDF(fname,FF_poll,rdemis,nstart,interpol=bbinterp,&
-          needed=BBneed_poll,UnDef=0.0,debug_flag=debug_nc,&
+          needed=BBneed_poll,found=BBfound,UnDef=0.0,debug_flag=debug_nc,&
           ncFileID_given=ncFileID)
         if(debug_me.and.FF_poll=="CO" ) write(*,"(a,i5,a,es12.3)") &
            dtxt//" CO READ: ", nstart, trim(FF_poll), maxval(rdemis)
     end if
-!-------- Aug 2017
+    !-------- 
 
-    select case(BBMAP)
-    case("GFED")
-
-     !unit conversion, GFED [g/m2/8day]->[kg/m2/s]
-      to_kgm2s = 1.0e-3 /(8*24.0*3600.0)
-      if(ndn>1) to_kgm2s=to_kgm2s/ndn               ! total-->avg.
-      forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*to_kgm2s
-
-    case("FINN")
-
-     ! unit conversion, FINN [mole/day]->[kg/m2/s]
-     ! (Can be negative if REMPPM to be calculated)
-      fac=FF_defs_BB(iBB)%unitsfac * FF_defs_BB(iBB)%frac ! --> [kg/day]
-      fac=fac/(GRIDWIDTH_M*GRIDWIDTH_M*24.0*3600.0) ! [kg/day]->[kg/m2/s]
-      if(ndn>1) fac=fac/ndn                         ! total-->avg.
-      forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*fac*xm2(i,j)
-
-    case("GFAS")
-
-     ! GFAS units are [kg/m2/s]. No further unit conversion is needed.
-     ! However, fac can be /=1, e.g. when REMPPM is calculated
-      fac=FF_defs_BB(iBB)%unitsfac * FF_defs_BB(iBB)%frac
-      if(ndn>1) fac=fac/ndn                         ! total-->avg.
-      if(fac/=1.0) forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*fac
-    end select
-
-   ! Assign . units should be [kg/m2/s] here 
-    forall(j=1:ljmax,i=1:limax) &
-      BiomassBurningEmis(ind,i,j) = BiomassBurningEmis(ind,i,j) + rdemis(i,j) 
-
-    if(debug_me) &
-       write(*,"(3a10,2i4,f8.3,es12.3)") dtxt//" SUMS:", &
-        trim(FF_poll), trim( species(iemep)%name), me, ind, &
-        species(iemep)%molwt, sum( BiomassBurningEmis(ind,:,:) )
-
-    call PrintLog(dtxt//":: Assigns "//trim(FF_poll),&
-      first_call.and.MasterProc)
-
-    if(debug_me) sum_emis(ind)=sum_emis(ind)+&
-          sum(BiomassBurningEmis(ind,:,:))
+    if ( BBfound ) then
+       select case(BBMAP)
+       case("GFED")
+   
+        !unit conversion, GFED [g/m2/8day]->[kg/m2/s]
+         to_kgm2s = 1.0e-3 /(8*24.0*3600.0)
+         if(ndn>1) to_kgm2s=to_kgm2s/ndn               ! total-->avg.
+         forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*to_kgm2s
+   
+       case("FINN")
+   
+        ! unit conversion, FINN [mole/day]->[kg/m2/s]
+        ! (Can be negative if REMPPM to be calculated)
+         fac=FF_defs_BB(iBB)%unitsfac * FF_defs_BB(iBB)%frac ! --> [kg/day]
+         fac=fac/(GRIDWIDTH_M*GRIDWIDTH_M*24.0*3600.0) ! [kg/day]->[kg/m2/s]
+         if(ndn>1) fac=fac/ndn                         ! total-->avg.
+         forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*fac*xm2(i,j)
+   
+       case("GFAS")
+   
+        ! GFAS units are [kg/m2/s]. No further unit conversion is needed.
+        ! However, fac can be /=1, e.g. when REMPPM is calculated
+         fac=FF_defs_BB(iBB)%unitsfac * FF_defs_BB(iBB)%frac
+         if(ndn>1) fac=fac/ndn                         ! total-->avg.
+         if(fac/=1.0) forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*fac
+       end select
+   
+      ! Assign . units should be [kg/m2/s] here 
+       forall(j=1:ljmax,i=1:limax) &
+         BiomassBurningEmis(ind,i,j) = BiomassBurningEmis(ind,i,j) + rdemis(i,j) 
+   
+       if(debug_me) &
+          write(*,"(3a10,2i4,f8.3,es12.3)") dtxt//" SUMS:", &
+           trim(FF_poll), trim( species(iemep)%name), me, ind, &
+           species(iemep)%molwt, sum( BiomassBurningEmis(ind,:,:) )
+   
+       call PrintLog(dtxt//":: Assigns "//trim(FF_poll),&
+         first_call.and.MasterProc)
+   
+       if(debug_me) sum_emis(ind)=sum_emis(ind)+&
+             sum(BiomassBurningEmis(ind,:,:))
+    else ! BBfound false
+       call PrintLog(dtxt//":: Skips   "//trim(FF_poll),&
+         first_call.and.MasterProc)
+    end if ! BBfound
   end do ! BB_DEFS
 
   ! have to close the file here
@@ -708,38 +761,64 @@ subroutine Export_FireNc()
 end subroutine Export_FireNc
 
 
-subroutine read_FINNinc(BiomassBurningMapping_in, NBB_DEFS_in, NEMEPSPECS_in)
-!NB: NBB_DEFS and NEMEPSPECS are local variables here, not the module variables
-  integer, intent(out) :: NBB_DEFS_in, NEMEPSPECS_in
-  character(len=*) , intent(inout):: BiomassBurningMapping_in
+  ! SUBROUTINE to read CMX_BoundaryCondition file
+  !   
+  subroutine readCMXmapping(fname,bbspecs,ndefs,nemep,tmpFF_defs) 
+     character(len=*), intent(in) :: fname
+     character(len=*),dimension(:), intent(in) :: bbspecs
+     integer, intent(out) :: ndefs,nemep
+     type(bbtype), dimension(:), intent(inout) :: tmpFF_defs
+     character(len=200) :: txtinput
+     character(len=*), parameter :: dtxt='CMXbb:'
+     integer :: ind1, ind2,  npossible=0
+     integer, dimension(NSPEC_TOT) ::emep_used = 0
+     type(cmxmap_t) :: bbcmx
+     ndefs = 0
 
- include 'BiomassBurningMapping_FINN.inc'
+     call PrintLog(dtxt//' START '//fname,MasterProc)
+    ! check file exists. open_file returns ios for iostat
+     call open_file(IO_TMP,'r',fname,needed=.true.) ! returns ios
+     call CheckStop(ios,dtxt//"open_file error on " // fname )
 
- BiomassBurningMapping_in = BiomassBurningMapping
- NBB_DEFS_in = NBB_DEFS
- NEMEPSPECS_in = NEMEPSPECS
+     do while(.true.)
+       read(IO_TMP,fmt='(a100)',iostat=ios) txtinput
+       if ( ios /= 0 ) exit   ! likely end of file
+       if (txtinput(1:1) == '#' ) then
+          call PrintLog(dtxt//txtinput,MasterProc)
+          cycle
+       end if
+       npossible = npossible + 1
+       read(txtinput,*) bbcmx
+       if(MasterProc) print *, 'CMXbbTEST ', trim(bbcmx%bbSpec)//';'// trim(bbcmx%emSpec)
 
- if(.not.allocated(FF_defs_BB))allocate(FF_defs_BB(NBB_DEFS))
+      ! Find and set indices
+       ind1 = find_index(bbcmx%bbSpec,bbspecs(:),any_case=.true.)
+       if (ind1<1) print *, 'PANIClin ', trim(txtinput)
+       if (ind1<1) print *, 'PANIC ', ind1, trim(bbcmx%bbSpec)
+       call CheckStop(ind1<1,dtxt//'ERROR bbSpec not found:'//bbcmx%bbSpec)
 
- FF_defs_BB = FF_defs
- 
-end subroutine read_FINNinc
+       ind2 = find_index(bbcmx%emSpec,species(:)%name,any_case=.true.)
+       call CheckStop(ind2<1,dtxt//'ERROR emep spec not found:'//bbcmx%emSpec)
+       emep_used(ind2) = 1
 
-subroutine read_GFASinc(BiomassBurningMapping_in, NBB_DEFS_in, NEMEPSPECS_in)
-!NB: NBB_DEFS and NEMEPSPECS are local variables here, not the module variables
-  integer, intent(out) :: NBB_DEFS_in, NEMEPSPECS_in
-  character(len=*) , intent(inout):: BiomassBurningMapping_in
+      ! bbtype: BBname unitsfac frac emep
+       ndefs = ndefs + 1
+       tmpFF_defs(ndefs)%BBname    = bbcmx%bbSpec
+       tmpFF_defs(ndefs)%unitsfac  = bbcmx%unitsfac
+       tmpFF_defs(ndefs)%frac      = bbcmx%frac
+       tmpFF_defs(ndefs)%emep      = ind2
+!       print *, 'CMXERR', ind2, trim(txtinput)//';'// trim(species(ind2)%name)
+       write(txtinput,'(i2, a, i4,a)') ndefs, trim(txtinput)// ' => ', &
+            ind2, trim(species(ind2)%name)
+       call PrintLog(dtxt//'SET:'//txtinput,MasterProc)
+       
+     end do
+     close(IO_TMP)
+     nemep = sum( emep_used )
+     write(txtinput,'(a, 3i4)') ' nposs, ndefs,nemep', npossible, ndefs, nemep
+     call PrintLog(dtxt//' DONE '//txtinput,MasterProc)
+     
+  end subroutine readCMXmapping
 
- include 'BiomassBurningMapping_GFAS.inc'
-
- BiomassBurningMapping_in = BiomassBurningMapping
- NBB_DEFS_in = NBB_DEFS
- NEMEPSPECS_in = NEMEPSPECS
-
- if(.not.allocated(FF_defs_BB))allocate(FF_defs_BB(NBB_DEFS))
-
- FF_defs_BB = FF_defs
- 
-end subroutine read_GFASinc
 endmodule ForestFire_mod
 !=============================================================================

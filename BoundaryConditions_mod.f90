@@ -1,7 +1,7 @@
-! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -61,67 +61,46 @@ module BoundaryConditions_mod
 
 use CheckStop_mod,      only: CheckStop
 use Chemfields_mod,     only: xn_adv, xn_bgn, NSPEC_BGN  ! emep model concs.
-use ChemDims_mod,       only: NSPEC_SHL,NSPEC_ADV
+use ChemDims_mod,         only: NSPEC_SHL,NSPEC_ADV
 use ChemSpecs_mod                ! provide species names, IXADV_*
-use Config_module, only: KMAX_MID  &  ! Number of levels in vertical
+use Config_module,         only: KMAX_MID  &  ! Number of levels in vertical
                      ,iyr_trend &  ! Used for e.g. future scenarios
                      ! Two options for CH4. BGND_CH4 has priority.
                      ,BGND_CH4  &  ! If positive, replaces defaults 
                      ,fileName_CH4_ibcs & ! If present, replaces uses iyr_trend
+                     ,cmxbicDefaultFile & ! Table of simple defaults
                      ,USES, MasterProc, PPB, Pref, LoganO3File, DustFile
-use Debug_module,    only: DEBUG   ! -> DEBUG%BCS
-use Functions_mod,   only: StandardAtmos_kPa_2_km ! for use in Hz scaling
-use GridValues_mod,     only: glon, glat   & ! full domain lat, long
+use Debug_module,          only: DEBUG, DebugCell   ! -> DEBUG%BCS
+use Functions_mod,         only: StandardAtmos_kPa_2_km ! for use in Hz scaling
+use GridValues_mod,        only: glon, glat   & ! full domain lat, long
                             ,debug_proc, debug_li, debug_lj & ! debugging
                             ,i_fdom, j_fdom,A_mid,B_mid  !
-use Io_mod,             only: open_file, ios, IO_TMP
-use Io_Progs_mod,       only: datewrite, PrintLog
-use Landuse_mod,        only: mainly_sea
-use LocalVariables_mod, only: Grid
-use MetFields_mod,      only: roa
-use MPI_Groups_mod,     only: MPI_DOUBLE_PRECISION, MPI_SUM,MPI_INTEGER, &
+use Io_mod,                only: open_file, ios, IO_TMP
+use Io_Progs_mod,          only: datewrite, PrintLog, ios
+use Landuse_mod,           only: mainly_sea
+use LocalVariables_mod,    only: Grid
+use MetFields_mod,         only: roa
+use MPI_Groups_mod,        only: MPI_DOUBLE_PRECISION, MPI_SUM,MPI_INTEGER, &
                              MPI_COMM_CALC, IERROR
-use NetCDF_mod,         only: ReadField_CDF,vertical_interpolate
-use Par_mod,          only: &
-   LIMAX, LJMAX, limax, ljmax, me &
-  ,neighbor, NORTH, SOUTH, EAST, WEST   &  ! domain neighbours
-  ,NOPROC&
-  ,IRUNBEG,JRUNBEG,li1,li0,lj0,lj1
+use NetCDF_mod,            only: ReadField_CDF,vertical_interpolate
+use NumberConstants,       only: UNDEF_I, UNDEF_R
+use Par_mod,               only: LIMAX, LJMAX, limax, ljmax, me &
+              ,neighbor, NORTH, SOUTH, EAST, WEST   &  ! domain neighbours
+              ,NOPROC,IRUNBEG,JRUNBEG,li1,li0,lj0,lj1
 use PhysicalConstants_mod, only: PI, ATWAIR
-use SmallUtils_mod, only : find_index 
-use TimeDate_mod,    only: daynumber
+use SmallUtils_mod,        only : find_index , xcindex
+use TimeDate_mod,          only: daynumber
 use TimeDate_ExtraUtil_mod,only: date2string
 
 implicit none
 private
 
-integer, public, parameter :: &
-   IBC_O3       =  1   &
-  ,IBC_NO       =  2   &
-  ,IBC_NO2      =  3   &
-  ,IBC_PAN      =  4   &
-  ,IBC_HNO3     =  5   &  ! used for nitrate too
-  ,IBC_SO2      =  6   &
-  ,IBC_SO4      =  7   &
-  ,IBC_CO       =  8   &
-  ,IBC_C2H6     =  9   &
-  ,IBC_C4H10    = 10   &
-  ,IBC_HCHO     = 11   &
-  ,IBC_CH3CHO   = 12   &
-  ,IBC_H2O2     = 13   &
-  ,IBC_NH4_f    = 14   &
-  ,IBC_NO3_f    = 15   &
-  ,IBC_NO3_c    = 16   &
-  ,IBC_SeaSalt_f= 17   &
-  ,IBC_SeaSalt_c= 18   &
-  ,IBC_SeaSalt_g= 19   &
-  ,IBC_Dust_f   = 20   &      ! Dust
-  ,IBC_Dust_c   = 21   &      ! Dust
-  ,NGLOB_BC     = IBC_Dust_c  ! Totan no. species setup in this module
 
 ! -- subroutines in this module:
 public  :: BoundaryConditions         ! call every month
+
 private :: GetBICData, &
+           readCMXmapping,          & ! NEW 
            Set_bcmap,               & ! sets xn2adv_changed, etc.
            My_bcmap                   ! sets bc2xn_adv, bc2xn_bc, and  misc_bc
 
@@ -130,6 +109,82 @@ logical, private, save :: first_call  = .true.
 
  !/ - for debugging
 logical, private, parameter :: DEBUG_MYBC = .false.
+
+!/ - 2019 update for genChem
+!    for CMX boundary conditions
+type, public :: typ_i2fb
+    integer :: ind1 = UNDEF_I  !  typically for BIC species
+    integer :: ind2 = UNDEF_I  !  typically for emep species
+    real    :: num  = UNDEF_R
+    logical :: bool = .true.
+end type typ_i2fb
+type(typ_i2fb), dimension(100), private, save :: cmxmapping = typ_i2fb()
+
+
+type :: defBIC_t     ! Simple tabulate boundary & initial conditions, in case no global BICs
+  character(len=30)  :: name       ! BIC species namej
+  real :: surf       ! Mean surface conc. (ppb)
+  integer :: dmax    ! Day when concentrations peak
+  real :: amp        ! amplitude of surface conc. (ppb)
+  real :: hz         ! Scale-height (km) - height to drop 1/e concentration
+  real :: vmin       ! background, minimum conc., in vertical direction
+  real :: hmin       ! background, minimum conc., in horiz direction
+  real :: conv_fac   ! factor to convert input data to mixing ratio
+end type defBIC_t
+
+! Define concs where a simple  specification based on lat/mm
+! etc. will be given
+type(defBIC_t), parameter, dimension(21) :: defBIC = [&
+    !                           surf   dmax   amp   hz    vmin  hmin conv_fac!ref
+    !                            ppb          ppb   km   hmin,vmin:same units as input data=conv_fac
+   defBIC_t('SO2  '  ,  0.15 , 15.0, 0.05, 999.9, 0.03, 0.03,PPB)&!W99, bcKz vmin
+  ,defBIC_t('SO4  '  ,  0.15 ,180.0, 0.00, 999.9, 0.05, 0.03,PPB)&!W99
+  ,defBIC_t('NO   '  ,  0.1  , 15.0, 0.03, 4.0  , 0.03, 0.02,PPB)&
+  ,defBIC_t('NO2  '  ,  0.1  , 15.0, 0.03, 4.0  , 0.05, 0.04,PPB)&
+  ,defBIC_t('PAN  '  ,  0.20 ,120.0, 0.15, 999.9, 0.20, 0.1 ,PPB)&!Kz change vmin
+  ,defBIC_t('CO   '  ,  125.0, 75.0, 35.0, 25.0 , 70.0, 30.0,PPB)&!JEJ-W
+  ,defBIC_t('SeaSalt_f', 0.2  , 15.0,  0.05,  1.6 , 0.01, 0.01,PPB)&
+  ,defBIC_t('SeaSalt_c', 1.5  , 15.0,  0.25,  1.6 , 0.01, 0.01,PPB)&
+  ,defBIC_t('SeaSalt_g', 1.0  , 15.0,  0.5,  1.0 , 0.01, 0.01,PPB)&
+  ,defBIC_t('C2H6 '  ,  2.0  , 75.0, 1.0 , 10.0 , 0.05, 0.05,PPB)&
+  ,defBIC_t('C4H10'  ,  2.0  , 45.0, 1.0 , 6.0  , 0.05, 0.05,PPB)&
+  ,defBIC_t('HCHO '  ,  0.7  ,180.0, 0.3 , 6.0  , 0.05, 0.05,PPB)&
+  ,defBIC_t('CH3CHO' ,  0.3  ,180.0, 0.05 , 6.0  , 0.005, 0.005,PPB)& !NAMBLEX,Solberg,etc.
+  ,defBIC_t('HNO3 '  ,  0.07 ,180.0, 0.03, 999.9,0.025, 0.03,PPB)& !~=NO3, but with opposite seasonal var.
+  ,defBIC_t('NO3_f ' ,  0.07 , 15.0, 0.03, 1.6  ,0.025, 0.02,PPB)& !ACE-2
+  ,defBIC_t('NO3_c ' ,  0.07 , 15.0, 0.00, 1.6  ,0.025, 0.02,PPB)& !ACE-2
+  ,defBIC_t('NH4_f ' ,  0.15 ,180.0, 0.00, 1.6  , 0.05, 0.03,PPB)& !ACE-2(SO4/NH4=1)
+ ! all BCs read in are in mix. ratio, thus hmin,vmin needs to be in mix. ratio for thosetio for those
+  ,defBIC_t('O3   '  , -99.9 ,-99.9,-99.9,-99.9 ,-99.9,10.0*PPB  ,1.)&!N1
+  ,defBIC_t('H2O2 '  , -99.9 ,-99.9,-99.9,-99.9 ,-99.9,0.01*PPB  ,1.)&
+  ! Dust: the factor PPB converts from PPB to mixing ratio.
+  ,defBIC_t('Dust_c',-99.9 ,-99.9,-99.9,-99.9 ,-99.9,1.0e-15,1.0)&
+  ,defBIC_t('Dust_f',-99.9 ,-99.9,-99.9,-99.9 ,-99.9,1.0e-15,1.0)&
+] 
+
+!pwds    SpecBC(IBC_SO4  )  = sineconc( 0.15 ,180.0, 0.00, 1.6  , 0.05, 0.03,PPB)!W99
+!st 14.05.2014    SpecBC(IBC_SeaSalt_F)=sineconc( 0.5  , 15.0,  0.3,  1.6 , 0.01, 0.01,PPB)
+!st 14.05.2014    SpecBC(IBC_SeaSalt_C)=sineconc( 3.0  , 15.0,  1.0,  1.6 , 0.01, 0.01,PPB)
+    !refs:
+    ! N1 - for ozone we read Logan's data, so the only paramater specified
+    !      is a min value of 10 ppb. I hope this doesn't come into effect in
+    !      Europe as presumably any such min values are in the S. hemisphere.
+    !      Still, giving O3 such a value let's us use the same code for
+    !      all species.
+    ! W99: Warneck, Chemistry of the Natural Atmosphere, 2nd edition, 1999
+    !    Academic Press. Fig 10-6 for SO2, SO4.
+    ! JEJ - Joffen's suggestions from Mace/Head, UiO and other data..
+    !      with scale height estimated large from W99, Isaksen+Hov (1987)
+    ! M -Mozart-obs comparison
+    ! ACE-2 Lots of conflicting measurements exist, from NH4/SO4=2 to NH4/SO4=0.5
+    ! A 'mean' value of NH4/SO4=1 is therefore selected. Otherwise NH4 is assumed to
+    ! act as SO4
+    ! aNO3 is assumed to act as SO4, but with 1/2 concentrations and seasonal var.
+    ! pNO3 is assumed to act like seasalt, with decreasing conc with height, with
+    ! approx same conc. as fine nitrate.
+    ! The seasonal var of HNO3 is now assumed to be opposite of aNO3.
+
+ integer, parameter, private :: NGLOB_BC  = size(defBIC) !CMX Max no. BIC species
 
 ! Set indices
 ! -----------------------------------------------------------------------
@@ -191,7 +246,66 @@ integer, allocatable, dimension(:,:),save :: &
 real, allocatable,dimension(:,:,:),save   :: O3_logan,O3_logan_emep
 real, allocatable,dimension(:,:,:),save   :: Dust_3D, Dust_3D_emep
 
+logical,  private, save :: dbg0  ! MasterProc .and. DEBUG%BCS
+
 contains
+
+  ! SUBROUTINE to read CMX_BoundaryCondition file
+  !   
+  subroutine readCMXmapping(nused) 
+     integer, intent(out) :: nused
+     character(len=100) :: txtinput
+     character(len=*), parameter :: dtxt='rdCMX:'
+     character(len=30) :: txt1, txt2, booltxt   ! usually globBC, emep
+     character(len=200) :: fname ! ='CMX_BoundaryConditions.txt' ! tmp
+     real :: bcfac
+     logical :: bool
+     integer :: ind1, ind2,  npossible=0
+     nused = 0
+     fname = cmxbicDefaultFile ! ='CMX_BoundaryConditions.txt' ! tmp
+    ! check file exists. open_file returns ios for iostat
+     call PrintLog(dtxt//' START '//fname,MasterProc)
+     call open_file(IO_TMP,'r',fname,needed=.true.)
+     call CheckStop(ios,dtxt//"open_file error on " // fname )
+     do while(.true.)
+       read(IO_TMP,fmt='(a100)',iostat=ios) txtinput
+       if ( ios /= 0 ) exit   ! likely end of file
+       if (txtinput(1:1) == '#' ) then
+          call PrintLog(dtxt//txtinput,MasterProc)
+          cycle
+       end if
+       npossible = npossible + 1
+       read(txtinput,*) txt1, txt2, bcfac, booltxt
+
+      ! Find and set indices
+       ind1 = find_index(txt1,defBIC(:)%name,any_case=.true.)
+       if ( ind1 < 1 ) then
+          call PrintLog(dtxt//'SKIP:'//txtinput,MasterProc)
+          cycle
+       else
+         ind2 = find_index(txt2,species(:)%name,any_case=.true.)
+         call CheckStop(ind2<1,dtxt//'ERROR emep spec not found:'//txt2)
+         call CheckStop(ind2<=NSPEC_SHL,dtxt//'ERROR spec not advec:'//txt2)
+       end if
+
+       nused = nused + 1
+       cmxmapping(nused)%ind1 = ind1
+       cmxmapping(nused)%ind2 = ind2
+       cmxmapping(nused)%num  = bcfac 
+       cmxmapping(nused)%bool = .true.
+       if ( booltxt=='F') then
+          cmxmapping(nused)%bool = .false.
+       end if
+       write(txtinput,'(a, 2i4,f8.3,L2)') trim(txtinput)// ' => ', &
+            ind1, ind2, bcfac, cmxmapping(nused)%bool
+       call PrintLog(dtxt//'SET:'//txtinput,MasterProc)
+       
+     end do
+     close(IO_TMP)
+     write(txtinput,'(a, 2i4)') ' nposs, nused', npossible, nused
+     call PrintLog(dtxt//' DONE '//txtinput,MasterProc)
+     
+  end subroutine readCMXmapping
 
   subroutine BoundaryConditions(year,month)
     ! ---------------------------------------------------------------------------
@@ -210,21 +324,28 @@ contains
     integer :: ibc, iem, k, i, j ,n, ntot ! loop variables
     integer :: info                     ! used in rsend
     real    :: bc_fac      ! Set to 1.0, except sea-salt over land = 0.01
-    logical :: bc_seaspec  ! if sea-salt species
+    logical :: bc_seaspec, adv_is_SS  ! if sea-salt species
 
     integer  :: errcode
-    integer, save :: idebug=0, itest=1, i_test=0, j_test=0
+    integer, save :: idebug=0, itest=1, i_test=0, j_test=0, ncmx
     real :: bc_data(LIMAX,LJMAX,KMAX_MID)
 
     if (first_call) then
-       if (DEBUG%BCS) write(*,"(a,I3,1X,a,i5)") &
-            "FIRST CALL TO BOUNDARY CONDITIONS, me: ", me,  "TREND YR ", iyr_trend
+
+       dbg0 = (MasterProc .and. DEBUG%BCS)
+
+       if ( dbg0 ) write(*,"(a,I3,1X,3(a,i5))") &
+            "FIRST CALL TO BOUNDARY CONDITIONS, me: ", me,  &
+            "TREND YR ", iyr_trend
+
        allocate(misc_bc(NGLOB_BC+1:NTOT_BC,KMAX_MID))
        call My_bcmap(iyr_trend)      ! assigns bc2xn_adv and bc2xn_bgn mappings
+                                     ! e.g.  bc2xn_adv(IBC_NOX,IXADV_NO2) = 0.55
        call Set_bcmap()              ! assigns xn2adv_changed, etc.
 
-       num_changed = num_adv_changed + num_bgn_changed   !u1
-       if (DEBUG%BCS) write(*, "((A,I0,1X))")           &
+
+       num_changed = num_adv_changed + num_bgn_changed 
+       if ( dbg0 ) write(*, "((A,I0,1X))")           &
             "BCs: num_adv_changed: ", num_adv_changed,  &
             "BCs: num_bgn_changed: ", num_bgn_changed,  &
             "BCs: num     changed: ", num_changed
@@ -232,12 +353,13 @@ contains
        bc_data=0.0
 
     end if ! first call
-    if (DEBUG%BCS) write(*, "((A,I0,1X))")           &
+    if ( dbg0 ) write(*, "((a,i0,1x))") &
          "CALL TO BOUNDARY CONDITIONS, me:", me, &
          "month ", month, "TREND2 YR ", iyr_trend, "me ", me
 
     if (num_changed==0) then
-       write(*,*) "BCs: No species requested"
+       !CMX write(*,*) "BCs: No species requested"
+       call printLog("BCs: No species requested",MasterProc)
        return
     end if
 
@@ -248,6 +370,7 @@ contains
              if (i_fdom(i)==DEBUG%IJ(1).and.j_fdom(j)==DEBUG%IJ(2)) then
                 i_test = i
                 j_test = j
+print *, 'CMXBCIJ ', i_test, j_test, DebugCell
              end if
           end do
        end do
@@ -255,7 +378,7 @@ contains
 
     if (first_call) then
        idebug = 1
-       if (DEBUG%BCS) write(*,*) "RESET 3D BOUNDARY CONDITIONS", me
+       if (dbg0) write(*,*) "RESET 3D BOUNDARY CONDITIONS", me
        do k = 1, KMAX_MID
           do j = 1, ljmax
              do i = 1, limax
@@ -265,7 +388,7 @@ contains
           end do
        end do
     else       
-       if (DEBUG%BCS.and.MasterProc) write(*,*) "RESET LATERAL BOUNDARIES"
+       if (dbg0) write(*,*) "RESET LATERAL BOUNDARIES"
        do k = 2, KMAX_MID
           do j = lj0, lj1
              !left
@@ -307,6 +430,7 @@ contains
     !== BEGIN READ_IN OF GLOBAL DATA
 
     do ibc = 1, NGLOB_BC
+       if(dbg0) print *, 'CMX IBC TEST', ibc, bc_used(ibc), trim(defBIC(ibc)%name)
        if(bc_used(ibc) == 0)cycle
  
        call GetBICData(year,month,ibc,bc_used(ibc),bc_data,errcode)
@@ -318,18 +442,20 @@ contains
 
              iem = spc_used_adv(ibc,n)
              ntot = iem + NSPEC_SHL 
+             adv_is_SS = xcindex(species(ntot)%name,'SeaSalt_')>0
+             if(dbg0) write(*,*) 'CMX IEM TEST', n, iem, trim(species(ntot)%name), adv_is_SS
 
              ! Sea-salt. 
              !  If SeaSalt isn't called from mk.GenChem, we don't have the
              !  SS_GROUP, so we search for the simple SEASALT name.
              bc_seaspec = .false.
-             if ( USES%SEASALT .and. &
-                  ( index( species(ntot)%name, "SeaSalt_" ) > 0 ) ) then
+             if ( USES%SEASALT .and. adv_is_SS ) then 
+!                  ( index( species(ntot)%name, "SeaSalt_" ) > 0 ) ) then
                 bc_seaspec = .true.
              end if
 
              if ( debug_proc ) write (*,*) "SEAINDEX", &
-                  trim(species(ntot)%name), n, ntot, bc_seaspec,&
+                  trim(species(ntot)%name), n, ntot, bc_seaspec, adv_is_SS,&
                   index( species(ntot)%name, "SeaSalt_")
 
              do k = 1, KMAX_MID
@@ -344,7 +470,6 @@ contains
 
                       xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
                            bc_fac * &  ! used for sea-salt species 
-                                !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
                    end do ! i
                 end do ! j
@@ -359,9 +484,7 @@ contains
                 do j = 1, ljmax
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
-                                !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
-                      !                      !        bc_bgn(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
                    end do ! i
                 end do ! j
              end do ! k
@@ -392,7 +515,6 @@ contains
 
                       xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
                            bc_fac * &  ! used for sea-salt species 
-                                !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
                    end do
                    !right
@@ -406,9 +528,7 @@ contains
 
                       xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
                            bc_fac * &  ! used for sea-salt species 
-                                !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
-
                    end do
                 end do
                 !lower
@@ -423,7 +543,6 @@ contains
 
                       xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
                            bc_fac * &  ! used for sea-salt species 
-                                !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
                    end do
@@ -440,7 +559,6 @@ contains
 
                       xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
                            bc_fac * &  ! used for sea-salt species 
-                                !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
                    end do
@@ -459,7 +577,6 @@ contains
 
                       xn_adv(iem,i,j,k) =   xn_adv(iem,i,j,k) +&
                            bc_fac * &  ! used for sea-salt species 
-                                !                           bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_adv(ibc,iem)
                            bc_data(i,j,k)*bc2xn_adv(ibc,iem)
 
                    end do
@@ -477,13 +594,11 @@ contains
                    !left
                    do i = 1, li0-1
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
-                                !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
                    end do
                    !right
                    do i = li1+1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
-                                !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
                    end do
                 end do
@@ -491,7 +606,6 @@ contains
                 do j = 1, lj0-1
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
-                                !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
                    end do
                 end do
@@ -499,7 +613,6 @@ contains
                 do j = lj1+1, ljmax
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
-                                !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
                    end do
                 end do
@@ -509,7 +622,6 @@ contains
                 do j = 1, ljmax
                    do i = 1, limax
                       xn_bgn(iem,i,j,k) = xn_bgn(iem,i,j,k) &
-                                !                           +  bc_data(i_fdom(i)-IRUNBEG+1,j_fdom(j)-JRUNBEG+1,k)*bc2xn_bgn(ibc,iem)
                            +  bc_data(i,j,k)*bc2xn_bgn(ibc,iem)
                    end do
                 end do
@@ -539,7 +651,6 @@ contains
                 do j = 1, ljmax
                    do i = 1, limax
                       xn_adv(iem,i,j,k) =  xn_adv(iem,i,j,k) + misc_bc(ibc,k)! 
-                      !                      !        bc_bgn(n,(i_fdom(i)-IRUNBEG+1),(j_fdom(j)-JRUNBEG+1),k)
                    end do ! i
                 end do ! j
              end do ! k
@@ -669,13 +780,13 @@ subroutine My_bcmap(iyr_trend)
   integer, intent(in) :: iyr_trend !ds Year for which BCs are wanted
   real :: trend_ch4
   integer :: ii,i,k, io_ch4, yr_rcp= -999
+  integer :: ibc, iadv, itot, ncmx  ! CMX NEW
   real :: decrease_factor(NGLOB_BC+1:NTOT_BC) ! Decrease factor for misc bc's
         ! Gives the factor for how much of the top-layer conc. that is left
         ! at bottom layer
   character(len=120) :: txt
   real     ::  ch4_rcp
   character(len=*),parameter :: dtxt='BCs_Mybcmap:'
-
   real :: top_misc_bc(NGLOB_BC+1:NTOT_BC) ! Conc. at top of misc bc
 !    real :: ratio_length(KMAX_MID)    ! Vertical length of the actual layer
                                       ! divided by length from midpoint of
@@ -780,8 +891,22 @@ subroutine My_bcmap(iyr_trend)
       "BCproblem - My_bcmap")
   end do
 
-  !/- mappings for species from Logan + obs model given with IBC index.
-  include 'BoundaryConditions_CM.inc'
+!/- mappings for species from  CMX to emep 
+!CMX QUICK n DIRTY for now. Do we really need bc2xn also?
+
+  call readCMXmapping(ncmx)
+
+  do i = 1, ncmx
+    ibc  = cmxmapping(i)%ind1              ! index in defBIC
+    itot = cmxmapping(i)%ind2
+    iadv = itot  - NSPEC_SHL
+    if(dbg0) write(*,*)'MyCMX', ibc, itot, iadv, trim(species(itot)%name)
+    call CheckStop(iadv<1,dtxt//'ERROR spec not advec:'//species(itot)%name)
+    bc2xn_adv(ibc, iadv) = cmxmapping(i)%num
+  end do
+!END CMX
+    
+   
 end subroutine My_bcmap
 
 subroutine Set_bcmap()
@@ -838,9 +963,17 @@ subroutine Set_bcmap()
     end if
   end do ! iem
 
-  if (DEBUG%BCS) write(*,*) "TEST SET_BCMAP bc_used: ",&
-    (bc_used(ibc),ibc=1, NTOT_BC)
-  if (MasterProc.and.DEBUG%BCS) write(*,*)"Finished Set_bcmap: Nbcused is ", sum(bc_used)
+  if (dbg0) then
+    !write(*,*) "TEST SET_BCMAP bc_used: ", (bc_used(ibc),ibc=1, NTOT_BC)
+    do ibc=1, size(defBIC)
+      write(*,*) "SET_BCMAP bc_used: ", ibc, bc_used(ibc), trim(defBIC(ibc)%name)
+    end do
+    !do ibc = NGLOB_BC +1, NTOT_BC
+    do ibc = size(defBIC)+1, NTOT_BC
+      write(*,*) "SET_BCMAP bc_used: ", ibc, bc_used(ibc), 'bgnd H2/CH4'
+    end do
+    write(*,*)"Finished Set_bcmap: Nbcused is ", sum(bc_used)
+  end if
 
   allocate(spc_changed2adv(num_adv_changed))
   allocate(spc_changed2bgn(num_bgn_changed))
@@ -894,17 +1027,8 @@ subroutine GetBICData(year,month,ibc,used,bc_data,errcode)
 logical, parameter :: &
   DEBUG_Logan  = .false., &
   DEBUG_HZ     = .false.
-! we define some concentrations in terms of sine curves and other simple data:
-type :: sineconc
-  real :: surf       ! Mean surface conc. (ppb)
-  integer :: dmax    ! Day when concentrations peak
-  real :: amp        ! amplitude of surface conc. (ppb)
-  real :: hz         ! Scale-height (km) - height to drop 1/e concentration
-  real :: vmin       ! background, minimum conc., in vertical direction
-  real :: hmin       ! background, minimum conc., in horiz direction
-  real :: conv_fac   ! factor to convert input data to mixing ratio
-end type sineconc
-type(sineconc), save, dimension(NGLOB_BC) :: SpecBC
+
+type(defBIC_t) :: specBIC
 
 type :: SIAfac ! trends in boundary conditions
   integer :: year
@@ -993,7 +1117,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   real :: scale_old, scale_new
   real, parameter :: macehead_lat = 53.3 !latitude of Macehead station
   real, parameter :: macehead_lon = -9.9 !longitude of Macehead station
-  character(len = 100) ::varname
+  character(len = 100) ::varname, bcSpec !CMX bcSpec
   real :: count_loc,O3fix_loc, mpi_rcv(2),mpi_snd(2)
   real :: conv_fac
 
@@ -1086,10 +1210,9 @@ real :: trend_o3=1.0, trend_co, trend_voc
 !  end if
 
 !================================================================== 
-! Trends - derived from EMEP report 3/97
+! Trends - methods updated from EMEP report 3/97
 ! adjustment for years outside the range 1990-2000.
 
-!June 2013 svn 2619:
 ! Assume O3 increases to 2000, consistent with obs.
 ! Keep the 1990 base-year for CO and VOC.
   select case(iyr_trend)
@@ -1152,84 +1275,22 @@ real :: trend_o3=1.0, trend_co, trend_voc
       lat5(i,j) = max(lat5(i,j),6)   ! Min value in latfunc
       lat5(i,j) = min(lat5(i,j),14)  ! Max value in latfunc
     endforall
-    ! Define concs where a simple  specification based on lat/mm
-    ! etc. will be given
-    !                           surf   dmax   amp   hz    vmin  hmin conv_fac!ref
-    !                            ppb          ppb   km   hmin,vmin:same units as input data=conv_fac
-    SpecBC(IBC_SO2  )  = sineconc( 0.15 , 15.0, 0.05, 999.9, 0.03, 0.03,PPB)!W99, bcKz vmin
-!pwds    SpecBC(IBC_SO4  )  = sineconc( 0.15 ,180.0, 0.00, 1.6  , 0.05, 0.03,PPB)!W99
-    SpecBC(IBC_SO4  )  = sineconc( 0.15 ,180.0, 0.00, 999.9, 0.05, 0.03,PPB)!W99
-    SpecBC(IBC_NO   )  = sineconc( 0.1  , 15.0, 0.03, 4.0  , 0.03, 0.02,PPB)
-    SpecBC(IBC_NO2  )  = sineconc( 0.1  , 15.0, 0.03, 4.0  , 0.05, 0.04,PPB)
-    SpecBC(IBC_PAN  )  = sineconc( 0.20 ,120.0, 0.15, 999.9, 0.20, 0.1 ,PPB)!Kz change vmin
-    SpecBC(IBC_CO   )  = sineconc( 125.0, 75.0, 35.0, 25.0 , 70.0, 30.0,PPB)!JEJ-W
-!st 14.05.2014    SpecBC(IBC_SeaSalt_F)=sineconc( 0.5  , 15.0,  0.3,  1.6 , 0.01, 0.01,PPB)
-!st 14.05.2014    SpecBC(IBC_SeaSalt_C)=sineconc( 3.0  , 15.0,  1.0,  1.6 , 0.01, 0.01,PPB)
-    SpecBC(IBC_SeaSalt_f)=sineconc( 0.2  , 15.0,  0.05,  1.6 , 0.01, 0.01,PPB)
-    SpecBC(IBC_SeaSalt_c)=sineconc( 1.5  , 15.0,  0.25,  1.6 , 0.01, 0.01,PPB)
-    SpecBC(IBC_SeaSalt_g)=sineconc( 1.0  , 15.0,  0.5,  1.0 , 0.01, 0.01,PPB)
-    SpecBC(IBC_C2H6 )  = sineconc( 2.0  , 75.0, 1.0 , 10.0 , 0.05, 0.05,PPB)
-    SpecBC(IBC_C4H10)  = sineconc( 2.0  , 45.0, 1.0 , 6.0  , 0.05, 0.05,PPB)
-    SpecBC(IBC_HCHO )  = sineconc( 0.7  ,180.0, 0.3 , 6.0  , 0.05, 0.05,PPB)
-    SpecBC(IBC_CH3CHO) = sineconc( 0.3  ,180.0, 0.05 , 6.0  , 0.005, 0.005,PPB) !NAMBLEX,Solberg,etc.
-    SpecBC(IBC_HNO3 )  = sineconc( 0.07 ,180.0, 0.03, 999.9,0.025, 0.03,PPB)
-                         !~=NO3, but with opposite seasonal var.
-    SpecBC(IBC_NO3_f ) = sineconc( 0.07 , 15.0, 0.03, 1.6  ,0.025, 0.02,PPB) !ACE-2
-    SpecBC(IBC_NO3_c ) = sineconc( 0.07 , 15.0, 0.00, 1.6  ,0.025, 0.02,PPB) !ACE-2
-    SpecBC(IBC_NH4_f ) = sineconc( 0.15 ,180.0, 0.00, 1.6  , 0.05, 0.03,PPB) !ACE-2(SO4/NH4=1)
- ! all BCs read in are in mix. ratio, thus hmin,vmin needs to be in mix. ratio for thosetio for those
-    SpecBC(IBC_O3   )  = sineconc(-99.9 ,-99.9,-99.9,-99.9 ,-99.9,10.0*PPB  ,1.)!N1
-    SpecBC(IBC_H2O2 )  = sineconc(-99.9 ,-99.9,-99.9,-99.9 ,-99.9,0.01*PPB  ,1.)
-  ! Dust: the factor PPB converts from PPB to mixing ratio.
-    SpecBC(IBC_Dust_c)=sineconc(-99.9 ,-99.9,-99.9,-99.9 ,-99.9,1.0e-15,1.0)
-    SpecBC(IBC_Dust_f)=sineconc(-99.9 ,-99.9,-99.9,-99.9 ,-99.9,1.0e-15,1.0)
-    !refs:
-    ! N1 - for ozone we read Logan's data, so the only paramater specified
-    !      is a min value of 10 ppb. I hope this doesn't come into effect in
-    !      Europe as presumably any such min values are in the S. hemisphere.
-    !      Still, giving O3 such a value let's us use the same code for
-    !      all species.
-    ! W99: Warneck, Chemistry of the Natural Atmosphere, 2nd edition, 1999
-    !    Academic Press. Fig 10-6 for SO2, SO4.
-    ! JEJ - Joffen's suggestions from Mace/Head, UiO and other data..
-    !      with scale height estimated large from W99, Isaksen+Hov (1987)
-    ! M -Mozart-obs comparison
-    ! ACE-2 Lots of conflicting measurements exist, from NH4/SO4=2 to NH4/SO4=0.5
-    ! A 'mean' value of NH4/SO4=1 is therefore selected. Otherwise NH4 is assumed to
-    ! act as SO4
-    ! aNO3 is assumed to act as SO4, but with 1/2 concentrations and seasonal var.
-    ! pNO3 is assumed to act like seasalt, with decreasing conc with height, with
-    ! approx same conc. as fine nitrate.
-    ! The seasonal var of HNO3 is now assumed to be opposite of aNO3.
 
     ! Consistency check:
-    if (DEBUG%GLOBBC) print *, "SPECBC NGLB ",NGLOB_BC
-    do i = 1, NGLOB_BC
-      if (DEBUG%GLOBBC) print *,"SPECBC i, hmin ",i,SpecBC(i)%surf,SpecBC(i)%hmin
-      if( SpecBC(i)%hmin*SpecBC(i)%conv_fac < 1.0e-17) then
-        write(unit=txtmsg,fmt="(A,I0)") "PECBC: Error: No SpecBC set for species ", i
-        call CheckStop(txtmsg)
-      end if
-    end do
+    if (dbg0) write(*,*) "SPECBC NGLB ",NGLOB_BC
+
+!CMX    do i = 1, NGLOB_BC
+!CMX       if (DEBUG%GLOBBC) print *,"SPECBC i, hmin ",i,SpecBC(i)%surf,SpecBC(i)%hmin
+!CMX       if( SpecBC(i)%hmin*SpecBC(i)%conv_fac < 1.0e-17) then
+!CMX        write(unit=txtmsg,fmt="(A,I0)") "PECBC: Error: No SpecBC set for species ", i
+!CMX        call CheckStop(txtmsg)
+!CMX      end if
+!CMX    end do
 
     ! Latitude functions taken from Lagrangian model, see Simpson (1992)
     latfunc(:,6:14) = 1.0    ! default
     if(me==0)write(*,*)'WARNING SET LATFUNC TO CONSTANT 1'
 !Dave, Peter 10th Feb 2015: simplify and set to 1!
-                              !  30        40        50       60         70 degN
-!    latfunc(IBC_SO2 ,6:14) = (/ 0.05,0.15,0.3 ,0.8 ,1.0 ,0.6 ,0.2 ,0.12,0.05/)
-!    latfunc(IBC_HNO3,6:14) = (/ 1.00,1.00,1.00,0.85,0.7 ,0.55,0.4 ,0.3 ,0.2 /)
-!    latfunc(IBC_PAN ,6:14) = (/ 0.15,0.33,0.5 ,0.8 ,1.0 ,0.75,0.5 ,0.3 ,0.1 /)
-!    latfunc(IBC_CO  ,6:14) = (/ 0.6 ,0.7 ,0.8 ,0.9 ,1.0 ,1.0 ,0.95,0.85,0.8 /)
-!
-!    latfunc(IBC_SO4   ,:) = latfunc(IBC_SO2 ,:)
-!    latfunc(IBC_NO    ,:) = latfunc(IBC_SO2 ,:)
-!    latfunc(IBC_NO2   ,:) = latfunc(IBC_SO2 ,:)
-!    latfunc(IBC_HCHO  ,:) = latfunc(IBC_HNO3,:)
-!    latfunc(IBC_CH3CHO,:) = latfunc(IBC_HNO3,:)
-!    latfunc(IBC_NH4_f ,:) = latfunc(IBC_SO2 ,:)
-!    latfunc(IBC_NO3_f ,:) = latfunc(IBC_SO2 ,:)
-!    latfunc(IBC_NO3_c ,:) = latfunc(IBC_SO2 ,:)
 
     ! Use Standard Atmosphere to get average heights of layers
     p_kPa(:) = 0.001*( A_mid(:) + B_mid(:)*Pref ) ! Pressure in kPa
@@ -1242,8 +1303,11 @@ real :: trend_o3=1.0, trend_co, trend_voc
 !  Specifies concentrations for a fake set of Logan data.
 
   fname = "none"           ! dummy for printout
-  select case (ibc)
-  case (IBC_O3)
+  specBIC = defBIC(ibc)
+  bcSpec  = specBIC%name
+  if(dbg0) write(*,*) 'CMX CASING ', ibc,  me, trim(bcSpec)
+  select case (bcSpec)
+  case ('O3')
      Nlevel_logan=30
      if(.not.allocated(O3_logan))allocate(O3_logan(Nlevel_logan,LIMAX,LJMAX))
      if(.not.allocated(O3_logan_emep))allocate(O3_logan_emep(LIMAX,LJMAX,KMAX_MID))
@@ -1289,29 +1353,29 @@ real :: trend_o3=1.0, trend_co, trend_voc
             -O3fix/PPB,trend_o3,macehead_O3(month)
        bc_data = max(15.0*PPB,bc_data-O3fix)
     end if
-  case ( IBC_H2O2 )
+  case ( 'H2O2' )
 
      bc_data=1.0E-25
 
-  case (IBC_NO  ,IBC_NO2  ,IBC_HNO3,IBC_CO, &
-        IBC_C2H6,IBC_C4H10,IBC_PAN ,IBC_NO3_c,&
-        IBC_SO2   , IBC_SO4  , IBC_HCHO , &
-        IBC_SeaSalt_f,IBC_SeaSalt_c, IBC_SeaSalt_g, &
-        IBC_CH3CHO, IBC_NH4_f, IBC_NO3_f)
+  case ('NO' ,'NO2' ,'HNO3','CO', &
+        'C2H6','C4H10','PAN' ,'NO3_c',&
+        'SO2'   , 'SO4'  , 'HCHO' , &
+        'SeaSalt_f','SeaSalt_c', 'SeaSalt_g', &
+        'CH3CHO', 'NH4_f', 'NO3_f')
     ! NB since we only call once per month we add 15 days to
     ! day-number to get a mid-month value
-    cosfac = cos( twopi_yr * (daynumber+15.0-SpecBC(ibc)%dmax))
-    bc_data(:,:,KMAX_MID) = SpecBC(ibc)%surf + SpecBC(ibc)%amp*cosfac
+    cosfac = cos( twopi_yr * (daynumber+15.0-specBIC%dmax))
+    bc_data(:,:,KMAX_MID) = specBIC%surf + specBIC%amp*cosfac
 
-    if(SpecBC(ibc)%hz<100.0)then
+    if(specBIC%hz<100.0)then
     !/ - correct for other heights
     do k = 1, KMAX_MID-1
-      scale_new = exp( -h_km(k)/SpecBC(ibc)%hz )
+      scale_new = exp( -h_km(k)/specBIC%hz )
       bc_data(:,:,k) = bc_data(:,:,KMAX_MID)*scale_new
       if (DEBUG_HZ) then
-        scale_old = exp( -(KMAX_MID-k)/SpecBC(ibc)%hz )
+        scale_old = exp( -(KMAX_MID-k)/specBIC%hz )
         write(*,"(a8,2i3,2f8.3,i4,f8.2,f8.3,2f8.3)") &
-         "SCALE-HZ ", month, ibc, SpecBC(ibc)%surf, SpecBC(ibc)%hz, k,&
+         "SCALE-HZ ", month, ibc, specBIC%surf, specBIC%hz, k,&
           h_km(k), p_kPa(k), scale_old, scale_new
       end if ! DEBUG_HZ
     end do
@@ -1323,28 +1387,29 @@ real :: trend_o3=1.0, trend_co, trend_voc
     end if
 
     !/ - min value after vertical factors, before latitude factor
-    bc_data = max( bc_data, SpecBC(ibc)%vmin )
+    bc_data = max( bc_data, specBIC%vmin )
 
     !/ - correct for latitude functions
     forall(i=1:LIMAX,j=1:LJMAX)
       bc_data(i,j,:) = bc_data(i,j,:) * latfunc(ibc,lat5(i,j))
     endforall
 
-    case (IBC_DUST_C,IBC_DUST_F)
+    case ('Dust_c', 'Dust_f')
+       if( dbg0 ) write(*,*) 'CMXdust? ', trim(bcSpec), USES%DUST
        if(USES%DUST)then
 !         bc_data(:,:,:) = 0.0
 
 !dust are read from the results of a Global run
-         Nlevel_Dust=20
+         Nlevel_Dust=20  !CMX QUERY ???
          if(.not.allocated(Dust_3D))allocate(Dust_3D(Nlevel_Dust,LIMAX,LJMAX))
          if(.not.allocated(Dust_3D_emep))allocate(Dust_3D_emep(LIMAX,LJMAX,KMAX_MID))
          Dust_3D=0.0
          Dust_3D_emep=0.0
  
-         if(ibc==IBC_DUST_C)then
+         if(bcSpec=='Dust_c')then
             varname='D3_ug_DUST_WB_C'  ! QUERY : ARGH!   RECODE more flexibly!
           if(me==0)write(*,*)'coarse DUST BIC read from climatological file'
-         else if(ibc==IBC_DUST_F)then
+         else if(bcSpec=='Dust_f')then
             varname='D3_ug_DUST_WB_F'
             if(me==0)write(*,*)'fine DUST BIC read from climatological file'
          else
@@ -1356,7 +1421,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
          !interpolate vertically
          call vertical_interpolate(DustFile,Dust_3D,Nlevel_Dust,Dust_3D_emep,debug=.false.)
 
-!has to convert from ug/m3 into mixing ratio. NB: Dust in Netcdf file has molwt = 200 g/mol
+        ! have to convert from ug/m3 into mixing ratio. NB: Dust in Netcdf file
+        !  has molwt = 200 g/mol
          conv_fac=ATWAIR/200.*1.E-9
          do k = 1, KMAX_MID
             do j = 1, ljmax
@@ -1370,8 +1436,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
          end if
 
     case  default
-      print *,"Error with specified BCs:", ibc
-      txtmsg = "BC Error UNSPEC"
+      print *,"CMXError with specified BCs:", ibc, bcSpec
+      txtmsg = "BC Error UNSPEC"//bcSpec
     end select
 !================== end select ==================================
 
@@ -1387,26 +1453,25 @@ real :: trend_o3=1.0, trend_co, trend_voc
 
 
   !/ - min value after latitude factors , but before trends
-  bc_data = max( bc_data, SpecBC(ibc)%hmin )
+  bc_data = max( bc_data, specBIC%hmin )
 
 
     !/ trend adjustments
-   select case (ibc)
-   case ( IBC_O3 )
+   select case (bcSpec)
+   case ( 'O3' )
       bc_data = bc_data*trend_o3
-   case (IBC_C4H10 , IBC_C2H6 )
+   case ('C4H10' , 'C2H6' )
       bc_data =  bc_data*trend_voc
-   case ( IBC_CO )
+   case ( 'CO' )
       bc_data =  bc_data*trend_co
-   case ( IBC_SO2,IBC_SO4)
+   case ( 'SO2','SO4')
       bc_data = bc_data*SIAtrend%so2
-   case( IBC_NH4_f)
+   case( 'NH4_f')
       bc_data = bc_data*SIAtrend%nh4
-   case ( IBC_NO3_f,IBC_NO3_c,IBC_HNO3,IBC_NO2,IBC_NO,IBC_PAN)
+   case ( 'NO3_f','NO3_c','HNO3','NO2','NO','PAN')
       bc_data = bc_data*SIAtrend%nox
    end select
-
-   bc_data = bc_data * SpecBC(ibc)%conv_fac !Convert to mixing ratio
+   bc_data = bc_data * specBIC%conv_fac !Convert to mixing ratio
 
 
 end subroutine GetBICData

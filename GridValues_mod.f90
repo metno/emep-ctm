@@ -1,7 +1,7 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,10 +47,9 @@ use MetFields_mod
 use Config_module,      only: &
      KMAX_BND, KMAX_MID, & ! vertical extent
      MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN, JUMPOVER29FEB,&
-     PT,Pref,NMET,USE_EtaCOORDINATES,MANUAL_GRID,USE_WRF_MET_NAMES,&
+     PT,Pref,NMET,MANUAL_GRID,&
      startdate,NPROCX,NPROCY,Vertical_levelsFile,&
-     EUROPEAN_settings, GLOBAL_settings,USES,FORCE_PFT_MAPS_FALSE,&
-     USE_SOILNOx
+     EUROPEAN_settings, GLOBAL_settings,USES,FORCE_PFT_MAPS_FALSE
 use Debug_module, only:  DEBUG   ! -> DEBUG%GRIDVALUES
 
 use MPI_Groups_mod!, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_LOGICAL, &
@@ -266,9 +265,9 @@ subroutine GridRead(meteo,cyclicgrid)
       if(MasterProc)write(*,*)KMAX_MID, 'vertical levels '
       External_Levels_Def=.true.
       ! Must use eta coordinates
-      if(MasterProc.and..not.USE_EtaCOORDINATES)&
+      if(MasterProc.and..not.USES%EtaCOORDINATES)&
         write(*,*)'WARNING: using hybrid levels even if not asked to! '
-      USE_EtaCOORDINATES=.true.
+      USES%EtaCOORDINATES=.true.
     else
       if(MasterProc)write(*,*)'WARNING: could not open '//trim(Vertical_levelsFile)
       External_Levels_Def=.false.
@@ -372,8 +371,8 @@ subroutine GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,projection)
      if(status/=nf90_noerr) then
         ! WRF projection format
         call check(nf90_get_att(ncFileID,nf90_global,"MAP_PROJ",wrf_proj_code))
-        if(.not.USE_WRF_MET_NAMES .and. MasterProc)write(*,*)'Assuming WRF metdata'
-        USE_WRF_MET_NAMES = .true.
+        if(.not.USES%WRF_MET_NAMES .and. MasterProc)write(*,*)'Assuming WRF metdata'
+        USES%WRF_MET_NAMES = .true.
         select case(wrf_proj_code)
         case(6)
            status = nf90_get_att(ncFileID,nf90_global,"POLE_LAT",wrf_POLE_LAT)
@@ -468,7 +467,7 @@ subroutine GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,projection)
      call check(nf90_close(ncFileID))
   end if
 
-  CALL MPI_BCAST(USE_WRF_MET_NAMES ,1,MPI_LOGICAL,0,MPI_COMM_WORLD,IERROR)
+  CALL MPI_BCAST(USES%WRF_MET_NAMES ,1,MPI_LOGICAL,0,MPI_COMM_WORLD,IERROR)
   CALL MPI_BCAST(IIFULLDOM ,4*1,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
   CALL MPI_BCAST(JJFULLDOM ,4*1,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
   CALL MPI_BCAST(KMAX ,4*1,MPI_BYTE,0,MPI_COMM_WORLD,IERROR)
@@ -695,7 +694,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     end do ! j
     
   case('lambert')
-    if(USE_WRF_MET_NAMES)then
+    if(USES%WRF_MET_NAMES)then
       call check(nf90_get_att(ncFileID, nf90_global, "TRUELAT1",lat_stand1_lambert ))
       call check(nf90_get_att(ncFileID, nf90_global, "TRUELAT2",lat_stand2_lambert ))
       lat0_lambert = lat_stand1_lambert
@@ -737,7 +736,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     F_lambert = cos(deg2rad*lat_stand1_lambert) &
               * tan(0.25*PI+0.5*deg2rad*lat_stand1_lambert)**k_lambert /k_lambert!normalization constant
     y0_lambert = F_lambert*tan(0.25*PI-0.5*deg2rad*lat0_lambert)**k_lambert!reference y coordinate, also called rho0
-    if(USE_WRF_MET_NAMES)then
+    if(USES%WRF_MET_NAMES)then
       call check(nf90_inq_varid(ncid=ncFileID, name="XLONG", varID=varID))
       call check(nf90_get_var(ncFileID,varID,v,count=(/1/)))
       call check(nf90_inq_varid(ncid=ncFileID, name="XLAT", varID=varID))
@@ -821,7 +820,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       enddo
     enddo
   case('lon lat')
-    if(.not. USE_WRF_MET_NAMES)then
+    if(.not. USES%WRF_MET_NAMES)then
       !NB: lon and lat are stored as 1 dimensional arrays
       call check(nf90_inq_varid(ncid=ncFileID, name="lon", varID=varID))
       
@@ -1030,9 +1029,9 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
   status=nf90_inq_varid(ncid=ncFileID, name="k", varID=varID)
   if(status/=nf90_noerr)then
     !always use hybrid coordinates at output, if hybrid in input
-    if(.not.USE_EtaCOORDINATES)then
+    if(.not.USES%EtaCOORDINATES)then
       write(*,*)'WARNING: using hybrid levels even if not asked to! ',trim(filename)
-      USE_EtaCOORDINATES=.true.
+      USES%EtaCOORDINATES=.true.
     end if
     if(MasterProc)write(*,*)'reading met hybrid levels from ',trim(filename)
     !          call check(nf90_inq_varid(ncid=ncFileID, name="hyam", varID=varID))
@@ -3162,10 +3161,10 @@ subroutine set_EuropeanAndGlobal_Config()
        //', MonthlyNH3 = '//trim(USES%MonthlyNH3)&
        ,', E-SNOx = ',USES%EURO_SOILNOX&
        ,', G-SNOx = ',USES%GLOBAL_SOILNOX&
-       ,', USE_SOILNOx= ',USE_SOILNOX
+       ,', USES%SOILNOx= ',USES%SOILNOX
 
 !  trim(EUROPEAN_settings)//','//&
-!       trim(GLOBAL_settings), USES%EURO_SOILNOX, USES%GLOBAL_SOILNOX, USE_SOILNOX
+!       trim(GLOBAL_settings), USES%EURO_SOILNOX, USES%GLOBAL_SOILNOX, USES%SOILNOX
 
 end subroutine set_EuropeanAndGlobal_Config
 

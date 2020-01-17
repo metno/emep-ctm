@@ -1,7 +1,7 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,7 +50,7 @@ module RunChem_mod
   use ColumnSource_mod,  only: Winds, getWinds
   use Config_module,    only: MasterProc, & 
                               KMAX_MID, END_OF_EMEPDAY, step_main,  &
-                              USE_FASTJ, USES, AOD_WANTED, dt_advec
+                              USES, AOD_WANTED, dt_advec
   use Debug_module,      only: DebugCell, DEBUG  & ! -> DEBUG%RUNCHEM
                               ,DEBUG_EMISSTACKS ! MKPS
   use DefPhotolysis_mod, only: setup_phot
@@ -129,9 +129,9 @@ subroutine runchem()
 
       !****** debug cell set here *******
       debug_flag =  .false.  
+      DebugCell = debug_proc .and. debug_li==i .and. debug_lj==j
       if(DEBUG%RUNCHEM.and.debug_proc) then
         debug_flag = (debug_li==i .and. debug_lj==j) 
-        DebugCell = debug_flag
         DEBUG%datetxt = print_date(current_date)
         if(debug_flag) write(*,*) "RUNCHEM DEBUG START!"
       end if
@@ -170,7 +170,7 @@ subroutine runchem()
 
       call emis_massbudget_1d(i,j)   ! Adds bio/nat to rcemis
 
-      if(USE_FASTJ)then
+      if(USES%FASTJ)then
 !         call setup_phot_fastj(i,j,errcode,0)! recalculate the column
         !interpolate (intelligently) from 3-hourly values
          call  phot_fastj_interpolate(i,j,errcode)

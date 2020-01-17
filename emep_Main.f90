@@ -1,7 +1,7 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -58,9 +58,9 @@ program emep_Main
        iyr_trend, nmax,step_main , meteo,     &
        IOU_INST,IOU_HOUR,IOU_HOUR_INST, IOU_YEAR,IOU_MON, IOU_DAY, &
        HOURLYFILE_ending, &
-       USES, USE_uEMEP,JUMPOVER29FEB,&
+       USES, JUMPOVER29FEB,&
        ANALYSIS, & ! forecast in ANALYSIS mode
-       Config_Constants, startdate, enddate
+       Config_Constants, startdate, enddate, WriteConfig_to_RunLog
   use Country_mod,       only: init_Country
   use DA_3DVar_mod,      only: NTIMING_3DVAR,DA_3DVar_Init, DA_3DVar_Done
   use Debug_module,      only: DEBUG   ! -> DEBUG%MAINCODE
@@ -221,7 +221,7 @@ program emep_Main
 
   call Add_2timing(3,tim_after,tim_before,"Yearly emissions read in")
 
-  if(USE_uEMEP) call init_uEMEP
+  if(USES%uEMEP) call init_uEMEP
 
   call MetModel_LandUse(1)   !
 
@@ -392,6 +392,8 @@ program emep_Main
 
   call wrtxn(current_date,.true.)
   call massbudget()
+
+  call WriteConfig_to_RunLog(IO_LOG)
 
   call Output_timing(IO_MYTIM,me,NPROC,GIMAX,GJMAX)
 

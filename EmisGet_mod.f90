@@ -1,7 +1,7 @@
-! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -40,7 +40,7 @@ use Country_mod,       only: NLAND, IC_NAT, IC_VUL, IC_NOA, Country, &
                              IC_NMR,IC_DUMMY 
 use Debug_module,      only: DEBUG
 use EmisDef_mod,       only: NSECTORS, ANTROP_SECTORS, NCMAX, & 
-                            N_HFAC,N_SPLIT, EMIS_FILE, & 
+                            N_HFAC,N_SPLIT, N_SPLITMAX, EMIS_FILE, & 
                             VOLCANOES_LL, &
                           ! NMR-NH3 specific variables (for FUTURE )
                             NH3EMIS_VAR,dknh3_agr,ISNAP_AGR,ISNAP_TRAF, &
@@ -130,7 +130,7 @@ real, public,allocatable, dimension(:,:), save :: emis_hprofile
 
 ! some common variables
 character(len=TXTLEN_FILE), private :: fname             ! File name
-character(len=80), private :: errmsg
+character(len=180), private :: errmsg
 
 ! Import list of the emitted species we need to find in the 
 ! emissplit files.
@@ -214,7 +214,7 @@ contains
             .or. Emis_source%units == 'mg/month' .or. Emis_source%units == 'mg/year' &
             .or. Emis_source%units == 'g/h' .or. Emis_source%units == 'mg/h')then
           !per gridcell unit
-          if(me==0 .and. (step_main<10 .or. DEBUG%EMISSIONS))&
+          if(me==0 .and. DEBUG%EMISSIONS)&
                write(*,*)'reading emis '//trim(Emis_source%varname)//' from '//trim(fname)//', proj ',trim(EmisFile%projection),', res ',EmisFile%grid_resolution
          call ReadField_CDF(fname,Emis_source%varname,Emis_XD,record,&
                known_projection=trim(EmisFile%projection),&
@@ -313,6 +313,12 @@ contains
                       cycle
                    else
                       if(MasterProc)write(*,*)'found '//species(iem_used)%name//' for '//trim(ewords(6))
+                      if(pollName(1)/='NOTSET')then
+                         if(all(pollName(1:20)/=trim(EMIS_FILE(iem_used))))then
+                            if(Masterproc)write(*,"(A)")'NOT reading '//species(iem_used)%name//' from '//trim(fname)
+                            cycle      
+                         endif
+                      end if
                       !see if case has been found before
                       !should search only among NEmis_id first!
                       ix_Emis = find_index(ewords(6),Emis_id%species(:))
@@ -340,10 +346,6 @@ contains
              endif
 
              cdfemis = 0.0 ! safety, shouldn't be needed though
-             if(pollName(1)/='NOTSET')then
-                if(all(pollName(1:20)/=trim(EMIS_FILE(iem_used))))cycle      
-                if(Masterproc)write(*,"(A)")'reading '//trim(EMIS_FILE(iem_used))//' from '//trim(fname)
-             end if             
              call ReadField_CDF(fname,cdfvarname,cdfemis,nstart=nstart,&
                   interpol='mass_conservative',&
                   needed=.false.,UnDef=0.0,&
@@ -518,6 +520,7 @@ contains
     character(len=*), parameter :: dtxt='Em_inicdf:'
     integer :: countrycode
     logical :: apply_femis
+    integer :: source_found(NEmis_sourcesMAX)
 
     fname=trim(date2string(EmisFile_in%filename,startdate,mode='YMDH'))
     status=nf90_open(path = trim(fname), mode = nf90_nowrite, ncid = ncFileID)
@@ -568,7 +571,14 @@ contains
     if(status==nf90_noerr)EmisFile%sector = sector
     status = nf90_get_att(ncFileID,nf90_global,"country_ISO", name)
     if(status==nf90_noerr)EmisFile%country_ISO = trim(name)
-    
+
+    !init accounting of requested sources
+    do i = 1,NEmis_sourcesMAX     
+       source_found(i)=0
+    end do
+    do i = 1,min(size(EmisFile_in%source), NEmis_sourcesMAX)  
+       if(EmisFile_in%source(i)%varname /= 'NOTSET')source_found(i)=1
+    end do
 
     nemis_old = NEmis_sources
     !loop over all variables
@@ -582,6 +592,7 @@ contains
           !if ( debugm0 ) write(*,*) dtxt//'source:',trim(EmisFile_in%source(i)%varname)
           if(EmisFile_in%source(i)%varname == cdfvarname)then
              nn = nn + 1
+             source_found(i) = 0 !mark as found
              call CheckStop(NEmis_sources+nn > NEmis_sourcesMAX,"NEmis_sourcesMAX exceeded (A)")
              Emis_source(NEmis_sources+nn)%ix_in=i
              if ( debugm0 ) write(*,*) dtxt//'var add:',trim(cdfvarname)
@@ -636,6 +647,11 @@ contains
        endif
         
     enddo
+    do i = 1,min(size(EmisFile_in%source), NEmis_sourcesMAX)  
+       if(MasterProc .and. source_found(i)==1)then
+          write(*,*)'WARNING: did not find any variable with name '//trim(EmisFile_in%source(i)%varname)//' in '//trim(fname)
+       endif
+    end do
     if(nemis_old /= NEmis_sources)then
        !at least one valid source found in the file       
        NEmisFile_sources = NEmisFile_sources + 1
@@ -966,20 +982,26 @@ end if
 
 !It is rather easy to get coordinates which are equals. 
 !In order to avoid random decisions when this happens, we increase slightly the bounds:
-          femis_lonmin(N_femis_lonlat)=femis_lonmin(N_femis_lonlat)-1.0E-10
-          femis_lonmax(N_femis_lonlat)=femis_lonmax(N_femis_lonlat)+1.0E-10
           femis_latmin(N_femis_lonlat)=femis_latmin(N_femis_lonlat)-1.0E-10
           femis_latmax(N_femis_lonlat)=femis_latmax(N_femis_lonlat)+1.0E-10
-
+          if(femis_lonmax(N_femis_lonlat)-femis_lonmin(N_femis_lonlat)>=360.0)then
+             !covers the entire globe
+             femis_lonmax(N_femis_lonlat)=361.0
+             femis_lonmin(N_femis_lonlat)=-361.0
+          else
+             femis_lonmin(N_femis_lonlat)=femis_lonmin(N_femis_lonlat)-1.0E-10
+             femis_lonmax(N_femis_lonlat)=femis_lonmax(N_femis_lonlat)+1.0E-10
+             
 !"normalize" longitudes to the interval -180,180
-          if(femis_lonmin(N_femis_lonlat)>180.0)femis_lonmin(N_femis_lonlat)=femis_lonmin(N_femis_lonlat)-360.0
-          if(femis_lonmin(N_femis_lonlat)<-180.0)femis_lonmin(N_femis_lonlat)=femis_lonmin(N_femis_lonlat)+360.0
-          if(femis_lonmax(N_femis_lonlat)>180.0)femis_lonmax(N_femis_lonlat)=femis_lonmax(N_femis_lonlat)-360.0
-          if(femis_lonmax(N_femis_lonlat)<-180.0)femis_lonmax(N_femis_lonlat)=femis_lonmax(N_femis_lonlat)+360.0
-
+             if(femis_lonmin(N_femis_lonlat)>180.0)femis_lonmin(N_femis_lonlat)=femis_lonmin(N_femis_lonlat)-360.0
+             if(femis_lonmin(N_femis_lonlat)<-180.0)femis_lonmin(N_femis_lonlat)=femis_lonmin(N_femis_lonlat)+360.0
+             if(femis_lonmax(N_femis_lonlat)>180.0)femis_lonmax(N_femis_lonlat)=femis_lonmax(N_femis_lonlat)-360.0
+             if(femis_lonmax(N_femis_lonlat)<-180.0)femis_lonmax(N_femis_lonlat)=femis_lonmax(N_femis_lonlat)+360.0
 !There will still be problem when trying to "cross" the 180 degree longitude, therefore we put a test here:
-          call CheckStop(femis_lonmin(N_femis_lonlat)>femis_lonmax(N_femis_lonlat),&
-               "femislonlat: crossing 180 degrees longitude not allowed")
+             call CheckStop(femis_lonmin(N_femis_lonlat)>femis_lonmax(N_femis_lonlat),&
+                  "femislonlat: crossing 180 degrees longitude not allowed")
+          endif
+
        else
 
           if(txtinwords(1)=='Country' .or. txtinwords(1)=='country'  .or. txtinwords(1)=='Country_ISO' )then
@@ -1331,7 +1353,7 @@ end if
 ! zero to just use species()%molwt.:
   type(KeyVal), dimension(1)  :: MassValue ! set for e.f. NOx as NO2, SOx as SO2
   integer :: NKeys
-  real, dimension(NSPEC_ADV,N_SPLIT,NLAND) :: tmp_emisfrac
+  real, dimension(NSPEC_ADV,N_SPLITMAX,NLAND) :: tmp_emisfrac
   real, dimension(NSPEC_ADV) :: tmp_emis_masscorr
   integer, dimension(NSPEC_ADV) :: tmp_iqrc2itot !maps from iqrc 
   integer, dimension(NSPEC_ADV) :: tmp_iqrc2iem !maps from iqrc 
@@ -1420,7 +1442,7 @@ end if
 
               if (debugm) write(*,*) "SPLITINFO iem ", i,idef, intext(idef,i)
 
-              itot = find_index(intext(idef,i), species(:)%name )
+              itot = find_index(intext(idef,i), species(:)%name, any_case=.true. )
 
               if ( defaults ) then
                 if ( Headers(i+2) /= "UNREAC" ) then 
@@ -1559,9 +1581,12 @@ end if
        end do READ_DATA 
        close(IO_EMIS)
 
-       call CheckStop(  defaults .and. n  /=  N_SPLIT, &
+       call CheckStop(  defaults .and. n  >  N_SPLITMAX, &
+                        "ERROR: EmisGet: defaults .and. n  >  N_SPLITMAX" )
+       if(ie==1 .and. defaults) N_SPLIT=n
+       if(ie>1 .and. defaults) &
+            call CheckStop(  defaults .and. n  /=  N_SPLIT, &
                         "ERROR: EmisGet: defaults .and. n  /=  N_SPLIT" )
-
        if (debugm ) write(*,*) "Read ", n, " records from ",fname
 
     end do IDEF_LOOP 
@@ -1595,7 +1620,7 @@ end if
   call CheckStop(allocerr, "Allocation error for iqrc2itot")
   allocate(emis_masscorr(nrcemis),stat=allocerr)
   call CheckStop(allocerr, "Allocation error for emis_masscorr")
-  emisfrac(:,:,:)     = tmp_emisfrac(1:nrcemis,:,:)
+  emisfrac(:,:,:)     = tmp_emisfrac(1:nrcemis,1:N_SPLIT,:)
   iqrc2itot(:)        = tmp_iqrc2itot(1:nrcemis)
   iqrc2iem(:)        = tmp_iqrc2iem(1:nrcemis)
   emis_masscorr(:)    = tmp_emis_masscorr(1:nrcemis)
@@ -1608,7 +1633,16 @@ end if
      allocate(roaddust_masscorr(NROADDUST),stat=allocerr)
      call CheckStop(allocerr, "Allocation error for emis_masscorr")
      itot_RDF = find_index( "Dust_ROAD_f", species(:)%name ,any_case=.true. )
-     call CheckStop(itot_RDF<=0, "Asked for road dust but did not find Dust_ROAD_f")
+     if ( itot_RDF <=0 ) then ! No explicit road dust. Assign to "dust"
+       itot_RDF = find_index( "Dust_f", species(:)%name ,any_case=.true. )
+       if ( itot_RDF>0) then
+         if ( MasterProc) &
+           call PrintLog(dtxt//"WARNING: No road_dust species. Assign to dust." )
+       else
+         call StopAll(dtxt//"did not find Dust_ROAD_f or Dust_f" )
+       end if
+ 
+     end if
      do ie=1,NROADDUST
         roaddust_masscorr(ie)=1.0/species(itot_RDF)%molwt
      end do

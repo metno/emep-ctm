@@ -1,7 +1,7 @@
-! <StoFlux_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <StoFlux_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,7 +29,7 @@
 module StoFlux_mod
   use CheckStop_mod
   use Config_module,         only: NLANDUSEMAX, dt_advec, MasterProc
-  use Debug_module,          only: DEBUG   ! -> DEBUG%GRIDVALUES
+  use Debug_module,          only: DEBUG, DebugCell ! -> DEBUG%GRIDVALUES
   use DO3SE_mod,             only: do3se, nSumVPD, SumVPD_LC
   use GasParticleCoeffs_mod, only: DDspec
   use Io_Progs_mod,          only: current_date, datewrite
@@ -56,7 +56,7 @@ module StoFlux_mod
   real,   public,save, allocatable,dimension(:,:,:) :: &
        SumVPD ,   &   ! For critical VPD calcs, reset each day  
        old_gsun       !
-  integer, private, save, dimension(NLANDUSEMAX) :: mapSumVPD
+  integer, private, save, dimension(NLANDUSEMAX) :: indSumVPD
 
   real, private, save :: gext_leaf = 1.0/2500.0
   real, private :: rc_leaf, rb_leaf
@@ -66,20 +66,22 @@ module StoFlux_mod
 
 contains
  !----------------------------------------------------------------------------
-  subroutine Setup_StoFlux(jd )
+  subroutine Setup_StoFlux(i,j)
 
-    integer, intent(in) :: jd ! daynumber
-    integer, save :: old_daynumber
+    integer, intent(in) :: i,j !  coordinates
     logical, save :: my_first_call = .true.
     integer ::  istat, iL
+    character(len=*), parameter :: dtxt='SetupFST:'
 
      if ( my_first_call ) then
        idepO3 = find_index('O3',DDspec(:)%name)
        allocate(SumVPD(LIMAX,LJMAX,nSumVPD))
        allocate(old_gsun(LIMAX,LJMAX,nSumVPD))
+       SumVPD   = 0.0
+       old_gsun = 1.0e99
        do iL = 1, NLANDUSEMAX
          if ( do3se(iL)%VPDcrit > 0.0  ) then
-           mapSumVPD(iL) = find_index( iL, SumVPD_LC )
+           indSumVPD(iL) = find_index( iL, SumVPD_LC )
          end if
        end do
        my_first_call = .false.
@@ -87,12 +89,13 @@ contains
 
      Sub(:)%FstO3 = 0.0
 
-    ! resets whole grid on day change
-     if ( jd /= old_daynumber ) then
-        SumVPD        = 0.0    ! For Critical VPD stuff, wheat
-        old_gsun      = 1.0e99 ! "     "
-        old_daynumber = jd
+    ! resets whole grid at local night
+    if ( Grid%Idirect < 1.0e-6 .and. old_gsun(i,j,1)<1.0e6  ) then
+    !if ( Grid%Idirect < 1.0e-6 ) then
+        SumVPD(i,j,:)        = 0.0    ! For Critical VPD stuff, wheat
+        old_gsun(i,j,:)      = 1.0e99 ! "     "
     end if
+    if ( DebugCell ) call datewrite(dtxt, [Grid%Idirect, old_gsun(i,j,1) ])
 
   end subroutine Setup_StoFlux
 
@@ -102,29 +105,31 @@ contains
     integer, intent(in) :: nLC
     integer, dimension(nLC), intent(in) :: iL_used
     logical, intent(in) :: debug_flag
-    logical :: dbg
+    logical :: dbg, dbghh
     character(len=*), parameter :: dtxt='CalcFST:'
 
     real :: tmp_gsun
-    integer :: i,j, iiL, iL, vpdLC
-    ! Evapotranspiration needs:
+    integer :: i,j, iiL, iL, ivpdLC
+    ! Evapotranspiration (not currently used!) needs:
     real :: gv, gvcms  ! conductace for water vapour, mmole/ms/s and cm/s
 
     i = Grid%i
     j = Grid%j
-    dbg = DEBUG%STOFLUX .and. debug_flag
+    dbg = DEBUG%STOFLUX .and. DebugCell
+    dbghh = dbg .and. current_date%seconds == 0
 
     LC_LOOP: do iiL = 1, nLC
       iL = iL_used(iiL) 
       L = Sub(iL)
 
+      Sub(iL)%FstO3       = 0.0
+
        ! take care of  temperate crops, outside growing season
       if ( L%hveg < 1.1 * L%z0 ) then 
 
-        Sub(iL)%FstO3      = 0.0
         Sub(iL)%cano3_ppb   = 0.0  !! Can't do better?
-        Sub(iL)%EvapTransp  = 0.0   ! No evapo-transpiration ?
-        if ( dbg ) call datewrite(dtxt//" hveg < z0 ", iL, [ L%hveg, L%z0 ] )
+        Sub(iL)%EvapTransp  = 0.0   ! evapo-transpiration. Not used anyway..
+        if ( dbghh ) call datewrite(dtxt//" hveg < z0 ", iL, [ L%hveg, L%z0 ] )
 
       else !=======================
 
@@ -134,42 +139,46 @@ contains
        ! For now we just calculate the g_sto*R_sur bit:
        ! (Caution - g_sto is for O3 only)
 
+       if( L%g_sun > 0.0 ) then ! J20
 
-         !Could be coded faster with Ra....
+          !Could be coded faster with Ra....
 
-        u_hveg = Wind_at_h( Grid%u_ref, Grid%z_ref, L%hveg,L%d,L%z0,L%invL )
+         u_hveg = Wind_at_h( Grid%u_ref, Grid%z_ref, L%hveg,L%d,L%z0,L%invL )
 
-        rc_leaf = 1.0/(L%g_sto+ gext_leaf)
+         rc_leaf = 1.0/(L%g_sto+ gext_leaf)
 
-        !McNaughton + van den Hurk:
+         !McNaughton + van den Hurk:
  
-        if ( do3se(iL)%Lw > 0 )  then
+         if ( do3se(iL)%Lw > 0 )  then
            rb_leaf = 1.3 * 150.0 * sqrt(do3se(iL)%Lw/u_hveg)
-        else ! default (CAREFUL!)
+         else ! default (CAREFUL!)
            rb_leaf = 1.3 * 150.0 * sqrt(0.05/u_hveg)
-        end if
+         end if
 
         ! VPD limitation for wheat
 
-        if ( do3se(iL)%VPDcrit > 0.0  ) then
-           vpdLC = mapSumVPD(iL)
-           if( L%g_sun > 0.0 ) SumVPD(i,j,vpdLC) = &
-                               SumVPD(i,j,vpdLC) + L%vpd*dt_advec/3600.0
+         if ( do3se(iL)%VPDcrit > 0.0  ) then
+           ivpdLC = indSumVPD(iL)
+           SumVPD(i,j,ivpdLC) = SumVPD(i,j,ivpdLC) + L%vpd*dt_advec/3600.0
            tmp_gsun = L%g_sun
-           if ( SumVPD(i,j,vpdLC) > 8.0 ) &
-               L%g_sun = min( L%g_sun, old_gsun(i,j,vpdLC) )
-           if( dbg ) call datewrite(dtxt//"SUMVPD", iL, &
-               [ real(vpdLC), L%rh, L%t2C,  L%vpd, SumVPD(i,j,vpdLC) ] ) 
 
-           old_gsun(i,j,vpdLC) = L%g_sun
-        end if
+           if ( SumVPD(i,j,ivpdLC) > do3se(iL)%VPDcrit ) then
+               L%g_sun = min( L%g_sun, old_gsun(i,j,ivpdLC) )
+              if( dbghh .and. abs(tmp_gsun-L%g_sun)>1.0e-6 ) call datewrite(dtxt//"SUMVPD", iL, &
+               [ do3se(iL)%VPDcrit, L%rh, L%t2C,  L%vpd, SumVPD(i,j,ivpdLC), &
+                 tmp_gsun, L%g_sun, old_gsun(i,j,ivpdLC) ] ) 
+            end if
+
+           old_gsun(i,j,ivpdLC) = L%g_sun
+         end if
 
        ! Flux in nmole/m2/s:
 
-        Sub(iL)%FstO3 = L%cano3_nmole * rc_leaf/(rb_leaf+rc_leaf) * L%g_sun 
+         Sub(iL)%FstO3 = L%cano3_nmole * rc_leaf/(rb_leaf+rc_leaf) * L%g_sun 
 
-        if( dbg ) call datewrite(dtxt//" O3 ", &
-          [ iiL, nLC, iL ], [ L%hveg, L%g_sun, L%cano3_nmole, L%cano3_ppb ] )
+       end if ! g_sun > 0.0
+       !if( dbg ) call datewrite(dtxt//" O3 ", &
+       !  [ iiL, nLC, iL ], [ L%hveg, L%g_sun, L%cano3_nmole, L%cano3_ppb ] )
 
 ! ======   CLOVER  ===========================================================
       ! For Clover we have a very special procedure, using O3 from grassland
@@ -178,12 +187,12 @@ contains
       ! correct
         if( LandType(iL)%is_clover) then
 
-           Sub(iL)%FstO3 = &
+           if ( L%g_sun>0) Sub(iL)%FstO3 = &
               Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb * Sub(iL)%FstO3
 
-           if (  dbg ) call datewrite(dtxt//"CLOVER ", iL, &
-                 (/ Sub(iL)%FstO3, Sub(iLC_grass)%cano3_ppb, &
-                    Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb /) )
+           if (  dbghh ) call datewrite(dtxt//"CLOVER ", iL, &
+                 [ Sub(iL)%FstO3, Sub(iLC_grass)%cano3_ppb, &
+                    Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb ] )
         end if ! clover
 ! ======   CLOVER  =========================================================
 
@@ -202,6 +211,8 @@ contains
 
         gv = 0.0
         gvcms = 0.0
+        Sub(iL)%EvapTransp  = 0.0   ! evapo-transpiration. Not used anyway..
+
         if( L%g_sto > 1.0e-10 ) then
           gv = 1.0/ (2.0 * DDspec(idepO3)%Rb_cor /(KARMAN*L%ustar) &
              + 1.0/ ( L%g_sto * L%LAI ) )
@@ -213,7 +224,6 @@ contains
        ! ms2molm2s = 1.6*1.0e-3/(8.3144e-8*L%t2)
        
           gv = gv * 1.6e-3/(8.3144e-8*L%t2)
-        end if
          
        ! Step 3: 
        ! Mass flux density is E x 0.018 kg/mole -> kg/m2/s
@@ -221,16 +231,16 @@ contains
        ! ie ms2kgm2s  = 1.6*1.0e-3/(8.3144e-8*L%t2)
        ! ie ms2mm     = 1.6*1.0e-3/(8.3144e-8*L%t2)
 
-        Sub(iL)%EvapTransp = 0.018 *  L%vpd/101.0  * gv
+          Sub(iL)%EvapTransp = 0.018 *  L%vpd/101.0  * gv
+        end if
 
        !!L%g_sto * L%LAI  * 1.6e-3/(8.3144e-8*L%t2)   ! Evapo-transpiration
        !                 (rb_leaf/1.6 + 0.0224*(L%t2/273.0) 
 
 
-        if ( dbg .and. current_date%seconds==0 ) then 
-          call datewrite(dtxt//"VALS ", iL, [ L%LAI, L%g_sto, L%g_sun,&
-              u_hveg, Sub(iL)%cano3_ppb, Sub(iL)%FstO3, gvcms ] )
-        end if
+        if ( dbghh ) call datewrite(dtxt//"VALS ", iL, &
+            [ L%hveg,L%LAI,L%g_sto,L%g_sun,&
+              u_hveg, Sub(iL)%cano3_ppb, Sub(iL)%FstO3 ] ) ! skip gvcms
 
       end if
 

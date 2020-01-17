@@ -1,7 +1,7 @@
-! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +26,7 @@
 !*****************************************************************************!
 module MetFields_mod
 
-  use Config_module,  only : USES,USE_WRF_MET_NAMES,NPROC, PBL, meteo, startdate, TopoFile
+  use Config_module,  only : USES,NPROC, PBL, meteo, startdate, TopoFile
   use MPI_Groups_mod     , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
                                  MPI_COMM_CALC, MPI_COMM_WORLD, MPI_COMM_SUB, MPISTATUS, &
                                  IERROR, ME_MPI, NPROC_MPI, largeLIMAX,largeLJMAX, share, share_logical
@@ -1015,7 +1015,7 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
 
 
 
-if(USE_WRF_MET_NAMES)then
+if(USES%WRF_MET_NAMES)then
    WRF_MET_CORRECTIONS = .true.
    MET_C_GRID = .true.
    MET_SHORT = .false. !metfields are stored as "float"

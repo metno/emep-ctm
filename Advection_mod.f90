@@ -1,8 +1,8 @@
-! <Advection_mod.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <Advection_mod.f90 - A component of the EMEP MSC-W Eulerian
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -73,9 +73,9 @@
   use Config_module, only : KMAX_BND,KMAX_MID,NMET, step_main, nmax, &
                   dt_advec, dt_advec_inv,  PT,Pref, KCHEMTOP, &
                   NPROCX,NPROCY,NPROC, &
-                  USES,USE_uEMEP,uEMEP,ZERO_ORDER_ADVEC
+                  USES,uEMEP,ZERO_ORDER_ADVEC
   use Debug_module,       only: DEBUG_ADV
-  use Convection_mod,     only: convection_pstar,convection_Eta
+  use Convection_mod,     only: convection_Eta
   use EmisDef_mod,        only: NSECTORS, Nneighbors, loc_frac, loc_frac_1d
   use GridValues_mod,     only: GRIDWIDTH_M,xm2,xmd,xm2ji,xmdji,xm_i, Pole_Singular, &
                                 dhs1, dhs1i, dhs2i, &
@@ -499,7 +499,7 @@
                            ,dth,fac1,fluxx)
 
                       do i = li0,li1
-                         if(USE_uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_x(fluxx,i,j,k)
+                         if(USES%uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_x(fluxx,i,j,k)
 
                          dpdeta0=(dA(k)+dB(k)*ps(i,j,1))*dEta_i(k)
                          psi = dpdeta0/max(dpdeta(i,j,k),1.0)
@@ -534,7 +534,7 @@
                         ,dth,fac1,fluxy)
 
                    do j = lj0,lj1
-                      if(USE_uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_y(fluxy,i,j,k)
+                      if(USES%uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_y(fluxy,i,j,k)
 
                       dpdeta0=(dA(k)+dB(k)*ps(i,j,1))*dEta_i(k)
                       psi = dpdeta0/max(dpdeta(i,j,k),1.0)
@@ -560,7 +560,7 @@
                       !                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
                       call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
                    endif
-                   if(USE_uEMEP)then
+                   if(USES%uEMEP)then
                       call uemep_adv_k(fluxk,i,j)
                    end if
 
@@ -612,7 +612,7 @@
                         ,dth,fac1,fluxy)
 
                    do j = lj0,lj1
-                      if(USE_uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_y(fluxy,i,j,k)
+                      if(USES%uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_y(fluxy,i,j,k)
 
                       dpdeta0=(dA(k)+dB(k)*ps(i,j,1))*dEta_i(k)
                       psi = dpdeta0/max(dpdeta(i,j,k),1.0)
@@ -647,7 +647,7 @@
                            ,dth,fac1,fluxx)
 
                       do i = li0,li1
-                         if(USE_uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_x(fluxx,i,j,k)
+                         if(USES%uEMEP .and. k>KMAX_MID-uEMEP%Nvert)call uemep_adv_x(fluxx,i,j,k)
 
                          dpdeta0=(dA(k)+dB(k)*ps(i,j,1))*dEta_i(k)
                          psi = dpdeta0/max(dpdeta(i,j,k),1.0)
@@ -675,7 +675,7 @@
                       call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
                    endif
 
-                   if(USE_uEMEP)then
+                   if(USES%uEMEP)then
                       call uemep_adv_k(fluxk,i,j)
                    end if
 
@@ -706,29 +706,8 @@
 
        call CheckStop(ADVEC_TYPE/=1, "ADVEC_TYPE no longer supported")
 
-       do k=1,KMAX_MID
-          do j = lj0,lj1
-             do i = li0,li1
-                dpdeta(i,j,k) = (dA(k)+dB(k)*ps(i,j,1))*dEta_i(k)
-                xn_adv(:,i,j,k) = xn_adv(:,i,j,k)*dpdeta(i,j,k)
-             end do
-          end do
-       end do
-
-       call convection_Eta(dpdeta,dt_advec)
-       do k=1,KMAX_MID
-          do j = lj0,lj1
-             do i = li0,li1
-                psi = 1.0/max(dpdeta(i,j,k),1.0)
-                xn_adv(:,i,j,k) = xn_adv(:,i,j,k)*psi
-             end do
-          end do
-          mindpdeta = minval( dpdeta(li0:li1, lj0:lj1, k) )
-          if ( nWarnings < MAX_WARNINGS  .and.mindpdeta<1.0) then
-             call datewrite("WARNING:C dpdeta < 1",k,  (/ mindpdeta /) )
-             nWarnings = nWarnings + 1
-          end if
-       end do
+!convection uses mixing ratio units
+       call convection_Eta(dt_advec)
 
     end if
 
@@ -801,7 +780,7 @@
 
     do j = lj0,lj1
        do i = li0,li1
-          if(USE_uEMEP)call uemep_diff(i,j,ds3,ds4,ndiff)
+          if(USES%uEMEP)call uemep_diff(i,j,ds3,ds4,ndiff)
           
           call vertdiffn(xn_adv(1,i,j,1),NSPEC_ADV,LIMAX*LJMAX,1,EtaKz(i,j,1,1),ds3,ds4,ndiff)
 

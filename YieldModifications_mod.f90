@@ -1,7 +1,7 @@
-! <YieldModifications_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <YieldModifications_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -148,7 +148,62 @@
   !! C15ivoc, C13ivoc (C13 not used)
   !! Yields derived from Tsimpidi et al., ACP, 2010, p529
   !! and Robert's VBS_SOAformation
+  !! Note (July2019)! Earlier version had set VBS-parameters for Benzene and Toluene based on Hodzic et al. (2016) -- this is inconsistent with the rest of the scheme!
+  !!       It is especially problematic if including aging of the VBS-species since that is already assumed to have been included in the Hodzic VBS!
+  !!       Changing this to use the VBS-parameters from  Koo et al. 2014 (which are consistent with the Tsimpidi 2010 VBS)
    type(vbs_t), dimension(9), parameter :: vbs_T10 = [ &  ! vbs_t(&
+      vbs_t('OXYL', 106.0, 2.1, -999., 0.859, 9.2e-14,  &     ! Tsimpidi ... ARO2 -- note unusually low RO2 rate for OXYL
+          ! 0.01, 0.1,     1     10    100   1000
+          [ 0.0,  0.0, 0.002, 0.195, 0.3,   0.435 ],&  ! high
+          [ 0.0,  0.0, 0.075, 0.300, 0.375, 0.525 ])&  ! low
+     ,vbs_t('C4H10',  58.0, 1.7, -999., 0.625, 2.5e-13, &     ! Tsimpidi ... ALK4
+          [ 0.0,  0.0, 0.000, 0.038, 0.0,   0.0   ],&
+          [ 0.0,  0.0, 0.000, 0.075, 0.0  , 0.0   ])&
+     ,vbs_t('C3H6' ,  42.0, 1.7, -999., 0.52, 8.8e-13,  &     ! Tsimpidi ... OLE1
+          [ 0.0,  0.0, 0.001, 0.005, 0.038, 0.150 ],&
+          [ 0.0,  0.0, 0.005, 0.009, 0.060, 0.225 ])&
+     ,vbs_t('ISOP' ,  68.0, 2.0, -999., 0.706, 8.0e-13,  &     ! Tsimpidi ... ISOP, RO2-rate for ISOPBO2
+          [ 0.0,  0.0, 0.001, 0.023, 0.015, 0.000 ],&
+          [ 0.0,  0.0, 0.009, 0.030, 0.015, 0.0   ])&
+     ,vbs_t('APIN' , 136.0, 1.7, -999., 0.914, 3.6e-13,  &     ! Tsimpidi ... TERP, RO2-rate from MCM (weighted average of three RO2 species, from a-pinene+OH)
+          [ 0.0,  0.0, 0.012, 0.122, 0.201, 0.500 ],&
+          [ 0.0,  0.0, 0.107, 0.092, 0.359, 0.6   ]) &
+  ! Jathar et al 2010 used POA/POC = 1.4
+     ,vbs_t('C15ivoc' , 252.0, 1.4, -999., 0.914, 0.e-13,  &   !Jathar 2010 CHANGE
+          [ 0.0,  0.044, 0.071, 0.41,  0.30, 0.0 ],&   ! used same for h/l now
+          [ 0.0,  0.044, 0.071, 0.41,  0.30, 0.0 ])&
+     ,vbs_t('C13ivoc' , 218.4, 1.4, -999., 0.914, 0.e-13,  &   !Jathar 2010 CHANGE
+          [ 0.0,  0.014, 0.059, 0.22,  0.40, 0.0 ],&   ! used same for h/l now
+          [ 0.0,  0.014, 0.059, 0.22,  0.40, 0.0 ])&
+     ,vbs_t('BENZ',  78., 2.1, -999., 0.77, 8.8e-13, &     ! Koo et al. 2014, BENZ. ? Mw,fHO2..
+          [ 0.0,  0.0, 0.003, 0.165, 0.3,   0.435 ],& ! high     
+          [ 0.0,  0.0, 0.075, 0.225, 0.375, 0.525 ])& ! low
+     ,vbs_t('TOLU',  92., 2.1, -999., 0.82, 8.8e-13, &     ! Koo et al. 2014, TOL. ? Mw,fHO2..
+          [ 0.0,  0.0, 0.011, 0.257, 0.482, 0.718 ],& ! high     
+          [ 0.0,  0.0, 0.011, 0.257, 0.750, 0.468 ])] ! high
+!old Hodzic BENZ and TOL:
+!          [ 0.031, 0.011, 0.507, 0.019, 0.030, 0.142 ],&  ! high
+!          [ 0.007, 0.003, 0.270, 0.142, 0.400, 0.120 ])&  ! low 
+!     ,vbs_t('TOLU',  92., 2.1, -999., 0.82, 8.8e-13, &     ! Hodzic TOL. ? Mw,fHO2..
+!          [ 0.042, 0.123, 0.263, 0.020, 0.319, 0.329 ],&  ! high
+!          [ 0.371, 0.028, 0.207, 0.586, 0.063, 0.138 ])]  ! low 
+! Not used yet. NOTE - starts at C* 0.1 so would need -1 col
+!    ! Alkanes - only have high NOx, from Presto, Ots. No RO2, sso skip fHO2RO2
+!     ,vbs_t('C15H2' , 212.4, 1.7, -999., -999.,  &     ! Presto, 2010 Alkanes
+!          [ 0.044, 0.071, 0.41 , 0.30  ],  [ 0.044, 0.071, 0.41 , 0.30  ])]
+!          !    .1      1    10    100
+
+  !! IMPORTANT. Order must be OXYL, C4H10, C3H6, ISOP, APIN,
+  !! C15ivoc, C13ivoc (C13 not used)
+  !! Yields derived from Tsimpidi et al., ACP, 2010, p529
+  !! and Robert's VBS_SOAformation
+  !! BUT NOTE THAT THE VBS YIELDS FOR BENZENE AND TOLUENE ARE TAKEN FROM Hodzic et al. (2016)
+  !! These yields are INCONSISTENT with the other yields (incl the OXYL yield) and they
+  !! are NOT RECOMMENDED TO BE USED! They are especially problematic if aging of the VBS-SOA
+  !! is included (since the Hodzic-VBS is based on already aged SOA!
+  !! CONCLUSION: the vbs_T10old version is REALLY NOT RECOMMENDED AT ALL (only kept temporarily 
+  !! [I hope] to be able to reproduce earlier model runs.
+   type(vbs_t), dimension(9), parameter :: vbs_T10old = [ &  ! vbs_t(&
       vbs_t('OXYL', 106.0, 2.1, -999., 0.859, 9.2e-14,  &     ! Tsimpidi ... ARO2 -- note unusually low RO2 rate for OXYL
           ! 0.01, 0.1,     1     10    100   1000
           [ 0.0,  0.0, 0.002, 0.195, 0.3,   0.435 ],&  ! high
@@ -183,6 +238,7 @@
 !     ,vbs_t('C15H2' , 212.4, 1.7, -999., -999.,  &     ! Presto, 2010 Alkanes
 !          [ 0.044, 0.071, 0.41 , 0.30  ],  [ 0.044, 0.071, 0.41 , 0.30  ])]
 !          !    .1      1    10    100
+
 
   !! IMPORTANT. Order must be OXYL, C4H10, C3H6, ISOP, APIN,
   !! C15ivoc, C13ivoc (C13 not used)
@@ -277,6 +333,16 @@
             vbs(6) = vbs_HM(6)  ! IVOC
             if ( MasterProc ) then
                write(*,*) 'Using VBS-TH yield modifications' 
+            endif
+         case('VBS-T10old')
+            vbs   = vbs_T10old
+            if ( MasterProc ) then
+               write(*,*) 'Using VBS-T10old yield modifications'
+               write(*,*) 'NOTE!!! WARNING!!! This version has INCONSISTENT' 
+               write(*,*) 'and too large SOA yields for BENZENE and TOLUENE'
+               write(*,*) 'if aging of SOA is included (which it is for the' 
+               write(*,*) 'standard model version!). You are strongly recommended'
+               write(*,*) 'to use a consistent SOA-version, e.g. vbs-T10, instead!'
             endif
          case default
             call StopAll(dtxt//'Unknown YieldModifications '//YieldModifications)

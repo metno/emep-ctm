@@ -1,7 +1,7 @@
-! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -69,9 +69,7 @@ use Chemfields_mod ,      only: cfac, so2nh3_24hr,Grid_snow
 use ChemDims_mod,         only: NSPEC_ADV, NSPEC_SHL,NDRYDEP_ADV
 use ChemSpecs_mod            ! several species needed
 use Config_module,        only: dt_advec,PT, K2=> KMAX_MID, NPROC, &
-                              USES, USE_SOILNOX, &
-                              MasterProc, &
-                              PPBINV, IOU_INST,&
+                              USES, MasterProc, PPBINV, IOU_INST,&
                               KUPPER, NLANDUSEMAX
 use Debug_module,         only: DEBUG, DEBUG_ECOSYSTEMS
 use DerivedFields_mod,    only: d_2d, f_2d, VGtest_out_ix
@@ -390,7 +388,7 @@ contains
    ! Note, xn_2d has no2 in #/cm-3
  
     no2fac = 1.0
-    if ( .not. USE_SOILNOX ) then
+    if ( .not. USES%SOILNOX ) then
       no2fac = max( 1.0, xn_2d(NO2,K2) )
       no2fac = max(0.00001,  (no2fac-1.0e11)/no2fac)
     end if
@@ -398,7 +396,7 @@ contains
 
     if ( dbghh ) then
       write(*,"(a,2i4,L2,9es12.4)") dtxt//" CONCS SO2,NH3,O3,NO2 (ppb),f ", &
-       i,j, USE_SOILNOX,  xn_2d(SO2,K2)*surf_ppb, xn_2d(NH3,K2)*surf_ppb, &
+       i,j, USES%SOILNOX,  xn_2d(SO2,K2)*surf_ppb, xn_2d(NH3,K2)*surf_ppb, &
           xn_2d(O3,K2)*surf_ppb, xn_2d(NO2,K2)*surf_ppb, no2fac
     end if
 
@@ -406,7 +404,7 @@ contains
 
     call ParticleCoeffs(Grid%t2,Grid%rho_s,debug_flag=debug_flag)
 
-    call Setup_StoFlux( daynumber )
+    call Setup_StoFlux( i, j )
 
 ! - can set settling velcoty here since not landuse dependent
 
@@ -562,7 +560,7 @@ contains
            ! assuming c.p.=4 ppb (ca. 1.0e11 #/cm3):        
            ! Note, xn_2d has no2 in #/cm-3
 
-            else if ( .not. USE_SOILNOX .and.  icmp == idcmpNO2 ) then
+            else if ( .not. USES%SOILNOX .and.  icmp == idcmpNO2 ) then
 
               if( dbg .and. first_ddep .and. icmp==idcmpNO2 ) &
                   write(*,*) 'DBGXNO2 no2fac TRIGGERED', no2fac, 4.0e-11*xn_2d(NO2,K2)

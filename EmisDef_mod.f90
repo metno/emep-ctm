@@ -1,8 +1,8 @@
-! <EmisDef_mod.f90 - A component of the EMEP MSC-W Unified Eulerian
+! <EmisDef_mod.f90 - A component of the EMEP MSC-W Eulerian
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -86,7 +86,9 @@ private
          !DSHK N_HFAC  = 12  ! Number of height distribution classes defined
    integer, save, pointer, dimension(:), public :: sec2hfac_map => null()! mapping of sector to height distribution class
    integer, save, public :: & !must be compatible with: emisfrac
-          N_SPLIT  = 11  ! Number of speciation classes defined
+          N_SPLITMAX  = 30  ! Max number of speciation classes defined
+   integer,  save, public :: & !must be compatible with: emisfrac
+          N_SPLIT = 0  ! Actual number of speciation classes defined as defined in SplitDefaultFile
    integer, save, pointer, dimension(:), public :: sec2split_map => null()! mapping of sector to speciation class
 
 !SNAP specific definitions
@@ -97,7 +99,7 @@ private
    integer, save, target, dimension(NSECTORS_SNAP), public :: & ! mapping of sector to height distribution class
         SNAP_sec2hfac_map = [1,2,3,4,5,6,7,8,9,10,11] !values must be <= N_HFAC
    integer, save, target, dimension(NSECTORS_SNAP), public :: & ! mapping of sector to height distribution class
-        SNAP_sec2split_map = [1,2,3,4,5,6,7,8,9,10,11] !values must be <= N_SPECIATION
+        SNAP_sec2split_map = [1,2,3,4,5,6,7,8,9,10,11] !values must be <= N_SPLIT
 !   integer, save, dimension(NSECTORS_SNAP) ::snap2gnfr=(/1,3,2,4,13,5,6,7,10,11,-1/)
    integer, save, dimension(NSECTORS_SNAP,3), public ::snap2gnfr=reshape([1,3,2,4,13,5,6,7,10,11,-1 &
                                                           ,-1,-1,-1,-1,-1,-1,-1,8,-1,12,-1 &
@@ -112,10 +114,23 @@ private
    integer, save, target, dimension(NSECTORS_GNFR), public :: & ! mapping of sector to height distribution class
         GNFR_sec2hfac_map = [1,3,2,4,6,7,8,8,8,9,10,10,5] !values must be <= N_HFAC
    integer, save, target, dimension(NSECTORS_GNFR), public :: & ! mapping of sector to height distribution class
-        GNFR_sec2split_map = [1,3,2,4,6,7,8,8,8,9,10,10,5] !values must be <= N_SPECIATION
+        GNFR_sec2split_map = [1,3,2,4,6,7,8,8,8,9,10,10,5] !values must be <= N_SPLIT
 
-   integer, save, dimension(NSECTORS_GNFR), public ::gnfr2snap=(/1,3,2,4,6,7,8,-1,-1,9,10,-1,5/)
+   integer, save, dimension(NSECTORS_GNFR), public ::gnfr2snap=(/1,3,2,4,6,7,8,-8,-8,9,10,-10,5/)
 
+
+!GNFR_CAMS  specific definitions (used with CAMS v2.2.1 and  v3.1 emissions from November 2019)
+!GNFR A_PublicPower and F_RoadTransport are splitted into sub-sectors (14-15 and 16-19, respectively)  
+   integer, public, parameter :: &
+          NSECTORS_GNFR_CAMS  = 19    ! Number of sectors defined in CAMS v2.2.1 and v3.1 emissions
+   integer, save, target, dimension(NSECTORS_GNFR_CAMS), public :: & ! mapping of sector to time factor class
+        GNFR_CAMS_sec2tfac_map = [1,3,2,4,6,7,8,8,8,9,10,10,5,1,1,7,7,7,7] !values must be <= N_TFAC
+   integer, save, target, dimension(NSECTORS_GNFR_CAMS), public :: & ! mapping of sector to height distribution class
+        GNFR_CAMS_sec2hfac_map = [1,3,2,4,6,7,8,8,8,9,10,10,5,1,3,7,7,7,7] !values must be <= N_HFAC
+   integer, save, target, dimension(NSECTORS_GNFR_CAMS), public :: & ! mapping of sector to emission split class
+        GNFR_CAMS_sec2split_map = [1,2,3,4,5,6,7,8,9,10,11,12,13,1,1,16,17,18,19] !values must be <= N_SPLIT
+
+   
 !TEST to try own defintions
    integer, public, parameter:: &
           NSECTORS_TEST  = 11 ! Number of sectors defined. Must match the sizes of the maps below
@@ -124,7 +139,7 @@ private
         TEST_sec2tfac_map  = [1,2,3,4,5,6,7,8,9,10,11] &
       ! mapping of sector to height distribution class. vals must be <= N_HFAC
        ,TEST_sec2hfac_map  = [1,2,3,4,5,6,7,8,9,10,11] & 
-      ! mapping of sector to height distribution class ! must be<=N_SPECIATION
+      ! mapping of sector to height distribution class ! must be<=N_SPLIT
        ,TEST_sec2split_map = [1,2,3,4,5,6,7,8,9,10,11] 
 
 

@@ -1,7 +1,7 @@
-! <CellMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <CellMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -24,6 +24,8 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
+! <CellMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
+!*****************************************************************************!
 module CellMet_mod
 !=============================================================================
 !+
@@ -45,7 +47,7 @@ use MetFields_mod,     only: ps, u_ref, cc3dmax, sdepth, surface_precip, &
                             ice_nwp,fh, fl, z_mid, z_bnd, q, roa, rh2m, sst, &
                             rho_surf, th, pzpbl, t2_nwp, ustar_nwp, zen,&
                             coszen, Idirect, Idiffuse
-use Config_module,    only: KMAX_MID, KMAX_BND, PT, USE_ZREF, IOU_INST
+use Config_module,    only: KMAX_MID, KMAX_BND, PT, USES, IOU_INST
 use PhysicalConstants_mod, only: PI, CP, GRAV, KARMAN
 use SoilWater_mod,     only: fSW
 use SubMet_mod,        only: Get_SubMet, Sub
@@ -104,7 +106,7 @@ subroutine Get_CellMet(i,j,debug_flag)
 
 
   ! Have option to use a different reference ht:
-  if ( USE_ZREF ) then
+  if ( USES%ZREF ) then
     Grid%z_ref    = &
     min( 0.1*pzpbl(i,j),  z_mid(i,j,KMAX_MID) )   ! within or top of SL
   else
@@ -131,8 +133,8 @@ subroutine Get_CellMet(i,j,debug_flag)
 
   !**  prefer micromet signs and terminology here:
   Grid%Hd    = -fh(i,j,1)       ! Heat flux, *away from* surface
-if( debug_flag ) write(*,"(a,3es12.3)") 'CellHd', Grid%Hd, &
-   maxval(fh(:,:,1)), minval(fh(:,:,1))
+if( debug_flag ) write(*,"(a,3es12.3,f8.2)") 'CellHd', Grid%Hd, &
+   maxval(fh(:,:,1)), minval(fh(:,:,1)), Grid%z_mid
   Grid%LE    = -fl(i,j,1)       ! Heat flux, *away from* surface
   Grid%ustar = ustar_nwp(i,j)   !  u*
   Grid%t2    = t2_nwp(i,j,1)    ! t2 , K

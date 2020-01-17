@@ -1,7 +1,7 @@
-! <SmallUtils_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <SmallUtils_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -57,6 +57,7 @@ module SmallUtils_mod
   private :: num2str_i
   private :: num2str_r
   public :: to_upper     !> Converts string to upper case
+  public :: xcindex      !> index function which ignores case
   public :: Self_Test    !< For testing
 
   private :: find_index_c, find_index_i
@@ -243,8 +244,10 @@ function find_index_c(wanted, list, first_only, any_case, debug)  result(Index)
   wanted_copy = wanted
   list_copy   = list
   if ( present(any_case) ) then
-    wanted_copy = to_upper(wanted)
-    list_copy   = to_upper(list)
+     if(any_case)then
+        wanted_copy = to_upper(wanted)
+        list_copy   = to_upper(list)
+     endif
   end if
 
   do n = 1, size(list)
@@ -423,6 +426,11 @@ elemental Function to_upper (str) Result (string)
     end do
 
 End Function to_upper
+elemental function xcindex(str,substr) result (ind)
+ character(len=*), intent(in) :: str, substr
+ integer :: ind
+  ind = index( to_upper(str), to_upper(substr) )
+end function xcindex
 !============================================================================
 ! key2str 
 !   replace occurence(s) of keyword key on string iname by value val

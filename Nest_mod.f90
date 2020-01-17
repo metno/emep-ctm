@@ -1,7 +1,7 @@
-! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.33>
+! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2019 met.no
+!*  Copyright (C) 2007-2020 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,9 +30,8 @@ module Nest_mod
 ! The Nesting modes and related setings read from config nml:
 !  NEST_MODE_READ
 !    'NONE':      do not read (default)
-!    'NHOUR':     read every NEST_NHOURREAD
+!    'NHOUR':     read every NEST_NHOURREAD, if the files are found
 !    'START':     read at the start of run
-!    'RESTART:    read at the start of run, if the files are found
 !  NEST_MODE_SAVE
 !    'NONE':      do not write (default)
 !    'NHOUR':     write every NEST_NHOURSAVE
@@ -81,7 +80,7 @@ use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
      IOU_INST,RUNDOMAIN,USES,&
      NEST_MODE_READ,NEST_MODE_SAVE,NEST_NHOURREAD,NEST_NHOURSAVE, &
      NEST_template_read_3D,NEST_template_read_BC,NEST_template_write,&
-     NEST_template_dump,BC_DAYS,&
+     NEST_template_dump,BC_DAYS,NEST_save_append,NEST_save_overwrite,&
      NEST_native_grid_3D,NEST_native_grid_BC,NEST_omit_zero_write,NEST_out_DOMAIN,&
      NEST_MET_inner,NEST_RUNDOMAIN_inner,&
      NEST_WRITE_SPC,NEST_WRITE_GRP,NEST_OUTDATE_NDUMP,NEST_outdate,OUTDATE_NDUMP_MAX,&
@@ -116,7 +115,7 @@ private
 logical, private, save :: mydebug =  .false.
 
 character(len=TXTLEN_SHORT),private, parameter :: &
-  READ_MODES(5)=[character(len=TXTLEN_SHORT)::'NONE','RESTART','NHOUR','START','MONTH'],&
+  READ_MODES(4)=[character(len=TXTLEN_SHORT)::'NONE','NHOUR','START','MONTH'],&
   SAVE_MODES(4)=[character(len=TXTLEN_SHORT)::'NONE','NHOUR','END','MONTH']
 character(len=TXTLEN_FILE),private, save ::  &
   filename_read_3D = 'template_read_3D',& ! Overwritten in readxn and wrtxn.
@@ -327,11 +326,10 @@ subroutine readxn(indate)
 end subroutine readxn
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
-subroutine wrtxn(indate,WriteNow)
+subroutine wrtxn(indate, End_of_run)
   type(date), intent(in) :: indate
-  logical, intent(in) :: WriteNow !Do not check indate value
+  logical, intent(in) :: End_of_run! Only output if NEST_MODE_SAVE = 'END'
   real :: data(LIMAX,LJMAX,KMAX_MID) ! Data array
-  logical, parameter :: APPEND=.false.
 
   type(Deriv) :: def1 ! definition of fields
   integer :: n,i,j,k,iotyp,ndim,kmax,ncfileID
@@ -346,24 +344,28 @@ subroutine wrtxn(indate,WriteNow)
   if(NEST_MODE_SAVE=='NONE')return
 
 ! Check if the file exist already at start of run. Do not wait until first write to stop!
-! If you know what you are doing you can set paramter APPEND=.true.,
-! and the new data will be appended to the file
-  overwrite=first_call.and..not.APPEND
-  if(overwrite.and.MasterProc)then
+! If you know what you are doing you can set configuration variable NEST_save_append=T,
+! and the new data will be appended to the file, or set NEST_save_overwrite=T to skip the check
+  overwrite=MasterProc.and.first_call.and..not.NEST_save_append
+  if(overwrite.and..not.NEST_save_overwrite)then
     filename_write=date2string(NEST_template_write,indate,mode='YMDH',debug=mydebug)
-    inquire(file=fileName_write,exist=overwrite)
-    call CheckStop(overwrite.and.NEST_MODE_SAVE/='OUTDATE',&
+    inquire(file=fileName_write,exist=fexist)
+    call CheckStop(fexist,&
       "Nest: Refuse to overwrite. Remove this file: "//trim(fileName_write))
   end if
 
-  select case(NEST_MODE_SAVE)
-  case('END')
-    if(.not.WriteNow)return
-  case('MONTH')
-    if(indate%month==1.or.indate%day/=1.or.indate%hour/=0.or.indate%seconds/=0)return
-  case default
-    if(mod(indate%hour,NEST_NHOURSAVE)/=0.or.indate%seconds/=0)return
-  end select
+  if(End_of_run)then
+     if(NEST_MODE_SAVE /= 'END') return
+  else
+     select case(NEST_MODE_SAVE)
+     case('END')
+        return
+     case('MONTH')
+        if(indate%month==1.or.indate%day/=1.or.indate%hour/=0.or.indate%seconds/=0)return
+     case default
+        if(mod(indate%hour,NEST_NHOURSAVE)/=0.or.indate%seconds/=0)return
+     end select
+  endif
 
   iotyp=IOU_INST
   ndim=3 !3-dimensional
@@ -385,7 +387,7 @@ subroutine wrtxn(indate,WriteNow)
     write(*,*)'Nest:write data ',trim(fileName_write)
   end if
   CALL MPI_BCAST(fexist,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
-  overwrite=fexist.and.first_call.and..not.APPEND
+  overwrite=fexist.and.first_call.and.(NEST_save_overwrite.or..not.NEST_save_append)
 
 ! Limit output, e.g. for NMC statistics (3DVar and restriction to inner grid BC)
   if(first_call)then
@@ -510,7 +512,6 @@ end subroutine wrtxn
 subroutine Dump(indate)
   type(date), intent(in) :: indate
   real :: data(LIMAX,LJMAX,KMAX_MID) ! Data array
-  logical, parameter :: APPEND=.false.
 
   type(Deriv) :: def1 ! definition of fields
   integer :: n,i,j,k,iotyp,ndim,kmax,ncfileID
