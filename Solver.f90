@@ -305,16 +305,18 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 
 ! - put special cases here:
 
-!/ ** For small scales
-   if(dt_advec<620.0) nchem = NUM_INITCHEM +int((dt_advec- dt_init) / DT_INITCHEM )
-
-!/ Used for >21km resolution and dt_advec>520 seconds:
+!/ ** Use less iterations for small scales
+   if(dt_advec<620.0)then
+      nchem = NUM_INITCHEM +int((dt_advec- dt_init) / (5*DT_INITCHEM) )
+      nchem = max(NUM_INITCHEM + 1, nchem)
+   end if
 !.. timesteps from 6 to nchem
-
    if( nchem > NUM_INITCHEM )dt=(dt_advec - dt_init )/(nchem-NUM_INITCHEM)
 
+!  timesteps for init iterations
    dt(1:NUM_INITCHEM)=DT_INITCHEM     !.. first five timesteps
 
+!  For really fine scales, use constant dt, smaller than DT_INITCHEM
    if(dt_advec<= dt_init )then
       nchem=int(dt_advec/DT_INITCHEM)+1
       dt=(dt_advec)/(nchem)
