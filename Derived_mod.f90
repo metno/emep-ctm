@@ -916,6 +916,7 @@ subroutine Setups()
   !
   !--------------------------------------------------------
   !====================================================================
+    nvoc = 0
     do n = 1, NSPEC_ADV
       if(species( NSPEC_SHL+n )%carbons > 0 .and. &
          species( NSPEC_SHL+n )%name   /= "CO"  .and. &

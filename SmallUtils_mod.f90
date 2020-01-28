@@ -240,7 +240,7 @@ function find_index_c(wanted, list, first_only, any_case, debug)  result(Index)
   n_match  = 0
   Index =  NOT_FOUND
   debug_print=.false.;if(present(debug))debug_print=debug
-  OnlyFirst=.false.;if(present(first_only))OnlyFirst=first_only
+  OnlyFirst=.true.;if(present(first_only))OnlyFirst=first_only
   wanted_copy = wanted
   list_copy   = list
   if ( present(any_case) ) then
@@ -287,7 +287,7 @@ function find_index_i(wanted, list, first_only, debug)  result(Index)
   n_match  = 0
   Index =  NOT_FOUND
   debug_print=.false.;if(present(debug))debug_print=debug
-  OnlyFirst=.false.;if(present(first_only))OnlyFirst=first_only
+  OnlyFirst=.true.;if(present(first_only))OnlyFirst=first_only
 
   do n = 1, size(list)
     if ( wanted == list(n)  ) then

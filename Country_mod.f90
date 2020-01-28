@@ -533,8 +533,8 @@ integer, public :: IC_OCEC  ! Oceania
   integer :: iland,ix
 
   ! First define all countries as undefined
-  do iland=1,NLAND
-    Country(iland) = cc(  "N/A" ,'-', iland ,F,  17 , 17 , -100  , "Not_defined                   " )
+  do iland=1,MAXNLAND
+    Country(iland) = cc(  "N/A" ,'-', 67 ,F,  67, 67, -100  , "Not_defined                   " )
   end do
 
 !The value of IC_XX is the index in Country array. Can in principle change between two runs or versions.

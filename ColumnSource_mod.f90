@@ -342,7 +342,7 @@ function getModLev(i,j,height) result(k)
   integer :: k
   k=KMAX_MID
   if(height<=0.0)return
-  do while(k>0.and.height>z_bnd(i,j,k))
+  do while(k>1.and.height>z_bnd(i,j,k))
     k=k-1
   end do
 end function getModLev
