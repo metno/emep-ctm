@@ -3515,7 +3515,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                  if(ig<0.5 .or. ig>dims(1))then
                     !try to come from the other side
                     !check first that it covers all latitudes
-                    if(abs(Rlon(dims(1))-Rlon(1))<0.1+1/dRloni)then
+                    if(abs(Rlon(dims(1))-Rlon(1))<0.1+1/dRloni .or. abs(Rlon(dims(1))-Rlon(1)-360.0)<0.1+1/dRloni)then
                        if(ig<0.5)ig=ig+dims(1)
                        if(ig>dims(1))ig=ig-dims(1)
                     endif

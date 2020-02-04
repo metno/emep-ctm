@@ -92,7 +92,7 @@ use GridValues_mod,     only: glat, xm_i, xm_j, xm2         &
        ,debug_proc, debug_li, debug_lj, A_mid, B_mid          &
        ,Eta_bnd,Eta_mid,dA,dB,A_mid,B_mid,A_bnd,B_bnd         &
        ,KMAX_MET,External_Levels_Def,k1_met,k2_met,x_k1_met,rot_angle&
-       ,Meteo_Get_KMAXMET,remake_vertical_levels_interpolation_coeff
+       ,Read_KMAX,remake_vertical_levels_interpolation_coeff
 
 use Io_mod ,            only: ios, datewrite, PrintLog, IO_LOG
 use Landuse_mod,        only: water_fraction, water_frac_set, &
@@ -403,7 +403,7 @@ subroutine MeteoRead()
     meteoname = date2string(meteo,next_inptime,mode='YMDH')
 
     !check if the number of vertical levels has changed
-    call Meteo_Get_KMAXMET(meteoname,kmax)
+    call Read_KMAX(meteoname,kmax)
 
     if(kmax/=KMAX_MET)then
        if(me==0)write(*,*)'WARNING: number of vertical levels in meteo file has changed from ',KMAX_MET,' to ', KMAX

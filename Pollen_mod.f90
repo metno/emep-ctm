@@ -54,7 +54,7 @@ use Config_module,         only: KMAX_MID, DataDir, &
                                  dt=>dt_advec, &
                                  outdate=>NEST_OUTDATE,OUTDATE_NDUMP=>NEST_OUTDATE_NDUMP,&
                                  out_DOMAIN=>NEST_out_DOMAIN,&
-                                 MODE_READ=>NEST_MODE_READ,MODE_SAVE=>NEST_MODE_SAVE,&
+                                 MODE_READ=>NEST_MODE_READ,&
                                  template_read_IC=>NEST_template_read_3D,&
                                  template_write_IC=>NEST_template_write
 use MPI_Groups_mod,        only: MPI_INTEGER,MPI_LOGICAL,MPI_COMM_CALC,&
@@ -946,7 +946,6 @@ subroutine pollen_dump()
   type(Deriv) :: def1
   real,allocatable, dimension(:,:,:) :: data ! Data arrays
 
-  if(MODE_SAVE/='OUTDATE') return
   if(.not.checkdates(daynumber,"pollen")) return
   if(.not.compare_date(OUTDATE_NDUMP,current_date,&
                        outdate(:OUTDATE_NDUMP),wildcard=-1))return

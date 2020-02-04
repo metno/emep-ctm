@@ -109,7 +109,7 @@ public :: GridRead
 public :: extendarea_N ! returns array which includes neighbours from other subdomains
 public :: set_EuropeanAndGlobal_Config
 public :: remake_vertical_levels_interpolation_coeff
-public :: Meteo_Get_KMAXMET
+public :: Read_KMAX
 
 private :: Alloc_GridFields
 private :: GetFullDomainSize
@@ -1976,7 +1976,7 @@ subroutine make_vertical_levels_interpolation_coeff
 
 end subroutine make_vertical_levels_interpolation_coeff
 
-subroutine Meteo_Get_KMAXMET(filename, KMAX, ncfileID_in)
+subroutine Read_KMAX(filename, KMAX, ncfileID_in)
 
   character(len=*), intent(in)  :: filename 
   integer, intent(out)  :: KMAX
@@ -1998,16 +1998,19 @@ subroutine Meteo_Get_KMAXMET(filename, KMAX, ncfileID_in)
      status=nf90_inq_dimid(ncid=ncFileID, name="lev", dimID=kdimID)!hybrid coordinates                                               
      if(status/=nf90_noerr) then
         status=nf90_inq_dimid(ncid=ncFileID, name="hybrid", dimID=kdimID)!hybrid coordinates                                         
-        if(status/=nf90_noerr) then ! WRF format                                                                                     
+        if(status/=nf90_noerr) then ! nesting cwf-cifs_XXX_raqbcformat
+           status=nf90_inq_dimid(ncid=ncFileID, name="level", dimID=kdimID)                                       
+           if(status/=nf90_noerr) then ! WRF format                                                                                     
            call check(nf90_inq_dimid(ncid=ncFileID, name="bottom_top", dimID=kdimID))
            end if
+        end if
      end if
   end if
   call check(nf90_inquire_dimension(ncid=ncFileID,dimID=kdimID,len=KMAX))
 
   if(.not.present(ncfileID_in))call check(nf90_close(ncFileID))  
 
-end subroutine Meteo_Get_KMAXMET
+end subroutine Read_KMAX
 
 subroutine remake_vertical_levels_interpolation_coeff(filename)
   ! make again interpolation coefficients to convert the levels defined in meteo
@@ -2033,7 +2036,7 @@ subroutine remake_vertical_levels_interpolation_coeff(filename)
     deallocate(A_bnd_met,B_bnd_met)
   end if
 
-  call Meteo_Get_KMAXMET(filename, KMAX_MET, ncfileID)
+  call Read_KMAX(filename, KMAX_MET, ncfileID)
 
   status=nf90_inq_varid(ncid=ncFileID, name="k", varID=varID)
   if(status/=nf90_noerr)then

@@ -83,7 +83,7 @@ module GasParticleCoeffs_mod
  !OLD DH2O    = 21.0e-6 &! comp old  m2/s at STP, Massman
 
   integer, public, parameter ::&
-        NDRYDEP_GASES = 14+66  &! no. of gases in Wesely tables, DDdefs below
+        NDRYDEP_GASES = 14+67  &! no. of gases in Wesely tables, DDdefs below
        ,NDRYDEP_AERO  = 14     &! no. of particles in DDdefs below
        ,NDRYDEP_DEF   = NDRYDEP_GASES + NDRYDEP_AERO ! gases + aerosol defs
      !mafor ,NDRYDEP_DEF   = 17      ! gases + aerosol defs ! MSK 26.01.2015 start
@@ -172,11 +172,11 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'HO2NO2 ',DH2O/2.1, 2.1, 6.0E4, 9999, 1.0E+04, 1.0, 0., -1,-1,-1,-1)&
  ,DD_t( 'C3H7OOH',DH2O/2.7, 2.7, 8.3E+01, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)& 
  ,DD_t( 'ACETOL', DH2O/2.6, 2.6, 8.0e3, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)& 
- ,DD_t( 'MDNO3OH', DH2O/3.7, 3.7, 5.0e4, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! rather low soluble (H* ca 0.7 - 1.7e4 M/atm) organic nitrates (mixed group)
- ,DD_t( 'C5DICARB', DH2O/3.1, 3.1, 6.E+05, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)& ! perhaps f=0.1?
+ ,DD_t( 'MDNO3OH', DH2O/3.7, 3.7, 5.0e4, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! intermediate solubility (H* ca 4 - 8e4 M/atm) organic nitrates (mixed group)
+ ,DD_t( 'C5DICARB', DH2O/3.1, 3.1, 6.E+05, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)& ! perhaps f=0.1? C5DICARB should probably be combined with DICARB!
  ,DD_t( 'MDSOLOOH',DH2O/3.3 , 3.3, 1.1E+05, 9999, 1.0E+04, 0.2, 0., -1,-1,-1,-1)& ! from CRI version
  ,DD_t( 'GLYOX', DH2O/2.1, 2.1, 3.0e5, 9999, 1.0E+04, 0., 0.,-1,-1,-1,-1)& !
- ,DD_t( 'DICARB', DH2O/3.0, 3.0, 2.3e5, 9999,  1.0E+04, 0., 0., -1,-1,-1,-1)& ! DICARB - mixture of C4 and C5 dicarbonyls + UCARB12 (which is not a dicarbonyl but with similar estimated D and H*
+ ,DD_t( 'DICARB', DH2O/3.0, 3.0, 2.e5, 9999,  1.0E+04, 0.05, 0., -1,-1,-1,-1)& ! DICARB - mixture of C4 and C5 dicarbonyls + UCARB12 (which is not a dicarbonyl but with similar estimated D and H*
  ,DD_t( 'MEOOH', DH2O/1.9, 1.9, 3.0e2, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! Methyl hydroperoxide - maybe reactivity should be higher!
  ,DD_t( 'SHISOLOOH', DH2O/2.9, 2.9, 1.2e6, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! Small (C2-C5) High solubility (estimated H* ca 1 - 1.4e6 M/atm) multifunctional organic hydroperoxides
  ,DD_t( 'LHISOLOOH', DH2O/4.3, 4.3, 1.6e6, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& ! Large (C7-C10) High solubility (estimated H* ca 1.6e6 M/atm) multifunctional organic hydroperoxides
@@ -205,7 +205,7 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'HYPERACET', DH2O/2.8, 2.8, 3.1e4, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)& !
  ,DD_t( 'VLSOLNO3', DH2O/3.2, 3.2, 1.0e0, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! very low solubility (H* < ca 1e3 M/atm) organic nitrates (mixed group)
  ,DD_t( 'HOCH2CHO', DH2O/2.2, 2.2, 4.1e4, 9999, 1.0E+04, 0., 0.,-1,-1,-1,-1)& !glycolaldehyde
- ,DD_t( 'CARB12', DH2O/3.1, 3.1, 3.4e4, 9999, 1.0E+04, 0., 0.,-1,-1,-1,-1)& ! moderately soluble carbonyls (mixed) with estimated H* ca 3.0 - 3.8E4 M/atm
+ ,DD_t( 'CARB12', DH2O/3.1, 3.1, 3.4e4, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)& ! moderately soluble carbonyls (mixed) with estimated H* ca 3.0 - 3.8E4 M/atm
  ,DD_t( 'CH3CO2H', DH2O/2.0, 2.0, 7.0e5, 9999,  1.0E+04, 0, 0.,-1,-1,-1,-1)& !acetic acid
  ,DD_t( 'HCOCO3H', DH2O/2.6, 2.6, 3.2e6, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
  ,DD_t( 'CH3NO3', DH2O/2.3, 2.3, 2.0e0, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& !methyl nitrate (and ethyl nitrate)
@@ -221,7 +221,8 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'C10NO3OOH', DH2O/4.8, 4.8, 2.2e4, 9999, 1.0E+04, 0.3, 0.,-1,-1,-1,-1)& ! moderately soluble C10-organic nitrates with a hydro peroxide group
  ,DD_t( 'C10PAN2', DH2O/4.8, 4.8, 5.2e3, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
  ,DD_t( 'C96OOH', DH2O/4.3, 4.3, 9.0e4, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
- ,DD_t( 'CO23C4CHO', DH2O/3.2, 3.2, 5.5e6, 9999, 1.0E+04, 0, 0.,-1,-1,-1,-1)&
+ ,DD_t( 'CO23C4CHO', DH2O/3.2, 3.2, 5.5e6, 9999, 1.0E+04, 0, 0.,-1,-1,-1,-1)& ! perhaps combine and replace this by TRICARB?
+ ,DD_t( 'TRICARB', DH2O/3., 3., 1.e6, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)&
  ,DD_t( 'NOPINAOOH', DH2O/4.2, 4.2, 1.8e5, 9999, 1.0E+04, 0.2, 0.,-1,-1,-1,-1)&
  ,DD_t( 'ANHY', DH2O/2.9, 2.9, 2.5e2, 9999, 1.0E+04, 1.0, 0.,-1,-1,-1,-1)& ! Maleic anhydride (2,5-furandione)
  ,DD_t( 'MACROH', DH2O/3.1, 3.1, 1.5e3, 9999, 1.0E+04, 0.05, 0.,-1,-1,-1,-1)&
@@ -273,7 +274,7 @@ type, private :: WD_t
   real :: W_sub
 end type WD_t
 
-integer, parameter :: NWETDEP_DEF = 22+1
+integer, parameter :: NWETDEP_DEF = 22+2
 type(WD_t), public, dimension(NWETDEP_DEF),parameter :: WDdefs = [ &
   WD_t('SO2'  , 0.3,  0.15)  &! Berge+Jakobsen
  ,WD_t('SO4'  , 1.0,  EFF25) &! Berge+Jakobsen
@@ -298,6 +299,7 @@ type(WD_t), public, dimension(NWETDEP_DEF),parameter :: WDdefs = [ &
  ,WD_t('0p6' , 0.6, 0.18) &!
  ,WD_t('0p7' , 0.7, 0.21) &!
  ,WD_t('0p8' , 0.8, 0.24) &! 
+ ,WD_t('1p1' , 1.1, 0.33) &!
  ,WD_t('1p2' , 1.2, 0.36) &!
  ,WD_t('1p3' , 1.3, 0.39) &!
 ]

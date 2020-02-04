@@ -71,7 +71,8 @@ use CheckStop_mod,           only: CheckStop,check=>CheckNC
 use Chemfields_mod,          only: xn_adv    ! emep model concs.
 use ChemDims_mod,            only: NSPEC_ADV, NSPEC_SHL
 use ChemSpecs_mod,           only: species_adv
-use GridValues_mod,          only: A_mid,B_mid, glon,glat, i_fdom,j_fdom, RestrictDomain
+use GridValues_mod,          only: A_mid,B_mid, glon, glat, i_fdom, j_fdom, &
+     RestrictDomain, Read_KMAX
 use Io_mod,                  only: open_file,IO_TMP,PrintLog
 use InterpolationRoutines_mod,  only : grid2grid_coeff,point2grid_coeff
 use MetFields_mod,           only: roa
@@ -1425,7 +1426,8 @@ subroutine read_newdata_LATERAL(ndays_indate)
   character (len=80) ::units
   real :: scale_factor,add_offset
   logical :: time_exists,divbyroa
-
+  integer ::KMAX_nest
+  
   KMAX_BC=KMAX_MID
   if(mydebug)write(*,*)'Nest: read_newdata_LATERAL, first?', first_call
   if(first_call)then
@@ -1480,6 +1482,17 @@ subroutine read_newdata_LATERAL(ndays_indate)
     rtime_saved(2)=-99.0!just to put a value
     if(mydebug)write(*,*)'Nest: end initializations 2D'
 
+  else
+     !not first call
+     call Read_KMAX(filename_read_BC, KMAX_nest)
+     if(KMAX_nest /= KMAX_ext_BC)then
+        if(MasterProc)write(*,*)'WARNING: the number of vertical levels has changed in NEST_BC file!'
+        if(MasterProc)write(*,*)'WARNING: reinitializing nesting'
+        call init_nest(ndays_indate,filename_read_BC,NEST_native_grid_BC,&
+                   IIij,JJij,Weight,k1_ext,k2_ext,weight_k1,weight_k2,&
+                   N_ext_BC,KMAX_ext_BC,GIMAX_ext,GJMAX_ext)
+        
+     endif
   end if
 
   rtime_saved(1)=rtime_saved(2) ! put old values in 1

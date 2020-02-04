@@ -121,11 +121,13 @@ subroutine set_extbic_id(idate)
       EXTERNAL_BIC_VERSION='IFS_MOZ_fkya'
     case(2014030100:2014091723)  ! 2014-03-01 00:00 to 2014-09-17 23:00 (avail. 2012-09-04)
       EXTERNAL_BIC_VERSION='IFS_MOZ_fnyp'
-    case(2014091800:)            ! from 2014-09-18 00:00
+    case(2014091800:2019120123)  ! 2014-09-18 00:00 to 2019-12-31 23:00
       EXTERNAL_BIC_VERSION='IFS_CMP_g4e2'
+    case(2020010100:)            ! from 2020-01-01 00:00
+      EXTERNAL_BIC_VERSION='IFS_CMP_46r1'
     end select
     BC_DAYS=5   ! if BC file is not found, look for 1..5-day old files
-  case("IFS_MOZ_f7kn","IFS_MOZ_fkya","IFS_MOZ_fnyp","IFS_CMP_g4e2") 
+  case("IFS_MOZ_f7kn","IFS_MOZ_fkya","IFS_MOZ_fnyp","IFS_CMP_g4e2","IFS_CMP_46r1")
     BC_DAYS=5   ! explicit MACC_ENS BC mapping version
   case("MACC_EVA","REANALYSIS")  ! GRG & AER    
     select case (idate(1))
