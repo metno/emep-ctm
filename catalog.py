@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Open Source EMEP/MSC-W model
@@ -13,9 +13,9 @@ import tarfile
 import shutil
 
 _CONST = {
-    'VERSION':"0.1.3",                          # script version
-    'RELEASE':['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
-               'rv4_10','rv4_15','rv4_17','rv4_32','rv4_33'],     # released model versions
+    'VERSION':"0.1.4",                          # script version
+    'RELEASE': ['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
+               'rv4_10','rv4_15','rv4_17','rv4_32','rv4_33', 'rv4_34'],     # released model versions
     'METYEAR':[2005, 2008] + [year for year in range(2010, 2015+1)],   # released met-years
     'THREDDS':'http://thredds.met.no/thredds/fileServer/data/EMEP',
     'FTP':'ftp://ftp.met.no/projects/emep/OpenSource',
