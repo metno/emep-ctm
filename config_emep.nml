@@ -2,17 +2,16 @@
   GRID      = 'EECCA',
   iyr_trend = 2015,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2019',
+  runlabel2 = 'Opensource_Setup_2020',
   startdate = 2015,01,01,00,
   enddate   = 2015,12,31,24,
 !------------------------------
   DataPath(1) = '../input',
+  EXP_NAME    = 'EMEPSTD',
 !------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
   EmisHeightsFile       = 'DataDir/EmisHeights.txt',
-  SplitDefaultFile      = 'DataDir/emissplit.defaults.POLL',
-  SplitSpecialsFile     = 'DataDir/emissplit.specials.POLL',
   MonthlyFacFile        = 'DataDir/MonthlyFac.POLL',
   DailyFacFile          = 'DataDir/DailyFac.POLL',
   HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
@@ -22,7 +21,12 @@
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
 !------------------------------
-  EXP_NAME              = 'EMEPSTD',
+  ZCMDIR                     = 'DataDir/ZCM_EmChem19',
+  SplitDefaultFile           = 'ZCMDIR/emissplit.defaults.POLL',
+  SplitSpecialsFile          = 'ZCMDIR/emissplit.specials.POLL',
+  cmxbicDefaultFile          = 'ZCMDIR/CMX_BoundaryConditions.txt',
+  cmxBiomassBurning_FINNv1p5 = 'ZCMDIR/CMX_BiomassBurning_FINNv1p5.txt',
+  cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1.txt',
 !------------------------------
   EmBio%GlobBvocMethod  = 'GLC-CLM', ! default for GLOBAL runs, not used for Europe
   EmBio%CLF             =  0.59,     ! 1/1.7 for CLM
