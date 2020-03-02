@@ -5,7 +5,6 @@ Open Source EMEP/MSC-W model
 simplified access to the source code, input data and benchmark results.
 """
 
-from __future__ import print_function
 import os
 import sys
 import hashlib
@@ -88,10 +87,10 @@ Examples:
                      help="get other input")
     group.add_option("-o", "--output", const="output",
                      action="append_const", dest="data",
-                     help="get model benckmark")
+                     help="get model benchmark")
     group.add_option("-s", "--source", const="source",
                      action="append_const", dest="data",
-                     help="get source code for benckmark")
+                     help="get source code for benchmark")
     group.add_option("-d", "--docs", const="docs",
                      action="append_const", dest="data",
                      help="get corresponding user guide")
@@ -136,7 +135,7 @@ def user_consent(question, ask=True, default='yes'):
     try:
         question = qq[default.lower()]%question
     except KeyError:
-        print("Unsuported option: user_consent(..,default='%s')"%default)
+        print("Unsupported option: user_consent(..,default='%s')"%default)
 
     # valid answers
     answer = {'y':True, 'yes':True, 'n':False, 'no':False}
@@ -146,13 +145,11 @@ def user_consent(question, ask=True, default='yes'):
         if not ask:                     # take the default
             print(question+default)
             data = default
-        elif sys.version_info[0] > 2:   # Python3.x
+        else:
             data = input(question)
-        else:                           # Python2.x
-            data = raw_input(question)
 
         # use default when user replies ''
-        data = len(data) and data.lower() or default.lower()
+        data = data.lower() if len(data) else default.lower()
         if data in answer:
             return answer[data]
 
@@ -225,10 +222,10 @@ class DataPoint(object):
         kwargs = _CONST
         kwargs.update(dict(REL=self.release, KEY=self.key,
                            YEAR=self.year, MOD=self.model))
-        self.tag = self.tag.format(**kwargs)
+        self.tag = self.tag.format_map(kwargs)
         kwargs.update(dict(TAG=self.tag))
-        self.src = self.src.format(**kwargs)
-        self.dst = self.dst.format(**kwargs)
+        self.src = self.src.format_map(kwargs)
+        self.dst = self.dst.format_map(kwargs)
         if os.path.basename(self.dst) == '':
             self.dst += os.path.basename(self.src)
 
@@ -238,7 +235,7 @@ class DataPoint(object):
         return "%6s %s"%(file_size(self.size), os.path.basename(self.dst))
 
     def __hash__(self):
-        '''find unique self.src occurences'''
+        '''find unique self.src occurrences'''
         return hash(repr(self.src))
     def __eq__(self, other):
         if isinstance(other, DataPoint):
@@ -261,13 +258,13 @@ class DataPoint(object):
             if dname != '':
                 os.rmdir(dname)
         except OSError as error:
-            if error.errno == 1:  # opperation not permited (permissions?)
+            if error.errno == 1:  # opperation not permitted (permissions?)
                 pass
-            if error.errno == 39: # directory was not empty
+            elif error.errno == 39: # directory was not empty
                 pass
             else:
-                print(error)
-                raise
+                raise error
+                
 
     def check(self, verbose=True, cleanup=False):
         """Check download against md5sum"""
@@ -287,10 +284,7 @@ class DataPoint(object):
 
     def download(self, verbose=True):
         """derived from http://stackoverflow.com/a/22776/2576368"""
-        if sys.version_info[0] > 2: # Python3.x
-            from urllib.request import urlopen
-        else:                       # Python2.x
-            from urllib2 import urlopen
+        from urllib.request import urlopen
         # check if file exists/md5sum, remove file if fail md5sum
         if self.check(verbose > 2, cleanup=True):
             return
@@ -369,12 +363,12 @@ class DataSet(object):
         if byteSize:
             self.size = float(byteSize) or 0
         else:
-            self.size = sum([x.size for _, x in self.dataset.items() if hasattr(x, "size")])
+            self.size = sum([x.size for x in self.dataset.values() if hasattr(x, "size")])
 
     def __str__(self):
         return "%-8s (meteo:%s, status:%s)"%(self.tag, self.year, self.status)
     def __repr__(self):
-        return "%s: %s"%(self, dict((k, str(v)) for k, v in self.dataset.items() if v))
+        return "%s: %s"%(self, {k: str(v) for k, v in self.dataset.items() if v})
 #       return "%s: %s"%(self,self.dataset)
 
 def read_catalog(filename, verbose=1):
@@ -465,13 +459,13 @@ def main(opts):
                 print("  Found %s"%x)
         return dataset
     def get_downloads(catalog, attr, target):
-        """List donwloads for tag|status|year DataSet"""
+        """List downloads for tag|status|year DataSet"""
         downloads = []
         if opts.verbose > 1:
             print("Searching datasets:%s"%(opts.data))
         for ds in get_datasets(catalog, attr, target):
             try:
-                ds = dict((key,ds.dataset[key]) for key in opts.data)
+                ds = {key: ds.dataset[key] for key in opts.data}
                 # only download meteo with matching --met-domain option
                 if 'meteo' in ds and opts.domain:
                     ds['meteo'] = [ x for x in ds['meteo'] if x.model == opts.domain ]
