@@ -16,7 +16,7 @@ _CONST = {
     'RELEASE': ['rv3', 'v201106', 'rv4_0', 'rv4_3', 'rv4_4', 'rv4_5', 'rv4_8',
                'rv4_10','rv4_15','rv4_17','rv4_32','rv4_33', 'rv4_34'],     # released model versions
     'METYEAR':[2005, 2008] + [year for year in range(2010, 2015+1)],   # released met-years
-    'THREDDS':'http://thredds.met.no/thredds/fileServer/data/EMEP/OpenSource',
+    'THREDDS':'https://thredds.met.no/thredds/fileServer/data/EMEP/OpenSource',
     'FTP':'ftp://ftp.met.no/projects/emep/OpenSource',
     'GIT':'https://github.com/metno/emep-ctm/',
     'DOC':'https://emep-ctm.readthedocs.io/',
@@ -284,7 +284,7 @@ class DataPoint(object):
 
     def download(self, verbose=True):
         """derived from http://stackoverflow.com/a/22776/2576368"""
-        from urllib.request import urlopen
+        from urllib.request import urlopen, HTTPError
         # check if file exists/md5sum, remove file if fail md5sum
         if self.check(verbose > 2, cleanup=True):
             return
@@ -296,7 +296,11 @@ class DataPoint(object):
         if (not os.path.isdir(dname))and(dname != ''):
             os.makedirs(dname)
 
-        url = urlopen(self.src)
+        try:
+            url = urlopen(self.src)
+        except HTTPError:
+            print("Could not download %s"%self.src)
+            sys.exit(-1)
         with open(self.dst, 'wb') as outfile:
             block = 1024*8          #   8K
             big_file = self.size > 1024*1024*128 # 128M
