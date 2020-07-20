@@ -167,6 +167,23 @@ selected output parameters, see provided output NetCDF files, or
 .. _`sec-sitesonde`:
 
 
+Emission outputs
+----------------
+
+``Emis_mgm2_XX`` fields in the output, give all emissions used by the model (accumulated over the relevant period). ``Sec_Emis_mgm2_XX`` are "sector emissions", i.e. includes only contributions from the files defined in emis_inputlist and Emis_sourceFiles. ``Sec_Emis_mgm2_XX`` do not include emissions such as volcanoes, forest fires, DMS, lightning, aircraft etc.
+
+Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
+
+.. code-block:: fortran
+
+  SecEmisOutWanted(2) = T,
+  SecEmisOutWanted(7) = T,
+
+will give you the emissions for sector 2 and 7 for all components.
+
+To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=.true.`` must be set in ``Config_module.f90``, and the code recompiled. (This parameter cannot be set in ``config_emep.nml`` for now)
+
+
 Add your own fields
 -------------------
 
@@ -204,23 +221,6 @@ and the values of the field must be put into the d_2d or d_3d array, using this 
     if(photo_out_ix>0) d_3d(photo_out_ix,i,j,1:num_lev3d,IOU_INST) = rcphot(IDNO2,lev3d(1:num_lev3d))
 
 (for 2D output, write in d_2d and ommit the vertical index)
-
-
-Other outputs
--------------
-
-``Emis_mgm2_XX`` fields in the output, give all emissions used by the model (accumulated over the relevant period). ``Sec_Emis_mgm2_XX`` are "sector emissions", i.e. includes only contributions from the files defined in emis_inputlist and Emis_sourceFiles. ``Sec_Emis_mgm2_XX`` do not include emissions such as volcanoes, forest fires, DMS, lightning, aircraft etc.
-
-Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
-
-.. code-block:: fortran
-
-  SecEmisOutWanted(2) = T,
-  SecEmisOutWanted(7) = T,
-
-will give you the emissions for sector 2 and 7 for all components.
-
-To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=.true.`` must be set in ``Config_module.f90``, and the code recompiled. (This parameter cannot be set in ``config_emep.nml`` for now)
 
 
 
