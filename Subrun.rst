@@ -577,7 +577,7 @@ List of file attributes (default in parenthesis):
     A large value will force the code to subdivide each emission gridcell in large number of pieces,
     that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
   - periodicity (‘time’) How often the values are updated.
-    Can be ‘yearly’, ‘Monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record.
+    Can be ‘yearly’, ‘monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record.
     The timestamp must correspond to the end of the time period of validity.
     For ‘yearly’ monthly timefactors are applied, if a sector is defined.
     For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
