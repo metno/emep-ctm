@@ -172,6 +172,12 @@ Emission outputs
 
 ``Emis_mgm2_XX`` fields in the output, give all emissions used by the model (accumulated over the relevant period). ``Sec_Emis_mgm2_XX`` are "sector emissions", i.e. includes only contributions from the files defined in emis_inputlist and Emis_sourceFiles. ``Sec_Emis_mgm2_XX`` do not include emissions such as volcanoes, forest fires, DMS, lightning, aircraft etc.
 
+For hourly outputs of emissions set 
+
+.. code-block:: fortran
+
+  HourlyEmisOut = T,
+
 Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
 
 .. code-block:: fortran
