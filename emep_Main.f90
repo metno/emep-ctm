@@ -1,4 +1,4 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -94,7 +94,7 @@ program emep_Main
   use TimeDate_ExtraUtil_mod,only : date2string, assign_startandenddate,&
                                     date_is_reached
   use Trajectory_mod,    only: trajectory_init,trajectory_in
-  use uEMEP_mod,         only: init_uEMEP, NTIMING_uEMEP
+  use LocalFractions_mod,         only: lf_init, NTIMING_lf
   !--------------------------------------------------------------------
   !
   !  Variables. There are too many to list here. Still, here are a
@@ -166,7 +166,7 @@ program emep_Main
   end if
 
   !*** Timing ********
-  call Init_timing(NTIMING_UNIMOD+NTIMING_3DVAR+NTIMING_uEMEP)
+  call Init_timing(NTIMING_UNIMOD+NTIMING_3DVAR+NTIMING_lf)
   call Code_Timer(tim_before0)
   tim_before = tim_before0
 
@@ -213,6 +213,7 @@ program emep_Main
 
   call Add_2timing(2,tim_after,tim_before,"Meteo read first record")
 
+
   if (MasterProc.and.DEBUG%MAINCODE) print *,"Calling emissions with year",yyyy
 
   call Init_masks()
@@ -221,8 +222,8 @@ program emep_Main
 
   call Add_2timing(3,tim_after,tim_before,"Yearly emissions read in")
 
-  if(USES%uEMEP) call init_uEMEP
-
+  if(USES%LocalFractions) call lf_init
+  
   call MetModel_LandUse(1)   !
 
   call Init_EcoSystems()     ! Defines ecosystem-groups for dep output

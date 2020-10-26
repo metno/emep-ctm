@@ -20,6 +20,7 @@
   TopoFile              = 'DataDir/topoGRID.nc'
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
+  Vertical_levelsFile   = 'DataDir/Vertical_levels20_EC.txt'
 !------------------------------
   ZCMDIR                     = 'DataDir/ZCM_EmChem19',
   SplitDefaultFile           = 'ZCMDIR/emissplit.defaults.POLL',

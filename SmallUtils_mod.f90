@@ -1,4 +1,4 @@
-! <SmallUtils_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <SmallUtils_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -111,6 +111,8 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
                keep_empty   ! keep empty strings on request
   integer   :: i, is, iw
   character(len=1) ::  c,s(0:3)
+  character(len=*), parameter :: dtxt='Wordsplit:'
+  
 
   errcode = 0
   wasinword = .false.   !To be safe, with spaces at start of line
@@ -132,7 +134,8 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
       is = is + 1
       if ( is> len(wordarray) ) then !DSJJ
          errcode = 2
-         print *, "ERROR in WORDSPLIT IS: ", trim(text(:i))
+         write(*,*) dtxt//"ERROR: too short: ", trim(text(:i))
+         write(*,*) dtxt//"ERROR: too short: ",i, is, len(wordarray)
          exit
       end if
       wordarray(iw)(is:is) = c
@@ -144,8 +147,8 @@ subroutine wordsplit(text,nword_max,wordarray,nwords,errcode,separator,&
       is = 0
       if(iw>nword_max ) then
          errcode = 2
-         print *, "ERROR in WORDSPLIT : Problem at ", text
-         print *,"Too many words"
+         print *,dtxt//"ERROR: Problem at ", text
+         print *,dtxt//"Too many words"
          iw=iw-1
          exit
       end if
@@ -381,10 +384,14 @@ end function find_duplicates
 !============================================================================
 ! Adapted from D. Frank code, string_functions
 ! Replaces 'text' in string s with 'rep'
-function str_replace (s,text,rep)  result(outs)
+function str_replace (s,text,rep,dbg)  result(outs)
   character(len=*)          :: s,text,rep
   character(len=len(s)+100) :: outs     ! provide outs with extra 100 char len
   integer             :: i, nt, nr
+  logical, optional :: dbg
+  logical :: debug = .false.
+
+  if ( present(dbg) ) debug=dbg
 
   outs = s
   nt = len_trim(text)
@@ -392,6 +399,7 @@ function str_replace (s,text,rep)  result(outs)
 
   do
      i = index(outs,text(:nt))
+     !if ( debug) print *, 'STRi ', i, nt, len_trim(outs)
      if (i == 0) exit
      outs = outs(:i-1) // rep(:nr) // outs(i+nt:)
   end do

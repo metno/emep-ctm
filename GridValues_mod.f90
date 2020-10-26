@@ -1,4 +1,4 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -41,12 +41,12 @@ Module GridValues_mod
 !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
 use CheckStop_mod,           only: CheckStop,StopAll,check=>CheckNC
-use Functions_mod,           only: great_circle_distance
+use Functions_mod,           only: great_circle_distance, StandardAtmos_km_2_kPa
 use Io_Nums_mod,             only: IO_LOG,IO_TMP
 use MetFields_mod
 use Config_module,      only: &
      KMAX_BND, KMAX_MID, & ! vertical extent
-     MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN, JUMPOVER29FEB,&
+     MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN, JUMPOVER29FEB,NPROCX,NPROCY,&
      PT,Pref,NMET,MANUAL_GRID,&
      startdate,NPROCX,NPROCY,Vertical_levelsFile,&
      EUROPEAN_settings, GLOBAL_settings,USES,FORCE_PFT_MAPS_FALSE
@@ -110,6 +110,8 @@ public :: extendarea_N ! returns array which includes neighbours from other subd
 public :: set_EuropeanAndGlobal_Config
 public :: remake_vertical_levels_interpolation_coeff
 public :: Read_KMAX
+
+public :: z2level_stdatm
 
 private :: Alloc_GridFields
 private :: GetFullDomainSize
@@ -3056,7 +3058,7 @@ subroutine set_EuropeanAndGlobal_Config()
   implicit none
   real:: x1,x2,x3,x4,y1,y2,y3,y4,lon,lat,ir,jr
   character(len=*), parameter :: dtxt='EurGlobSettings:'
-
+  integer :: EastProc
   if(EUROPEAN_settings == 'NOTSET')then
      !No value set in config input, use grid to see if it covers Europe
      !Test approximatively if any European country is included in rundomain
@@ -3069,11 +3071,9 @@ subroutine set_EuropeanAndGlobal_Config()
         EUROPEAN_settings = 'YES' 
      else
         
-        ! define middle point of middle subdomain
-        if(me==NPROC/2)then 
-           lon = glon(limax/2,ljmax/2)
-           lat = glat(limax/2,ljmax/2)
-        endif
+        ! define middle point of middle subdomain (only values from me=NPROC/2 will be used)
+        lon = glon(limax/2,ljmax/2)
+        lat = glat(limax/2,ljmax/2)
         CALL MPI_BCAST(lon,8,MPI_BYTE,NPROC/2,MPI_COMM_CALC,IERROR)
         CALL MPI_BCAST(lat,8,MPI_BYTE,NPROC/2,MPI_COMM_CALC,IERROR)
         
@@ -3102,20 +3102,32 @@ subroutine set_EuropeanAndGlobal_Config()
         GLOBAL_settings = 'YES' !default
         if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain extends below 19 degrees latitudes'
      else
-        !find if the point with lon = -40 and lat = 45 is within the domain
-        call lb2ij(-40.0,45.0,ir,jr)
-        if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
-           GLOBAL_settings = 'YES' !default
-           if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=-40 at lat=45'
-        else 
-           !find if the point with lon = 92 and lat = 45 is within the domain
-           call lb2ij(92.0,45.0,ir,jr)
+        !test the Eastern point at approximatively middle in the Y direction
+        EastProc = NPROCY/2 *NPROCX+NPROCX-1
+        lon = glon(li1,ljmax/2)
+        lat = glat(li1,ljmax/2)
+        CALL MPI_BCAST(lon,8,MPI_BYTE,EastProc,MPI_COMM_CALC,IERROR)
+        CALL MPI_BCAST(lat,8,MPI_BYTE,EastProc,MPI_COMM_CALC,IERROR)
+        x1=-32;x2=90;x3=x2;x4=x1;y1=30;y2=y1;y3=70;y4=y3
+        if(.not. inside_1234(x1,x2,x3,x4,y1,y2,y3,y4,lon,lat) )then
+           GLOBAL_settings = 'YES' 
+           if(MasterProc)write(*,18) dtxt//'assuming GLOBAL_settings: lon lat ',lon,lat,' outside Europe'
+        else           
+           !find if the point with lon = -40 and lat = 45 is within the domain
+           call lb2ij(-40.0,45.0,ir,jr)
            if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
               GLOBAL_settings = 'YES' !default
-              if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=92 at lat=45'
-           else
-              if(MasterProc)write(*,*)dtxt//'Not assuming GLOBAL_settings'
-           endif           
+              if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=-40 at lat=45'
+           else 
+              !find if the point with lon = 92 and lat = 45 is within the domain
+              call lb2ij(92.0,45.0,ir,jr)
+              if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
+                 GLOBAL_settings = 'YES' !default
+                 if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=92 at lat=45'
+              else
+                 if(MasterProc)write(*,*)dtxt//'Not assuming GLOBAL_settings'
+              endif
+           endif
         endif
      endif
   endif
@@ -3170,5 +3182,31 @@ subroutine set_EuropeanAndGlobal_Config()
 !       trim(GLOBAL_settings), USES%EURO_SOILNOX, USES%GLOBAL_SOILNOX, USES%SOILNOX
 
 end subroutine set_EuropeanAndGlobal_Config
+
+subroutine  z2level_stdatm(z, z_topo, lev)
+  !convert height z in meters to the corresponding level
+  !uses meteo topology file to find model height of surface
+  !assumes standard atmosphere for converting between meter height and pressure
+  !returns lowest level for all heights below top of lowest level.
+  real, intent(in) :: z, z_topo
+  integer, intent(out) :: lev
+
+  integer :: k
+  real :: P_at_z, P
+  real :: Psurf_topo !surface pressure assuming standard atmosphere and altitude given by topo
+  Psurf_topo = StandardAtmos_km_2_kPa(z_topo/1000.0)*1000.0
+  P_at_z = StandardAtmos_km_2_kPa(z/1000.0)*1000.0
+
+  !loop through levels until correct pressure is found, starting at top
+  lev = KMAX_MID
+  do k = 1, KMAX_MID
+     P=A_bnd(k)+Psurf_topo*B_bnd(k)
+     if(P>P_at_z)then
+        !we are above top of layer k
+        lev = k
+        exit
+     endif
+  enddo
+end subroutine z2level_stdatm
 
 end module GridValues_mod

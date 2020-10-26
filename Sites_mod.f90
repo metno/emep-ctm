@@ -1,4 +1,4 @@
-! <Sites_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Sites_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -49,20 +49,20 @@ use Config_module,      only: NMET,PPBINV,PPTINV, KMAX_MID, MasterProc&
       NXTRA_SONDE, & 
        SONDE_XTRA, & 
       FREQ_SONDE
-use Debug_module,       only: DEBUG   ! -> DEBUG%SITES
+use Debug_module,       only: DEBUG   ! -> DEBUG%SITES, DEBUG%SITE
 use DerivedFields_mod,  only: f_2d, d_2d  ! not used:, d_3d
 use Functions_mod,      only: Tpot_2_T    ! Conversion function
 use GridValues_mod,     only: lb2ij, i_fdom, j_fdom ,debug_proc &
-                              ,i_local, j_local, A_mid, B_mid
+                              ,i_local, j_local, A_mid, B_mid, z2level_stdatm
 use Io_mod,             only: check_file,open_file,ios &
                               , fexist, IO_SITES, IO_SONDES &
                               , Read_Headers,read_line
 use KeyValueTypes,      only : KeyVal, KeyValue, LENKEYVAL
 use MetFields_mod,      only : t2_nwp, th, pzpbl  &  ! output with concentrations
                               , z_bnd, z_mid, roa, Kz_m2s, q
-use MetFields_mod,      only : u_xmj, v_xmi, ps
+use MetFields_mod,      only : u_xmj, v_xmi, ps, model_surf_elevation
 use MPI_Groups_mod,     only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
-                             MPI_MIN, MPI_MAX, MPI_SUM, &
+                             MPI_MIN, MPI_MAX, MPI_SUM, MPI_ANY_SOURCE,&
                              MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS, IERROR, ME_MPI, NPROC_MPI
 use PhysicalConstants_mod,only: ATWAIR
 use NetCDF_mod,         only : Create_CDF_sondes,Out_CDF_sondes,&
@@ -71,14 +71,13 @@ use OwnDataTypes_mod,    only: TXTLEN_NAME
 use Par_mod,            only : li0,lj0,li1,lj1 &
                                 ,GIMAX,GJMAX,IRUNBEG,JRUNBEG&
                                 ,GI0,GI1,GJ0,GJ1,me,LIMAX,LJMAX
-use SmallUtils_mod,     only : find_index
+use SmallUtils_mod,     only : find_index !, str_replace
 use Tabulations_mod,    only : tab_esat_Pa
-use TimeDate_mod,       only : current_date
+use TimeDate_mod,       only : current_date, print_date
 use TimeDate_ExtraUtil_mod,   only : date2string
 
 implicit none
 private                     ! stops variables being accessed outside
-
 
 ! subroutines made available
 
@@ -101,25 +100,34 @@ integer, private, save, allocatable,dimension (:,:) :: sonde_gindex
 
 integer, public, save, dimension (NSITES_MAX) :: &
         site_x, site_y, site_z      &! local coordinates
+       ,site_alt, site_topo         &! LLZ system
        , site_gn                        ! number in global
 real, public, save, dimension (NSITES_MAX) :: &
+  site_glon = -999, site_glat= -999, & ! Same as next line?
   Sites_lon= -999, Sites_lat= -999
 
 integer, private, save, dimension (NSITES_MAX) :: &
          site_gx, site_gy, site_gz    ! global coordinates
+integer, private, save, dimension (NSITES_MAX) :: &
+         site_galt, site_gtopo  ! for LonLatZ topo system 
 integer, private, save, dimension (NSONDES_MAX) ::  &
          sonde_gx, sonde_gy   &        ! global coordinates
        , sonde_x, sonde_y     &        ! local coordinates
        , sonde_gn                       ! number in global
 real, public, save, dimension (NSONDES_MAX) :: &
+  sonde_glon = -999, sonde_glat= -999, & ! Same as next line?
   Sondes_lon= -999, Sondes_lat= -999, ps_sonde=0.0
 
 integer, private :: NSPC_SITE, NOUT_SITE, NOUT_SONDE, NSPC_SONDE
 
-character(len=TXTLEN_NAME), public, save, dimension(NSITES_MAX) :: site_name
-character(len=TXTLEN_NAME), private, save, dimension(NSONDES_MAX):: sonde_name
+! Allow wide text strings here to allow addition of lat/lon info
+integer, private, parameter :: TXTLEN_SITE=80
+character(len=TXTLEN_SITE), public, save, dimension(NSITES_MAX) :: site_name
+character(len=TXTLEN_SITE), private, save, dimension(NSONDES_MAX):: sonde_name
 character(len=20), private, save, allocatable, dimension(:)  :: site_species
 character(len=20), private, save, allocatable, dimension(:)  :: sonde_species
+character(len=20), private, save, dimension(2):: sCoords !(1=sites,2=sondes)
+integer, private, save :: nInitCalls = 0  ! for setting sCoords
 
 character(len=70), private :: errmsg ! Message text
 integer, private :: d                 ! processor index
@@ -140,6 +148,11 @@ integer, public :: NSHL_SITE, NADV_SONDE, NSHL_SONDE !number of requested specie
 integer, public, dimension(NSPEC_SHL) :: SITE_SHL
 integer, public, dimension(NSPEC_SHL) :: SONDE_SHL
 integer, public, dimension(NSPEC_ADV) :: SONDE_ADV 
+
+ type(KeyVal), private, dimension(20)     :: KeyValues ! Info on units, coords, etc.
+
+
+ logical, private, save :: dbgProc = .false.
 
 contains
 
@@ -192,19 +205,21 @@ subroutine sitesdef()
   call Init_sites(SitesFile,IO_SITES,NSITES_MAX, &
         nglobal_sites,nlocal_sites, &
         site_gindex, site_gx, site_gy, site_gz, &
+        site_glat, site_glon, & 
         site_x, site_y, site_z, site_gn, &
-        site_name)
+        site_name, site_galt, site_gtopo,site_alt,site_topo)
 
   call Init_sites(SondesFile,IO_SONDES,NSONDES_MAX, &
         nglobal_sondes,nlocal_sondes, &
         sonde_gindex, sonde_gx, sonde_gy, sonde_gz, &
+        sonde_glat, sonde_glon, & 
         sonde_x, sonde_y, sonde_z, sonde_gn, &
         sonde_name)
 
 !  call set_species(SITE_ADV,SITE_SHL,SITE_XTRA,site_species)
 !  call set_species(SONDE_ADV,SONDE_SHL,SONDE_XTRA,sonde_species)
 
-  if ( DEBUG%SITES ) then
+  if ( DEBUG%SITES .and. dbgProc ) then
      write(6,*) "sitesdef After nlocal ", nlocal_sites, " on me ", me
      do i = 1, nlocal_sites
        write(6,*) "sitesdef After set_species x,y ", &
@@ -236,7 +251,8 @@ subroutine set_species(adv,shl,xtra,s)
 end subroutine set_species
 !==================================================================== >
 subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
-        s_gindex, s_gx, s_gy, s_gz, s_x, s_y, s_z, s_n, s_name)
+        s_gindex, s_gx, s_gy, s_gz, s_glat, s_glon, &
+        s_x, s_y, s_z, s_n, s_name, s_galt,s_gtopo,s_alt,s_topo)
   ! ----------------------------------------------------------------------
   ! Reads the file "sites.dat" and "sondes.dat" to get coordinates of
   ! surface measurement stations or locations where vertical profiles
@@ -259,24 +275,31 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
                            ,s_x, s_y, s_z      & ! local coordinates
                            ,s_n                  ! number in global
   character(len=*), intent(out), dimension (:) :: s_name
+  real, intent(out), dimension (:) ::  s_glat, s_glon ! lat/lon for output
+  integer, intent(out), dimension (:), optional :: &
+    s_alt, s_topo, s_galt, s_gtopo ! alt and topography in LonLatZ system
 
   !-- Local:
   integer,  dimension (NMAX) :: s_n_recv  ! number in global
 
-  integer           :: nin     ! loop index
+  integer           :: nin, dest! loop index
   integer           :: ix, iy  ! coordinates read in
-  integer           :: lev     ! vertical coordinate (20=ground)
-  character(len=20) :: s       ! Name of site read in
+  integer           :: lev     ! vertical coordinate (20=ground if 20 levels)
+  real              :: z       ! station altitude above sea level for LatLonZ, or
+                               ! or above local minima for LatLonHrel, in meters
+  real              :: z_inp   ! helper variable
+  real              :: z_topo  ! altitude above sea level of surface, as assumed by meteo
+  character(len=TXTLEN_SITE) :: s     ! Name of site read in ! currently 64
   character(len=30) :: comment ! comment on site location
-  character(len=40) :: errmsg
+  character(len=60) :: errmsg, coords
   real              :: lat,lon
   character(len=*),parameter :: dtxt='SitesInit:'
 
   character(len=20), dimension(4) :: Headers
-  type(KeyVal), dimension(20)     :: KeyValues ! Info on units, coords, etc.
-  integer                         :: NHeaders, NKeys
+  integer                         :: NHeaders, NKeys, iif, jjf
   character(len=80)               :: txtinput  ! Big enough to contain
                                                ! one full input record
+  logical :: dbgSite = .false.
 
 
   ios = 0                      ! zero indicates no errors
@@ -302,21 +325,98 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
 
   n = 0          ! Number of sites found within domain
 
+  nInitCalls = nInitCalls + 1
+  sCoords(nInitCalls) = KeyValue(KeyValues,"Coords")
+  coords              = KeyValue(KeyValues,"Coords") ! shorthand
+
   SITELOOP: do nin = 1, NMAX
 
-    if (trim(KeyValue(KeyValues,"Coords"))=='LatLong') then
-      call read_line(io_num,txtinput,ios)
-      if ( ios /= 0 ) exit  ! End of file
-      read(unit=txtinput,fmt=*) s, lat, lon, lev
-      call lb2ij(lon,lat,ix,iy)
-    else
-      call read_line(io_num,txtinput,ios)
-      lon=-999.0
-      lat=-999.0
-      if ( ios /= 0 ) exit  ! End of file
-      read(unit=txtinput,fmt=*) s,  ix,  iy, lev
+    z_topo = -9999.
+    z_inp  = -9999.
+    z      = -9999.
+    
+    call read_line(io_num,txtinput,ios)  ! done on host, broadcast
+    if ( ios /= 0 ) exit  ! End of file
+    !if(MasterProc) write(*,*) 'STRA', trim(txtinput)
+    !FAILED txtinput= str_replace(txtinput,'  ',' ',dbg=.true.) ! compress a little
+    !if(MasterProc) write(*,*) 'STRB', trim(txtinput)
+    dbgSite = ( DEBUG%SITES .and. index( txtinput, DEBUG%SITE ) > 0 )
+
+    if ( MasterProc .and. dbgSite ) then
+      write(*,"(a,i3,a,2i3,4a)") dtxt// trim(fname)
+      write(*,'(a)') dtxt//' coords:'// trim(coords)
+      write(*,*) dtxt//'INPUT dbgSite:'//trim(txtinput)
     end if
 
+    if ( coords =='LatLong' .or. & ! older naming system, deprecated
+         coords =='LatLonKdown') then
+      read(unit=txtinput,fmt=*) s, lat, lon, lev
+      call lb2ij(lon,lat,ix,iy)
+      if ( MasterProc .and. dbgSite ) write(*,*) dtxt//'LLKD:', nin, lat, lon, ix, iy
+    else if (coords =='LatLonZ' .or. coords =='LatLonHrel') then
+      ! Z is given as altitude above sea level or (Hrel) local minima
+      read(unit=txtinput,fmt=*) s, lat, lon, z_inp
+      call lb2ij(lon,lat,ix,iy)
+      if ( MasterProc .and. dbgSite ) write(*,'(a,i4,2f8.3,2i4)') dtxt//'LLZH',&
+              nin, lat, lon, ix, iy
+      if ( ix<RUNDOMAIN(1) .or. ix>RUNDOMAIN(2) .or. &
+           iy<RUNDOMAIN(3) .or. iy>RUNDOMAIN(4) ) then !outside rundomain
+         lev = 0 ! Dummy val, not used
+      else
+         if(i_local(ix)>0 .and. i_local(ix)<=LIMAX&
+              .and. j_local(iy)>0 .and. j_local(iy)<=LJMAX ) then
+            z_topo =  model_surf_elevation(i_local(ix),j_local(iy))
+            do dest = 0, NPROC-1
+               if(dest == me) cycle
+               call MPI_SEND(z_topo, 8,MPI_BYTE,dest,nin,MPI_COMM_CALC,IERROR)
+            enddo
+         else
+            call MPI_RECV(z_topo, 8, MPI_BYTE, MPI_ANY_SOURCE, nin, &
+                                        MPI_COMM_CALC,MPISTATUS,IERROR)          
+         endif
+        ! If relative heighs are given, we assume that they are relative to NWP
+        ! topo. Not perfect, but we can't be perfect. This will ensure that
+        ! all Hrel in lowest 50-100m end up at KMAX_MID 
+         if ( coords =='LatLonHrel') then
+           z = max(z_inp,0.0)+z_topo
+         else
+           z = z_inp  ! LatLonZ
+         end if
+         call z2level_stdatm(z, z_topo, lev)
+         if(DEBUG%SITES .and. dbgProc) write(*,'(a,2f8.1,i4)')&
+              dtxt//' Z2LEV'//trim(txtinput),  z, z_topo, lev
+         !if ( dbgSite .and. MasterProc ) write(*,'(a,3i4,2f8.3)') 'CFAC Z2', me, ix,iy,z_inp, z
+      endif
+    else if ( coords =='IJKdown' ) then  ! Gices ix iy directly
+      lon=-999.0
+      lat=-999.0
+      read(unit=txtinput,fmt=*) s,  ix,  iy, lev
+      if ( MasterProc .and. dbgSite ) write(*,*) dtxt//' CCCC', nin, lat, lon, ix, iy
+    else
+      errmsg="!!!! Allowed: LatLonKdown, LatLonZ, LatLonHrel, IJKdown"
+      call StopAll(dtxt//'Coordinates unkown:'//trim(coords)//errmsg)
+    end if
+
+    if ( ix<RUNDOMAIN(1) .or. ix>RUNDOMAIN(2) .or. &
+        iy<RUNDOMAIN(3) .or. iy>RUNDOMAIN(4) ) then !outside rundomain
+       if(MasterProc) write(*,*) dtxt//trim(s)//' outside domain!'
+       cycle
+    end if
+    if(dbgSite .and. i_local(ix)>0 .and. i_local(ix)<=LIMAX&
+               .and. j_local(iy)>0 .and. j_local(iy)<=LJMAX ) then
+      write(*,'(a,5i4)') 'CFAC FOUND dbgSite'//trim(s),me,ix,iy,i_local(ix),j_local(iy)
+      dbgProc = .true.
+    end if
+    ! Didn't work with s here. Not sure why. Go via s2
+    call CheckStop(len_trim(adjustl(s)) >= 40, dtxt//'Need longer TXTLEN_SITE for '//trim(s))
+
+    if (lev<0) lev = KMAX_MID
+    if(lev>KMAX_MID)then
+       write(*,*)'WARNING: sites.dat found vertical level out of range. Setting to ',KMAX_MID
+       write(*,*)'WARNING: vertical level out of range'//trim(txtinput), me
+    endif
+    lev = min(lev,KMAX_MID)
+    
     if (ioerr < 0) then
       write(6,*) dtxt//" end of file after ", nin-1, trim(fname)
       exit SITELOOP
@@ -334,13 +434,29 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
     else
       comment = " ok - inside domain         "
       n = n + 1
+      if ( dbgSite .and. dbgProc) &
+         write(*,'(a,5i4,2f11.3)') dtxt//'dbgSite XY',me, n, ix,iy,lev,lat,lon
       
       s_gx(n)   = ix
       s_gy(n)   = iy
       s_gz(n)   = lev
 
+      s_glat(n)  = lat
+      s_glon(n)  = lon
+
+
+      if ( present(s_gtopo)) then
+        if ( z_topo> -888 ) then
+          s_galt(n)  = z_inp
+          s_gtopo(n) = z_topo
+        else
+          s_galt(n)    = z_inp
+          s_gtopo(n)   = -999
+        end if
+      end if
+
       if(trim(fname)==trim(SitesFile))then
-         if(lon>-990)Sites_lon(n) = lon
+         if(lon>-990)Sites_lon(n) = lon  ! QUERY. Same as s_glon??
          if(lat>-990)Sites_lat(n) = lat
       end if
       if(trim(fname)==trim(SondesFile))then
@@ -348,14 +464,18 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
          if(lat>-990)Sondes_lat(n) = lat
       end if
 
-      s_name(n)  = s !!! remove comments// comment
-      if (DEBUG%SITES.and.MasterProc) write(6,"(a,i4,a)") dtxt//" s_name : ",&
-            n, trim(s_name(n))
+      s_name(n)  = s !!! remove comments// comment len_trim=60 here
+      if (DEBUG%SITES.and.dbgProc)then
+         write(6,"(a,3i4,1x,a)") dtxt//" s_name : ",&
+            nin, n, me, trim(s_name(n))
+         if ( coords =='LatLonZ') &
+            write(*,*)z,' m height converted to level ',lev,', z_topo=', z_topo
+      endif
     end if
 
   end do SITELOOP
 
-  nglobal = n
+  nglobal = n    ! same on each processor
 
   ! NSITES/SONDES_MAX must be _greater_ than the number used, for safety
 
@@ -369,6 +489,7 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
 
     ix = s_gx(n) ! global-domain coords
     iy = s_gy(n)
+    dbgSite = ( DEBUG%SITES .and. index(s_name(n), DEBUG%SITE ) > 0 )
 
     if ( i_local(ix)>=li0 .and. i_local(ix)<=li1 .and. &
          j_local(iy)>=lj0 .and. j_local(iy)<=lj1 ) then
@@ -378,28 +499,34 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       s_y(nlocal) = j_local(iy)
       s_z(nlocal) = s_gz(n)
       s_n(nlocal) = n
+      if ( present(s_gtopo) ) then
+        s_alt(nlocal) = s_galt(n) 
+        s_topo(nlocal) = s_gtopo(n)
+      end if
 
-      if (DEBUG%SITES) &
-        write(6,"(a,i3,a,2i3,3i4,a,3i4)") dtxt//" Site on me : ", me, &
+      !if (DEBUG%SITES ) &
+      if ( dbgSite ) then
+        write(6,"(a,i3,a,2i3,3i4,a,3i4)") dtxt//" dbgSite on me : ", me, &
          " Nos. ", n, nlocal, s_gx(n), s_gy(n) , s_gz(n), " =>  ", &
           s_x(nlocal), s_y(nlocal), s_z(nlocal)
-        write(6,"(a,i3,a,2i3,4a)") dtxt// trim(fname), me, &
+        write(6,"(a,i3,a,2i3,4a)") dtxt//'Names?' , me, &
          " Nos. ", n, nlocal, " ", trim(s_name(n)), " => ", trim(s_name(s_n(nlocal)))
+      end if
 
      end if
 
   end do ! nglobal
 
   ! inform me=0 of local array indices:
-  if(DEBUG%SITES) write(6,*) dtxt//trim(fname), " before gc NLOCAL_SITES", &
-                           me, nlocal
+  !if(DEBUG%SITES) write(6,'(a,2i4)') dtxt// &
+  if(dbgProc) write(6,'(a,2i4)') dtxt//" before gc NLOCAL_SITES", me, nlocal
 
   if ( .not.MasterProc ) then
     call MPI_SEND(nlocal, 4*1, MPI_BYTE, 0, 333, MPI_COMM_CALC, IERROR)
     if(nlocal>0) call MPI_SEND(s_n, 4*nlocal, MPI_BYTE, 0, 334, &
                                MPI_COMM_CALC, IERROR)
   else
-    if(DEBUG%SITES) write(6,*) dtxt//" for me =0 LOCAL_SITES", me, nlocal
+    if(DEBUG%SITES) write(6,'(a,2i4)')dtxt//" for me=0 LOCAL_SITES",me,nlocal
     do n = 1, nlocal
       s_gindex(me,n) = s_n(n)
     end do
@@ -407,17 +534,19 @@ subroutine Init_sites(fname,io_num,NMAX, nglobal,nlocal, &
       call MPI_RECV(nloc, 4*1, MPI_BYTE, d, 333, MPI_COMM_CALC,MPISTATUS, IERROR)
       if(nloc>0) call MPI_RECV(s_n_recv, 4*nloc, MPI_BYTE, d, 334, &
                                MPI_COMM_CALC,MPISTATUS, IERROR)
-      if(DEBUG%SITES) write(6,*) dtxt//" recv d ", fname, d,  &
-                  " zzzz nloc : ", nloc, " zzzz me0 nlocal", nlocal
+      !if(DEBUG%SITES) write(6,'(3(a,i4))') dtxt//" recv d ", d,&
+      !      " zzzz nloc : ", nloc, " zzzz me0 nlocal", nlocal
       do n = 1, nloc
         s_gindex(d,n) = s_n_recv(n)
-        if(DEBUG%SITES) write(6,*) dtxt//" for d =", fname, d, &
-          " nloc = ", nloc, " n: ",  n,  " gives nglob ", s_gindex(d,n)
+        !if(DEBUG%SITES) write(6,'(4(a,i4))') " nloc = ", nloc, " n: ",  n, &
+        if(dbgProc) write(6,'(4(a,i4))') " nloc = ", nloc, " n: ",  n, &
+              " gives nglob ", s_gindex(d,n)
       end do ! n
     end do ! d
   end if ! MasterProc
 
-  if ( DEBUG%SITES ) write(6,*) dtxt//' on me', me, ' = ', nlocal
+  !if ( DEBUG%SITES .and. nlocal>0 ) write(6,*) dtxt//trim(fname)//' done', me, ' = ', nlocal
+  if ( dbgProc ) write(6,*) dtxt//trim(fname)//' done', me, ' = ', nlocal
 
 end subroutine Init_sites
 !==================================================================== >
@@ -442,20 +571,21 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
   character(len=*),parameter :: dtxt = 'siteswrt_surf:'
 
   real,dimension(NOUT_SITE,NSITES_MAX) :: out  ! for output, local node
+  logical :: dbgSite
 
-  if ( DEBUG%SITES ) then
+  if ( dbgProc ) then ! DEBUG%SITES ) then
     write(6,*) dtxt//"nlocal ", nlocal_sites, " on me ", me
     do i = 1, nlocal_sites
-      write(6,*) dtxt//"x,y ",site_x(i),site_y(i),&
-                  site_z(i)," me ", me
+      write(6,'(a,4i6,a,i4)') dtxt//"x,y ",site_x(i),site_y(i),&
+                  site_z(i),site_alt(i), " me ", me
     end do
 
     if ( MasterProc ) then
       write(6,*) "======= site_gindex ======== sitesdef ============"
       do n = 1, nglobal_sites
         write(6,*) dtxt//"def ", n, NPROC, (site_gindex(d,n),d=0,4)
-        write(6,'(a12,i4,2x,200i4)') dtxt//"def ", n, &
-                (site_gindex(d,n),d=0,NPROC-1)
+        !write(6,'(a,i4,2x,200i4)') dtxt//"def ", n, &
+        !        (site_gindex(d,n),d=0,NPROC-1)
       end do
       write(6,*) "======= site_end    ======== sitesdef ============"
     end if ! MasterProc
@@ -466,10 +596,15 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
   i_Att=0
   NSpec_Att=1 !number of Spec attributes defined
   do i = 1, nlocal_sites
+
     ix = site_x(i)
     iy = site_y(i)
     iz = site_z(i)
     if( iz == 0 ) iz = KMAX_MID  ! If ZERO'd, skip surface correction
+
+    dbgSite = ( DEBUG%SITES .and. index(site_name(site_gn(i)),DEBUG%SITE) > 0 )
+    if ( dbgSite .and. my_first_call ) write(*,'(a,6i4,L2)') dtxt//&
+     'DBGSITE FOUND '// trim(site_name(site_gn(i))), me,i,site_gn(i),ix,iy,iz,dbgProc
 
     i_Att=0
     do ispec = 1, NADV_SITE
@@ -477,6 +612,11 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
       if (site_z(i) == KMAX_MID ) then ! corrected to surface
         out(ispec,i) = xn_adv( SITE_ADV(ispec) ,ix,iy,KMAX_MID ) * &
                        cfac( SITE_ADV(ispec),ix,iy) * PPBINV
+        if ( dbgSite .and. species_adv(SITE_ADV(ispec))%name=='O3') &
+            write(*,'(a,3f12.4)') trim( &
+            dtxt//'ZZCFAC'//adjustl(species_adv(SITE_ADV(ispec))%name)), &
+              out(ispec,i), cfac( SITE_ADV(ispec),ix,iy),  &
+              xn_adv( SITE_ADV(ispec) ,ix,iy,KMAX_MID )*PPBINV
       else                      ! Mountain sites not corrected to surface
         out(ispec,i)  = xn_adv( SITE_ADV(ispec) ,ix,iy,iz ) * PPBINV
       end if
@@ -505,8 +645,6 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
           out(nn,i)   = th(ix,iy,iz,1)
           i_Att=i_Att+1
           Spec_Att(i_Att,1)='units:C:K'
-!       case("hmix")
-!         out(nn,i)   = pzpbl(ix,iy)
         case default
           call CheckStop("Error, Sites_mod/siteswrt_surf: SITE_XTRA_MISC:"&
                                // trim(SITE_XTRA_MISC(ispec)))
@@ -533,9 +671,10 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
           Spec_Att(i_Att,1)='units:C:'//trim(f_2d(d2index)%unit)
         end if
 
-        if( DEBUG%SITES ) &
+        if( dbgSite .and. my_first_call ) then ! DEBUG%SITES ) &
           write(6,"(a,3i4,a15,i4,es12.3)") dtxt//"D2DEBUG ", me, nn, i,&
             " "//trim(d2code), d2index, out(nn,i)
+        end if
         call CheckStop( abs(out(nn,i))>1.0e99, &
           dtxt//"ABS(SITES OUT: '"//trim(SITE_XTRA_D2D(ispec))//"') TOO BIG" )
       end do
@@ -545,9 +684,10 @@ subroutine siteswrt_surf(xn_adv,cfac,xn_shl)
   my_first_call = .false.
   ! collect data into gout on me=0 t
   call siteswrt_out("sites",IO_SITES,NOUT_SITE, FREQ_SITE, &
-                     nglobal_sites,nlocal_sites, &
-                     site_gindex,site_name,site_gx,site_gy,site_gz,&
-                     site_species,out,ps_sonde)
+                     nglobal_sites,nlocal_sites, site_gindex,site_name,&
+                     site_gx,site_gy,site_gz,site_glat,site_glon, &
+                     site_species,out,ps_sonde, &
+                     site_galt,site_gtopo)
 end subroutine siteswrt_surf
 !==================================================================== >
 subroutine siteswrt_sondes(xn_adv,xn_shl)
@@ -567,6 +707,7 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
   integer, dimension(KMAX_MID)      :: itemp
   real, dimension(KMAX_MID)              :: pp, temp, qsat, rh, sum_PM, sum_NOy
   real, dimension(NOUT_SONDE,NSONDES_MAX):: out
+  character(len=*),parameter :: dtxt = 'siteswrt_sond:'
 
   out=0.0
   ! Consistency check
@@ -737,14 +878,14 @@ subroutine siteswrt_sondes(xn_adv,xn_shl)
   ! collect data into gout on me=0 t
 
   call siteswrt_out("sondes",IO_SONDES,NOUT_SONDE, FREQ_SONDE, &
-                     nglobal_sondes,nlocal_sondes, &
-                     sonde_gindex,sonde_name,sonde_gx,sonde_gy,sonde_gy, &
+                     nglobal_sondes,nlocal_sondes, sonde_gindex,sonde_name,&
+                     sonde_gx,sonde_gy,sonde_gy,sonde_glat,sonde_glon, &
                      sonde_species,out,ps_sonde)
 
 end subroutine siteswrt_sondes
 !==================================================================== >
 subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
-     s_gindex,s_name,s_gx,s_gy,s_gz,s_species,out,ps_sonde)
+     s_gindex,s_name,s_gx,s_gy,s_gz,s_glat,s_glon,s_species,out,ps_sonde,s_galt,s_gtopo)
   ! -------------------------------------------------------------------
   ! collects data from local nodes and writes out to sites/sondes.dat
   ! -------------------------------------------------------------------
@@ -755,10 +896,12 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   integer, intent(in) :: nglobal, nlocal
   integer, intent(in), dimension (0:,:) :: s_gindex  ! index, starts at me=0
   character(len=*), intent(in), dimension (:) ::  s_name    ! site/sonde name
-  integer, intent(in), dimension (:) :: s_gx, s_gy, s_gz    ! coordinates
+  integer, intent(in), dimension (:) :: s_gx, s_gy, s_gz  ! coordinates
+  real, intent(in), dimension (:) :: s_glat,s_glon  ! coordinates
   character(len=*), intent(in), dimension (:) ::  s_species ! Variable names
   real,    intent(in), dimension(:,:) :: out    ! outputs, local node
   real,    intent(in), dimension(:) ::  ps_sonde   ! surface pressure local node
+  integer,  intent(in), dimension(:), optional :: s_galt, s_gtopo  !
 
   ! Local
   real,dimension(nout,nglobal) :: g_out ! for output, collected
@@ -777,6 +920,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
   integer  :: Nlevels,ispec,NSPEC,NStations,NMetaData
   integer ::i_Att_MPI
   logical :: debug_1d=.false.
+  character(len=*),parameter :: dtxt = 'siteswrt_out:'
 
   select case (fname)
   case("sites") ;type=1
@@ -806,15 +950,24 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       outfile = fname // "_" // suffix // ".csv"
 
       open(file=outfile,unit=io_num,action="write",form='FORMATTED')
-      write(io_num,"(i3,2x,a,a, 4i4)") nglobal, fname, " in domain",RUNDOMAIN
+      write(io_num,"(i3,2x,a,a, 4i4, a)") nglobal, trim(fname), " in domain",&
+           RUNDOMAIN, ' sCoords: '// sCoords(type)
       write(io_num,"(i3,a)") f, " Hours between outputs"
       do n = 1, nglobal
-        write(io_num,'(a50,3(",",i4))') s_name(n), s_gx(n), s_gy(n),s_gz(n)
+        if ( present(s_gtopo) ) then ! max(s_gtopo>0) then
+          if(n==1) write(io_num,'(a4,37x,2(",",a8),5(",",a7))')  'name', &
+            'lat', 'lon', 'ix','iy', 'iz', 'z_site', 'ztopo'
+          write(io_num,'(a40,2(",",f9.3),5(",",i7))') adjustl(s_name(n)), &
+             s_glat(n), s_glon(n), &
+             s_gx(n)-RUNDOMAIN(1)+1, s_gy(n)-RUNDOMAIN(3)+1,s_gz(n), &
+             s_galt(n), s_gtopo(n)
+        else
+          write(io_num,'(a56,3(",",i7))') s_name(n), &
+             s_gx(n)-RUNDOMAIN(1)+1, s_gy(n)-RUNDOMAIN(3)+1,s_gz(n)
+        end if
       end do ! nglobal
 
       write(io_num,'(i3,a)') size(s_species), " Variables units: ppb"
-      !MV write(io_num,'(a9,<size(s_species)>(",",a))')"site,date",(trim(s_species(i)),i=1,size(s_species))
-      !MAY2019 write(io_num,'(9999a)')"site,date", (",", (trim(s_species(i)) ),i=1,size(s_species))
       write(io_num,'(9999a)')"site,date,hh", (",", (trim(s_species(i)) ),i=1,size(s_species))
 
       !defintions of file for NetCDF output
@@ -937,7 +1090,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
         call MPI_SEND(ps_sonde, 8*nlocal, MPI_BYTE, 0, 348, MPI_COMM_CALC, IERROR)
   else ! MasterProc
     ! first, assign me=0 local data to g_out
-    if ( DEBUG%SITES ) print *, "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
+    if ( DEBUG%SITES ) write(*,*) "ASSIGNS ME=0 NLOCAL_SITES", me, nlocal
 
     do n = 1, nlocal
       nglob = s_gindex(0,n)

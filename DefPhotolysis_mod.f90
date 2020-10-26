@@ -1,4 +1,4 @@
-! <DefPhotolysis_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <DefPhotolysis_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -62,7 +62,7 @@
 
    integer, public, parameter :: &
              NRCPHOT          = 17  &! Number of photolytic reactions
-            ,NRCPHOTextended  = 18
+            ,NRCPHOTextended  = 20
    
    integer, public, parameter:: NzPHODIS=20 !number of heights defined in the input files
    real, save, public :: zPHODIS(NzPHODIS) !heights of the input files, in km assumed constants
@@ -117,6 +117,8 @@
 
     integer, public, parameter ::&
         IDHONO = 18  & ! added as extended
+       ,IDNO3_NO = 19 & ! added
+       ,IDNO3_NO2 = 20 & ! added
        ,IDMEK     = IDCH3COX & ! just name change CHECK
 !       ,IDCHOCHO_2CHO  = IDHCOHCO & ! Just name change CHECK, TMP!!!
 !       ,IDCHOCHO_2CO   = IDHCOHCO & ! Just name change CHECK, TMP!!!
@@ -130,9 +132,9 @@
 !NEEDS FIXING. Changed from ESX to try to match above, but eg NO3 is difficult
   integer, public, parameter :: & 
     IDO3_O1D   = 2,IDO3_O3P  = 1, & !:BUG FIX RB Apr25
-    IDNO3_NO  = IDNO3  &
-   ,IDNO3_NO2  = IDNO3 & !HONO NEEDS FIXING!
-   ,IDHCHO_H  = 6 & ! HCHO -> CO + 2 HO2
+!    IDNO3_NO  = IDNO3  &
+!   ,IDNO3_NO2  = IDNO3 & !HONO NEEDS FIXING!
+    IDHCHO_H  = 6 & ! HCHO -> CO + 2 HO2
    ,IDHCHO_H2 = 7 !&  ! HCHO -> CO + H2
 !   ,MCM_J18   = 18, MCM_J20   = 20 &
 !   ,MCM_J22   = 22 , IDMEK     = 22 &
@@ -424,13 +426,15 @@
 
            ! adding HONO
             rcphot(IDHONO,:)  =  0.22* rcphot(IDNO2,:)
-
+            rcphot(IDNO3_NO,:) = 0.127 * rcphot(IDNO3,:)
+            rcphot(IDNO3_NO2,:) = 0.873 * rcphot(IDNO3,:)
 
           end if   !  end izen <  90 (daytime)  test
 
-          if(photo_out_ix>0) d_3d(photo_out_ix,i,j,1:num_lev3d,IOU_INST) = &
-               rcphot(IDNO2,lev3d(1:num_lev3d))
-
+          if(photo_out_ix>0)then
+             d_3d(photo_out_ix,i,j,1:num_lev3d,IOU_INST) = &
+               rcphot(IDNO2,max(KCHEMTOP,lev3d(1:num_lev3d))) !WARNING: rcphot defined only up to KCHEMTOP!
+          endif
     end subroutine setup_phot
   ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 

@@ -221,7 +221,7 @@
   
   !-> HO2 cont.
     L = L +   rct(76,k) * xnew(TERPO2)  &
-    + rct(101,k)
+    + rct(100,k)
   
   xnew(HO2) = (xold(HO2) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -581,7 +581,7 @@
     + rcphot(IDNO3,k)
   
   !-> NO3 cont.
-    L = L +   rct(98,k)
+    L = L +   rct(97,k)
   
   xnew(NO3) = (xold(NO3) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -591,7 +591,7 @@
   P = rct(18,k) * xnew(NO2) * xnew(NO3)
   
   L = rct(19,k)  &
-    + rct(97,k)
+    + rct(96,k)
   
   xnew(N2O5) = (xold(N2O5) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -614,7 +614,7 @@
     + 0.1575* rct(51,k) * xnew(C2H4) * xnew(O3)  &
     + 0.169* rct(53,k) * xnew(C3H6) * xnew(O3)  &
     + 0.09* rct(65,k) * xnew(C5H8) * xnew(O3)  &
-    + 0.5* rct(101,k) * xnew(HO2)
+    + 0.5* rct(100,k) * xnew(HO2)
   
   L = rct(6,k) * xnew(OH)  &
     + rcphot(IDH2O2,k)  &
@@ -639,15 +639,15 @@
   P = rct(20,k) * xnew(NO2) * xnew(OH)  &
     + rct(36,k) * xnew(HCHO) * xnew(NO3)  &
     + rct(41,k) * xnew(CH3CHO) * xnew(NO3)  &
-    + 2* rct(97,k) * xnew(N2O5)  &
-    + rct(98,k) * xnew(NO3)  &
+    + 2* rct(96,k) * xnew(N2O5)  &
+    + rct(97,k) * xnew(NO3)  &
     + rct(20,k) * xnew(shipNOx) * xnew(OH)  &
     + 3.2e-5 * xnew(shipNOx)
   
   L = rct(21,k) * xnew(OH)  &
     + rcphot(IDHNO3,k)  &
-    + rct(99,k)  &
-    + rct(100,k)
+    + rct(98,k)  &
+    + rct(99,k)
   
   xnew(HNO3) = (xold(HNO3) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -1216,15 +1216,6 @@
   xnew(SO2) = (xold(SO2) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> TERPPeroxy
-
-  ! P = 0.0
-  
-  ! L = 0.0
-  
-  ! Nothing to do for TERPPeroxy! xnew(TERPPeroxy) = max(0.0, xold(TERPPeroxy))
-
-
 !-> shipNOx
 
   P = rcemis(SHIPNOX,k)
@@ -1291,7 +1282,8 @@
 
 !-> SQT_SOA_NV
 
-  P = 0.00383* RCBIO(2,K)
+  P = rcemis(SQT_SOA_NV,k)  &
+    + 0.00383* RCBIO(2,K)
   
   ! L = 0.0
   
@@ -1314,6 +1306,15 @@
   ! L = 0.0
   
   xnew(POLLEN_OLIVE) = xold(POLLEN_OLIVE) + dt2 * P
+
+
+!-> POLLEN_ALDER
+
+  P = rcemis(POLLEN_ALDER,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_ALDER) = xold(POLLEN_ALDER) + dt2 * P
 
 
 !-> POLLEN_RWEED

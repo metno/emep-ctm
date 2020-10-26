@@ -1,4 +1,4 @@
-! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -81,12 +81,13 @@ use EmisDef_mod,       only: NSECTORS, EMIS_FILE, O_DMS, O_NH3, loc_frac, Nneigh
                             ,SecEmisOut, EmisOut, SplitEmisOut, &
                             isec2SecOutWanted
 use EmisGet_mod,       only: nrcemis,iqrc2itot
+use Functions_mod,      only: Tpot_2_T    ! Conversion function
 use GasParticleCoeffs_mod, only: DDdefs
 use GridValues_mod,    only: debug_li, debug_lj, debug_proc, A_mid, B_mid, &
                             dA,dB,xm2, GRIDWIDTH_M, GridArea_m2,xm_i,xm_j,glon,glat
 use Io_Progs_mod,      only: datewrite
-use MetFields_mod,     only: roa,pzpbl,Kz_m2s,th,zen, ustar_nwp, u_ref,&
-                            met, derivmet,  &
+use MetFields_mod,     only: roa,Kz_m2s,th,zen, ustar_nwp, u_ref, hmix,&
+                            met, derivmet,  q, &
                             ws_10m, rh2m, z_bnd, z_mid, u_mid,v_mid,ps, t2_nwp, &
                             SoilWater_deep, SoilWater_uppr, Idirect, Idiffuse
 use MosaicOutputs_mod,     only: nMosaic, MosaicOutput
@@ -107,10 +108,11 @@ use PhysicalConstants_mod, only: PI,KAPPA,ATWAIR,GRAV
 use OrganicAerosol_mod, only :  ORGANIC_AEROSOLS, Reset_3dOrganicAerosol
 use ZchemData_mod,    only: Fpart ! for FSOA work
 use SmallUtils_mod,        only: find_index, LenArray, NOT_SET_STRING, trims
+use Tabulations_mod,      only : tab_esat_Pa
 use TimeDate_mod,          only: day_of_year,daynumber,current_date,&
                                 tdif_days
 use TimeDate_ExtraUtil_mod,only: to_stamp, date_is_reached
-use uEMEP_mod,             only: av_uEMEP
+use LocalFractions_mod,    only: lf_av
 use Units_mod,             only: Units_Scale,Group_Units,&
                                 to_molec_cm3 ! converts roa [kg/m3] to M [molec/cm3]
 implicit none
@@ -202,14 +204,14 @@ contains
 !=========================================================================
 subroutine Init_Derived()
   integer :: alloc_err
-  integer :: iddefPMc, i
+  integer :: iddefPMc
   character(len=*), parameter :: dtxt='IniDeriv:' !debug label
   dbg0 = (DEBUG%DERIVED .and. MasterProc )
 
   allocate(D2_O3_DAY( LIMAX, LJMAX, NTDAY))
   D2_O3_DAY = 0.0
 
-  if(USES%uEMEP .and. (uEMEP%HOUR_INST.or.uEMEP%HOUR)) HourlyEmisOut = .true.
+  if(USES%LocalFractions .and. (uEMEP%HOUR_INST.or.uEMEP%HOUR)) HourlyEmisOut = .true.
 
   if(dbg0) write(*,*) dtxt//"INIT STUFF"
   call Init_My_Deriv()  !-> wanted_deriv2d, wanted_deriv3d
@@ -350,7 +352,6 @@ subroutine Define_Derived()
   character(len=TXTLEN_IND)  :: outind
 
   integer :: ind, iadv, ishl, idebug, n, igrp, iout, isec_poll
-  logical :: found
 
   if(dbg0) write(6,*) " START DEFINE DERIVED "
   !   same mol.wt assumed for PPM25 and PPMCOARSE
@@ -924,7 +925,7 @@ subroutine Setups()
 
          nvoc = nvoc + 1
          voc_index(nvoc) = n
-         voc_carbon(nvoc) = species( NSPEC_SHL+n )%carbons
+         voc_carbon(nvoc) = int(species( NSPEC_SHL+n )%carbons)
       end if
     end do
   !====================================================================
@@ -974,15 +975,16 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     ind2d_pm10=-999   ,ind3d_pm10=-999,     &
     ind2d_pm25=-999 
 
-  integer :: imet_tmp, ind, ind_tmp, iadvDep
+  integer :: imet_tmp, ind, iadvDep
   real, pointer, dimension(:,:,:) :: met_p => null()
 
   logical, allocatable, dimension(:)   :: ingrp
   integer :: wlen,ispc,kmax,iem
-  integer :: isec_poll,isec,iisec,ii,ipoll
+  integer :: isec_poll,isec,iisec,ii,ipoll,itemp
   real :: default_frac,tot_frac,loc_frac_corr
   character(len=*), parameter :: dtxt='Deriv:'
-
+  real pp, temp, qsat
+  
   if(.not. date_is_reached(spinup_enddate))return ! we do not average during spinup
 
   timefrac = dt/3600.0
@@ -1200,7 +1202,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ( "HMIX", "HMIX00", "HMIX12" )
 
       forall ( i=1:limax, j=1:ljmax )
-        d_2d( n, i,j,IOU_INST) = pzpbl(i,j)
+        d_2d( n, i,j,IOU_INST) = hmix(i,j,1)
       end forall
 
       if ( dbgP ) then
@@ -2025,7 +2027,17 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         case("wind_speed_3D")
            forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
                 d_3d(n,i,j,k,IOU_INST)=sqrt(u_mid(i,j,lev3d(k))**2+v_mid(i,j,lev3d(k))**2)
-           
+        case("RH_3D") !relative humidity
+           do k=1, num_lev3d
+           do j=1, ljmax
+           do i=1, limax
+              pp = A_mid(k) + B_mid(k)*ps(i,i,1)
+              itemp= nint(th(i,i,k,1) * Tpot_2_T(pp))
+              qsat = 0.622 * tab_esat_Pa( itemp ) / pp
+              d_3d(n,i,j,k,IOU_INST)=min(q(i,i,k,1)/qsat,1.0)       
+           end do
+           end do
+           end do
         case default
            if(MasterProc) write(*,*) "MET3D NOT FOUND"//trim(f_3d(n)%name)//":"//trim(f_3d(n)%subclass)
            d_3d(n,:,:,:,IOU_INST)=0.0
@@ -2310,8 +2322,8 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   end do
 
   !the uemep fields do not fit in the general d_3d arrays. Use ad hoc routine
-  if(USES%uEMEP .and. .not. present(ONLY_IOU))then
-    call av_uEMEP(dt,End_of_Day)
+  if(USES%LocalFractions .and. .not. present(ONLY_IOU))then
+    call lf_av(dt,End_of_Day)
   endif
 
   first_call = .false.

@@ -1,0 +1,56 @@
+#----------------------------------------------------------------------------#
+#     Mapping of emissions from GFASv1 to EMEP EmChem19a species
+#     Included by  ForestFire_mod
+#----------------------------------------------------------------------------#
+# Column-1 gives GFASv1 species,
+# Column-2 gives MW if needed to get to kg/day. Not needed for GFASv1
+#  (GFAS units are [kg/m2/s]. No unit conversion is needed.)
+# Column-3 gives mass fraction of GFASv1 emissions assign to EMEP species
+# Column-4 gives EMEP species
+# Gas-phase species only here. See extra_mechanisms directory for e.g.
+# FFireIntert for PM, BC, OM or FFireTracers for tracer ffire_CO.
+#----------------------------------------------------------------------------#
+#   GFAS             mw?    fac?   emep              comment
+    'cofire       ', 1.000, 1.000, 'CO',             # 081.210 | Carbon Monoxide
+    'ch4fire      ', 1.000, 1.000, 'CH4',            # 082.210 | Methane
+    'h2fire       ', 1.000, 1.000, 'H2',             # 084.210 | Hydrogen
+    'noxfire      ', 1.000, 1.000, 'NO',             # 085.210 | Nitrogen Oxide. Use as NO
+    'so2fire      ', 1.000, 1.000, 'SO2',            # 102.210 | Sulfur Dioxide
+    'ch3ohfire    ', 1.000, 1.000, 'CH3OH',          # 103.210 | Methanol
+    'c2h5ohfire   ', 1.000, 1.000, 'C2H5OH',         # 104.210 | Ethanol
+    'c2h4fire     ', 1.000, 1.000, 'C2H4',           # 106.210 | Ethene
+    'c3h6fire     ', 1.000, 1.000, 'C3H6',           # 107.210 | Propene
+    'c5h8fire     ', 1.000, 1.000, 'C5H8',           # 108.210 | Isoprene
+    'toluenefire  ', 1.000, 1.000, 'TOLUENE',        # 110.210 | Toluene lump(C7H8+C6H6+C8H10)
+    'hialkenesfire', 1.000, 1.000, 'C3H6',           # 111.210 | Higher Alkenes (CnH2n, C>=4)
+    'hialkanesfire', 1.000, 1.000, 'NC4H10',         # 112.210 | Higher Alkanes (CnH2n+2, C>=4)
+    'ch2ofire     ', 1.000, 1.000, 'HCHO',           # 113.210 | Formaldehyde
+    'c2h4ofire    ', 1.000, 1.000, 'CH3CHO',         # 114.210 | Acetaldehyde
+    'nh3fire      ', 1.000, 1.000, 'NH3',            # 116.210 | Ammonia
+    'c2h6fire     ', 1.000, 1.000, 'C2H6',           # 118.210 | Ethane
+    'c4h10fire    ', 1.000, 1.000, 'NC4H10',         # 238.210 | Butanes
+#----------------------------------------------------------------------------#
+# BiomassBurning mapping GFASv1 to EMEP's ffire_OM, ffire_BC, ffire_remPPM25
+#----------------------------------------------------------------------------#
+# Column-1 gives GFASv1 species,
+# Column-2 gives unitsfac
+# Column-3 gives mass fraction of GFASv1 emissions assign to EMEP species
+# Column-4 gives EMEP species
+# Note, GFAS species are not essential in all files, but if given they need
+# to be part of the POSSIBLE_GFASv1_SPECS array in EMEP's ForestFire_mod.
+#
+# FFire PM species only here, see FFireTracers for ffire_CO tracer if wanted.
+# 
+# The tricky bit: we read in BC, OC, PM25 and PM10 from GFAS, but want BC, OM,
+# rempPM25 and c for EmChem19a , CRI etc. We solve this by using GFAS's
+# OC to estimate OM (factor 1.7), and subtracting both BC and OM from
+# PM25 to get remPM25.   (ForestFire_mod will prevent zeros)
+#----------------------------------------------------------------------------#
+#   GFAS             mw?     fac?   emep              comment
+    'tpmfire      ', 1.000,  1.000, 'ffire_c'       , # 088.210 | PM 10
+    'pm2p5fire    ', 1.000, -1.000, 'ffire_c'       , # 087.210 | PM 10 - PM 2.5
+    'pm2p5fire    ', 1.000,  1.000, 'ffire_rempPM25', # 087.210 | PM 2.5
+    'ocfire       ', 1.700, -1.000, 'ffire_rempPM25', # 090.210 | PM 2.5 - Organic Matter
+    'bcfire       ', 1.000, -1.000, 'ffire_rempPM25', # 091.210 | PM 2.5 - Black Carbon
+    'ocfire       ', 1.700,  1.000, 'ffire_OM',       # 090.210 | Organic Carbon --> O.Matter (OM/OC=1.7)
+    'bcfire       ', 1.000,  1.000, 'ffire_BC',       # 091.210 | Black Carbon

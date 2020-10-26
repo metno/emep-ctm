@@ -1,4 +1,4 @@
-! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -1785,7 +1785,7 @@ subroutine BLPhysics()
     !..spatial smoothing of new zi: Need fixed minimum here. 100 or 50 m is okay
     !  First, we make sure coastal areas had "land-like" values.
 
-     if(LANDIFY_MET) &
+    if(LANDIFY_MET) &
          call landify(pzpbl,"pzbpl")
      call smoosp(pzpbl,PBL%ZiMIN,PBL%ZiMAX)
 
@@ -1876,6 +1876,10 @@ subroutine BLPhysics()
     end if  ! Specify unstable, stable separately:
   end if ! NWP_Kz .and. foundKz_met
 
+  forall(i=1:limax,j=1:ljmax)
+     hmix(i,j,nr) = pzpbl(i,j)
+  end forall
+  
   ! spatial smoothing of new zi: Need fixed minimum here. 100 or 50 m is okay
   ! First, we make sure coastal areas had "land-like" values.
 

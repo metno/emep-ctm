@@ -1,4 +1,4 @@
-! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -69,7 +69,7 @@ module Debug_module
     ,SEASALT         = .false. &
     ,SETUP_1DCHEM    = .false. &
     ,SETUP_1DBIO     = .false. &
-    ,SITES           = .false. &
+    ,SITES           = .false. & ! set also DEBUG%SITE below
     ,SOILNOX         = .false. &
     ,SOLVER          = .false. &
     ,STOFLUX         = .false. &
@@ -85,7 +85,8 @@ module Debug_module
   !----------------------------------------------------------
    integer, dimension(2) :: IJ = [-999,-999]  ! index for debugging print out
    character(len=20)     :: SPEC = 'O3'       ! default.
-   character(len=20)     :: datetxt = '-'       ! default.
+   character(len=20)     :: datetxt = '-'     ! default.
+   character(len=20)     :: SITE = 'NOT_SET'  !  e.g. Birkenes. (Full name not essential)
    integer               :: ISPEC = -999      ! Will be set after NML
 end type emep_debug
 type(emep_debug), public, save :: DEBUG

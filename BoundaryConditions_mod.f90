@@ -1,4 +1,4 @@
-! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -1060,7 +1060,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   !---------------------------------------------------------------------------
   ! Mace Head ozone concentrations for backgroudn sectors
   ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
-  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2017
+  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2018
   real, dimension(12,MH_YEAR1:MH_YEAR2), parameter :: macehead_year=reshape(&
    [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
     36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
@@ -1101,7 +1101,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
     41.4,42.9,43.5,46.4,42.4,35.1,28.6,32.6,33.8,37.1,38.1,41.1,& !2014
     41.0,43.3,43.8,42.5,39.4,33.6,31.5,35.3,35.8,42.1,40.4,41.0,& !2015
     40.4,42.5,43.7,43.6,42.4,29.7,27.5,28.6,32.0,37.7,40.5,42.5,& !2016
-    41.1,45.2,46.1,45.5,40.2,33.2,28.7,32.6,34.1,39.4,41.2,39.5]& !2017
+    41.1,45.2,46.1,45.5,40.2,33.2,28.7,32.6,34.1,39.4,41.2,39.5,& !2017
+    42.1,43.6,44.8,46.9,42.8,33.8,28.0,28.9,34.3,38.9,41.5,37.8]& !2018
     ,[12,MH_YEAR2-MH_YEAR1+1])
   real, dimension(12), parameter :: macehead_default=&
   ! Defaults from 1998-2010 average

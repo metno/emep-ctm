@@ -1,4 +1,4 @@
-! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -103,6 +103,7 @@ integer      :: ncFileID_new=closedID  !don't save because should always be
                 !redefined (in case several routines are using ncFileID_new
                 !with different filename_given)
 integer,save :: ncFileID_iou(IOU_INST:IOU_HOUR_INST)=closedID
+integer,save :: LF_ncFileID_iou(IOU_INST:IOU_HOUR_INST)=closedID
 integer,save :: outCDFtag=0
 !CDF types for output:
 integer, public, parameter  :: Int1=1,Int2=2,Int4=3,Real4=4,Real8=5
@@ -230,7 +231,7 @@ subroutine Create_CDF_sondes(fileName,NSpec,NSpec_Att,SpecDef,&
   real :: kcoord(KMAXcdf+1)
   real :: Acdf(KMAXcdf),Bcdf(KMAXcdf),Aicdf(KMAXcdf+1),Bicdf(KMAXcdf+1)
   integer,parameter :: MAX_String_length=36
-  character(len=100) :: auxL(4)
+  character(len=TXTLEN_File) :: auxL(4)
   character(len=MAX_String_length) :: metaName,metaType,auxC(NStations)
   integer :: auxI(NStations),ierr
   real :: auxR(NStations)
@@ -311,6 +312,8 @@ subroutine Create_CDF_sondes(fileName,NSpec,NSpec_Att,SpecDef,&
       call wordsplit(trim(MetaData(0,n)),3,auxL,k,ierr,strict_separator=':')
       call CheckStop(3,k,&
         "NetCDF_mod: too short metadata definition "//trim(MetaData(0,n)))
+      call CheckStop(ierr /= 0, &
+        "NetCDF_mod: wordsplit error:: "//trim(MetaData(0,n)))
       select case(auxL(2))
       case("c","C","s","S") ! string/char attribute
         call check(nf90_put_att(ncFileID,nf90_global,trim(auxL(1)),trim(auxL(3))),&
@@ -1869,6 +1872,11 @@ subroutine CloseNetCDF
       if(ncFileID/=closedID)then
         call check(nf90_close(ncFileID))
         ncFileID_iou(i)=closedID
+      end if
+      ncFileID=LF_ncFileID_iou(i)
+      if(ncFileID/=closedID)then
+        call check(nf90_close(ncFileID))
+        LF_ncFileID_iou(i)=closedID
       end if
     end do
   end if
@@ -3520,23 +3528,16 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                        if(ig>dims(1))ig=ig-dims(1)
                     endif
                  endif
-                 if(ig<0.5 .or. ig>dims(1))then
-                    if(present(UnDef))then
-                       Rvar(ijk)=UnDef_local
-                    else
-                       write(*,*)me,i,j,k,glon(i,j),glat(i,j),ig
-                       call StopAll("ReadField_CDF: values outside grid required "//trim(varname)//" "//trim(filename))
-                    endif
+                 !nearest must always give something
+                 ig=max(1,min(dims(1),ig))
+                 jg=max(1,min(dims(2),nint((glat(i,j)-Rlat(startvec(2)))*dRlati)+1))
+                 igjgk=ig+(jg-1)*dims(1)+(k-1)*dims(1)*dims(2)
+                 if(OnlyDefinedValues.or.(Rvalues(igjgk)/=FillValue.and. .not.isnan(Rvalues(igjgk))))then
+                    Rvar(ijk)=Rvalues(igjgk)
                  else
-                    ig=max(1,min(dims(1),ig))
-                    jg=max(1,min(dims(2),nint((glat(i,j)-Rlat(startvec(2)))*dRlati)+1))
-                    igjgk=ig+(jg-1)*dims(1)+(k-1)*dims(1)*dims(2)
-                    if(OnlyDefinedValues.or.(Rvalues(igjgk)/=FillValue.and. .not.isnan(Rvalues(igjgk))))then
-                       Rvar(ijk)=Rvalues(igjgk)
-                    else
-                       Rvar(ijk)=UnDef_local
-                    end if
-                 endif
+                    Rvar(ijk)=UnDef_local
+                 end if
+                 
               end do
            end do
         end do

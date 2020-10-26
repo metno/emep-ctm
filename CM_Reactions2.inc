@@ -287,8 +287,8 @@
 
 !-> NO3_c
 
-  P = rct(99,k) * xnew(HNO3)  &
-    + rct(100,k) * xnew(HNO3)
+  P = rct(98,k) * xnew(HNO3)  &
+    + rct(99,k) * xnew(HNO3)
   
   ! L = 0.0
   
@@ -434,15 +434,15 @@
 
   P = rcemis(EC_F_WOOD_NEW,k)
   
-  L = rct(96,k)
+  L = rct(101,k)
   
   xnew(EC_f_wood_new) = (xold(EC_f_wood_new) + dt2 * P) / (1.0 + dt2 * L)
 
 
 !-> EC_f_wood_age
 
-  P = rct(96,k) * xnew(EC_f_wood_new)  &
-    + rcemis(EC_F_WOOD_AGE,k)
+  P = rcemis(EC_F_WOOD_AGE,k)  &
+    + rct(101,k) * xnew(EC_f_wood_new)
   
   ! L = 0.0
   
@@ -462,15 +462,15 @@
 
   P = rcemis(EC_F_FFUEL_NEW,k)
   
-  L = rct(96,k)
+  L = rct(101,k)
   
   xnew(EC_f_ffuel_new) = (xold(EC_f_ffuel_new) + dt2 * P) / (1.0 + dt2 * L)
 
 
 !-> EC_f_ffuel_age
 
-  P = rct(96,k) * xnew(EC_f_ffuel_new)  &
-    + rcemis(EC_F_FFUEL_AGE,k)
+  P = rcemis(EC_F_FFUEL_AGE,k)  &
+    + rct(101,k) * xnew(EC_f_ffuel_new)
   
   ! L = 0.0
   

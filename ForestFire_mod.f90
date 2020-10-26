@@ -1,4 +1,4 @@
-! <ForestFire_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <ForestFire_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -208,6 +208,7 @@ subroutine Config_Fire()
   integer :: ios, ne, n, k
   character(len=*), parameter :: dtxt='BB:Config'
 
+  if(.not.first_call) return
   if(DEBUG%FORESTFIRE.and.MasterProc) write(*,*) dtxt//" selects ",BBMAP
 
   select case(BBMAP)
@@ -339,6 +340,7 @@ subroutine Fire_Emis(daynumber)
   real :: rdemis(LIMAX,LJMAX)  ! Emissions read from file
   integer :: i,j,nstart, alloc_err, iBB, n
   logical, save :: first_call = .true.
+  logical       :: was_first_call
   integer, save  :: nn_old=-1
   real    :: fac, to_kgm2s   
 
@@ -353,7 +355,16 @@ subroutine Fire_Emis(daynumber)
   integer :: yyyy, mm, dd, hh
   character(len=*), parameter :: dtxt='BB:Fire_Emis:'
 
-  if(first_call) call Config_Fire()
+  ! copy current flag:
+  was_first_call = first_call
+  ! first?
+  if( first_call ) then
+    ! allocate arrays etc:
+    call Config_Fire()
+    ! reset flag:
+    first_call = .false.
+  end if ! first
+  
   debug_me=DEBUG%FORESTFIRE .and. debug_proc
   debug_ff=debug_level(BBverbose)
   debug_nc=debug_level(BBverbose-1)
@@ -419,7 +430,7 @@ subroutine Fire_Emis(daynumber)
   if(debug_me) then
     write(*,'(a,5i5)') dtxt// "newFFrec WAS set ", yyyy,mm,dd, dn1, dn2
     write(*,*) dtxt//'Starting MODE=',trim(BBMODE),&
-      date2string(" YYYY-MM-DD",[yyyy,mm,dd]),first_call,debug_ff,debug_nc
+      date2string(" YYYY-MM-DD",[yyyy,mm,dd]),was_first_call,debug_ff,debug_nc
     write(*,*) dtxt//' Interp= ', trim(bbinterp), dn1, dn2, nstart
   end if
 
@@ -507,21 +518,19 @@ subroutine Fire_Emis(daynumber)
            species(iemep)%molwt, sum( BiomassBurningEmis(ind,:,:) )
    
        call PrintLog(dtxt//":: Assigns "//trim(FF_poll),&
-         first_call.and.MasterProc)
+         was_first_call.and.MasterProc)
    
        if(debug_me) sum_emis(ind)=sum_emis(ind)+&
              sum(BiomassBurningEmis(ind,:,:))
     else ! BBfound false
        call PrintLog(dtxt//":: Skips   "//trim(FF_poll),&
-         first_call.and.MasterProc)
+         was_first_call.and.MasterProc)
     end if ! BBfound
   end do ! BB_DEFS
 
   ! have to close the file here
   call CheckNC(nf90_close(ncFileID),dtxt//"close:"//trim(fname))
   ncFileID=closedID
-
-  first_call  = .false.
 
   ! For cases where REMPPM25 s derived as the difference between PM25 and
   !  (BC+1.7*OC) we need some safety:

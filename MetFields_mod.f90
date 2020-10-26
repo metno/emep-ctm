@@ -1,4 +1,4 @@
-! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -187,8 +187,8 @@ module MetFields_mod
        ,sdepth          & !  Snowdepth, m
        ,ice_nwp         & ! QUERY why real?
        ,sst       &  ! SST Sea Surface Temprature- ONLY from 2002 in PARLAM
-       ,ws_10m    ! wind speed 10m
- 
+       ,ws_10m    &  ! wind speed 10m
+       ,hmix         ! same as pzpbl, but interpolated in time
 
  real,target,public, save,allocatable, dimension(:,:) :: &
      u_ref             & ! wind speed m/s at 45m (real, not projected)
@@ -197,7 +197,8 @@ module MetFields_mod
     ,convective_precip & ! Convective precip mm/hr
     ,Tpot2m            & ! Potential temp at 2m
     ,ustar_nwp         & ! friction velocity m/s ustar^2 = tau/roa
-    ,pzpbl             & ! stores H(ABL) for averaging and plotting purposes, m
+    ,pzpbl             & ! Height of boundary layer in m. Used to compute Kz.
+                         ! NB: use hmix variable for output, since hmix is interpolated in time, but not pzpbl
     ,pwp               & ! Permanent Wilting Point
     ,fc                & ! Field Capacity
     ,invL_nwp          & ! inverse of the Monin-Obuhkov length
@@ -667,6 +668,19 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   ix_pblnwp=ix
 !NWPHMIX
 
+  ix=ix+1
+  met(ix)%name             = 'hmix' ! NB: same as pzpbl, but interpolated in time 
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .true.
+  met(ix)%read_meteo       = .false.  
+  met(ix)%needed           = .false.
+  met(ix)%found            = .false.
+
+  allocate(hmix(LIMAX,LJMAX,NMET))
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => hmix
+  met(ix)%zsize = 1
+  met(ix)%msize = NMET
 
   ix=ix+1
   met(ix)%name             = 'temperature_2m'
@@ -901,7 +915,7 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .false.!read once only the first time
   met(ix)%needed           = .false.
   met(ix)%found            => foundtopo
-  allocate(model_surf_elevation(LIMAX,LJMAX))
+  allocate(model_surf_elevation(LIMAX,LJMAX)) !in meters above sea level
   model_surf_elevation=0.0
   met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:1)  => model_surf_elevation
   met(ix)%zsize = 1
@@ -1109,7 +1123,7 @@ end if
     allocate(u_ref(LIMAX,LJMAX))
     allocate(rho_surf(LIMAX,LJMAX))
     allocate(Tpot2m(LIMAX,LJMAX))
-    allocate(pzpbl(LIMAX,LJMAX))
+    allocate(pzpbl(LIMAX,LJMAX)) 
     allocate(pwp(LIMAX,LJMAX))
     allocate(fc(LIMAX,LJMAX))
     allocate(xwf(LIMAX+2*NEXTEND,LJMAX+2*NEXTEND)) 

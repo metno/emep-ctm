@@ -1,4 +1,4 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -42,12 +42,13 @@ module AerosolCalls
  use ChemSpecs_mod
  use Chemfields_mod,        only: PM25_water, PM25_water_rh50, & !H2O_eqsam, & !PMwater 
                                    cfac
- use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc
+ use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc, USES
  use Debug_module,          only: DEBUG   ! -> DEBUG%EQUIB
  use EQSAM4clim_ml,        only :  EQSAM4clim
 ! use EQSAM_v03d_mod,        only: eqsam_v03d
  use MARS_mod,              only: rpmares, rpmares_2900, DO_RPMARES_new
  use PhysicalConstants_mod, only: AVOG
+ use SmallUtils_mod,        only: find_index
  use ZchemData_mod,         only: xn_2d, temp, rh, pp
  implicit none
  private
@@ -68,6 +69,8 @@ module AerosolCalls
 !           !   FINE_PM = 1, COAR_NO3 = 2, COAR_SS = 3, COAR DUST = 4,pollen = 5    
 
 
+  integer, private, save :: iSeaSalt ! zero if no seasalt compounds
+
 contains
 
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -75,10 +78,16 @@ contains
     logical, intent(in) :: debug_flag
 !    integer, intent(in)  :: i, j
     logical, save :: my_first_call=.true.
+    character(len=*),parameter:: dtxt='AeroEqui:'
     
-    if( my_first_call .and. MasterProc ) then
-       write(*,*) 'AerosolEquilib: chosen: ',AERO%EQUILIB 
-       write(*,*) 'AerosolEquilib water: chosen: ',AERO%EQUILIB_WATER
+    if( my_first_call ) then
+      iSeaSalt = find_index('SeaSalt_f',species(:)%name )
+      call CheckStop(USES%SEASALT.and.iSeaSalt<1,dtxt//"iSeaSalt neg")
+      if(  MasterProc ) then
+        write(*,*) 'AerosolEquilib: chosen: ',AERO%EQUILIB 
+        write(*,*) 'AerosolEquilib water: chosen: ',AERO%EQUILIB_WATER
+        write(*,*) 'AerosolEquilib seasalt index: ',iSeaSalt
+      end if
     end if
     select case ( AERO%EQUILIB )
       case ( 'EMEP' )
@@ -288,8 +297,10 @@ contains
     no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
     nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
 !    aH2Oin(KCHEMTOP:KMAX_MID) = H2O_eqsam(i,j,KCHEMTOP:KMAX_MID)
-    NAin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
-    CLin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
+    if ( iSeaSalt > 0 ) then
+      NAin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
+      CLin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
+    end if
 
  !--------------------------------------------------------------------------                
   
@@ -388,8 +399,8 @@ contains
       nh3in(KMAX_MID:KMAX_MID)  = xn_2d(NH3,KMAX_MID:KMAX_MID)*1.e12/AVOG 
       no3in(KMAX_MID:KMAX_MID)  = xn_2d(NO3_f,KMAX_MID:KMAX_MID)*1.e12/AVOG
       nh4in(KMAX_MID:KMAX_MID)  = xn_2d(NH4_f,KMAX_MID:KMAX_MID)*1.e12/AVOG
-      NAin(KMAX_MID:KMAX_MID)   = xn_2d(SEASALT_F,KMAX_MID:KMAX_MID)*0.306e12/AVOG
-      CLin(KMAX_MID:KMAX_MID)   = xn_2d(SEASALT_F,KMAX_MID:KMAX_MID)*0.55e12/AVOG
+      NAin(KMAX_MID:KMAX_MID)   = xn_2d(iSeaSalt,KMAX_MID:KMAX_MID)*0.306e12/AVOG
+      CLin(KMAX_MID:KMAX_MID)   = xn_2d(iSeaSalt,KMAX_MID:KMAX_MID)*0.55e12/AVOG
 
 !.. Rh = 50% and T=20C
       rlhum(KMAX_MID:KMAX_MID) = 0.5
@@ -465,8 +476,8 @@ contains
     nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
     no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
     nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-    NAin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
-    CLin(KCHEMTOP:KMAX_MID)   = xn_2d(SEASALT_F,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
+    NAin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
+    CLin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
 
     rlhum(KCHEMTOP:KMAX_MID) = rh(:)
     tmpr(KCHEMTOP:KMAX_MID)  = temp(:)

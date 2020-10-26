@@ -186,7 +186,7 @@ type(Emis_id_type), public, save:: Emis_source(NEmis_sourcesMAX) !list of valid 
 integer,  public, save :: NEmis_sources = 0
 integer,  public, save :: NEmis_3Dsources = 0
 integer,  public, save :: NEmisFile_sources = 0
-integer,  public, save :: ix3Dmap(1000) = 0
+integer,  public, save :: ix3Dmap(NEmis_sourcesMAX) = 0
 real, allocatable, public, save,  dimension(:,:,:):: Emis_source_2D !One 2D map for each source
 real, allocatable, public, save,  dimension(:,:,:,:):: Emis_source_3D !One 3D map for each source
 integer, allocatable, public, save,  dimension(:,:,:):: Emis_country_map !country indices for each gridcell
@@ -232,20 +232,38 @@ real, public, allocatable, dimension(:,:,:,:), save :: SecEmisOut !per sector an
 
 !should be defined somewhere else?
 real, public, allocatable, dimension(:,:,:,:,:,:), save :: &
-  loc_frac&    ! Fraction of pollutants that are produced locally
+  loc_frac&    ! Fraction of pollutants that are produced locally, surrounding sources
   ,loc_frac_hour_inst&  !Houry local fractions
   ,loc_frac_hour&  !Houry average of local fractions
   ,loc_frac_day&  !Daily average of local fractions
   ,loc_frac_month&  !Monthly average of local fractions
   ,loc_frac_full  !Fullrun average of local fractions
+real, public, allocatable, dimension(:,:,:,:,:), save :: &
+     lf_src_acc ! accumulated local fraction over time periods
+real, public, allocatable, dimension(:,:,:,:,:), save :: &
+     lf_src_tot ! concentrations of pollutants used for Local Fractions
+     
+real, public, allocatable, dimension(:,:,:,:,:,:), save :: emis_lf_cntry
 real, public, allocatable, dimension(:,:,:,:), save :: &
-   loc_tot_hour_inst&   !all contributions
+   loc_frac_src &   ! Fraction of pollutants that are produced locally, list of defined sources
+  ,lf &   ! Fraction of pollutants that are produced locally, for all defined sources
+  ,emis_lf &   ! 3D Emission defined for each source
+  ,lf_emis_tot &   ! sum of 3D Emission defined for each pollutant used for lf
+  ,loc_frac_src_full &   ! Fraction of pollutants that are produced locally, list of defined sources
+  ,lf_src_full &   ! Fraction of pollutants that are produced locally, list of defined sources
+  ,loc_tot_hour_inst&   !all contributions
   ,loc_tot_hour&   !Hourly average of all contributions
   ,loc_tot_day&   !Daily average of all contributions
   ,loc_tot_month&  !Monthly average of all contributions
   ,loc_tot_full  !Fullrun average of all contributions
+real, public, allocatable, dimension(:,:,:), save :: &
+  loc_frac_drydep  ! ddepositions per source (not fractions!)
+real, public, allocatable, dimension(:,:,:), save :: &
+  loc_frac_wetdep  ! wdepositions per source (not fractions!)
 real, public, allocatable, dimension(:,:,:,:), save :: &
   loc_frac_1d  ! Fraction of pollutants without i or j and extended (0:limax+1 or 0:ljmax+1)
+real, public, allocatable, dimension(:,:), save :: &
+  loc_frac_src_1d  ! Fraction of pollutants without i or j and extended (0:limax+1 or 0:ljmax+1)
 integer, public, parameter:: Nneighbors = 9 !localfractions from 8 neighbors + self
 
 !Ocean variables

@@ -1,0 +1,38 @@
+# CMX_BoundaryConditions.txt for EmChem19a 
+# Provides mapping betweeen default boundary and initial conditions
+# (BICs) and EMEP species. A numerical factor may be applied, and a wanted
+# column is also provided so that BICs may we switched off. In many cases
+# one may prefer to provide results from another model as BICs; in this
+# case the mapping here is not used.
+# Provided as part of the default GenChem system. 
+# For list of possible BICs, see defBICs in BoundaruConditions_mod.f90.
+# For SeaSalt and Dust, see extra_mechanisms
+#
+# globBC     emep             fac  wanted
+#
+  'O3      ','O3      '   ,   1.0, T
+  'HNO3    ','HNO3    '   ,   1.0, T
+  'SO2     ','SO2     '   ,   1.0, T
+  'SO4     ','SO4    '    ,   1.0, T
+  'PAN     ','PAN     '   ,   1.0, T
+  'CO      ','CO      '   ,   1.0, T
+  'C2H6    ','C2H6'       ,   1.0, T
+  'C4H10   ','NC4H10  '   ,   1.0, T
+  'NO      ','NO      '   ,   1.0, T
+  'NO2     ','NO2     '   ,   1.0, T
+  'HCHO    ','HCHO    '   ,   1.0, T
+  'CH3CHO   ','CH3CHO  '   ,   1.0, T
+  'NO3_f    ','NO3_f  '   ,   1.0, T
+  'NO3_c    ','NO3_c  '   ,   1.0, T
+  'NH4_f    ','NH4_f    '   ,   1.0, T
+  'H2O2    ','H2O2    '   ,   1.0, T
+# CMX_BoundaryConditions.txt for generic emep run, Sea-salt
+# globBC     emep             fac  wanted
+#
+  'SeaSalt_f  ','SeaSalt_f',   1.0,   T
+  'SeaSalt_c  ','SeaSalt_c',   1.0,   T
+# CMX_BoundaryConditions.txt for generic emep, dust
+# globBC     emep             fac    wanted
+#
+ 'DUST_f',  'Dust_wb_f',     1.0,    T     #Dust
+ 'DUST_c',  'Dust_wb_c',     1.0,    T     #Dust

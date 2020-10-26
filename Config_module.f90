@@ -1,4 +1,4 @@
-! <Config_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Config_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -38,10 +38,10 @@ use ChemSpecs_mod,         only: species, CM_schemes_ChemSpecs
 use ChemGroups_mod,        only: chemgroups
 use Debug_module,          only: DEBUG, DebugCell
 use Io_Nums_mod,           only: IO_NML, IO_LOG, IO_TMP
-use OwnDataTypes_mod,      only: typ_ss, uEMEP_type, Emis_id_type, emis_in,&
-                                 EmisFile_id_type, Emis_sourceFile_id_type,&
+use OwnDataTypes_mod,      only: typ_ss, lf_sources, lf_country_group_type, uEMEP_type, Emis_id_type, &
+                                 emis_in, EmisFile_id_type, Emis_sourceFile_id_type,&
                                  TXTLEN_NAME, TXTLEN_FILE, TXTLEN_SHORT,&
-                                  TXTLEN_DERIV, Emis_mask_type, &
+                                 TXTLEN_DERIV, Emis_mask_type, &
                                  Deriv, typ_s1ind,typ_s5ind,O3cl_t,typ_s3,typ_s4
 use TimeDate_mod,          only: date
 use Precision_mod,         only: dp
@@ -168,12 +168,13 @@ type, public :: emep_useconfig
 !    ,ESX              = .false. &! Uses ESX
     ,PFT_MAPS         = .false. &! 
     ,uEMEP            = .false. &! make local fraction of pollutants
+    ,LocalFractions   = .false. &! make local fraction of pollutants
     ! meteo related
     ,SOILWATER        = .false. &!
     ,EtaCOORDINATES   = .true.  &! default since October 2014
     ,WRF_MET_NAMES    = .false. &!to read directly WRF metdata
     ,ZREF             = .false. &! testing
-    ,EFFECTIVE_RESISTANCE = .false. ! Drydep method designed for shallow layer
+    ,EFFECTIVE_RESISTANCE = .true. ! Drydep method designed for shallow layer
 
  ! If USES%EMISTACKS, need to set:
   character(len=4)  :: PlumeMethod   = "none" !MKPS:"ASME","NILU","PVDI"
@@ -245,7 +246,15 @@ logical, public, save ::             &
  ,JUMPOVER29FEB      = .false.         ! When current date is 29th February, jump to next date.
 
 type(uEMEP_type), public, save :: uEMEP ! The parameters steering uEMEP
-integer, public, save :: NTIMING_uEMEP = 5 !reset to zero if USES%uEMEP = F 
+
+integer, public, parameter :: MAXSRC=1000
+type(lf_sources), public, save :: lf_src(MAXSRC)
+integer, public, parameter :: Max_Country_list=100
+character(len=10), public, save :: lf_country_list(Max_Country_list)='NOTSET'!new format "uEMEP" Local Fractions. List of countries
+integer, public, parameter :: Max_Country_groups=30
+type(lf_country_group_type), public, save :: lf_country_group(Max_Country_groups)
+integer, public, parameter :: Max_Country_sectors=13
+integer, public, save :: lf_country_sector_list(Max_Country_sectors)=-1!new format "uEMEP" Local Fractions. List of sectors for each country
 
 integer, public, save :: &
   FREQ_HOURLY = 1  ! 3Dhourly netcdf special output frequency
@@ -365,10 +374,9 @@ integer, public, parameter ::       &
 integer, public, parameter :: &
    NSITES_MAX =        99     & ! Max. no surface sites allowed
   ,FREQ_SITE  =         1     & ! Interval (hrs) between outputs
-  ,NSHL_SITE_MAX  =    10     & ! Bosco OH NSPEC_SHL     & ! No. short-lived species
+  ,NSHL_SITE_MAX  =    10     & ! No. short-lived species
   ,NXTRA_SITE_MISC =    2     & ! No. Misc. met. params  ( e.g. T2, d_2d)
-  ,NXTRA_SITE_D2D  =   20       ! Bosco = +5-4 No. Misc. met. params  ( e.g. T2, d_2d)
-!Bosco  ,NXTRA_SITE_D2D  =  9+8       ! No. Misc. met. params  ( e.g. T2, d_2d)
+  ,NXTRA_SITE_D2D  =   18       ! No.  params from d_2d fields 
 integer, public, parameter :: NSONDES_MAX = 99 ! Max. no sondes allowed
 
 integer, private :: isite              ! To assign arrays, if needed
@@ -405,17 +413,14 @@ character(len=TXTLEN_SHORT), public :: SONDE_ADV_names(NSPEC_ADV) = 'NOTSET'
 !These variables must have been set in My_Derived for them to be used.
 character(len=24), public, parameter, dimension(NXTRA_SITE_D2D) :: &
   SITE_XTRA_D2D=[character(len=24):: &
-    "HMIX","PSURF", & ! Bosco skip: "ws_10m","rh2m",&
+    "HMIX", & !Hmix is interpolated in time, unlike NWP version 
     "Emis_mgm2_BioNatC5H8","Emis_mgm2_BioNatTERP",&
     "Emis_mgm2_BioNatNO","Emis_mgm2_nox",&
     'WDEP_PREC',&!''SNratio',&
-    'met2d_uref','met2d_u10', 'met2d_v10','met2d_rh2m', &
-    !'met2d_SMI1', 'met2d_SMI3',&
+    'met2d_ps', 'met2d_uref','met2d_u10', & !u10 seems to be wind-speed
+                                          !'met2d_v10','met2d_rh2m', &
     'met2d_SMI_uppr', 'met2d_SMI_deep',&
     'met2d_ustar_nwp', 'met2d_LH_Wm2', 'met2d_SH_Wm2',&
-    !BB 'SMI_deep','met2d_SMI_d','SMI_uppr','met2d_SMI_s',&
-!Boscso Extra: +5
-    !BB'USTAR_NWP', 
     'USTAR_DF','INVL_DF', &
     'met2d_PARdbh', 'met2d_PARdif' &
 ]
@@ -737,8 +742,9 @@ character(len=TXTLEN_FILE), target, save, public :: &
 character(len=TXTLEN_FILE), target, save, public :: RoadMapFile = 'DataDir/RoadMap.nc'
 character(len=TXTLEN_FILE), target, save, public :: AVG_SMI_2005_2010File = 'DataDir/AVG_SMI_2005_2010.nc'
 character(len=TXTLEN_FILE), target, save, public :: Soil_TegenFile = 'DataDir/Soil_Tegen.nc'
-character(len=TXTLEN_FILE), target, save, public :: SitesFile = 'DataDir/sitesLL.dat'
-character(len=TXTLEN_FILE), target, save, public :: SondesFile = 'DataDir/sondesLL.dat'
+! default site/sond files use lat, lon and Kdown coords:
+character(len=TXTLEN_FILE), target, save, public :: SitesFile = 'DataDir/sitesLLKD.dat'
+character(len=TXTLEN_FILE), target, save, public :: SondesFile = 'DataDir/sondesLLKD.dat'
 character(len=TXTLEN_FILE), target, save, public :: GLOBAL_LAInBVOCFile = 'DataDir/GLOBAL_LAInBVOC.nc'
 character(len=TXTLEN_FILE), target, save, public :: EMEP_EuroBVOCFile = 'DataDir/LandInputs_Mar2011/EMEP_EuroBVOC.nc'
 !SEASON replace by 'jan', 'apr', 'jul' or 'oct' in readdiss
@@ -780,7 +786,11 @@ subroutine Config_Constants(iolog)
    ,DEBUG  & !
    ,CONVECTION_FACTOR &
    ,EURO_SOILNOX_DEPSCALE &
-   ,uEMEP &
+   ,uEMEP & !old format . Avoid, will be removed in future versions
+   ,lf_src & !new format "uEMEP" Local Fractions
+   ,lf_country_list & !new format "uEMEP" Local Fractions. List of countries
+   ,lf_country_group & !new format "uEMEP" Local Fractions. List of group of countries
+   ,lf_country_sector_list & !new format "uEMEP" Local Fractions. List of sectors for each country
    ,INERIS_SNAP1, INERIS_SNAP2 &   ! Used for TFMM time-factors
    ,FREQ_HOURLY           &
    ,ANALYSIS, SOURCE_RECEPTOR, VOLCANO_SR &
@@ -880,6 +890,8 @@ subroutine Config_Constants(iolog)
     write(*,*) trim(logtxt), IOLOG
     write(IO_LOG,*) trim(logtxt)  ! Can't call PrintLog due to circularity
   end if
+ 
+  USES%LocalFractions = USES%LocalFractions .or. USES%uEMEP !for backward compatibility
 
   ! Convert DEBUG%SPEC to index
   if(first_call)then
@@ -928,6 +940,7 @@ subroutine Config_Constants(iolog)
         ExtraConfigFile(i) = key2str(ExtraConfigFile(i),'DataDir',DataDir)
         ExtraConfigFile(i) = key2str(ExtraConfigFile(i),'GRID',GRID)
         ExtraConfigFile(i) = key2str(ExtraConfigFile(i),'OwnInputDir',OwnInputDir)
+        ExtraConfigFile(i) = key2str(ExtraConfigFile(i),'EmisDir',EmisDir)
         if(MasterProc) then
          write(*,*) dtxt//'Also reading namelist ',i,trim(ExtraConfigFile(i))
          write(*,*) dtxt//"LAST LINE:"//trim(LAST_CONFIG_LINE) ! for debugs
@@ -948,9 +961,11 @@ subroutine Config_Constants(iolog)
 !EEEEEEEEEEEEEEEEEEEEEEEEE
 
   meteo = key2str(meteo,'DataDir',DataDir)
+  meteo = key2str(meteo,'EmisDir',EmisDir)
   meteo = key2str(meteo,'GRID',GRID)
   MetDir= key2str(meteo,'meteoYYYYMMDD.nc','./')
   DegreeDayFactorsFile=key2str(DegreeDayFactorsFile,'MetDir',MetDir)
+  DegreeDayFactorsFile=key2str(DegreeDayFactorsFile,'DataDir',DataDir)
   DegreeDayFactorsFile=key2str(DegreeDayFactorsFile,'GRID',GRID)
   DegreeDayFactorsFile=key2str(DegreeDayFactorsFile,'YYYY',startdate(1))
   if(MasterProc)then
@@ -1014,6 +1029,7 @@ subroutine Config_Constants(iolog)
      !part of a class cannot be a target (?) must therefore do this separately
      if(Emis_sourceFiles(i)%filename/='NOTSET')then
         Emis_sourceFiles(i)%filename = key2str(Emis_sourceFiles(i)%filename,'DataDir',DataDir)
+        Emis_sourceFiles(i)%filename = key2str(Emis_sourceFiles(i)%filename,'EmisDir',EmisDir)
         Emis_sourceFiles(i)%filename = key2str(Emis_sourceFiles(i)%filename,'GRID',GRID)
         Emis_sourceFiles(i)%filename = &
           key2str(Emis_sourceFiles(i)%filename,'OwnInputDir',OwnInputDir)
@@ -1022,6 +1038,7 @@ subroutine Config_Constants(iolog)
   do i = 1, size(EmisMask)
      if(EmisMask(i)%filename/='NOTSET')then
         EmisMask(i)%filename = key2str(EmisMask(i)%filename,'DataDir',DataDir)
+        EmisMask(i)%filename = key2str(EmisMask(i)%filename,'EmisDir',EmisDir)
         EmisMask(i)%filename = key2str(EmisMask(i)%filename,'GRID',GRID)
         EmisMask(i)%filename = &
           key2str(EmisMask(i)%filename,'OwnInputDir',OwnInputDir)
@@ -1031,6 +1048,7 @@ subroutine Config_Constants(iolog)
     if(associated(InputFiles(i)%filename))then
      InputFiles(i)%filename =key2str(InputFiles(i)%filename,'ZCMDIR',ZCMDIR)
      InputFiles(i)%filename =key2str(InputFiles(i)%filename,'DataDir',DataDir)
+     InputFiles(i)%filename =key2str(InputFiles(i)%filename,'EmisDir',EmisDir)
      InputFiles(i)%filename =key2str(InputFiles(i)%filename,'GRID',GRID)
      InputFiles(i)%filename = &
             key2str(InputFiles(i)%filename,'OwnInputDir',OwnInputDir)
@@ -1047,16 +1065,16 @@ subroutine Config_Constants(iolog)
      write(*,*)dtxt//'Reading CH4 IBCs from:', iyr_trend, trim(fileName_CH4_ibcs)
   endif
 
-  if(.not. USES%uEMEP)NTIMING_uEMEP = 0
-
 end subroutine Config_Constants
 
 ! PRELIM. Just writes out USES so far. 
 subroutine WriteConfig_to_RunLog(iolog)
   integer, intent(in) :: iolog ! for Log file
   NAMELIST /OutUSES/ USES
-  write(iolog,*) ' USES after 1st time-step'
-  write(iolog,nml=OutUSES)
+  if(MasterProc)then
+     write(iolog,*) ' USES after 1st time-step'
+     write(iolog,nml=OutUSES)
+  endif
 end subroutine WriteConfig_to_RunLog
 
 subroutine associate_File(FileName)

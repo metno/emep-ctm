@@ -1,4 +1,4 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -60,6 +60,7 @@ module RunChem_mod
   use FastJ_mod,         only: setup_phot_fastj,phot_fastj_interpolate
   use GridValues_mod,    only: debug_proc, debug_li, debug_lj, i_fdom, j_fdom
   use Io_Progs_mod,      only: datewrite
+  use LocalFractions_mod,only: lf_chem,lf_aero_pre,lf_aero_pos
   use MassBudget_mod,    only: emis_massbudget_1d
   use OrganicAerosol_mod,only: ORGANIC_AEROSOLS, OrganicAerosol, &
                               Init_OrganicAerosol, & 
@@ -210,6 +211,7 @@ subroutine runchem()
       if(DEBUG%RUNCHEM) call check_negs(i,j,'B')
 
       call Add_2timing(28,tim_after,tim_before,"Runchem:other setups")
+
 !     if(DEBUG%RUNCHEM.and.debug_flag) &
 !       call datewrite("RUNCHEM PRE-CHEM",(/xn_2d(PPM25,20),xn_2d(AER_BGNDOC,20)/))
 !     !-------------------------------------------------
@@ -218,10 +220,12 @@ subroutine runchem()
 
       if( .not. USES%NOCHEM) then
         call chemistry(i,j,DEBUG%RUNCHEM.and.debug_flag)
-      else
+      else  
         xn_2d(NSPEC_SHL+1:NSPEC_TOT,:) =  xn_2d(NSPEC_SHL+1:NSPEC_TOT,:)  &
                                          +rcemis(NSPEC_SHL+1:NSPEC_TOT,:)*dt_advec
       end if
+
+      if(USES%LocalFractions) call lf_chem(i,j)
 
       if(DEBUG%RUNCHEM) call check_negs(i,j,'C')
 !     !-------------------------------------------------
@@ -255,8 +259,10 @@ subroutine runchem()
                 
       !  Alternating Dry Deposition and Equilibrium chemistry
       !  Check that one and only one eq is chosen
-      if(mod(step_main,2)/=0) then 
+      if(mod(step_main,2)/=0) then
+        if(USES%LocalFractions) call lf_aero_pre(i,j)
         call AerosolEquilib(debug_flag)
+        if(USES%LocalFractions) call lf_aero_pos(i,j)
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
         !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
@@ -269,7 +275,9 @@ subroutine runchem()
         call DryDep(i,j)
         call Add_2timing(31,tim_after,tim_before,"Runchem:DryDep")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'F')
+        if(USES%LocalFractions) call lf_aero_pre(i,j)
         call AerosolEquilib(debug_flag)
+        if(USES%LocalFractions) call lf_aero_pos(i,j)
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'G')
         !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
@@ -303,7 +311,8 @@ subroutine runchem()
       else
          call Aero_water_MARS(i,j, debug_flag)         
       endif
-                   
+
+      
       call check_negs(i,j,'END')
       if(i>=li0.and.i<=li1.and.j>=lj0.and.j<=lj1) then
 

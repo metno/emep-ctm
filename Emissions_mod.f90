@@ -1,4 +1,4 @@
-! <Emissions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Emissions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -95,8 +95,8 @@ use EmisDef_mod,       only: &
      , NEmisMask, EmisMaskValues & !new format
      ,Emis_field, Emis_id, NEmis_id &
      ,NEmisFile_sources, EmisFiles,NEmis_sources, Emis_source&
-     , Emis_source_2D, Emis_source_3D,ix3Dmap, NEmis_3Dsources
-
+     , Emis_source_2D, Emis_source_3D,ix3Dmap, NEmis_3Dsources&
+     , emis_lf, lf_emis_tot, emis_lf_cntry
 use EmisGet_mod,       only: &
      EmisSplit &
     ,EmisGetCdf &
@@ -148,6 +148,7 @@ use Timefactors_mod,   only: &
     ,Read_monthly_emis_grid_fac &
     ,GridTfac &!array with monthly gridded time factors
     ,yearly_normalize !renormalize timefactors after reset
+use LocalFractions_mod, only : add_lf_emis
 implicit none
 private
 
@@ -391,7 +392,7 @@ contains
              Emis_source(ii)%species_ix = ix
              if(dbg)write(*,'(a,i4,a)')dtxt//' species found '// &
                   trim(Emis_source(ii)%country_ISO), ix, ' '//trim(species(ix)%name)
-             if(Emis_source(ii)%include_in_local_fractions .and. USES%uEMEP )then
+             if(Emis_source(ii)%include_in_local_fractions .and. USES%LocalFractions )then
                 if(me==0)write(*,*)"WARNING: local fractions will not include single species "//Emis_source(ii)%species
              endif
           else ! ix<=0
@@ -570,28 +571,43 @@ contains
     real :: fac, gridyear, ccsum,emsum(NEMIS_FILE)
     character(len=TXTLEN_NAME) :: fmt
     TYPE(timestamp)   :: ts1,ts2
-    logical, save ::first_call=.true.
+    logical, save ::first_call = .true.
     real, allocatable, dimension(:,:) :: sumemis ! Sum of emissions per country
-
+    logical :: writeoutsums 
+    logical :: writeout !if something to show and writeoutsums=T
+    
+    writeoutsums = first_call .or. step_main<10 .or. DEBUG%EMISSIONS 
+    writeout = .false. !init
+    
     ts1=make_timestamp(current_date)
     coming_date = current_date
     coming_date%seconds = coming_date%seconds + 1800!NB: end_of_validity_date is at end of period, for example 1-1-2018 for December 2017
     gridyear = GRIDWIDTH_M * GRIDWIDTH_M * 3600*24*nydays*1.0E-6!kg/m2/s -> kt/year
 
-    if(first_call)then
-       ! sum emissions per countries
-       allocate(sumemis(NLAND,NEMIS_FILE))
-       sumemis=0.0
-    endif
+    do n = 1, NEmisFile_sources
+       if(writeoutsums .or. EmisFiles(n)%periodicity=='monthly')then
+          writeoutsums = .true.
+          ! sum emissions per countries
+          allocate(sumemis(NLAND,NEMIS_FILE))
+          sumemis = 0.0
+          emsum = 0.0
+          exit
+       end if
+    end do
 
     !loop over all sources and see which one need to be reread from files
     do n = 1, NEmisFile_sources     
-       if(date_is_reached(to_idate(EmisFiles(n)%end_of_validity_date,5 )))then
-          if(me==0 .and. (step_main<10 .or. DEBUG%EMISSIONS))&
-               write(*,*)'Emis: update date is reached ',&
+      if(date_is_reached(to_idate(EmisFiles(n)%end_of_validity_date,5 )))then
+          if(me==0 .and. writeoutsums)&
+               write(*,*)'Emis: current date has reached past update date ',&
                EmisFiles(n)%end_of_validity_date,EmisFiles(n)%periodicity
+          if(writeoutsums) writeout = .true. ! at least something to write
+          if(writeoutsums .and. .not.allocated(sumemis))then
+             allocate(sumemis(NLAND,NEMIS_FILE))
+             emsum = 0.0
+          endif
           !values are no more valid, fetch new one
-          if(first_call)sumemis=0.0
+          if(writeoutsums)sumemis=0.0
           do is = EmisFiles(n)%source_start,EmisFiles(n)%source_end
              if(Emis_source(is)%is3D)then
                 ix = ix3Dmap(is)
@@ -784,7 +800,7 @@ contains
                 endif
              endif
 
-             if(first_call)then
+             if(writeout)then
                 ! sum emissions per countries (in ktonnes?)
                 itot = Emis_source(is)%species_ix
                 isec = Emis_source(is)%sector
@@ -827,7 +843,7 @@ contains
           endif
 
        endif
-       if(first_call)then
+       if(writeout)then
           CALL MPI_ALLREDUCE(MPI_IN_PLACE,sumemis,&
                NLAND*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
           if(me==0)then
@@ -849,12 +865,12 @@ contains
           end do
        endif
     enddo
-    if(first_call)then
+    if(writeout)then
        fmt="(a5,i4,1x,a9,3x,30(f12.2,:))"
        if(me==0 .and. NEmisFile_sources>0)write(*     ,fmt)'EMTAB', 999,'TOTAL    ',emsum(:)
-       deallocate(sumemis)   
        CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)!so that print out comes out nicely
     endif
+    if (allocated(sumemis)) deallocate(sumemis)   
 
     first_call=.false.
 
@@ -1091,7 +1107,7 @@ contains
     allocate(e_fact_lonlat(NSECTORS,MAXFEMISLONLAT,NEMIS_FILE))
     e_fact_lonlat=1.0
     if(.not.allocated(timefac))allocate(timefac(NLAND,N_TFAC,NEMIS_FILE))
-    if(.not.allocated(fac_ehh24x7))allocate(fac_ehh24x7(N_TFAC,24,7,NLAND))
+    if(.not.allocated(fac_ehh24x7))allocate(fac_ehh24x7(NEMIS_FILE,N_TFAC,24,7,NLAND))
     if(.not.allocated(fac_emm))allocate(fac_emm(NLAND,12,N_TFAC,NEMIS_FILE))
     if(.not.allocated(fac_min))allocate(fac_min(NLAND,N_TFAC,NEMIS_FILE))
     if(.not.allocated(fac_edd))allocate(fac_edd(NLAND, 7,N_TFAC,NEMIS_FILE))
@@ -1151,7 +1167,7 @@ contains
     CALL MPI_BCAST(fac_cemm,8*12,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
     CALL MPI_BCAST(fac_emm,8*NLAND*12*N_TFAC*NEMIS_FILE,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
     CALL MPI_BCAST(fac_edd,8*NLAND*7*N_TFAC*NEMIS_FILE,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
-    CALL MPI_BCAST(fac_ehh24x7,8*N_TFAC*24*7*NLAND,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
+    CALL MPI_BCAST(fac_ehh24x7,8*NEMIS_FILE*N_TFAC*24*7*NLAND,MPI_BYTE,0,MPI_COMM_CALC,IERROR) 
 
     !define fac_min for all processors
     forall(iemis=1:NEMIS_FILE,insec=1:N_TFAC,inland=1:NLAND) &
@@ -1599,7 +1615,9 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
   integer :: i_Emis_4D, iem_treated
   character(len=125) ::varname 
   TYPE(timestamp)   :: ts1,ts2
- 
+  integer :: iwday
+  real :: daynorm, roadfac
+  
   ! Initialize
   ehlpcom0 = GRAV* 0.001*AVOG!0.001 = kg_to_g / m3_to_cm3
 
@@ -1619,7 +1637,6 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
       call NewDayFactors(indate)
       if(USES%DEGREEDAY_FACTORS) call DegreeDayFactors(daynumber) ! => fac_emm, fac_edd
       !==========================
-      ! for ROADDUST
       wday=day_of_week(indate%year,indate%month,indate%day)
       if(wday==0)wday=7 ! Sunday -> 7
       oldday = indate%day
@@ -1663,14 +1680,17 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
 
   if(DEBUG_EMISTIMEFACS.and.MasterProc) &
     write(*,"(a,2f8.3)") " EmisSet  traffic 24x7", &
-      fac_ehh24x7(ISNAP_TRAF,1,4,1),fac_ehh24x7(ISNAP_TRAF,13,4,1)
+      fac_ehh24x7(1,ISNAP_TRAF,1,4,1),fac_ehh24x7(1,ISNAP_TRAF,13,4,1)
   !..........................................
 
   if(hourchange) then 
     totemadd(:)  = 0.
     gridrcemis(:,:,:,:) = 0.0 
     SecEmisOut(:,:,:,:) = 0.0
-    if(USES%ROADDUST)gridrcroadd0(:,:,:) = 0.0
+    if(USES%LocalFractions) emis_lf(:,:,:,:) = 0.0
+    if(USES%LocalFractions) lf_emis_tot(:,:,:,:) = 0.0
+    if(USES%LocalFractions) emis_lf_cntry(:,:,:,:,:,:) = 0.0
+    if(USES%ROADDUST) gridrcroadd0(:,:,:) = 0.0
     !..........................................
     ! Process each grid:
     do j = 1,ljmax
@@ -1701,8 +1721,8 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
             do iem = 1, NEMIS_FILE 
 
               tfac = timefac(iland_timefac,sec2tfac_map(isec),iem) &
-                   * fac_ehh24x7(sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
-
+                   * fac_ehh24x7(iem,sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
+              
               if(debug_tfac.and.iem==1) &
                 write(*,"(a,3i4,f8.3)")"EmisSet DAY TFAC:",isec,sec2tfac_map(isec),hour_iland,tfac
 
@@ -1718,7 +1738,7 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                 ! we make use of a baseload even for SNAP2
                 tfac = ( fac_min(iland,sec2tfac_map(isec),iem) & ! constant baseload
                      + ( 1.0-fac_min(iland,sec2tfac_map(isec),iem) )* gridfac_HDD(i,j) ) &
-                     * fac_ehh24x7(sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
+                     * fac_ehh24x7(iem,sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
 
                 if(debug_tfac .and. indate%hour==12 .and. iem==1) &
                   write(*,"(a,3i3,2i4,7f8.3)") "SNAPHDD tfac ",  &
@@ -1741,6 +1761,9 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                 totemadd(itot) = totemadd(itot) &
                      + tmpemis(iqrc) * dtgrid * xmd(i,j)
               end do ! f
+             
+              if(USES%LocalFractions) call add_lf_emis(s,i,j,iem,isec,iland)
+              
             end do ! iem
 
             !  Assign to height levels 1-KEMISTOP
@@ -1796,18 +1819,18 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                 hour_iland = 1
                 if(wday_loc==0)wday_loc=7 ! Sunday -> 7
                 if(wday_loc>7 )wday_loc=1 
-              end if
-
+             end if
+             
+              roadfac = 1.0
               if(ANY(iland==(/IC_FI,IC_NO,IC_SE/)).and. & ! Nordic countries
                  ANY(indate%month==(/3,4,5/)))then        ! spring road dust
-                tfac = fac_ehh24x7(ISNAP_TRAF,hour_iland,wday_loc,iland_timefac_hour)*2.0 ! Doubling in Mar-May (as in TNO model)
-              else
-                tfac = fac_ehh24x7(ISNAP_TRAF,hour_iland,wday_loc,iland_timefac_hour)
+                 roadfac=2.0
               end if
 
               do iem = 1, NROAD_FILES
-                s = tfac * roaddust_emis_pot(i,j,icc,iem)
-                if(DEBUG%ROADDUST.and.debug_proc.and.i==DEBUG_li.and.j==DEBUG_lj)&
+                 tfac = fac_ehh24x7(iem, ISNAP_TRAF,hour_iland,wday_loc,iland_timefac_hour)
+                 s = tfac * roadfac * roaddust_emis_pot(i,j,icc,iem)
+                 if(DEBUG%ROADDUST.and.debug_proc.and.i==DEBUG_li.and.j==DEBUG_lj)&
                   write(*,*)"DEBUG ROADDUST! iem,tfac,icc,roaddust_emis_pot,s", &
                     iem,tfac,icc,roaddust_emis_pot(i,j,icc,iem),s
 
@@ -1856,17 +1879,34 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
           if(isec>0)then
              call CheckStop(iqrc<=0,"emitted sector species must belong to one of the splitted species")
              iem = iqrc2iem(iqrc)
+             
+             if(Emis_source(n)%periodicity == 'monthly')then
+                !make normalization factor for daily fac
+                iland_timefac = find_index(Country(iland)%timefac_index,Country(:)%icode)
+                iwday = mod(wday-indate%day+35, 7) + 1 !note both indate%day and wday start at 1
+                daynorm = 0.0
+                do i = 1, nmdays(indate%month)
+                   daynorm = daynorm + fac_edd(iland_timefac,iwday,isec,iem)
+                   iwday = iwday + 1
+                   if(iwday>7)iwday = 1
+                enddo
+                daynorm = nmdays(indate%month)/daynorm
+             endif           
+
              do j = 1,ljmax
-                do i = 1,limax
-                   
+                do i = 1,limax                   
                    if(Emis_source(n)%periodicity == 'yearly' .or. Emis_source(n)%periodicity == 'monthly')then
                       !we need to apply hourly factors
                       call make_iland_for_time(debug_tfac, indate, i, j, iland, wday, iland_timefac,hour_iland,wday_loc,iland_timefac_hour)                      
-                      tfac = fac_ehh24x7(sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
+                      tfac = fac_ehh24x7(iem,sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
                       if(Emis_source(n)%periodicity == 'yearly')then
-                         !apply monthly factor on top of hourly factors
+                         !apply monthly and daily factor on top of hourly factors
                          tfac = tfac * timefac(iland_timefac,sec2tfac_map(isec),iem)                         
-                      endif                      
+                      endif
+                      if(Emis_source(n)%periodicity == 'monthly')then
+                         !apply daily factors, with renormalization to conserve monthly sums
+                         tfac = tfac * fac_edd(iland_timefac,wday,isec,iem) * daynorm
+                      endif
                    else
                       !not monthly or yearly emissions, timefactors must be included in emission values
                       tfac = 1.0
@@ -1879,6 +1919,9 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                       ! Add up emissions in ktonne 
                    totemadd(itot) = totemadd(itot) &
                         + s * dtgrid * xmd(i,j)
+
+                   if(USES%LocalFractions .and. me==0) write(*,*)'WARNING: single emitted species not implemented in uEMEP yet'
+                   
                    !  Assign to height levels 1-KEMISTOP
                    do k=KEMISTOP,KMAX_MID
                       gridrcemis(iqrc,k,i,j) = gridrcemis(iqrc,k,i,j)   &
@@ -1898,6 +1941,20 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
           iem=find_index(Emis_source(n)%species,EMIS_FILE(:))
           call CheckStop(iem<0, "did not recognize species "//trim(Emis_source(n)%species))
           call CheckStop(Emis_source(n)%sector<=0," sector must be defined for "//trim(Emis_source(n)%varname))
+
+          if(Emis_source(n)%periodicity == 'monthly')then
+             !make normalization factor for daily fac
+             iland_timefac = find_index(Country(iland)%timefac_index,Country(:)%icode)
+             iwday = mod(wday-indate%day+35, 7) + 1
+             daynorm = 0.0
+             do i = 1, nmdays(indate%month)
+                daynorm = daynorm + fac_edd(iland_timefac,iwday,isec,iem)
+                iwday = iwday + 1
+                if(iwday>7)iwday = 1
+             enddo
+             daynorm = nmdays(indate%month)/daynorm
+          endif
+          
           do f = 1,emis_nsplit(iem)
              itot = iemsplit2itot(f,iem)
              call CheckStop(itot<0, "did not recognize split "//trim(Emis_source(n)%species))
@@ -1907,10 +1964,14 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                    if(Emis_source(n)%periodicity == 'yearly' .or. Emis_source(n)%periodicity == 'monthly')then
                       !we need to apply hourly factors
                       call make_iland_for_time(debug_tfac, indate, i, j, iland, wday, iland_timefac,hour_iland,wday_loc,iland_timefac_hour)
-                      tfac = fac_ehh24x7(sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
+                      tfac = fac_ehh24x7(iem,sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
                       if(Emis_source(n)%periodicity == 'yearly')then
-                         !apply monthly factor on top of hourly factors
+                         !apply monthly and daily factor on top of hourly factors
                          tfac = tfac * timefac(iland_timefac,sec2tfac_map(isec),iem)                         
+                      endif
+                      if(Emis_source(n)%periodicity == 'monthly')then
+                         !apply daily factors, with renormalization to conserve monthly sums
+                         tfac = tfac * fac_edd(iland_timefac,wday,isec,iem) * daynorm
                       endif
                    else
                       !not monthly or yearly emissions, timefactors must be included in emission values
@@ -1921,13 +1982,14 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
 
                    !Degree days - only SNAP-2 
                    if(USES%DEGREEDAY_FACTORS .and. &
-                        sec2tfac_map(isec)==ISNAP_DOM .and. Gridded_SNAP2_Factors) then
+                        sec2tfac_map(isec)==ISNAP_DOM .and. Gridded_SNAP2_Factors .and. &
+                        (Emis_source(n)%periodicity == 'yearly' .or. Emis_source(n)%periodicity == 'monthly')) then
                       oldtfac = tfac
                       ! If INERIS_SNAP2  set, the fac_min will be zero, otherwise
                       ! we make use of a baseload even for SNAP2
                       tfac = ( fac_min(iland,sec2tfac_map(isec),iem) & ! constant baseload
                            + ( 1.0-fac_min(iland,sec2tfac_map(isec),iem) )* gridfac_HDD(i,j) ) &
-                           * fac_ehh24x7(sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
+                           * fac_ehh24x7(iem,sec2tfac_map(isec),hour_iland,wday_loc,iland_timefac_hour)
                       
                       if(debug_tfac .and. indate%hour==12 .and. iem==1) &
                            write(*,"(a,3i3,2i4,7f8.3)") "SNAPHDD tfac ",  &
@@ -1943,6 +2005,8 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                         SecEmisOut(i,j,iem,isec2SecOutWanted(isec)) + s
                    ! Add up emissions in ktonne 
                    totemadd(itot) = totemadd(itot) + s * dtgrid * xmd(i,j)
+
+                   if(USES%LocalFractions) call add_lf_emis(s,i,j,iem,isec,iland)
 
                    !  Assign to height levels 1-KEMISTOP
                    do k=KEMISTOP,KMAX_MID

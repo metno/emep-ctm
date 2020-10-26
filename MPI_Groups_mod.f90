@@ -1,4 +1,4 @@
-! <MPI_Groups_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <MPI_Groups_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -31,7 +31,7 @@ use mpi,only: MPI_REAL8,MPI_DOUBLE_PRECISION,MPI_DOUBLE_COMPLEX,&
               MPI_SUM,MPI_LOR,MPI_LAND,MPI_MAX,MPI_MIN, &
               MPI_COMM_WORLD,MPI_IN_PLACE,&
               MPI_ADDRESS_KIND,MPI_INFO_NULL,MPI_STATUS_SIZE,&
-              MPI_WTIME
+              MPI_WTIME, MPI_ANY_SOURCE
 implicit none
 
 integer, public, parameter ::  MasterPE = 0 ! root/master processor

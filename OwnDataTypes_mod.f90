@@ -1,4 +1,4 @@
-! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -206,11 +206,12 @@ end type O3cl_t
 
 !==================
 ! uEMEP parameters
-integer, public, parameter :: Npoll_uemep_max=7 !max number of uEMEP pollutant
-integer, public, parameter :: Nsector_uemep_max=10 !max number of sectors for each uEMEP pollutant
+integer, public, parameter :: Npoll_lf_max=7 !max number of lf pollutant
+integer, public, parameter :: Nsector_lf_max=13 !max number of sectors for each lf pollutant
+integer, public, parameter :: Size_Country_list=100 !max number of countries for each lf pollutant
 type, public :: poll_type
   character(len=4):: emis='none'    ! one of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
-  integer, dimension(Nsector_uemep_max) ::sector=-1    ! sectors to be included for this pollutant. Zero is sum of all sectors
+  integer, dimension(Nsector_lf_max) ::sector=-1    ! sectors to be included for this pollutant. Zero is sum of all sectors
   integer :: EMIS_File_ix = 0 !index in EMIS_File (set by model)
   integer :: Nsectors = 0 !set by model
   integer :: sec_poll_ishift = 0 !The start of index for isec_poll loops
@@ -316,12 +317,13 @@ type, public :: emis_in
 end type emis_in
 
 type, public :: uEMEP_type
+  integer     :: Nsrc=0 !number of distinct source to include
   integer     :: Npoll=0    ! Number of pollutants to treat in total
   integer     :: Nsec_poll=1    ! Number of sector and pollutants to treat in total
   integer     :: dist=0    ! max distance of neighbor to include. (will include a square with edge size=2*dist+1)
   integer     :: Nvert=20   ! number of k levels to include
   integer     :: DOMAIN(4) = -999
-  type(poll_type) :: poll(Npoll_uemep_max) !pollutants to include
+  type(poll_type) :: poll(Npoll_lf_max) !pollutants to include
   logical     :: YEAR =.true.! Output frequency
   logical     :: MONTH =.false.
   character(len=40)::  MONTH_ENDING = "NOTSET"
@@ -330,6 +332,42 @@ type, public :: uEMEP_type
   logical     :: HOUR_INST =.false.
   logical     :: COMPUTE_LOCAL_TRANSPORT=.false.
 end type uEMEP_type
+
+type, public :: lf_sources
+  character(len=TXTLEN_NAME) :: species = 'NONE' !pollutants to include 
+  character(len=TXTLEN_NAME) :: type = 'relative' !Qualitatively different type of sources: "coarse", "relative", "country"
+  integer :: dist = -1 ! window dimension, if defined 
+  integer :: Nvert = -1 ! vertical extend of the tracking/local rwindow
+  integer :: sector= -1 ! sector for this source. Zero is sum of all sectors
+  integer :: poll = 1 !index of pollutant in loc_tot (set by model)
+  integer :: start = 1 ! first position index in lf_src (set by model)
+  integer :: end = 1 ! last position index in lf_src (set by model)
+  integer :: iem = 0 ! index of emitted pollutant, emis (set by model)
+  integer :: Npos = 0 ! number of position indices in lf_src (set by model)
+  integer :: Nsplit = 0 ! into how many species the emitted pollutant is split into (set by model)
+  integer :: species_ix = -1 !species index, if single pollutant (for example NO or NO2, instead of nox) 
+  integer :: iqrc = -1 !index for emissplits, if single pollutant (for example NO or NO2, instead of nox) 
+  integer, dimension(4) :: DOMAIN = -1 ! DOMAIN which will be outputted
+  integer, dimension(15) :: ix = -1 ! internal index of the  (splitted) species (set by model)
+  real, dimension(15) :: mw=0.0  ! molecular weight of the (splitted) species (set by model)
+  character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' !country name, for example FR for France, as defined in Country_mod
+  integer :: country_ix = -1 !Internal country index. Does not have any meaning outside of code
+  logical :: DryDep = .false. ! if drydep is to be outputed
+  logical :: WetDep = .false. ! if wetdep is to be outputed
+  logical     :: YEAR =.true.! Output frequency
+  logical     :: MONTH =.false.
+  character(len=40)::  MONTH_ENDING = "NOTSET"
+  logical     :: DAY =.false.
+  logical     :: HOUR =.false.
+  logical     :: HOUR_INST =.false.
+end type lf_sources
+
+integer, parameter, public :: MAX_lf_country_group_size = 50 !max 50 countries in each group
+type, public :: lf_country_group_type
+   character(len=TXTLEN_NAME) :: name = 'NOTSET' !the overall name of the group (for example 'EU')
+   character(len=10), dimension(MAX_lf_country_group_size):: list = 'NOTSET' ! list of countries inside the group
+   integer, dimension(MAX_lf_country_group_size):: ix = -1 ! index of the country as defined in Country_ml (set by model)
+end type lf_country_group_type
 
 contains
 !=========================================================================

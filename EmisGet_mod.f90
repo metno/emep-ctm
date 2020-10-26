@@ -1,4 +1,4 @@
-! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -593,7 +593,7 @@ contains
           if(EmisFile_in%source(i)%varname == cdfvarname)then
              nn = nn + 1
              source_found(i) = 0 !mark as found
-             call CheckStop(NEmis_sources+nn > NEmis_sourcesMAX,"NEmis_sourcesMAX exceeded (A)")
+             call CheckStop(NEmis_sources+nn > NEmis_sourcesMAX,"lf: too many sources. Increase NEmis_sourcesMAX")
              Emis_source(NEmis_sources+nn)%ix_in=i
              if ( debugm0 ) write(*,*) dtxt//'var add:',trim(cdfvarname)
           endif
@@ -603,7 +603,7 @@ contains
           ! into different vertical levels)
            do i = 1,max(1,nn)
              !we define a new emission source
-             call CheckStop(NEmis_sources+1 > NEmis_sourcesMAX,"NEmis_sourcesMAX exceeded (B)")
+             call CheckStop(NEmis_sources+1 > NEmis_sourcesMAX,"lf: too many sources. Please, increase NEmis_sourcesMAX")
              NEmis_sources = NEmis_sources + 1
              Emis_source(NEmis_sources)%varname = trim(cdfvarname)
              Emis_source(NEmis_sources)%species = trim(cdfspecies)
@@ -1493,6 +1493,7 @@ end if
            call read_line(IO_EMIS,txtinput,ios)
            if ( ios /=  0 ) exit READ_DATA     ! End of file
            read(unit=txtinput,fmt=*,iostat=ios)  iland_icode, isec, (tmp(i),i=1, nsplit)
+
            if( MasterProc .and. ios /= 0 ) then
                print *, "ERROR: EmisGet: Failure reading emispslit file"
                print *, "Expecting to split into nsplit=", nsplit
@@ -1825,7 +1826,7 @@ subroutine make_iland_for_time(debug_tfac, indate, i, j, iland, wday, iland_time
           hour_iland, Country(iland)%timezone
      call datewrite("EmisSet DAY 24x7:", &
           (/ i, iland, wday, wday_loc, hour_iland /), &
-          (/ fac_ehh24x7(ISNAP_TRAF,hour_iland,wday_loc,iland_timefac_hour) /) )
+          (/ fac_ehh24x7(1,ISNAP_TRAF,hour_iland,wday_loc,iland_timefac_hour) /) )
   end if
     
 end subroutine make_iland_for_time

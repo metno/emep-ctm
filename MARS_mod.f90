@@ -64,25 +64,25 @@ module MARS_mod
       integer, private, save :: MAXNNN1 = 0
       integer, private, save :: MAXNNN2 = 0
 !ds      real        MWNO3            ! molecular weight for NO3
-      real, private, parameter :: MWNO3  = 62.0049 
+      real, private, parameter :: MWNO3  = 62.0!049 
 
 !ds      real        MWHNO3           ! molecular weight for HNO3
-      real, private, parameter :: MWHNO3 = 63.01287       
+      real, private, parameter :: MWHNO3 = 63.0!1287       
 
 !ds      real        MWSO4            ! molecular weight for SO4
-      real, private, parameter :: MWSO4 = 96.0576 
+      real, private, parameter :: MWSO4 = 96.0!576 
 
 !ds      real        MWHSO4           ! molecular weight for HSO4
-      real, private, parameter :: MWHSO4 = MWSO4 + 1.0080
+      real, private, parameter :: MWHSO4 = MWSO4 + 1.0!080
 
 !ds      real        MH2SO4           ! molecular weight for H2SO4
-      real, private, parameter :: MH2SO4 = 98.07354 
+      real, private, parameter :: MH2SO4 = 98.0!7354 
 
 !ds      real        MWNH3            ! molecular weight for NH3
-      real, private, parameter :: MWNH3 = 17.03061 
+      real, private, parameter :: MWNH3 = 17.0!3061 
 
 !ds      real        MWNH4            ! molecular weight for NH4
-      real, private, parameter :: MWNH4 = 18.03858
+      real, private, parameter :: MWNH4 = 18.0!3858
  contains
 
       real function poly4 (a,x)
@@ -481,15 +481,15 @@ module MARS_mod
 !..iamodels3 merge NH3/NH4 , HNO3,NO3 here
       TSO4 = MAX( 0.0, SO4 / MWSO4  )
       TSO4 = MAX( FLOOR, TSO4  )      !GEOS added
-      TNO3 = MAX( 0.0, (NO3 / MWNO3 + HNO3 / MWHNO3) )
-      TNH4 = MAX( 0.0, (NH3 / MWNH3 + NH4 / MWNH4)  )
+      TNO3 = MAX( 0.0, (NO3 / MWNO3 + HNO3 / MWHNO3) ) !in number of molecules per volume. conserved
+      TNH4 = MAX( 0.0, (NH3 / MWNH3 + NH4 / MWNH4)  ) !in number of molecules per volume. conserved
 
 !2/25/99 IJA
-!      TMASSNH3  = MAX(0.0, NH3 + (MWNH3 / MWNH4)  * NH4 )
+!      TMASSNH3  = MAX(0.0, NH3 + (MWNH3 / MWNH4)  * NH4 ) !total mass in units of "as NH3"
 !      TMASSHNO3 = MAX(0.0, NO3 + (MWHNO3 / MWNO3) * NO3 )
 
-      TMASSNH3  = MAX(0.0, NH3 +  NH4 )
-      TMASSHNO3 = MAX(0.0, HNO3 + NO3 )
+      TMASSNH3  = MAX(0.0, NH3 +  NH4 ) !NB: do not use as it is not conserved!! in kg per volume
+      TMASSHNO3 = MAX(0.0, HNO3 + NO3 ) !NB: do not use as it is not conserved!! in kg per volume
  
 !...now set humidity index fRH as a percent
 
@@ -644,7 +644,6 @@ module MARS_mod
          DO_RATIO_Low_2=.true.
          TSO4_HighA=TSO4*Ratio/RATIO_High
          TSO4_LowA=TSO4*Ratio/RATIO_Low
-!         High_Factor=(RATIO-RATIO_Low)/(RATIO_High-RATIO_Low)
          High_Factor=(RATIO*RATIO_High-RATIO_Low*RATIO_High)/(RATIO*RATIO_High-RATIO*RATIO_Low)
       end if
 
@@ -719,11 +718,12 @@ if( DEBUG%EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
               ASO4_High = TSO4_HighA * MWSO4
               ANO3_High = NO3
               ANH4_High = YNH4 * MWNH4
-              GNH3_High = TMASSNH3 - ANH4
+              GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
               if( GNH3 < 0.0 ) then
                  print *, " NEG GNH3", TWOSO4, ANH4, TMASSNH3
                  call CheckStop("NEG GNH3")
               end if
+
 !              RETURN
           goto 333
             END IF
@@ -738,21 +738,15 @@ if( DEBUG%EQUIB .and. debug_flag ) print *, "MARS DISC NEG ", XNO3, WH2O, DISC
             XNO3 = MIN( XXQ / AA, CC / XXQ )
           
           END IF
-!2/25/99 IJA
+
           AH2O_High = 1000.0 * WH2O
           YNH4 = TWOSO4 + XNO3
           ASO4_High = TSO4_HighA * MWSO4
-          !dsSAFE ANO3 = XNO3 * MWNO3
-          ANO3_High = min(XNO3 * MWNO3, TMASSHNO3 )
-          !dsSAFE ANH4 = YNH4 * MWNH4 ! ds should be safe as NH4/SO4 >2, but anyway:
-          ANH4_High = min(YNH4 * MWNH4, TMASSNH3 )  ! ds should be safe as NH4/SO4 >2, but anyway:
-          GNH3_High = TMASSNH3 - ANH4_High
-          GNO3_High = TMASSHNO3 - ANO3_High
-          !    if( GNH3 < 0.0 .or. GNO3 < 0.0 ) then
-          !       print *, " NEG GNH3 GNO3", TWOSO4, ANH4, TMASSNH3, ANO3, TMASSHNO3
-          !       call CheckStop("NEG GNH3 GNO3")
-          !    end if
-!          RETURN
+          ANO3_High = min(XNO3 , TNO3 ) * MWNO3
+          ANH4_High = min(YNH4 , TNH4 )* MWNH4  ! ds should be safe as NH4/SO4 >2, but anyway:
+          GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
+          GNO3_High = max(FLOOR,(TNO3 - XNO3))* MWHNO3
+
           goto 333
         END IF
 
@@ -801,15 +795,12 @@ if( DEBUG%EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
             GNO3_High = HNO3
             ASO4_High = TSO4_HighA * MWSO4
             ANO3_High = NO3
-            !ANH4 = YNH4 * MWNH4
-            ANH4_High = min( YNH4 * MWNH4, TMASSNH3)  ! ds added "min"
-            GNH3_High = TMASSNH3 - ANH4_High
-
+            ANH4_High = min(YNH4 , TNH4 )* MWNH4  ! ds should be safe as NH4/SO4 >2, but anyway:
+            GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
               !WRITE( 10, * ) ' COMPLEX ROOTS '
 !            RETURN
                 goto 333
           END IF
-! 2/25/99 IJA
 
 ! Deal with degenerate case (yoj)
 
@@ -839,9 +830,8 @@ if( DEBUG%EQUIB .and. debug_flag ) print *, "MARS DISC NEG2 ", XNO3, WH2O, DISC
                 GNO3_High = HNO3
                 ASO4_High = TSO4_HighA * MWSO4
                 ANO3_High = NO3
-                !ds ANH4 = YNH4 * MWNH4
-                ANH4_High = min( YNH4 * MWNH4, TMASSNH3)  ! ds added "min"
-                GNH3_High = TMASSNH3 - ANH4_High
+                ANH4_High = min(YNH4 , TNH4 )* MWNH4  ! ds should be safe as NH4/SO4 >2, but anyway:
+                GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
                 if( DEBUG%EQUIB .and. debug_flag ) WRITE( *, * ) ' TWO NEG ROOTS '
 !                RETURN
                 goto 333
@@ -901,13 +891,12 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
           IF ( EROR <= TOLER1 ) THEN 
 !!!            WRITE( 11, * ) RH, STION, GAMS( 1, 1 ),GAMS( 1, 2 ), GAMS( 1, 3 ),
 !!!     &      GAMS( 2, 1 ), GAMS( 2, 2 ), GAMS( 2, 3 ), PHIBAR
-! 2/25/99 IJA
 
             ASO4_High = TSO4_HighA * MWSO4
-            ANO3_High = min(XNO3 * MWNO3,TMASSHNO3)
-            ANH4_High = min( YNH4 * MWNH4, TMASSNH3 )
-            GNO3_High = TMASSHNO3  - ANO3_High
-            GNH3_High = TMASSNH3   - ANH4_High
+            ANO3_High = min(XNO3 , TNO3 ) * MWNO3
+            ANH4_High = min(  YNH4 , TNH4 )* MWNH4
+            GNO3_High = max(FLOOR,(TNO3 - XNO3))* MWHNO3
+            GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
             AH2O_High = 1000.0 * WH2O
 
 !            RETURN
@@ -924,11 +913,11 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
         ANO3_High = NO3
         XNO3 = NO3 / MWNO3
         YNH4 = TWOSO4
-!        ANH4 = YNH4 * MWNH4
-        ANH4_High = min( YNH4 * MWNH4, TMASSNH3 )  ! ds pw added "min"
+        ANH4_High = min(YNH4 , TNH4 )* MWNH4  ! ds should be safe as NH4/SO4 >2, but anyway:
         CALL AWATER ( fRH, TSO4_HighA, YNH4, XNO3, AH2O_High)
         GNO3_High = HNO3
-        GNH3_High = TMASSNH3 - ANH4_High
+        GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
+
 !        RETURN
         goto 333
 
@@ -957,9 +946,8 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 ! 2/25/99 IJA 
         ASO4_Low = TSO4_LowA * MWSO4
         ANH4_Low = TNH4 * MWNH4
-        !dsSAFE ANO3 = NO3
-        ANO3_Low = min( NO3, TMASSHNO3 )
-        GNO3_Low = TMASSHNO3 - ANO3_Low
+        ANO3_Low = min( NO3, TNO3*MWNO3 )
+        GNO3_Low = max(FLOOR,TNO3 - ANO3_Low/MWNO3)*MWHNO3
         GNH3_Low = FLOOR
         AH2O_Low = 1.0E3 *WH2O
 
@@ -1063,10 +1051,8 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
           MNA = MAX( 0.0, MNA )
           MNA = MIN( MNA, TNO3 / max(WH2O,FLOOR) )
           XNO3 = MNA * WH2O
-          !ds ANO3 = MNA * WH2O * MWNO3
-          ANO3_Low = min( TMASSHNO3, MNA * WH2O * MWNO3)
-! 2/25/99 IJA
-          GNO3_Low = TMASSHNO3 - ANO3_Low
+          ANO3_Low = min( MNA * WH2O, TNO3 )*MWNO3
+          GNO3_Low = max(FLOOR,TNO3 - ANO3_Low/MWNO3)*MWHNO3
 
 !GEOS added:
           ASO4_Low = MSO4 * WH2O * MWSO4 !pw added after [rjp, 12/12/01]
@@ -1134,7 +1120,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
         GNO3_Low = HNO3
         ANO3_Low = NO3
         ASO4_Low = TSO4 * MWSO4    ! PW after [rjp, 12/17/01]
-        
+ 
         CALL AWATER ( fRH, TSO4_LowA, TNH4, TNO3, AH2O_Low )      
 !        RETURN
            goto 111
@@ -1761,13 +1747,13 @@ real  AHSO4 ! Aerosol phase in bisulfate in MICROGRAMS/M**3
 
       ! Molecular weights
       REAL*8, PARAMETER :: MWNACL = 58.44277d0               ! NaCl
-      REAL*8, PARAMETER :: MWNO3  = 62.0049d0                ! NO3
-      REAL*8, PARAMETER :: MWHNO3 = 63.01287d0               ! HNO3
-      REAL*8, PARAMETER :: MWSO4  = 96.0576d0                ! SO4
-      REAL*8, PARAMETER :: MWHSO4 = MWSO4 + 1.0080d0         ! HSO4
-      REAL*8, PARAMETER :: MH2SO4 = 98.07354d0               ! H2SO4
-      REAL*8, PARAMETER :: MWNH3  = 17.03061d0               ! NH3
-      REAL*8, PARAMETER :: MWNH4  = 18.03858d0               ! NH4
+      REAL*8, PARAMETER :: MWNO3  = 62.0!049d0                ! NO3
+      REAL*8, PARAMETER :: MWHNO3 = 63.0!1287d0               ! HNO3
+      REAL*8, PARAMETER :: MWSO4  = 96.0!576d0                ! SO4
+      REAL*8, PARAMETER :: MWHSO4 = MWSO4 + 1.0!080d0         ! HSO4
+      REAL*8, PARAMETER :: MH2SO4 = 98.0!7354d0               ! H2SO4
+      REAL*8, PARAMETER :: MWNH3  = 17.0!3061d0               ! NH3
+      REAL*8, PARAMETER :: MWNH4  = 18.0!3858d0               ! NH4
       REAL*8, PARAMETER :: MWORG  = 16.0d0                   ! Organic Species
       REAL*8, PARAMETER :: MWCL   = 35.453d0                 ! Chloride
       REAL*8, PARAMETER :: MWAIR  = 28.964d0                 ! AIR

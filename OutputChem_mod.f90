@@ -1,4 +1,4 @@
-! <OutputChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <OutputChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -47,7 +47,7 @@ use SmallUtils_mod,     only: find_duplicates
 use TimeDate_mod,       only: tdif_secs,date,timestamp,make_timestamp,current_date, max_day &! days in month
                              ,daynumber,add2current_date,date
 use TimeDate_ExtraUtil_mod,only: date2string, date_is_reached
-use uEMEP_mod,          only: out_uEMEP
+use LocalFractions_mod,          only: lf_out
 use Units_mod,          only: Init_Units
 
 implicit none
@@ -229,8 +229,8 @@ subroutine Output_fields(iotyp)
   call CloseNetCDF
 
   !uemep use own outputting for now, since it has several extra dimensions
-  if(USES%uEMEP)then
-    call out_uEMEP(iotyp)
+  if(USES%LocalFractions)then
+    call lf_out(iotyp)
   endif
 
   ! Write text file to mark output is finished

@@ -1,4 +1,4 @@
-! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.34>
+! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2020 met.no
@@ -68,13 +68,14 @@ use Config_module,only: &
    ,KCHEMTOP                &       ! -> top of chemistry, now k=2
    ,dt => dt_advec          &       ! -> model timestep
    ,IOU_INST                &       ! Index: instantaneous values
-   ,WDEP_WANTED ! Which outputs wanted!
-use Debug_module,      only: DEBUG  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH
-use DerivedFields_mod, only: f_2d, d_2d     ! Contains Wet deposition fields
+   ,USES, WDEP_WANTED ! Which outputs wanted!
+use Debug_module,       only: DEBUG  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH
+use DerivedFields_mod,  only: f_2d, d_2d     ! Contains Wet deposition fields
 use GasParticleCoeffs_mod, only: WetCoeffs, WDspec, WDmapping, nwdep
-use GridValues_mod,    only: gridwidth_m,xm2,dA,dB
-use Io_mod,            only: IO_DEBUG, datewrite
-use MassBudget_mod,    only : wdeploss,totwdep
+use GridValues_mod,     only: gridwidth_m,xm2,dA,dB,i_fdom,j_fdom
+use Io_mod,             only: IO_DEBUG, datewrite
+use LocalFractions_mod, only: lf_wetdep
+use MassBudget_mod,     only : wdeploss,totwdep
 use MetFields_mod,       only: pr, roa, z_bnd, cc3d, lwc
 use MetFields_mod,       only: ps
 use OrganicAerosol_mod,  only: ORGANIC_AEROSOLS
@@ -732,7 +733,11 @@ subroutine WetDeposition(i,j,debug_flag)
           loss = xn_2d(itot,k) * ( 1.0 - lossfac(k)  )
         endif
         xn_2d(itot,k) = xn_2d(itot,k) - loss
-        wdeploss(iadv) = wdeploss(iadv) + loss * rho(k)
+        loss = loss * rho(k) ! concentration -> weight
+        wdeploss(iadv) = wdeploss(iadv) + loss
+        
+        if(USES%LocalFractions) call lf_wetdep(iadv, i, j, k, loss, invgridarea)
+
         if(DEBUG%AQUEOUS.and.debug_flag.and.pr_acc(KMAX_MID)>1.0e-5) then
           write(*,"(a50,2i4,a,9es12.2)") "DEBUG_WDEP, k, icalc, spec", k, &
            icalc, trim(WDspec(icalc)%name)//':'//trim(species_adv(iadv)%name),&
@@ -768,6 +773,7 @@ subroutine WetDeposition(i,j,debug_flag)
     iadv = f_2d(f2d)%index
     d_2d(f2d,i,j,IOU_INST) = wdeploss(iadv) * invgridarea
 
+
     if(DEBUG%MY_WETDEP.and.debug_flag) &
       call datewrite("WET-PPPSPEC: "//species_adv(iadv)%name,&
         iadv,(/wdeploss(iadv)/))
@@ -781,7 +787,6 @@ subroutine WetDeposition(i,j,debug_flag)
 
     wdep = dot_product(wdeploss(gmap%iadv),gmap%uconv(:))
     d_2d(f2d,i,j,IOU_INST) = wdep * invgridarea
-
     if(DEBUG%MY_WETDEP.and.debug_flag)then
       do g=1,size(gmap%iadv)
         iadv=gmap%iadv(g)
