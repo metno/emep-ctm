@@ -12,7 +12,7 @@ import sys
 import tarfile
 
 _CONST = {
-    "VERSION": "0.1.5",  # script version
+    "VERSION": "0.1.6",  # script version
     "RELEASE": [  # released model versions
         "rv3",
         "v201106",
@@ -27,8 +27,19 @@ _CONST = {
         "rv4_32",
         "rv4_33",
         "rv4_34",
+        "rv4_36",
     ],
-    "METYEAR": [2005, 2008, 2010, 2011, 2012, 2013, 2014, 2015],  # released met-years
+    "METYEAR": [  # released met-years
+        2005,
+        2008,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2017,
+    ],
     "THREDDS": "https://thredds.met.no/thredds/fileServer/data/EMEP/OpenSource",
     "FTP": "ftp://ftp.met.no/projects/emep/OpenSource",
     "GIT": "https://github.com/metno/emep-ctm/",

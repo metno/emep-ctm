@@ -18,13 +18,13 @@ catalog.py
 # help and usage information
 catalog.py -h
 
-# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8|rv4_10|rv4_15|rv4_17)
+# retrieve release dataset for revision REV (rv3|v201106|rv4_0|rv4_3|rv4_4|rv4_5|rv4_8|rv4_10|rv4_15|rv4_17|rv4_32|rv4_33|rv4_34|rv4_36)
 catalog.py -R REV          
 
 # get only the source code and user guide for revision REV
 catalog.py -R REV -sd
 
-# download meteorological input for YEAR (2005|2008|2010..2015)
+# download meteorological input for YEAR (2005|2008|2010..2015|2017)
 catalog.py -Y YEAR -m
 
 # download meteorological input for 2015 and EECCA domain
@@ -32,6 +32,9 @@ catalog.py -Y 2015 -m --met-domain EECCA
 
 # download meteorological input for 2015 and EMEP01 domain
 catalog.py -Y 2015 -m --met-domain EMEP01
+
+# download meteorological input for 2017 and MACC17 domain
+catalog.py -Y 2017 -m --met-domain MACC17
 ```
 
 # Tools to read sites and sondes output
