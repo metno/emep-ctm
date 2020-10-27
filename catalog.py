@@ -287,12 +287,12 @@ def file_size(value):
     num = max(float(value), 0)
     for unit in ["B", "K", "M", "G"]:
         if num < 1024.0:
-            return f"{num:4.1f}{unit}"
+            return f"{num:.1f}{unit}"
         num /= 1024.0
-    return f"{num:4.1f}T"
+    return f"{num:.1f}T"
 
 
-class DataPoint(object):
+class DataPoint:
     """Info and retrieval/check methods"""
 
     def __init__(self, release, key, year, model, src, dst="", byteSize=0, md5sum=None):
@@ -300,10 +300,10 @@ class DataPoint(object):
 
         self.release = int(release)  # release date (YYYYMM)
         self.key = str(key)
-        try:
-            self.tag = {"other": "{KEY}{REL}", "meteo": "{KEY}{YEAR}"}[self.key]
-        except KeyError:
-            self.tag = "{MOD}{KEY}"  # eg 'rv4_8source'
+        self.tag = {  # eg 'rv4_8source'
+            "other": "{KEY}{REL}",
+            "meteo": "{KEY}{YEAR}",
+        }.get(self.key, "{MOD}{KEY}")
         try:
             self.year = int(year)  # met-year
         except ValueError:
@@ -312,44 +312,38 @@ class DataPoint(object):
             self.model = str(model)  # model version (or meteo domain)
         except ValueError:
             self.model = None
-        self.src = str(src)  # single source url/file
-        self.dst = str(dst)  # path for uncompressed self.dst
-        if self.dst == "":
-            self.dst = "{TMPDIR}/{TAG}/"
+        self.src: str  # single source url/file
+        self.dst: Path  # path for uncompressed self.dst
         self.size = float(byteSize)  # self.src file size [bytes]
         self.md5sum = md5sum  # self.src checksum
-        if self.md5sum:
-            self.md5sum = str(self.md5sum)
 
         # replace keywords
         kwargs = _CONST
-        kwargs.update(
-            dict(REL=self.release, KEY=self.key, YEAR=self.year, MOD=self.model)
-        )
+        kwargs.update(REL=self.release, KEY=self.key, YEAR=self.year, MOD=self.model)
         self.tag = self.tag.format_map(kwargs)
-        kwargs.update(dict(TAG=self.tag))
-        self.src = Path(self.src.format_map(kwargs))
-        self.dst = Path(self.dst.format_map(kwargs))
+        kwargs.update(TAG=self.tag)
+        self.src = src.format_map(kwargs)
+        self.dst = Path(dst.format_map(kwargs))
         if self.dst.name == "":
-            self.dst /= self.src.name
+            self.dst /= Path(self.src).name
 
-    def __str__(self):
-        return f"{self.tag:>14} {self.file_size:6} {self.dst}"
+    def __str__(self) -> str:
+        return f"{self.tag:>14} {self.file_size:>6} {self.dst}"
 
-    def __repr__(self):
-        return f"{self.file_size:6} {self.dst.name}"
+    def __repr__(self) -> str:
+        return f"{self.file_size:>6} {self.dst.name}"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """find unique self.src occurrences"""
         return hash(repr(self.src))
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, DataPoint):
             return self.src == other.src
         else:
             return False
 
-    def __ne__(self, other):
+    def __ne__(self, other) -> bool:
         return not self.__eq__(other)
 
     @property
@@ -382,14 +376,13 @@ class DataPoint(object):
         if verbose:
             print(f"Check    {self}")
 
-        with open(self.dst, "rb") as file:
-            if self.md5sum != hashlib.md5(file.read()).hexdigest():
-                if cleanup:  # remove broken file
-                    self.cleanup(verbose)
-                if verbose:
-                    print(f"  md5 /= {self.md5sum}")
-                return False
-            return True
+        if self.md5sum != hashlib.md5(self.dst.read_bytes()).hexdigest():
+            if verbose:
+                print(f"  md5 /= {self.md5sum}")
+            if cleanup:  # remove broken file
+                self.cleanup(verbose)
+            return False
+        return True
 
     def download(self, verbose=True):
         """derived from http://stackoverflow.com/a/22776/2576368"""
@@ -402,31 +395,26 @@ class DataPoint(object):
         if verbose:
             print(f"Download {self}")
 
-        self.dst.parent.mkdir(parents=True, exist_ok=True)
         try:
             url = urlopen(self.src)
         except HTTPError:
             print(f"Could not download {self.src}")
             sys.exit(-1)
-        with open(self.dst, "wb") as outfile:
-            block = 1024 * 8  #   8K
-            big_file = self.size > 1024 * 1024 * 128  # 128M
-            n = total = 0
-            if verbose and big_file:
-                n = 0
-                total = self.size / block
-                print_progress(n, total, length=50)
+
+        self.dst.parent.mkdir(parents=True, exist_ok=True)
+        with url, self.dst.open("wb") as file:
+            block = 1_024 * 8  #   8K
+            big_file = self.size > 1_048_576 * 128  # 128M
+            total = self.size if verbose and big_file else 0
+            n = 0
             while True:
                 buff = url.read(block)
                 if not buff:
                     break
-                outfile.write(buff)
-                if verbose and big_file:
-                    n += 1
-                    if n % 128 == 0:  # 8K*128=1M
-                        print_progress(n, total, length=50)
-            if verbose and big_file and total % 128 != 0:
-                print_progress(total, total, length=50)
+                file.write(buff)
+                n += len(buff)
+                if total and (n == total or n % 1_048_576 == 0):  # 1M
+                    print_progress(n, total, length=50)
 
     def unpack(self, verbose=True, inspect=False):
         """Unpack download"""
@@ -458,7 +446,7 @@ class DataPoint(object):
             shutil.copyfile(self.dst, outfile)
 
 
-class DataSet(object):
+class DataSet:
     """Info and retrieval/check methods"""
 
     def __init__(self, tag, release, year, status, dataset=None, byteSize=None):
@@ -493,7 +481,7 @@ def read_catalog(filename: Path, verbose: int = 1):
       index(dict):      catalog sorted into meteo|input|output|source|docs
       archive(list):    all DataSet
     """
-    from csv import reader as csvreader
+    from csv import reader
 
     # download catalog if file not found
     if not filename.is_file():
@@ -501,25 +489,26 @@ def read_catalog(filename: Path, verbose: int = 1):
 
     # catalog file should be present at this point
     with open(filename) as file:
-        reader = csvreader(file, delimiter=",")
-        next(reader)  # skip header
+        csv = reader(file, delimiter=",")
+        next(csv)  # skip header
         catalog: list = []  # list all src files (1 file per row)
         rels, keys = set(), set()  # unique DataPoint.release/.keys for indexing
 
         if verbose > 2:
             print(f"Reading {filename}")
-        for row in reader:
-            if row and "".join(row).strip():  # skip empty lines
-                try:
-                    catalog += [DataPoint(*row)]
-                    rels.add(catalog[-1].release)  # unique releases
-                    keys.add(catalog[-1].key)  # unique keys (meteo,source,&c)
-                    if verbose > 2:
-                        print(f"  {catalog[-1]}")
-                except:
-                    print("Failed to parse ({filename}): {row}")
-                    print(DataPoint(*row))
-                    raise
+        for row in csv:
+            if not row or "".join(row).strip() == "":
+                continue  # skip empty lines
+            try:
+                catalog += [DataPoint(*row)]
+                rels.add(catalog[-1].release)  # unique releases
+                keys.add(catalog[-1].key)  # unique keys (meteo,source,&c)
+                if verbose > 2:
+                    print(f"  {catalog[-1]}")
+            except:
+                print("Failed to parse ({filename}): {row}")
+                print(DataPoint(*row))
+                raise
         if verbose > 1:
             print(f"{filename} read(srcs:{len(catalog)})")
 
@@ -601,7 +590,7 @@ def main(opts):
                 if total > 0:
                     downloads += aux
                 if opts.verbose and aux:
-                    print(f"Queue download: {file_size(total):6} {aux[0].tag}")
+                    print(f"Queue download: {file_size(total):>6} {aux[0].tag}")
         return downloads
 
     # list files to download
@@ -616,7 +605,7 @@ def main(opts):
     # list file_sizes to download
     downloads = list(set(downloads))  # unique files, for single download and total size
     total = file_size(sum(x.size for x in downloads))
-    print(f"Queue download: {total:6} Total")
+    print(f"Queue download: {total:>6} Total")
     if not user_consent("Do you wish to proceed?", opts.ask):
         print("OK, bye")
         sys.exit(0)
