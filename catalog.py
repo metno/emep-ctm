@@ -6,10 +6,11 @@ simplified access to the source code, input data and benchmark results.
 """
 
 import hashlib
-import os
 import shutil
 import sys
 import tarfile
+from contextlib import closing
+from pathlib import Path
 
 _CONST = {
     "VERSION": "0.1.6",  # script version
@@ -45,10 +46,10 @@ _CONST = {
     "GIT": "https://github.com/metno/emep-ctm/",
     "DOC": "https://emep-ctm.readthedocs.io/",
     "RTD": "https://buildmedia.readthedocs.org/media/pdf/emep-ctm",
-    "CSV": "/catalog.csv",  # list all files from all releases
+    "CSV": Path(__file__).parent / "catalog.csv",  # list all files from all releases
     "RAW": "https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",  # catalog on the repo
     "TMPDIR": "./downloads",  # temp path for downloads
-    "DATADIR": ".",  # base path for datasets
+    "DATADIR": Path("."),  # base path for datasets
 }
 
 
@@ -70,7 +71,7 @@ Examples:
     %prog -Y YEAR --meteo
 """.format(
         REV="|".join(_CONST["RELEASE"]),
-        MET="|".join(["%d" % y for y in _CONST["METYEAR"]]),
+        MET="|".join(str(y) for y in _CONST["METYEAR"]),
     )
 
     parser = OptionParser(usage, version=_CONST["VERSION"])
@@ -82,10 +83,12 @@ Examples:
         dest="verbose",
         help="don't print status messages to stdout",
     )
-    parser.add_option("-v", "--verbose", action="count", dest="verbose", help="Increase verbosity")
+    parser.add_option(
+        "-v", "--verbose", action="count", dest="verbose", help="Increase verbosity"
+    )
     parser.add_option(
         "--catalog",
-        default=os.path.dirname(__file__) + _CONST["CSV"],
+        default=_CONST["CSV"],
         action="store",
         type="string",
         dest="catalog",
@@ -216,7 +219,7 @@ Examples:
     if opts.extras:
         opts.data += ["extra"]
     if opts.outpath:
-        _CONST["DATADIR"] = opts.outpath
+        _CONST["DATADIR"] = Path(opts.outpath)
     if opts.tmppath:
         _CONST["TMPDIR"] = opts.tmppath
     return opts, args
@@ -316,19 +319,21 @@ class DataPoint(object):
 
         # replace keywords
         kwargs = _CONST
-        kwargs.update(dict(REL=self.release, KEY=self.key, YEAR=self.year, MOD=self.model))
+        kwargs.update(
+            dict(REL=self.release, KEY=self.key, YEAR=self.year, MOD=self.model)
+        )
         self.tag = self.tag.format_map(kwargs)
         kwargs.update(dict(TAG=self.tag))
-        self.src = self.src.format_map(kwargs)
-        self.dst = self.dst.format_map(kwargs)
-        if os.path.basename(self.dst) == "":
-            self.dst += os.path.basename(self.src)
+        self.src = Path(self.src.format_map(kwargs))
+        self.dst = Path(self.dst.format_map(kwargs))
+        if self.dst.name == "":
+            self.dst /= self.src.name
 
     def __str__(self):
         return "%-14s %6s %s" % (self.tag, file_size(self.size), self.dst)
 
     def __repr__(self):
-        return "%6s %s" % (file_size(self.size), os.path.basename(self.dst))
+        return "%6s %s" % (file_size(self.size), self.dst.name)
 
     def __hash__(self):
         """find unique self.src occurrences"""
@@ -345,16 +350,15 @@ class DataPoint(object):
 
     def cleanup(self, verbose=True):
         """Remove (raw) downloads"""
-        if not os.path.isfile(self.dst):
+        if not self.dst.is_file():
             return
         if verbose:
             print("%-8s %s" % ("Cleanup", self))
 
         try:
-            os.remove(self.dst)
-            dname = os.path.dirname(self.dst)
-            if dname != "":
-                os.rmdir(dname)
+            self.dst.unlink()
+            if self.dst.parent != "":
+                self.dst.parent.rmdir()
         except OSError as error:
             if error.errno == 1:  # opperation not permitted (permissions?)
                 pass
@@ -365,13 +369,13 @@ class DataPoint(object):
 
     def check(self, verbose=True, cleanup=False):
         """Check download against md5sum"""
-        if not os.path.isfile(self.dst):
+        if not self.dst.is_file():
             return False
         if verbose:
             print("%-8s %s" % ("Check", self))
 
-        with open(self.dst, "rb") as infile:
-            if self.md5sum != hashlib.md5(infile.read()).hexdigest():
+        with open(self.dst, "rb") as file:
+            if self.md5sum != hashlib.md5(file.read()).hexdigest():
                 if cleanup:  # remove broken file
                     self.cleanup(verbose)
                 if verbose:
@@ -390,10 +394,7 @@ class DataPoint(object):
         if verbose:
             print("%-8s %s" % ("Download", self))
 
-        dname = os.path.dirname(self.dst)
-        if (not os.path.isdir(dname)) and (dname != ""):
-            os.makedirs(dname)
-
+        self.dst.parent.mkdir(parents=True, exist_ok=True)
         try:
             url = urlopen(self.src)
         except HTTPError:
@@ -402,10 +403,11 @@ class DataPoint(object):
         with open(self.dst, "wb") as outfile:
             block = 1024 * 8  #   8K
             big_file = self.size > 1024 * 1024 * 128  # 128M
+            n = total = 0
             if verbose and big_file:
                 n = 0
-                ntot = self.size / block
-                print_progress(n, ntot, length=50)
+                total = self.size / block
+                print_progress(n, total, length=50)
             while True:
                 buff = url.read(block)
                 if not buff:
@@ -414,9 +416,9 @@ class DataPoint(object):
                 if verbose and big_file:
                     n += 1
                     if n % 128 == 0:  # 8K*128=1M
-                        print_progress(n, ntot, length=50)
-            if verbose and big_file and ntot % 128 != 0:
-                print_progress(ntot, ntot, length=50)
+                        print_progress(n, total, length=50)
+            if verbose and big_file and total % 128 != 0:
+                print_progress(total, total, length=50)
 
     def unpack(self, verbose=True, inspect=False):
         """Unpack download"""
@@ -425,34 +427,26 @@ class DataPoint(object):
 
         if tarfile.is_tarfile(self.dst):
             print("%-8s %s" % ("Untar", self))
-            infile = tarfile.open(self.dst, "r")
-            if user_consent("  See the contents first?", inspect, "no"):
-                print(infile.list(verbose=(verbose > 1)))
-                if not user_consent("  Do you wish to proceed?", inspect):
-                    print("OK, skipping file")
-                    return
-            dname = "%s/" % _CONST["DATADIR"]
-            if (not os.path.isdir(dname)) and (dname != ""):
-                os.makedirs(dname)
-            try:
-                infile.extractall(dname)
-            except EOFError as error:
-                print("  Failed unpack '%s':\n    %s." % (self.dst, error))
-                if not user_consent("    Do you wish to continue?", inspect, "yes"):
-                    sys.exit(-1)
-            infile.close()
+            with closing(tarfile.open(self.dst, "r")) as file:
+                if user_consent("  See the contents first?", inspect, "no"):
+                    print(file.list(verbose=(verbose > 1)))
+                    if not user_consent("  Do you wish to proceed?", inspect):
+                        print("OK, skipping file")
+                        return
+
+                _CONST["DATADIR"].parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    file.extractall(_CONST["DATADIR"])
+                except EOFError as error:
+                    print("  Failed unpack '%s':\n    %s." % (self.dst, error))
+                    if not user_consent("    Do you wish to continue?", inspect, "yes"):
+                        sys.exit(-1)
 
         else:
-            outfile = "%s/%s/%s" % (
-                _CONST["DATADIR"],
-                self.key,
-                os.path.basename(self.dst),
-            )
+            outfile = _CONST["DATADIR"] / self.key / self.dst.name
             if verbose > 1:
                 print("%-8s %s" % ("Copy", outfile))
-            dname = os.path.dirname(outfile)
-            if (not os.path.isdir(dname)) and (dname != ""):
-                os.makedirs(dname)
+            outfile.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.dst, outfile)
 
 
@@ -470,7 +464,7 @@ class DataSet(object):
         if byteSize:
             self.size = float(byteSize) or 0
         else:
-            self.size = sum([x.size for x in self.dataset.values() if hasattr(x, "size")])
+            self.size = sum(x.size for x in self.dataset.values() if hasattr(x, "size"))
 
     def __str__(self):
         return "%-8s (meteo:%s, status:%s)" % (self.tag, self.year, self.status)
@@ -482,7 +476,7 @@ class DataSet(object):
 #       return "%s: %s"%(self,self.dataset)
 
 
-def read_catalog(filename, verbose=1):
+def read_catalog(filename: Path, verbose: int = 1):
     """
     Returns releases read from catalog csv-file
 
@@ -497,14 +491,14 @@ def read_catalog(filename, verbose=1):
     from csv import reader as csvreader
 
     # download catalog if file not found
-    if not os.path.isfile(filename):
+    if not filename.is_file():
         DataPoint(0, "catalog", 0, "", _CONST["RAW"], filename).download(verbose)
 
     # catalog file should be present at this point
-    with open(filename) as infile:
-        reader = csvreader(infile, delimiter=",")
+    with open(filename) as file:
+        reader = csvreader(file, delimiter=",")
         next(reader)  # skip header
-        catalog = []  # list all src files (1 file per row)
+        catalog: list = []  # list all src files (1 file per row)
         rels, keys = set(), set()  # unique DataPoint.release/.keys for indexing
 
         if verbose > 2:
