@@ -49,7 +49,6 @@ character(len=14), save, dimension(NEMIS_Specs), public :: EMIS_Specs = (/ &
 , "SQT_SOA_NV    " &
 , "POLLEN_BIRCH  " &
 , "POLLEN_OLIVE  " &
-, "POLLEN_ALDER  " &
 , "POLLEN_RWEED  " &
 , "POLLEN_GRASS  " &
 /)

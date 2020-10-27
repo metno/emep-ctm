@@ -93,7 +93,6 @@ type(dep_t), public, dimension(NDRYDEP_ADV), save :: CM_DDepMap = (/ &
 , dep_t("SQT_SOA_NV", "PMf       ", -999.0 ) &
 , dep_t("POLLEN_BIRCH", "POLLb     ", -999.0 ) &
 , dep_t("POLLEN_OLIVE", "POLLo     ", -999.0 ) &
-, dep_t("POLLEN_ALDER", "POLLa     ", -999.0 ) &
 , dep_t("POLLEN_RWEED", "POLLr     ", -999.0 ) &
 , dep_t("POLLEN_GRASS", "POLLg     ", -999.0 ) &
 /)

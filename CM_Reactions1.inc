@@ -1308,15 +1308,6 @@
   xnew(POLLEN_OLIVE) = xold(POLLEN_OLIVE) + dt2 * P
 
 
-!-> POLLEN_ALDER
-
-  P = rcemis(POLLEN_ALDER,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_ALDER) = xold(POLLEN_ALDER) + dt2 * P
-
-
 !-> POLLEN_RWEED
 
   P = rcemis(POLLEN_RWEED,k)

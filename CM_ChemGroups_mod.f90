@@ -1184,23 +1184,14 @@ module ChemGroups_mod
   integer, public, target, save, dimension (2) :: &
     DDEP_FFUELECFINE_GROUP = (/ EC_f_ffuel_new, EC_f_ffuel_age /)
   
-  integer, public, target, save, dimension (5) :: &
-    POLLEN_GROUP = (/  &
-      POLLEN_BIRCH, POLLEN_OLIVE, POLLEN_ALDER, POLLEN_RWEED,  &
-      POLLEN_GRASS  &
-    /)
+  integer, public, target, save, dimension (4) :: &
+    POLLEN_GROUP = (/ POLLEN_BIRCH, POLLEN_OLIVE, POLLEN_RWEED, POLLEN_GRASS /)
   
-  integer, public, target, save, dimension (5) :: &
-    WDEP_POLLEN_GROUP = (/  &
-      POLLEN_BIRCH, POLLEN_OLIVE, POLLEN_ALDER, POLLEN_RWEED,  &
-      POLLEN_GRASS  &
-    /)
+  integer, public, target, save, dimension (4) :: &
+    WDEP_POLLEN_GROUP = (/ POLLEN_BIRCH, POLLEN_OLIVE, POLLEN_RWEED, POLLEN_GRASS /)
   
-  integer, public, target, save, dimension (5) :: &
-    DDEP_POLLEN_GROUP = (/  &
-      POLLEN_BIRCH, POLLEN_OLIVE, POLLEN_ALDER, POLLEN_RWEED,  &
-      POLLEN_GRASS  &
-    /)
+  integer, public, target, save, dimension (4) :: &
+    DDEP_POLLEN_GROUP = (/ POLLEN_BIRCH, POLLEN_OLIVE, POLLEN_RWEED, POLLEN_GRASS /)
   
   integer, public, target, save, dimension (20) :: &
     CSTAR_GROUP = (/  &
