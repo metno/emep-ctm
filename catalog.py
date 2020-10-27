@@ -6,6 +6,7 @@ simplified access to the source code, input data and benchmark results.
 """
 
 import hashlib
+import json
 import shutil
 import sys
 import tarfile
@@ -236,7 +237,7 @@ def user_consent(question, ask=True, default="yes"):
     try:
         question = qq[default.lower()] % question
     except KeyError:
-        print("Unsupported option: user_consent(..,default='%s')" % default)
+        print(f"Unsupported option: user_consent(..,default='{default}')")
 
     # valid answers
     answer = {"y": True, "yes": True, "n": False, "no": False}
@@ -271,7 +272,7 @@ def print_progress(iteration, total, prefix="", suffix="", decimals=2, length=10
     filled = int(round(length * iteration / float(total)))
     percents = round(100.00 * (iteration / float(total)), decimals)
     progress = "█" * filled + "-" * (length - filled)
-    sys.stdout.write("\r%s |%s| %s%s %s" % (prefix, progress, percents, "%", suffix))
+    sys.stdout.write(f"\r{prefix} |{progress}| {percents}% {suffix}")
     sys.stdout.flush()
     if iteration == total:
         sys.stdout.write("\n")
@@ -286,9 +287,9 @@ def file_size(value):
     num = max(float(value), 0)
     for unit in ["B", "K", "M", "G"]:
         if num < 1024.0:
-            return "%3.1f%s" % (num, unit)
+            return f"{num:4.1f}{unit}"
         num /= 1024.0
-    return "%.1f%s" % (num, "T")
+    return f"{num:4.1f}T"
 
 
 class DataPoint(object):
@@ -333,10 +334,10 @@ class DataPoint(object):
             self.dst /= self.src.name
 
     def __str__(self):
-        return "%-14s %6s %s" % (self.tag, file_size(self.size), self.dst)
+        return f"{self.tag:>14} {self.file_size:6} {self.dst}"
 
     def __repr__(self):
-        return "%6s %s" % (file_size(self.size), self.dst.name)
+        return f"{self.file_size:6} {self.dst.name}"
 
     def __hash__(self):
         """find unique self.src occurrences"""
@@ -351,12 +352,16 @@ class DataPoint(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    @property
+    def file_size(self) -> str:
+        return file_size(self.size)
+
     def cleanup(self, verbose=True):
         """Remove (raw) downloads"""
         if not self.dst.is_file():
             return
         if verbose:
-            print("%-8s %s" % ("Cleanup", self))
+            print(f"Cleanup  {self}")
 
         try:
             self.dst.unlink()
@@ -375,14 +380,14 @@ class DataPoint(object):
         if not self.dst.is_file():
             return False
         if verbose:
-            print("%-8s %s" % ("Check", self))
+            print(f"Check    {self}")
 
         with open(self.dst, "rb") as file:
             if self.md5sum != hashlib.md5(file.read()).hexdigest():
                 if cleanup:  # remove broken file
                     self.cleanup(verbose)
                 if verbose:
-                    print("%-8s %s" % ("  md5/=", self.md5sum))
+                    print(f"  md5 /= {self.md5sum}")
                 return False
             return True
 
@@ -395,13 +400,13 @@ class DataPoint(object):
             return
 
         if verbose:
-            print("%-8s %s" % ("Download", self))
+            print(f"Download {self}")
 
         self.dst.parent.mkdir(parents=True, exist_ok=True)
         try:
             url = urlopen(self.src)
         except HTTPError:
-            print("Could not download %s" % self.src)
+            print(f"Could not download {self.src}")
             sys.exit(-1)
         with open(self.dst, "wb") as outfile:
             block = 1024 * 8  #   8K
@@ -429,7 +434,7 @@ class DataPoint(object):
             return
 
         if tarfile.is_tarfile(self.dst):
-            print("%-8s %s" % ("Untar", self))
+            print(f"Untar    {self}")
             with closing(tarfile.open(self.dst, "r")) as file:
                 if user_consent("  See the contents first?", inspect, "no"):
                     print(file.list(verbose=(verbose > 1)))
@@ -441,14 +446,14 @@ class DataPoint(object):
                 try:
                     file.extractall(_CONST["DATADIR"])
                 except EOFError as error:
-                    print("  Failed unpack '%s':\n    %s." % (self.dst, error))
+                    print(f"  Failed unpack '{self.dst}':\n    {error}.")
                     if not user_consent("    Do you wish to continue?", inspect, "yes"):
                         sys.exit(-1)
 
         else:
             outfile = _CONST["DATADIR"] / self.key / self.dst.name
             if verbose > 1:
-                print("%-8s %s" % ("Copy", outfile))
+                print(f"Copy     {outfile}")
             outfile.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.dst, outfile)
 
@@ -470,13 +475,10 @@ class DataSet(object):
             self.size = sum(x.size for x in self.dataset.values() if hasattr(x, "size"))
 
     def __str__(self):
-        return "%-8s (meteo:%s, status:%s)" % (self.tag, self.year, self.status)
+        return f"{self.tag:>8} (meteo:{self.year}, status:{self.status})"
 
     def __repr__(self):
-        return "%s: %s" % (self, {k: str(v) for k, v in self.dataset.items() if v})
-
-
-#       return "%s: %s"%(self,self.dataset)
+        return f"{self}: {json.dumps(self.dataset)}"
 
 
 def read_catalog(filename: Path, verbose: int = 1):
@@ -505,7 +507,7 @@ def read_catalog(filename: Path, verbose: int = 1):
         rels, keys = set(), set()  # unique DataPoint.release/.keys for indexing
 
         if verbose > 2:
-            print("Reading %s" % filename)
+            print(f"Reading {filename}")
         for row in reader:
             if row and "".join(row).strip():  # skip empty lines
                 try:
@@ -513,13 +515,13 @@ def read_catalog(filename: Path, verbose: int = 1):
                     rels.add(catalog[-1].release)  # unique releases
                     keys.add(catalog[-1].key)  # unique keys (meteo,source,&c)
                     if verbose > 2:
-                        print("  %s" % catalog[-1])
+                        print(f"  {catalog[-1]}")
                 except:
-                    print("Failed to parse (%s): %r" % (filename, row))
+                    print("Failed to parse ({filename}): {row}")
                     print(DataPoint(*row))
                     raise
         if verbose > 1:
-            print("%s read(srcs:%d)" % (filename, len(catalog)))
+            print(f"{filename} read(srcs:{len(catalog)})")
 
     index = dict.fromkeys(rels)  # index[releases][keys:meteo,source,&c]
     if verbose > 2:
@@ -529,9 +531,9 @@ def read_catalog(filename: Path, verbose: int = 1):
         for k in keys:  # k:meteo,source,&c
             index[r][k] = [x for x in catalog if (x.release == r) and (x.key == k)]
             if verbose > 2:
-                print("  index[%s][%s](srcs:%d)" % (r, k, len(index[r][k])))
+                print(f"  index[{r}][{k}](srcs:{len(index[r][k])})")
     if verbose > 1:
-        print("%s index[release:%d][sets:%d]" % (filename, len(rels), len(keys)))
+        print(f"{filename} index[release:{len(rels)}][sets:{len(keys)}]")
 
     # repack index from dict({key:DataPoint,}) to dict(DataSet)
     if verbose > 2:
@@ -548,9 +550,9 @@ def read_catalog(filename: Path, verbose: int = 1):
             v,
         )
         if verbose > 2:
-            print("  index[%s]: %s" % (r, index[r]))
+            print(f"  index[{r}]: {index[r]}")
     if verbose > 1:
-        print("%s index(release:%d)" % (filename, len(rels)))
+        print(f"{filename} index(release:{len(rels)})")
 
     return index
 
@@ -561,24 +563,24 @@ def main(opts):
     def get_datasets(catalog, attr, target):
         """Search catalog for tag|status|year DataSet"""
         if opts.verbose > 1:
-            print("Searching %s(s):%s" % (attr, target))
+            print(f"Searching {attr}(s):{target}")
         try:
-            dataset = [v for _, v in catalog.items() if getattr(v, attr) in target]
+            dataset = [v for v in catalog.values() if getattr(v, attr) in target]
             if len(dataset) == 0:
                 raise IndexError
         except IndexError:
-            print("No datasets found for --%s=%s" % (attr, target))
+            print(f"No datasets found for --{attr}={target}")
             sys.exit(-1)
         if opts.verbose > 1:
             for x in dataset:
-                print("  Found %s" % x)
+                print(f"  Found {x}")
         return dataset
 
     def get_downloads(catalog, attr, target):
         """List downloads for tag|status|year DataSet"""
         downloads = []
         if opts.verbose > 1:
-            print("Searching datasets:%s" % (opts.data))
+            print(f"Searching datasets:{opts.data}")
         for ds in get_datasets(catalog, attr, target):
             try:
                 ds = {key: ds.dataset[key] for key in opts.data}
@@ -586,20 +588,20 @@ def main(opts):
                 if "meteo" in ds and opts.domain:
                     ds["meteo"] = [x for x in ds["meteo"] if x.model == opts.domain]
             except KeyError:
-                print("No datasets found for --%s=%s" % (attr, target))
+                print(f"No datasets found for --{attr}={target}")
                 sys.exit(-1)
             if opts.verbose > 1:
                 for key in ds:
-                    print("  Found %-6s:%s" % (key, ds[key]))
+                    print(f"  Found {key:>6}:{ds[key]}")
 
             for key in ds:
                 # do not try to download 0-size files
                 aux = [x for x in ds[key] if x.size > 0]
-                total = sum([x.size for x in aux])
+                total = sum(x.size for x in aux)
                 if total > 0:
                     downloads += aux
                 if opts.verbose and aux:
-                    print("Queue download: %6s %s" % (file_size(total), aux[0].tag))
+                    print(f"Queue download: {file_size(total):6} {aux[0].tag}")
         return downloads
 
     # list files to download
@@ -613,8 +615,8 @@ def main(opts):
 
     # list file_sizes to download
     downloads = list(set(downloads))  # unique files, for single download and total size
-    total = sum([x.size for x in downloads])
-    print("Queue download: %6s %s" % (file_size(total), "Total"))
+    total = file_size(sum(x.size for x in downloads))
+    print(f"Queue download: {total:6} Total")
     if not user_consent("Do you wish to proceed?", opts.ask):
         print("OK, bye")
         sys.exit(0)
