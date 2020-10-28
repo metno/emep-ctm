@@ -22,7 +22,7 @@ Here is an example of content of the most important parameters:
     GRID = 'EECCA',
     iyr_trend = 2015,
     runlabel1 = 'Base',
-    runlabel2 = 'Opensource_Setup_2019',
+    runlabel2 = 'Opensource_Setup_2020',
     startdate = 2015,01,01,00,
     enddate = 2015,01,10,24,
 
