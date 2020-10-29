@@ -80,7 +80,20 @@ Simpson *et al.*, 2017
   EMEP Status Report 1/2017, pp115-122,
   The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
   2017
-
+ 
+ Simpson *et al.*, 2020a
+  Simpson, D., Bergström, R., Tsyro, S. and Wind, P.,
+  Updates to the EMEP/MSC-W model, 2019-2020, in 
+  EMEP Status Report 1/2020, pp155-165,
+  The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+  2020
+  
+ Simpson *et al.*, 2020b
+  Simpson, D., Bergström, R.,Briolat, A., Imhof, H., Johansson, J.
+  Priestley, M., Valdebenito, A., GenChem v1.0 - a chemical pre-processing and testing system for
+  atmospheric modelling,Geoscientific Model Development, https://doi.org/10.5194/gmd-2020-147
+  2020
+  
 Tuovinen *et al.*, 2004
     Tuovinen, J.-P.; Ashmore, M.; Emberson, L. & Simpson, D. Testing and
     improving the EMEP ozone deposition module Atmos. Environ., 2004,
