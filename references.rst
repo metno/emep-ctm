@@ -91,17 +91,23 @@ Simpson *et al.*, 2017
  Simpson *et al.*, 2020b
   Simpson, D., Bergström, R.,Briolat, A., Imhof, H., Johansson, J.
   Priestley, M., Valdebenito, A., GenChem v1.0 - a chemical pre-processing and testing system for
-  atmospheric modelling,Geoscientific Model Development, https://doi.org/10.5194/gmd-2020-147
+  atmospheric modelling, *Geosci. Model Devel.*, https://doi.org/10.5194/gmd-2020-147
   2020
   
 Tuovinen *et al.*, 2004
     Tuovinen, J.-P.; Ashmore, M.; Emberson, L. & Simpson, D. Testing and
-    improving the EMEP ozone deposition module Atmos. Environ., 2004,
+    improving the EMEP ozone deposition module *Atmos. Environ.*, 2004,
     38, 2373-2385
 
 Wiedinmyer *et al.*, 2011
     Wiedinmyer, C., Akagi, S. K., Yokelson, R. J., Emmons, L. K.,
     Al-Saadi, J. A., Orlando, J. J., and Soja, A. J.: The Fire INventory
     from NCAR (FINN): a high resolution global model to estimate the
-    emissions from open burning, Geosci. Model Dev., 4,
+    emissions from open burning, *Geosci. Model Dev.*, 4,
     625–641,doi:10.5194/gmd-4-625-2011, 2011
+    
+Wind *et al.*, 2020
+    Wind, P., Rolstad Denby, B. and Gauss, M.,
+    Local fractions -- a method for the calculation of local source contributions to air pollution, 
+    illustrated by examples using the EMEP MSC-W model (rv4\_33),
+    *Geosci. Model Devel.*, 13, 3, 1623-1634, https://www.geosci-model-dev.net/13/1623/2020/, 2020
