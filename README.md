@@ -16,6 +16,7 @@ which supports the development of air quality polices in the European Union.
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
 [guide]:    http://emep-ctm.readthedocs.io/en/latest
 [publ2020]: http://emep.int/publ/emep2020_publications.html
+[rel434]:   http://github.com/metno/emep-ctm/releases/tag/rv4_36
 [rel434]:   http://github.com/metno/emep-ctm/releases/tag/rv4_34
 [rel433]:   http://github.com/metno/emep-ctm/releases/tag/rv4_33
 [rel432]:   http://github.com/metno/emep-ctm/releases/tag/rv4_32
@@ -42,19 +43,20 @@ The Open Source releases are intended to:
 
 ## Releases
 
-The latest Open Source EMEP MSC-W model version ([rv4.34][rel434])
-will be used on the [EMEP status reporting of the year 2020][publ2020].
+The latest Open Source EMEP MSC-W model version ([rv4.36][rel436])
+is based on the version used on the [EMEP status reporting of the year 2020][publ2020].
 The source code, together with a set of input data,
 an updated user guide and a full year model results for the year 2015,
 under [GPL license v3][GPLv3].
 
 You can download the source code and input data by following the instructions on the 
-[OpenSource rv4.34 (202001)][rel434] release page.
+[OpenSource rv4.34 (202011)][rel436] release page.
 
 Information on use of the model can be found in the [EMEP MSC-W model User Guide][guide]
 
 #### Previous releases (YYYYMM - date of release)
 
+* [OpenSource rv4.34 (202011)][rel434].
 * [OpenSource rv4.33 (201906)][rel433].
 * [OpenSource rv4.32 (201904)][rel432].
 * [OpenSource rv4.17 (201802)][rel417].
@@ -198,6 +200,15 @@ The reports can be found under the following links:
   pages = {7825--7865},
   doi = {10.5194/acp-12-7825-2012},
   url = {https://www.atmos-chem-phys.net/12/7825/2012/}
+}
+
+@misc{emep-ctm_rv4.36,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model rv4.36 (202011)},
+  month        = nov,
+  year         = 2020,
+  doi          = {10.5281/zenodo.4230110},
+  url          = {https://doi.org/10.5281/zenodo.4230110}
 }
 
 @misc{emep-ctm_rv4.34,
