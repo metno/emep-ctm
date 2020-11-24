@@ -16,7 +16,7 @@ which supports the development of air quality polices in the European Union.
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
 [guide]:    http://emep-ctm.readthedocs.io/en/latest
 [publ2020]: http://emep.int/publ/emep2020_publications.html
-[rel434]:   http://github.com/metno/emep-ctm/releases/tag/rv4_36
+[rel436]:   http://github.com/metno/emep-ctm/releases/tag/rv4_36
 [rel434]:   http://github.com/metno/emep-ctm/releases/tag/rv4_34
 [rel433]:   http://github.com/metno/emep-ctm/releases/tag/rv4_33
 [rel432]:   http://github.com/metno/emep-ctm/releases/tag/rv4_32
@@ -56,7 +56,7 @@ Information on use of the model can be found in the [EMEP MSC-W model User Guide
 
 #### Previous releases (YYYYMM - date of release)
 
-* [OpenSource rv4.34 (202011)][rel434].
+* [OpenSource rv4.34 (202001)][rel434].
 * [OpenSource rv4.33 (201906)][rel433].
 * [OpenSource rv4.32 (201904)][rel432].
 * [OpenSource rv4.17 (201802)][rel417].
