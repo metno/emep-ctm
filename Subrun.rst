@@ -710,7 +710,7 @@ Those mappings are defined in "EmisDef_mod.f90" in the arrays "XXX_sec2hfac_map"
 For example the mapping "GNFR_sec2hfac_map = (/1,3,2,4,6,7,8,8,8,9,10,10,5/)", means that in the GNFR convention, the sector 13 is mapped to the fifth emission height in "EmisHeights.txt".
 You can add both more emission heights in "EmisHeights.txt" and access them by changing the maps.
 (The maps cannot be set by config_emep.nml for now because it is not guaranteed that everything will work when you change the wrong things).
-You can define a new mapping for example using the "TEST" mapping (also in EmisDef.f90). To switch to "TEST" for those mappings set "USE_SECTOR_NAME='TEST'" in "config_emep.nml".
+You can define a new mapping for example using the "TEST" mapping (also in EmisDef.f90). To switch to "TEST" for those mappings set "USES%SECTORS_NAME='TEST'" in "config_emep.nml".
 
 Local Fractions (under development)
 -----------------------------------
