@@ -730,6 +730,7 @@ config_emep.nml settings:
     lf_src(1)%YEAR = T, !average value for full run in output 
     lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
     lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
+    
     !Local Fractions pollutants and sectors to include:
     lf_src(1)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
     lf_src(1)%sector=0, !0 means sum of all sectors
@@ -742,6 +743,7 @@ config_emep.nml settings:
     lf_src(3)%sector=0,
     lf_src(4)%species="nox ",
     lf_src(4)%sector=8,
+    
     ! Country source receptor types:
     lf_src(5)%drydep=T, !means make country dry deposition maps too
     lf_src(5)%wetdep=T, !means make country wet deposition maps too
@@ -750,6 +752,7 @@ config_emep.nml settings:
     lf_country_list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
     lf_country_group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country_group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
+    
     ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
 
