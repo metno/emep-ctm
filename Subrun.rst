@@ -722,7 +722,6 @@ config_emep.nml settings:
 
 .. code-block:: Fortran
     :caption: Local Fractions flag example
-    :linenos:
 
     USES%LocalFractions = F, ! T for computing Local Fractions
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
