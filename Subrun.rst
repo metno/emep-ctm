@@ -720,7 +720,7 @@ When chosen, the Local Fractions (used by the urban EMEP, uEMEP) will be outputt
 
 config_emep.nml settings:
 
-.. code-block:: Fortran
+.. code-block:: text
     :caption: Local Fractions flag example
     :linenos:
 
