@@ -720,37 +720,37 @@ When chosen, the Local Fractions (used by the urban EMEP, uEMEP) will be outputt
 
 config_emep.nml settings:
 
-.. code-block:: text
+.. code-block:: Fortran
     :caption: Local Fractions flag example
     :linenos:
 
-  USES%LocalFractions = F, ! T for computing Local Fractions
-  !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
-  !NB: Values from lf_src(1) are used for all sources
-  lf_src(1)%YEAR = T, !average value for full run in output
-  lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
-  lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
-  !Local Fractions pollutants and sectors to include:
-  lf_src(1)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
-  lf_src(1)%sector=0, !0 means sum of all sectors
-  lf_src(1)%make_fracsum=T,
-  lf_src(2)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
-  lf_src(2)%sector=0, !0 means sum of all sectors
-  lf_src(2)%res=5, ! sources are squares with size 5x5 gridcells
-  lf_src(2)%make_fracsum=T,
-  lf_src(3)%species="nox ",
-  lf_src(3)%sector=0,
-  lf_src(4)%species="nox ",
-  lf_src(4)%sector=8,
-  ! Country source receptor types:
-  lf_src(5)%drydep=T, !means make country dry deposition maps too
-  lf_src(5)%wetdep=T, !means make country wet deposition maps too
-  lf_src(5)%type='country',
-  lf_country_sector_list(1:8)=0,1,2,3,4,5,6,7,
-  lf_country_list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
-  lf_country_group(1)%name='NORDIC', !any name given to the group (used as output name)
-  lf_country_group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
-  ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
+    USES%LocalFractions = F, ! T for computing Local Fractions
+    !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
+    !NB: Values from lf_src(1) are used for all sources
+    lf_src(1)%YEAR = T, !average value for full run in output 
+    lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
+    lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
+    !Local Fractions pollutants and sectors to include:
+    lf_src(1)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
+    lf_src(1)%sector=0, !0 means sum of all sectors
+    lf_src(1)%make_fracsum=T,
+    lf_src(2)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
+    lf_src(2)%sector=0, !0 means sum of all sectors
+    lf_src(2)%res=5, ! sources are squares with size 5x5 gridcells
+    lf_src(2)%make_fracsum=T,
+    lf_src(3)%species="nox ",
+    lf_src(3)%sector=0,
+    lf_src(4)%species="nox ",
+    lf_src(4)%sector=8,
+    ! Country source receptor types:
+    lf_src(5)%drydep=T, !means make country dry deposition maps too
+    lf_src(5)%wetdep=T, !means make country wet deposition maps too
+    lf_src(5)%type='country',
+    lf_country_sector_list(1:8)=0,1,2,3,4,5,6,7,
+    lf_country_list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
+    lf_country_group(1)%name='NORDIC', !any name given to the group (used as output name)
+    lf_country_group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
+    ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
