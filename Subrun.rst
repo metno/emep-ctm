@@ -725,6 +725,11 @@ config_emep.nml settings:
     :linenos:
 
   USES%LocalFractions = F, ! T for computing Local Fractions
+  !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
+  !NB: Values from lf_src(1) are used for all sources
+  lf_src(1)%YEAR = T !average value for full run in output
+  lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
+  lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
   !Local Fractions pollutants and sectors to include:
   lf_src(1)%species="pm25" ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
   lf_src(1)%sector=0 !0 means sum of all sectors
@@ -747,15 +752,9 @@ config_emep.nml settings:
   lf_country_list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
   lf_country_group(1)%name='NORDIC', !any name given to the group (used as output name)
   lf_country_group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
-
-  !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
-  !NB: Values from lf_src(1) are used for all sources
-  lf_src(1)%YEAR = T !average value for full run in output
-  lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
-  lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
-
     
   ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
+
 
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
