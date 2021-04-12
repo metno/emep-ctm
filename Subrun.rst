@@ -757,7 +757,6 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
     !NB: Values from lf_src(1) are used for all sources
     lf_src(1)%YEAR = T, !average value for full run in output 
-    lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
     lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
     
     !Local Fractions pollutants and sectors to include:
