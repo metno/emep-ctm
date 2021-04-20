@@ -72,7 +72,6 @@ IMPORTANT:
     Time factors for monthly emissions  & ``MonthlyFac.POLL`` (7 files)       & ASCII [#POLL]_
     Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
     Time factors for hourly emissions   & ``HourlyFacs.INERIS``               & ASCII
-    Emission heights                    & ``EmisHeights.txt``                 & ASCII
     Natural |SO2|                       & ``DMS.nc``                          & netCDF
     Volcanoes                           & ``columnsource_emission.csv``       & ASCII
                                         & ``columnsource_location.csv``       & ASCII
