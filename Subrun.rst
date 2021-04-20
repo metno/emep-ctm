@@ -706,7 +706,7 @@ The timefactors are defined in "MonthlyFac.POLL" "DailyFac.POLL" and "HourlyFacc
 There are 6 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
 
 .. code-block:: Fortran
-    :caption: Default definition of emission height distributions.
+    :caption: Default definition of emission height distributions
 
     Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
     Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
