@@ -708,13 +708,13 @@ There are 6 predefined release heights distributions. Those can also be defined 
 .. code-block:: Fortran
     :caption: Default definition of emission height distributions
 
-  Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
-  Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
-  Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
-  Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
-  Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
-  Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
-  Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
+    Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
+    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
+    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
+    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
+   Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
+   Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
 
 Which height/split/timefac is chosen for a given sector is defined can also be controlled by the user.
 GNFR_CAMS sectors are predefined (SNAP also, but we recommend to use GNFR_CAMS).
@@ -723,26 +723,26 @@ The values for split, emission release height and timefactors can be defined thr
 .. code-block:: Fortran
     :caption: Predefined sector definitions for GNFR_CAMS
 
-  SECTORS_ADD(1) = 'GNFR_CAMS', 'GNFR_A',  'sec01',  1, 1,  1, 'Public Power', 'ALL',
-  SECTORS_ADD(2) = 'GNFR_CAMS', 'GNFR_B',  'sec02',  3, 3,  2, 'Industry', 'ALL',
-  SECTORS_ADD(3) = 'GNFR_CAMS', 'GNFR_C',  'sec03',  2, 2,  3, 'OtherStationaryComb', 'ALL',
-  SECTORS_ADD(4) = 'GNFR_CAMS', 'GNFR_D',  'sec04',  4, 4,  4, 'Fugitive', 'ALL',
-  SECTORS_ADD(5) = 'GNFR_CAMS', 'GNFR_E',  'sec05',  6, 2,  5, 'Solvents', 'ALL',
-  SECTORS_ADD(6) = 'GNFR_CAMS', 'GNFR_F',  'sec06',  7, 2,  6, 'RoadTransport', 'ALL',
-  SECTORS_ADD(7) = 'GNFR_CAMS', 'GNFR_G',  'sec07',  8, 2,  7, 'Shipping', 'ALL',
-  SECTORS_ADD(8) = 'GNFR_CAMS', 'GNFR_H',  'sec08',  8, 2,  8, 'Aviation', 'ALL',
-  SECTORS_ADD(9) = 'GNFR_CAMS', 'GNFR_I',  'sec09',  8, 2,  9, 'Offroad', 'ALL',
-  SECTORS_ADD(10) = 'GNFR_CAMS', 'GNFR_J', 'sec10',  9, 6, 10, 'Waste', 'ALL',
-  SECTORS_ADD(11) = 'GNFR_CAMS', 'GNFR_K', 'sec11', 10, 2, 11, 'AgriLivestock', 'ALL',
-  SECTORS_ADD(12) = 'GNFR_CAMS', 'GNFR_L', 'sec12', 10, 2, 12, 'AgriOther', 'ALL',
-  SECTORS_ADD(13) = 'GNFR_CAMS', 'GNFR_M', 'sec13',  5, 5, 13, 'Other', 'ALL',
-  SECTORS_ADD(14) = 'GNFR_CAMS', 'GNFR_A1','sec14',  1, 1,  1, 'PublicPower_Point', 'ALL',
-  SECTORS_ADD(15) = 'GNFR_CAMS', 'GNFR_A2','sec15',  1, 3,  1, 'PublicPower_Area', 'ALL',
-  SECTORS_ADD(16) = 'GNFR_CAMS', 'GNFR_F1','sec16',  7, 2, 16, 'RoadTransportExhaustGasoline', 'ALL',
-  SECTORS_ADD(17) = 'GNFR_CAMS', 'GNFR_F2','sec17',  7, 2, 17, 'RoadTransportExhaustDiesel', 'ALL',
-  SECTORS_ADD(18) = 'GNFR_CAMS', 'GNFR_F3','sec18',  7, 2, 18, 'RoadTransportExhaustLPGgas', 'ALL',
-  SECTORS_ADD(19) = 'GNFR_CAMS', 'GNFR_F4','sec19',  7, 2, 19, 'RoadTransportNonExhaustOther', 'ALL',
-  
+    SECTORS_ADD(1) = 'GNFR_CAMS', 'GNFR_A',  'sec01',  1, 1,  1, 'Public Power', 'ALL',
+    SECTORS_ADD(2) = 'GNFR_CAMS', 'GNFR_B',  'sec02',  3, 3,  2, 'Industry', 'ALL',
+    SECTORS_ADD(3) = 'GNFR_CAMS', 'GNFR_C',  'sec03',  2, 2,  3, 'OtherStationaryComb', 'ALL',
+    SECTORS_ADD(4) = 'GNFR_CAMS', 'GNFR_D',  'sec04',  4, 4,  4, 'Fugitive', 'ALL',
+    SECTORS_ADD(5) = 'GNFR_CAMS', 'GNFR_E',  'sec05',  6, 2,  5, 'Solvents', 'ALL',
+    SECTORS_ADD(6) = 'GNFR_CAMS', 'GNFR_F',  'sec06',  7, 2,  6, 'RoadTransport', 'ALL',
+    SECTORS_ADD(7) = 'GNFR_CAMS', 'GNFR_G',  'sec07',  8, 2,  7, 'Shipping', 'ALL',
+    SECTORS_ADD(8) = 'GNFR_CAMS', 'GNFR_H',  'sec08',  8, 2,  8, 'Aviation', 'ALL',
+    SECTORS_ADD(9) = 'GNFR_CAMS', 'GNFR_I',  'sec09',  8, 2,  9, 'Offroad', 'ALL',
+    SECTORS_ADD(10) = 'GNFR_CAMS', 'GNFR_J', 'sec10',  9, 6, 10, 'Waste', 'ALL',
+    SECTORS_ADD(11) = 'GNFR_CAMS', 'GNFR_K', 'sec11', 10, 2, 11, 'AgriLivestock', 'ALL',
+    SECTORS_ADD(12) = 'GNFR_CAMS', 'GNFR_L', 'sec12', 10, 2, 12, 'AgriOther', 'ALL',
+    SECTORS_ADD(13) = 'GNFR_CAMS', 'GNFR_M', 'sec13',  5, 5, 13, 'Other', 'ALL',
+    SECTORS_ADD(14) = 'GNFR_CAMS', 'GNFR_A1','sec14',  1, 1,  1, 'PublicPower_Point', 'ALL',
+    SECTORS_ADD(15) = 'GNFR_CAMS', 'GNFR_A2','sec15',  1, 3,  1, 'PublicPower_Area', 'ALL',
+    SECTORS_ADD(16) = 'GNFR_CAMS', 'GNFR_F1','sec16',  7, 2, 16, 'RoadTransportExhaustGasoline', 'ALL',
+    SECTORS_ADD(17) = 'GNFR_CAMS', 'GNFR_F2','sec17',  7, 2, 17, 'RoadTransportExhaustDiesel', 'ALL',
+    SECTORS_ADD(18) = 'GNFR_CAMS', 'GNFR_F3','sec18',  7, 2, 18, 'RoadTransportExhaustLPGgas', 'ALL',
+    SECTORS_ADD(19) = 'GNFR_CAMS', 'GNFR_F4','sec19',  7, 2, 19, 'RoadTransportNonExhaustOther', 'ALL',
+
   
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
@@ -751,19 +751,20 @@ Here is an example of how to define a new sector with a new height distribution,
 .. code-block:: Fortran
     :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'MyCar', with half of it emitted between surface and a height defined by the pressure 101084.9 Pa, and the other half between this levels and the Pressure 100229.1 Pa.
 
-  Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
-  Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
-  Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
-  Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
-  Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
-  Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
-  Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
-  Emis_h(1:,7) = 0.5,      0.5,     0.0,     0.0,     0.0,     0.00,     0.0 , 
-  
-  emis_inputlist(1)%name='GNFR.nc'
-  emis_inputlist(2)%name='MyEmis.nc'
-  emis_inputlist(2)%sector='MyNewSector'
-SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 7,  6, 'Special car exhaust', 'pm25',
+    Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
+    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
+    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
+    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
+    Emis_h(1:,7) = 0.5,      0.5,     0.0,     0.0,     0.0,     0.00,     0.0 , 
+      
+    emis_inputlist(1)%name='GNFR.nc'
+    emis_inputlist(2)%name='MyEmis.nc'
+    emis_inputlist(2)%sector='MyNewSector'
+    SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 7,  6, 'Special car exhaust', 'pm25',
+
 
 Local Fractions (under development)
 -----------------------------------
