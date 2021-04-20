@@ -149,30 +149,4 @@ This script is described in detail in :numref:`ch-submitarun`.
 
 .. _`sec-modelgrid`:
 
-Model grid
-----------
 
-The current EMEP model version, and the provided gridded input data,
-have a horizontal resolution of :math:`50\times 50 km^2`
-(at :math:`60^\circ N`\ ) and are defined on a polar stereographic projection
-with 20 sigma levels vertically. The model is very flexible with regard
-to the horizontal resolution, in that it readily makes use of
-meteorological data provided with the model. The vertical resolution is
-currently still restricted to the fixed 20 layer system. The physical
-description is given in detail in Chapter 2 of the EMEP Status Report
-1/2003 Part I (Simpson *et al.*, 2003).
-
-In 2008 the EMEP domain was extended eastwards in order to include the
-EECCA countries in the EMEP model grid, see :numref:`fig-EECCA`.
-To distinguish the new grid from the old EMEP grid, the new grid is called
-EECCA in this text and in the ``config_emep.nml``.
-
-
-.. _`fig-eecca`:
-
-.. figure:: EECCA.pdf
-    :scale: 80 %
-
-    The extended EMEP grid covering EECCA area with
-    :math:`132\times 159` gridpoints on :math:`50\times 50 km^2`
-    resolution defined on a polar stereographic projection.
