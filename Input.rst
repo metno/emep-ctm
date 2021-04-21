@@ -510,35 +510,29 @@ An additional file defined in ``HourlyFacSpecialsFile`` can be created by the us
 Emission heights
 ~~~~~~~~~~~~~~~~
 
-A vertical distribution for different sectors are given in the
-file ``EmisHeights.txt``. The release heights are defined as layers at specific pressure.
+In previous versions the emission height distribtuions was given in a separate file. Now it is 
+part of the code, and can also be modified by the users using config_emep.nml setting
+(see section "defining own sectors).
+
+A set of vertical distribution for different sectors are predefined in the model. 
+The release heights are defined as layers at specific pressure.
 
 The release height defintions are independent of the layers used by the model. 
 
+There are 6 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
+
 .. code-block:: Fortran
-    :name: EmisHeights.txt
-    :caption: ``EmisHeights.txt`` example.
-    
-    # Emissions distribution
-    # Upper layer heights in meters: 20. 92. 184. 324. 522. 781. 1106.
-    # Has 100% SNAP2 emissions in lowest layer
-    # Plevels are pressure in Pa at top of corresponding levels (P Surface = 101325.0)
-     Nklevels 7   Vertical Levels
-     Plevels 101084.9 100229.1 99133.2 97489.35 95206.225 92283.825 88722.15
-     1         0.0      0.00     0.0025   0.1475   0.40     0.30     0.15    ! SNAP1
-     2         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP2
-     3         0.06     0.16     0.75     0.03     0.00     0.00     0.0     ! SNAP3
-     4         0.05     0.15     0.70     0.10     0.00     0.00     0.0     ! SNAP4
-     5         0.02     0.08     0.60     0.30     0.00     0.00     0.0     ! SNAP5
-     6         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP6
-     7         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP7
-     8         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP8
-     9         0.0      0.00     0.41     0.57     0.02     0.00     0.0     ! SNAP9
-    10         0.85     0.15     0.00     0.00     0.00     0.00     0.0     ! SNAP10
-    11         1.0      0.00     0.00     0.00     0.00     0.00     0.0     ! SNAP11
+    :caption: Default definition of emission height distributions
 
+    Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
+    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
+    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
+    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
 
-The line starting with the keyword ``Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
+The ``Emis_Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
 
 These layers are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
 The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
