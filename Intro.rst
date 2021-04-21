@@ -59,8 +59,8 @@ power5+). It is compatible with all compilers tested so far: Intel, PGI,
 gfortran, XL Fortran. A Makefile is included, the path to NetCDF (``INCL``
 and ``LLIB``) have to be adapted to your machine, and the Fortran compiler
 (``F90``) and flags (``F90FLAGS``) to the compiler you are using. 
-Then the command `make` should comple the model and produce the executable 
-`emepctm`
+Then the command ``make`` should comple the model and produce the executable 
+``emepctm``
 
 The code has been tested with 1 to 1024 CPUs, and scales well (for large
 grids). If only one CPU is used 1-2 GB memory is required. If more than
