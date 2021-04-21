@@ -510,7 +510,7 @@ An additional file defined in ``HourlyFacSpecialsFile`` can be created by the us
 Emission heights
 ~~~~~~~~~~~~~~~~
 
-In previous versions the emission height distribtuions was given in a separate file. Now it is 
+In previous versions the emission height distributions was given in a separate file. Now it is 
 part of the code, and can also be modified by the users using config_emep.nml setting
 (see section "defining own sectors).
 
