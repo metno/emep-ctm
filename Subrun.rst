@@ -734,7 +734,7 @@ The values for split, emission release height and timefactors can be defined thr
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
 The name in the first column (GNFR_CAMS) should match the sector name defined in the emission file, or be given in the config_emep.nml (see example below).
-The second name can be chosen by the user (it will be used if SecEmisOutWanted is T)), the third name is the variable name ending in the netcdf emission file (the start being the name of the pollutant), the first number refers to the index used for time factors, the second number the index in the Emis_h array, the third number is the index used in the split files. The long name in the second last column is a longer description, and the last column refers to the species to be included for this sector (if they exist in the emission file).
+The second name can be chosen by the user (it will be used if SecEmisOutWanted is T)), the third name is the variable name ending in the netcdf emission file (the start being the name of the pollutant) NB: not implemented yet!, the first number refers to the index used for time factors, the second number the index in the Emis_h array, the third number is the index used in the split files. The long name in the second last column is a longer description, and the last column refers to the species to be included for this sector (if they exist in the emission file).
 
 Here is an example of how to define a new sector with a new height distribution, used by emissions given in a separate file.
 
