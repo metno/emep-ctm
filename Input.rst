@@ -170,7 +170,9 @@ Gridded emissions
 ~~~~~~~~~~~~~~~~~
 
 Since 2015 different formats of gridded emissions can be used and
-mixed (with some restrictions) under one common framework.
+mixed (with some restrictions) under one common framework. See the
+section ``Defining own sectors``
+
 The different formats that are presently supported are:
 
 "Old style" ASCII emissions format (no more in use):
