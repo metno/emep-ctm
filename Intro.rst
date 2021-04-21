@@ -38,7 +38,7 @@ And a copy of the license file, **gpl.txt**, is provided with the model
 code source files.
 
 It is important to note that the code is provided "as it is", and
-EMEP/MSC-W has very limited resources with which to support usage of the
+EMEP/MSC-W has limited resources with which to support usage of the
 code.
 
 .. _`sec-compinf`:
@@ -58,7 +58,9 @@ supercomputers (Itanium2 cluster, Intel Xeon cluster, Cray XT4, IBM
 power5+). It is compatible with all compilers tested so far: Intel, PGI,
 gfortran, XL Fortran. A Makefile is included, the path to NetCDF (``INCL``
 and ``LLIB``) have to be adapted to your machine, and the Fortran compiler
-(``F90``) and flags (``F90FLAGS``) to the compiler you are using.
+(``F90``) and flags (``F90FLAGS``) to the compiler you are using. 
+Then the command `make` should comple the model and produce the executable 
+`emepctm`
 
 The code has been tested with 1 to 1024 CPUs, and scales well (for large
 grids). If only one CPU is used 1-2 GB memory is required. If more than
@@ -77,22 +79,18 @@ plus one day.
 Getting Started
 ---------------
 
-It is recommended to read all the chapters of this EMEP/MSC-W model User
-Guide before you start downloading anything from the EMEP/MSC-W Open
-Source website.
-
 This is what you need to do before you can do a "base run" with the
 EMEP/MSC-W model:
 
 *  Read the EMEP/MSC-W model User Guide
 *  Download input data,
-   description and downloading instructions in :numref:`ch-inputfiles`.
+   description and downloading instructions in Input files section.
 *  Download the EMEP/MSC-W model source code,
-   description and downloading instructions :numref:`sec-modelcode`.
-*  Follow the instructions for "Submitting a Run" description in
-   :numref:`ch-submitarun`.
+   description and downloading instructions Model code section.
+*  Follow the instructions for "Submitting a Run" description in the
+   Base run section.
 *  Download some model results for comparison,
-   description in and downloading instructions :numref:`ch-output`.
+   description in and downloading instructions the Output files section.
 
 .. _`sec-modelcode`:
 
