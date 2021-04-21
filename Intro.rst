@@ -143,7 +143,6 @@ An overview of the files is given in :numref:`tab-modelfiles`.
 In addition there is a run script called ``modrun.sh``, which will be
 placed in the ``EMEP_MSC-W_model.rv4.36.OpenSource`` directory. The run script,
 ``modrun.sh``, can easily be modified to work on your computer system.
-This script is described in detail in :numref:`ch-submitarun`.
 
 .. _`sec-modelgrid`:
 
