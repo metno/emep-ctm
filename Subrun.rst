@@ -716,7 +716,7 @@ There are 6 predefined release heights distributions. Those can also be defined 
     Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
     Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
 
-Which height/split/timefac is chosen for a given sector is defined can also be controlled by the user.
+Which height/split/timefac is chosen for a given sector can also be controlled by the user.
 GNFR_CAMS sectors are predefined (SNAP also, but we recommend to use GNFR_CAMS).
 The values for split, emission release height and timefactors can be defined through settings in the config_emep.nml settings. The following will reproduce the default settings:
 
@@ -744,6 +744,8 @@ The values for split, emission release height and timefactors can be defined thr
     SECTORS_ADD(19) = 'GNFR_CAMS', 'GNFR_F4','sec19',  7, 2, 19, 'RoadTransportNonExhaustOther', 'ALL',
 
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
+The name in the first column (GNFR_CAMS) should match the sector name defined in the emission file, or be given in the config_emep.nml (seee example below).
+The second name can be chosen by the user, the third name is the variable name in the netcdf emission file, the first number refers to the index used for time factors, the second number the index in the Emis_h array, the third number is the index used in the split files. The long name in the second last column is a longer description, and the last column refers to the species to be included for this sector (if they exist in the emission file).
 
 Here is an example of how to define a new sector with a new height distribution, used by emissions given in a separate file.
 
