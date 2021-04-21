@@ -739,7 +739,7 @@ The second name can be chosen by the user, the third name is the variable name i
 Here is an example of how to define a new sector with a new height distribution, used by emissions given in a separate file.
 
 .. code-block:: Fortran
-    :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'MyCar', with half of it emitted between surface and a height defined by the pressure 101084.9 Pa, and the other half between this levels and the Pressure 100229.1 Pa.
+    :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'MyCar', with emission released between the height defined between the pressure 100229.1 Pa and the Pressure 99133.2 Pa.
 
     Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
     Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
@@ -748,7 +748,7 @@ Here is an example of how to define a new sector with a new height distribution,
     Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
     Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
     Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
-    Emis_h(1:,7) = 0.5,      0.5,     0.0,     0.0,     0.0,     0.00,     0.0 , 
+    Emis_h(1:,7) = 0.0,      0.00,     1.0,      0.00,     0.00,     0.00,     0.0 , 
       
     emis_inputlist(1)%name='GNFR.nc',
     emis_inputlist(2)%name='MyEmis.nc',
