@@ -701,22 +701,10 @@ Emissions can be assigned to a sector. A sector defines three properties:
 3. Timefactors
 
 The set of splits is defined in files "emissplit.defaults.POLL" and "emissplit.specials.POLL".
+The release height distribution can be chosen among the 6 predefined values, or defined in config_emep.nml.
 The timefactors are defined in "MonthlyFac.POLL" "DailyFac.POLL" and "HourlyFacc.INERIS".
 
-There are 6 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
-
-.. code-block:: Fortran
-    :caption: Default definition of emission height distributions
-
-    Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
-    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
-    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
-    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
-
-Which height/split/timefac is chosen for a given sector can also be controlled by the user.
+Which height/split/timefac is chosen for a given sector can be also be controlled by the user.
 GNFR_CAMS sectors are predefined (SNAP also, but we recommend to use GNFR_CAMS).
 The values for split, emission release height and timefactors can be defined through settings in the config_emep.nml settings. The following will reproduce the default settings:
 
