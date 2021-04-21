@@ -173,7 +173,7 @@ Since 2015 different formats of gridded emissions can be used and
 mixed (with some restrictions) under one common framework.
 The different formats that are presently supported are:
 
-"Old style" ASCII emissions format:
+"Old style" ASCII emissions format (no more in use):
     Total yearly emissions.
 
     The gridded emission files contain 16 columns where the first column
@@ -495,8 +495,9 @@ There is one file available per compound in ASCII format.
 
 The first two columns in the files represent the country code
 (http://www.emep.int/grid/country_numbers.txt), the second column
-represents the sector (http://webdab.emep.int/sectors.html). In the
-monthly files, the 12 consecutive columns represent the time factors
+represents an index that can be referenced by the sector definion. 
+(Orginally this index correspond to a SNAP sector). 
+In the monthly files, the 12 consecutive columns represent the time factors
 corresponding to the months of the year. In the daily files there are 7
 consecutive columns representing the time factor for each day of the
 week.
@@ -576,16 +577,16 @@ these the gridded files is given in files labelled
 ``emissplit.defaults.POLL`` or ``emissplit.specials.POLL``,
 where ``POLL`` can be |NOx|\ , VOC, etc.
 
-The defaults file give the emission split for each SNAP sector (one per
-row, with second index being the SNAP sector), which is applied to all
+The defaults file give the emission split for each sector split index 
+(one per row, with second index being the sector split index), which is applied to all
 countries by default. For VOC this split was derived from the UK
 inventory of Passant (2002), as part of the chemical comparison project
 of Hayman *et al.* (2011).
 
 The specials files are in general optional, and can be used to specify
-speciation for particular countries or SNAP sectors. The 1\ :sup:`st`
-column specifies the country code of interest, the second the SNAP
-sector.
+speciation for particular countries or sectors. The 1\ :sup:`st`
+column specifies the country code of interest, the second the
+sector index.
 
 If forest fires are used, then the file ``emissplit.specials.voc`` is
 required (not optional), and the country-code 101 used to specify the
