@@ -734,12 +734,12 @@ The values for split, emission release height and timefactors can be defined thr
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
 The name in the first column (GNFR_CAMS) should match the sector name defined in the emission file, or be given in the config_emep.nml (see example below).
-The second name can be chosen by the user, the third name is the variable name in the netcdf emission file, the first number refers to the index used for time factors, the second number the index in the Emis_h array, the third number is the index used in the split files. The long name in the second last column is a longer description, and the last column refers to the species to be included for this sector (if they exist in the emission file).
+The second name can be chosen by the user (it will be used if SecEmisOutWanted is T)), the third name is the variable name ending in the netcdf emission file (the start being the name of the pollutant), the first number refers to the index used for time factors, the second number the index in the Emis_h array, the third number is the index used in the split files. The long name in the second last column is a longer description, and the last column refers to the species to be included for this sector (if they exist in the emission file).
 
 Here is an example of how to define a new sector with a new height distribution, used by emissions given in a separate file.
 
 .. code-block:: Fortran
-    :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'MyCar', with emission released between the height defined between the pressure 100229.1 Pa and the Pressure 99133.2 Pa.
+    :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'pm25_MyCar', with emission released between the height defined between the pressure 100229.1 Pa and the Pressure 99133.2 Pa.
 
     Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
     Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
