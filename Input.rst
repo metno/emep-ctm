@@ -537,6 +537,19 @@ There are 6 predefined release heights distributions. Those can also be defined 
 
 The ``Emis_Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
 
+Instead of Pressure levels, altitudes in meters can be specified. Those will then be transformed in Pressure using a standard atmosphere. Example with heights corresponding to the pressure levels above:
+
+.. code-block:: Fortran
+    :caption: Definition of emission height distributions using level heights in meters
+
+    Emis_Zlevels(1:) = 20.0056, 91.6272, 184.0692, 324.2962, 522.2669, 781.3580, 1106.2653,
+    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
+    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
+    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
+    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
+
 These layers are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
 The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
 
