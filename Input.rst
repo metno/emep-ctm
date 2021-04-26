@@ -550,7 +550,7 @@ Instead of Pressure levels, altitudes in meters can be specified. Those will the
     Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
     Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
 
-These layers are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
+The layers defined in Emis_h are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
 The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
 
 
