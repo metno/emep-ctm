@@ -737,6 +737,7 @@ The second name can be chosen by the user (it will be used if SecEmisOutWanted i
 
 Here is an example of how to define a new sector with a new height distribution, used by emissions given in a separate file.
 
+
 .. code-block:: Fortran
     :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'pm25_MyCar', with emission released between the height defined between the pressure 100229.1 Pa and the Pressure 99133.2 Pa.
 
@@ -755,11 +756,9 @@ Here is an example of how to define a new sector with a new height distribution,
     SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 7,  6, 'Special car exhaust', 'pm25',
  
  
+For levels heights defined in meters instead of pressure, see the "Emission heights" section.
  
- 
- For levels heights defined in meters instead of pressure, see the "Emission heights" section.
- 
- Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
+Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
 
 Local Fractions (under development)
