@@ -753,7 +753,6 @@ Here is an example of how to define a new sector with a new height distribution,
     emis_inputlist(2)%name='MyEmis.nc',
     emis_inputlist(2)%sector='MyNewSector',
     SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 7,  6, 'Special car exhaust', 'pm25',
-    
  
  For levels heights defined in meters instead of pressure, see the "Emission heights" section.
  
