@@ -718,7 +718,7 @@ The values for split, emission release height and timefactors can be defined thr
     SECTORS_ADD(5) = 'GNFR_CAMS', 'GNFR_E',  'sec05',  6, 2,  5, 'Solvents', 'ALL',
     SECTORS_ADD(6) = 'GNFR_CAMS', 'GNFR_F',  'sec06',  7, 2,  6, 'RoadTransport', 'ALL',
     SECTORS_ADD(7) = 'GNFR_CAMS', 'GNFR_G',  'sec07',  8, 2,  7, 'Shipping', 'ALL',
-    SECTORS_ADD(8) = 'GNFR_CAMS', 'GNFR_H',  'sec08',  8, 2,  8, 'Aviation', 'ALL',
+    SECTORS_ADD(8) = 'GNFR_CAMS', 'GNFR_H',  'sec08',  8, 7,  8, 'Aviation', 'ALL',
     SECTORS_ADD(9) = 'GNFR_CAMS', 'GNFR_I',  'sec09',  8, 2,  9, 'Offroad', 'ALL',
     SECTORS_ADD(10) = 'GNFR_CAMS', 'GNFR_J', 'sec10',  9, 6, 10, 'Waste', 'ALL',
     SECTORS_ADD(11) = 'GNFR_CAMS', 'GNFR_K', 'sec11', 10, 2, 11, 'AgriLivestock', 'ALL',
@@ -739,24 +739,22 @@ Here is an example of how to define a new sector with a new height distribution,
 
 
 .. code-block:: Fortran
-    :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'pm25_MyCar', with emission released between the height defined between the pressure 100229.1 Pa and the Pressure 99133.2 Pa.
+    :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'pm25_MyCar', with emission released between 20 and 50 meters.
 
-    Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
-    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
-    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
-    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
-    Emis_h(1:,7) = 0.0,      0.00,     1.0,      0.00,     0.00,     0.00,     0.0 , 
+    Emis_Zlevels(1:)20.0,   50.0,   92.0,  184.0,  324.0,  522.0,  781.0, 1106.0,
+    Emis_h(1:,1) = 0.000,  0.000,  0.000,  0.003,  0.147,  0.400,  0.300,  0.150, 
+    Emis_h(1:,2) = 1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+    Emis_h(1:,3) = 0.060,  0.067,  0.093,  0.750,  0.030,  0.000,  0.000,  0.000, 
+    Emis_h(1:,4) = 0.050,  0.063,  0.087,  0.700,  0.100,  0.000,  0.000,  0.000, 
+    Emis_h(1:,5) = 0.020,  0.034,  0.046,  0.600,  0.300,  0.000,  0.000,  0.000,
+    Emis_h(1:,6) = 0.000,  0.000,  0.000,  0.410,  0.570,  0.020,  0.000,  0.000,
+    Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153, 
+    Emis_h(1:,8) = 0.000,  1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000, 
       
     emis_inputlist(1)%name='GNFR.nc',
     emis_inputlist(2)%name='MyEmis.nc',
     emis_inputlist(2)%sector='MyNewSector',
-    SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 7,  6, 'Special car exhaust', 'pm25',
- 
- 
-For levels heights defined in meters instead of pressure, see the "Emission heights" section.
+    SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 8,  6, 'Special car exhaust', 'pm25',
  
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
