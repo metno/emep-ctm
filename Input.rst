@@ -522,33 +522,23 @@ The release heights are defined as layers at specific pressure.
 
 The release height defintions are independent of the layers used by the model. 
 
-There are 6 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
+There are 7 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
 
 .. code-block:: Fortran
     :caption: Default definition of emission height distributions
 
-    Emis_Plevels(1:) = 101084.9, 100229.1, 99133.2, 97489.35, 95206.225, 92283.825, 88722.15,
-    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
-    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
-    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
+    Emis_Zlevels(1:)20.0,   50.0,   92.0,  184.0,  324.0,  522.0,  781.0, 1106.0,
+    Emis_h(1:,1) = 0.000,  0.000,  0.000,  0.003,  0.147,  0.400,  0.300,  0.150, 
+    Emis_h(1:,2) = 1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+    Emis_h(1:,3) = 0.060,  0.067,  0.093,  0.750,  0.030,  0.000,  0.000,  0.000, 
+    Emis_h(1:,4) = 0.050,  0.063,  0.087,  0.700,  0.100,  0.000,  0.000,  0.000, 
+    Emis_h(1:,5) = 0.020,  0.034,  0.046,  0.600,  0.300,  0.000,  0.000,  0.000,
+    Emis_h(1:,6) = 0.000,  0.000,  0.000,  0.410,  0.570,  0.020,  0.000,  0.000,
+    Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153, 
 
-The ``Emis_Plevels`` defines the pressure at the layer boundaries for emissions in Pascal. Standard atmosphere is assumed. The surface pressure is omitted and assumed to be at 101325.0 Pa. The first layers is from surface to 101084.9 Pa, the second layer from 101084.9 Pa to 100229.1 Pa ... until the seventh and last layer which runs from 92283.825 Pa to 88722.15 Pa. Sector 1 will release nothing in the first and second layer, 0.25% into the third layer, 14.75% into the fourth layer etc. 
+The ``Emis_Zlevels`` defines the height of the layer boundaries for emissions in meters. (Standard atmosphere is assumed to transform those in Pressure by the model). The first layers is from surface to 20 meters, the second layer from 20 to 50 m... until the eigth and last layer which runs from 781 to 1106 meters. 
 
-Instead of Pressure levels, altitudes in meters can be specified. Those will then be transformed in Pressure using a standard atmosphere. Example with heights corresponding to the pressure levels above:
-
-.. code-block:: Fortran
-    :caption: Definition of emission height distributions using level heights in meters
-
-    Emis_Zlevels(1:) = 20.0056, 91.6272, 184.0692, 324.2962, 522.2669, 781.3580, 1106.2653,
-    Emis_h(1:,1) = 0.0,      0.00,     0.0025,   0.1475,   0.40,     0.30,     0.15 ,
-    Emis_h(1:,2) = 1.0,      0.00,     0.00,     0.00,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,3) = 0.06,     0.16,     0.75,     0.03,     0.00,     0.00,     0.0 ,  
-    Emis_h(1:,4) = 0.05,     0.15,     0.70,     0.10,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,5) = 0.02,     0.08,     0.60,     0.30,     0.00,     0.00,     0.0 ,
-    Emis_h(1:,6) = 0.0,      0.00,     0.41,     0.57,     0.02,     0.00,     0.0 ,  
+For example sectors defined with the height index "1", will release nothing in the first and second layer, 0.3% into the third layer, 14.7% into the fourth layer etc. 
 
 The layers defined in Emis_h are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
 The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
