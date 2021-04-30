@@ -518,9 +518,9 @@ part of the code, and can also be modified by the users using config_emep.nml se
 (see section "defining own sectors).
 
 A set of vertical distribution for different sectors are predefined in the model. 
-The release heights are defined as layers at specific pressure.
+The release heights are defined as a set of fractions released into predefined layers.
 
-The release height defintions are independent of the layers used by the model. 
+The release height definitions are independent of the layers used by the model. 
 
 There are 7 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
 
@@ -538,7 +538,7 @@ There are 7 predefined release heights distributions. Those can also be defined 
 
 The ``Emis_Zlevels`` defines the height of the layer boundaries for emissions in meters. (Standard atmosphere is assumed to transform those in Pressure by the model). The first layers is from surface to 20 meters, the second layer from 20 to 50 m... until the eigth and last layer which runs from 781 to 1106 meters. 
 
-For example sectors defined with the height index "1", will release nothing in the first and second layer, 0.3% into the third layer, 14.7% into the fourth layer etc. 
+For example sectors defined with the height index "1", will release nothing in the three lowest layers, 0.3% into the fourth layer, 14.7% into the fifth layer etc. 
 
 The layers defined in Emis_h are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
 The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
