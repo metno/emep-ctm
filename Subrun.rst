@@ -587,7 +587,7 @@ List of file attributes (default in parenthesis):
   - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
   - country_ISO ('NOTSET') will be used as default for sources units if set.
   - sector (-1) will be used as default for sources sector if set.
-  - sectorsName ('SNAPsectors') . Can also be set to 'GNFRsectors. Sectors are mapped automatically, if the emssions file is defined with one category, but the model use another.
+  - sectorsName ('NOTSET') . Should match one of the SECTORS%name defined ('GNFR_CAMS' for example).
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
 
