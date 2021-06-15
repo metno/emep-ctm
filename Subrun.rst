@@ -656,9 +656,11 @@ A "mask" can be defined for instance with:
     EmisMask(1)%cdfname  = 'London_PM'  !name of the variable to read from the file
     EmisMask(1)%ID       = 'LONDON'  !the name you give to that mask
     EmisMask(1)%threshold = 1.0E-10 !the mask is set at any point larger than the threshold
+    EmisMask(1)%threshold_max = 100 ! ... and smaller than the threshold_max value (default 1E60)
+
 
     
-Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell whicgh are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region).
+Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell which are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region). To include for example all values=23, but not 24, set EmisMask(1)%threshold = 22.5 and EmisMask(1)%threshold_max = 23.5
 
 A mask defines only a region. It is not directly related to any pollutant. 
 
