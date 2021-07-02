@@ -824,10 +824,10 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
     lf_src(2)%wetdep=T, !means make country wet deposition maps too
 
     ! Specify which countries and sectors
-    lf_country_sector_list(1:8)=0,1,2,3,4,5,6,7,
-    lf_country_list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
-    lf_country_group(1)%name='NORDIC', !any name given to the group (used as output name)
-    lf_country_group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
+    lf_country%sector_list(1:8)=0,1,2,3,4,5,6,7,
+    lf_country%list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
+    lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
+    lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
     
 Instead of defining countries in the emission files, one can define "source regions" in a separate netcdf file. Each region must have an integer value. The values to be included as a source region are then specified by the minimum and maximum value to include. The maskfile should be defined too. For example:
 
@@ -840,7 +840,7 @@ Instead of defining countries in the emission files, one can define "source regi
 
     lf_country%mask_val_min = 1,
     lf_country%mask_val_max= 357,
-    lf_country_sector_list(1:1)=0,
+    lf_country%sector_list(1:1)=0,
     lf_src(1)%species="pm25",
     lf_src(1)%type='country',
     
