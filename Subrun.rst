@@ -835,7 +835,7 @@ Instead of defining countries in the emission files, one can define "source regi
     :caption: Local Fractions mask regions source receptor example
 
     EmisMask(1)%filename='municip_mask/municip_mask_500m.nc',
-    EmisMask(1)%cdfname='region_id'
+    EmisMask(1)%cdfname='region_id',
     EmisMask(1)%ID='NUMBER',
 
     lf_country%mask_val_min = 1,
