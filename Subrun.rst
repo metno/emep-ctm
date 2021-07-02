@@ -160,7 +160,6 @@ Gridcells are either entirely included or entirely reduced, never cut into small
 .. code-block:: Fortran
     :name: femis
     :caption: ``femis.dat`` example.
-    :linenos:
 
     Name                          7  sox  nox  co   voc  nh3  pm25  pmco
     17                            0  1.0  1.0  1.0  1.0  1.0  0.5   0.5
@@ -207,7 +206,6 @@ Sets of countries can in principle be defined; for now only the set
 
 .. code-block:: Fortran
     :caption: Mixed emission configuration example.
-    :linenos:
 
     emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
@@ -229,7 +227,6 @@ Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as sp
 
 .. code-block:: Fortran
     :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(1)%name``.
-    :linenos:
 
     emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
     emis_inputlist(1)%use_lonlat_femis = F,
@@ -242,7 +239,6 @@ The city emissions are used to set the mask, and that mask is then in turn used 
 
 .. code-block:: Fortran
     :caption: Mixed emission using mask configuration example.
-    :linenos:
 
     emis_inputlist(1)%name = '/MyPathToEmissions/emis_local.POLL',
     emis_inputlist(1)%set_mask = T,
@@ -650,7 +646,6 @@ A "mask" can be defined for instance with:
 
 .. code-block:: Fortran
     :caption: Define a mask example
-    :linenos:
 
     EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'London_PM',  !name of the variable to read from the file
@@ -670,7 +665,6 @@ To be used with the Local Fractions (see below), one can also define a set of re
 
 .. code-block:: Fortran
     :caption: Define a set of masks with integers, example
-    :linenos:
     
     EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
