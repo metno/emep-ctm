@@ -666,6 +666,14 @@ A mask defines only a region. It is not directly related to any pollutant.
 
 The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set. It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
 
+To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER: 
+
+.. code-block:: Fortran
+    :caption: Define a mask example
+    :linenos:
+    EmisMask(1)%ID = 'NUMBER'
+
+
 Other less used options
 -----------------------
 
@@ -824,5 +832,18 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
     lf_country_group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country_group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
     
+Instead of defining countries in the emission files, one can define "source regions" in a separate netcdf file. Each region must have an integer value. The values to be included as a source region are then specified by the minimum and maximum value to include. The maskfile should be defined too. For example:
 
+.. code-block:: Fortran
+    :caption: Local Fractions Country source receptor type example
 
+    EmisMask(1)%filename='municip_mask/municip_mask_500m.nc',
+    EmisMask(1)%cdfname='region_id'
+    EmisMask(1)%ID='NUMBER',
+
+    lf_country%mask_val_min = 1,
+    lf_country%mask_val_max= 357,
+    lf_country_sector_list(1:1)=0,
+    lf_src(1)%species="pm25",
+    lf_src(1)%type='country',
+    
