@@ -832,7 +832,7 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
 Instead of defining countries in the emission files, one can define "source regions" in a separate netcdf file. Each region must have an integer value. The values to be included as a source region are then specified by the minimum and maximum value to include. The maskfile should be defined too. For example:
 
 .. code-block:: Fortran
-    :caption: Local Fractions Country source receptor type example
+    :caption: Local Fractions mask regions source receptor example
 
     EmisMask(1)%filename='municip_mask/municip_mask_500m.nc',
     EmisMask(1)%cdfname='region_id'
