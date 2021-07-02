@@ -652,11 +652,11 @@ A "mask" can be defined for instance with:
     :caption: Define a mask example
     :linenos:
 
-    EmisMask(1)%filename = '/mypath/myfile.nc' !name of the netcdf file to read from
-    EmisMask(1)%cdfname  = 'London_PM'  !name of the variable to read from the file
-    EmisMask(1)%ID       = 'LONDON'  !the name you give to that mask
-    EmisMask(1)%threshold = 1.0E-10 !the mask is set at any point larger than the threshold
-    EmisMask(1)%threshold_max = 100 ! ... and smaller than the threshold_max value (default 1E60)
+    EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'London_PM',  !name of the variable to read from the file
+    EmisMask(1)%ID       = 'LONDON',  !the name you give to that mask
+    EmisMask(1)%threshold = 1.0E-10, !the mask is set at any point larger than the threshold
+    EmisMask(1)%threshold_max = 100, ! ... and smaller than the threshold_max value (default 1E60)
 
 
     
@@ -669,10 +669,12 @@ The masks defined here, will also be applied on files from emis_inputlist (old f
 To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER: 
 
 .. code-block:: Fortran
-    :caption: Define a mask example
+    :caption: Define a set of masks with integers, example
     :linenos:
     
-    EmisMask(1)%ID = 'NUMBER'
+    EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
+    EmisMask(1)%ID = 'NUMBER',
 
 
 Other less used options
