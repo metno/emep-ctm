@@ -671,6 +671,7 @@ To be used with the Local Fractions (see below), one can also define a set of re
 .. code-block:: Fortran
     :caption: Define a mask example
     :linenos:
+    
     EmisMask(1)%ID = 'NUMBER'
 
 
