@@ -829,7 +829,7 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
     
-Instead of defining countries in the emission files, one can define "source regions" in a separate netcdf file. Each region must have an integer value. The values to be included as a source region are then specified by a list or as the minimum and maximum value to include (defining both a list and an intervall is allowed, but only only list and one intervall). The maskfile should be defined too. For example to include masks 2,5,8,12 and all mask between 100 and 357 (included):
+Instead of defining countries in the emission files, one can define "source regions" in a separate netcdf file. Each region must have an integer value. The values to be included as a source region are then specified by a list or as the minimum and maximum value to include (defining both a list and an intervall is allowed, but only one list and one intervall). The maskfile should be defined too. For example to include masks 2,5,8,12 and all mask between 100 and 357 (included):
 
 .. code-block:: Fortran
     :caption: Local Fractions mask regions source receptor example
