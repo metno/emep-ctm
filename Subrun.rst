@@ -799,6 +799,21 @@ config_emep.nml settings:
     ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
 
+If one wants to include many species, sectors and res values, without writing one entry per source, one can use the following syntax:
+
+.. code-block:: Fortran
+    :caption: Local Fractions sectors arrays example
+
+    USES%LocalFractions = F, ! T for computing Local Fractions
+    lf_species(1:2)%name = 'pm25','pmco','nox',
+    lf_species(1)%sectors(1:) = 0, 1, 2, 8,
+    lf_species(1)%res(1:) = 1, 4,
+    lf_species(2)%sectors(1:) = 0, 1, 2, 8,
+    lf_species(2)%res(1:) = 1, 4,
+
+The corresponding lf_src values will then be added to the already defined lf_src (3*4*2 = 24 new sources in this example). You can not with this syntax combine different res for different sectors for the same species.
+
+
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
 
 Local fractions can also be used to make traditional Source Receptor (or blame) matrices, in a single run.
