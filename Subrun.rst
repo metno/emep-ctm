@@ -860,3 +860,4 @@ Instead of defining countries in the emission files, one can define "source regi
     lf_src(1)%species="pm25",
     lf_src(1)%type='country',
     
+If a value is within the min and max range, but does not appear in the mask file, it will not be taken into account (meaning it is ok to specify a range that covers all the masks values, even if some values are not defined on the mask) 
