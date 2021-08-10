@@ -721,7 +721,7 @@ The values for split, emission release height and timefactors can be defined thr
     SECTORS_ADD(1) = 'GNFR_CAMS', 'GNFR_A',  'sec01',  1, 1,  1, 'Public Power', 'ALL',
     SECTORS_ADD(2) = 'GNFR_CAMS', 'GNFR_B',  'sec02',  3, 3,  2, 'Industry', 'ALL',
     SECTORS_ADD(3) = 'GNFR_CAMS', 'GNFR_C',  'sec03',  2, 2,  3, 'OtherStationaryComb', 'ALL',
-    SECTORS_ADD(4) = 'GNFR_CAMS', 'GNFR_D',  'sec04',  4, 4,  4, 'Fugitive', 'ALL',
+    SECTORS_ADD(4) = 'GNFR_CAMS', 'GNFR_D',  'sec04',  5, 5,  4, 'Fugitive', 'ALL',
     SECTORS_ADD(5) = 'GNFR_CAMS', 'GNFR_E',  'sec05',  6, 2,  5, 'Solvents', 'ALL',
     SECTORS_ADD(6) = 'GNFR_CAMS', 'GNFR_F',  'sec06',  7, 2,  6, 'RoadTransport', 'ALL',
     SECTORS_ADD(7) = 'GNFR_CAMS', 'GNFR_G',  'sec07',  8, 2,  7, 'Shipping', 'ALL',
