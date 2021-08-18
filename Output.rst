@@ -178,7 +178,13 @@ For hourly outputs of emissions set
 
   HourlyEmisOut = T,
 
-Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
+For daily outputs of emissions set 
+
+.. code-block:: fortran
+
+  DailyEmisOut = T,
+  
+  Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
 
 .. code-block:: fortran
 
