@@ -184,7 +184,7 @@ For daily outputs of emissions set
 
   DailyEmisOut = T,
   
-  Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
+Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
 
 .. code-block:: fortran
 
