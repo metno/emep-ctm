@@ -778,7 +778,7 @@ config_emep.nml settings:
 .. code-block:: Fortran
     :caption: Local Fractions flag example
 
-    USES%LocalFractions = F, ! T for computing Local Fractions
+    USES%LocalFractions = T, ! T for computing Local Fractions, F otherwise
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
     !NB: Values from lf_src(1) are used for all sources
     lf_src(1)%YEAR = T, !average value for full run in output 
@@ -797,7 +797,7 @@ config_emep.nml settings:
     lf_src(3)%sector=0,
     lf_src(4)%species="nox ",
     lf_src(4)%sector=8,
-    
+    Marco Olmo
     ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
 
@@ -806,7 +806,7 @@ If one wants to include many species, sectors and res values, without writing on
 .. code-block:: Fortran
     :caption: Local Fractions sectors arrays example
 
-    USES%LocalFractions = F, ! T for computing Local Fractions
+    USES%LocalFractions = T, ! T for computing Local Fractions
     lf_species(1:2)%name = 'pm25','pmco','nox',
     lf_species(1)%sectors(1:) = 0, 1, 2, 8,
     lf_species(1)%res(1:) = 1, 4,
@@ -823,7 +823,7 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
 .. code-block:: Fortran
     :caption: Local Fractions Country source receptor type example
 
-    USES%LocalFractions = F, ! T for computing Local Fractions
+    USES%LocalFractions = T, ! T for computing Local Fractions
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
     !NB: Values from lf_src(1) are used for all sources
     lf_src(1)%YEAR = T, !average value for full run in output 
@@ -863,3 +863,26 @@ Instead of defining countries in the emission files, one can define "source regi
     lf_src(1)%type='country',
     
 If a value is within the min and max range, but does not appear in the mask file, it will not be taken into account (meaning it is ok to specify a range that covers all the masks values, even if some values are not defined on the mask) 
+
+
+The full Ozone chemistry can be included. This option is under development, and only limited options are available. The cpu cost is high, approximatively 10 times the cost without this option (independently of the number of sources tracked). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``. Example of config settings:
+
+.. code-block:: Fortran
+    :caption: Local Fractions Country source receptor type example
+
+    USES%LocalFractions = T, ! T for computing Local Fractions
+    lf_src(1)%YEAR = T, !average value for full run in output 
+    lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
+    
+    !Local Fractions pollutants and sectors to include:
+    lf_src(1)%species="FULLCHEM", ! 
+    lf_src(1)%type='country',  ! Means make country style SR
+
+    ! Specify which countries and sectors
+    lf_country%sector_list(1:)=0,1,8,
+    lf_country%list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
+    lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
+    lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
+    
+
+
