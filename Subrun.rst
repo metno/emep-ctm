@@ -276,6 +276,12 @@ The mode options are:
         do nothing (default).
     'START'
         read at the start of run.
+    'RESTART'
+        read at the start of run, but do not overwrite BC. Use this option when you restart a run
+without changing the domain size ("checkpoint-restart"). The difference with "START" is only that BC are not overwritten. 
+(This is important in the case of restarting exactly at the start of a month (at time 00:00, the 1st),
+because the nest file contains the BC from preceding month, and if 'START' is used it will use those for the new month, 
+i.e. overwrite new BC with old ones.)
     ‘NHOUR’
         read at given ``NEST_NHOURREAD`` hourly intervals, if the file is found.
         ``NEST_NHOURREAD`` is set in ``Model_config`` and should be an integer fraction of 24.
