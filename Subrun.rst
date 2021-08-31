@@ -653,19 +653,19 @@ A "mask" can be defined for instance with:
 .. code-block:: Fortran
     :caption: Define a mask example
 
-    EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
-    EmisMask(1)%cdfname  = 'London_PM',  !name of the variable to read from the file
-    EmisMask(1)%ID       = 'LONDON',  !the name you give to that mask
-    EmisMask(1)%threshold = 1.0E-10, !the mask is set at any point larger than the threshold
+    EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
+    EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
+    EmisMask(1)%threshold = 1.0E-10, ! the mask is set at any point larger than the threshold
     EmisMask(1)%threshold_max = 100, ! ... and smaller than the threshold_max value (default 1E60)
-
+    EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
 
     
 Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell which are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region). To include for example all values=23, but not 24, set EmisMask(1)%threshold = 22.5 and EmisMask(1)%threshold_max = 23.5
 
 A mask defines only a region. It is not directly related to any pollutant. 
 
-The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set. It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
+The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set (but the multiplicative factor is always 0.0 for old format emissions). It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
 
 To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER: 
 
