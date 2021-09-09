@@ -377,7 +377,10 @@ Natural |SO2|
 ~~~~~~~~~~~~~~~~~~~~
 
 Natural |SO2| emissions (dimethylsulfide (DMS) from sea) are
-provided as monthly gridded files. The values are computed taking into account sea surface temperature and wind speed.
+provided as monthly gridded files. The values are computed taking into account sea surface
+temperature and wind speed. Surface water concentrations of DMS (needed for the flux
+calculation) are taken from SOLAS (Surface Ocean Lower Atmosphere Study) and were
+downloaded from https://www.bodc.ac.uk/solas_integration/implementation_products/group1/dms/.
 
 Surface Pressure
 ~~~~~~~~~~~~~~~~
