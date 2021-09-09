@@ -531,7 +531,7 @@ The release heights are defined as a set of fractions released into predefined l
 
 The release height definitions are independent of the layers used by the model. 
 
-There are 7 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
+There are 8 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
 
 .. code-block:: Fortran
     :caption: Default definition of emission height distributions
@@ -544,6 +544,7 @@ There are 7 predefined release heights distributions. Those can also be defined 
     Emis_h(1:,5) = 0.020,  0.034,  0.046,  0.600,  0.300,  0.000,  0.000,  0.000,
     Emis_h(1:,6) = 0.000,  0.000,  0.000,  0.410,  0.570,  0.020,  0.000,  0.000,
     Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153, 
+    Emis_h(1:,8) = 0.200,  0.800,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
 
 The ``Emis_Zlevels`` defines the height of the layer boundaries for emissions in meters. (Standard atmosphere is assumed to transform those in Pressure by the model). The first layers is from surface to 20 meters, the second layer from 20 to 50 m... until the eigth and last layer which runs from 781 to 1106 meters. 
 
