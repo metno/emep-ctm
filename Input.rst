@@ -352,20 +352,26 @@ Aircraft emissions
 
 In the EMEP/MSC-W model aircraft emissions are 'OFF' by default. They
 can be switched 'ON' by setting ``USE_AIRCRAFT_EMIS=.true.`` in
-``config_emep.nml`` and download the data from
-http://www.pa.op.dlr.de/quantify. The EMEP model uses data provided by
-the EU-Framework Programme 6 Integrated Project QUANTIFY
-(http://www.pa.op.dlr.de/quantify). However, before using these data a
-protocol has to be signed, which is why the data file can not be
-provided directly on the EMEP/MSC-W Open Source website. If you want to
-use aircraft emissions go to http://www.pa.op.dlr.de/quantify, click on
-'QUANTIFY emission inventories and scenarios', and then click on
+``config_emep.nml``. When using aircraft emissions there are two options:
+Either the dataset provided by the EU-Framework Programme 6 Integrated
+Project QUANTIFY (http://www.pa.op.dlr.de/quantify), or the more recent
+CAMS-GLOB-AIR dataset which can be downloaded from the Atmosphere Data Store
+(https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-global-emission-inventories?tab=form).
+However, before using these data a protocol has to be signed, which is why
+the data file can not be provided directly on the EMEP MSC-W Open Source
+website.
+Since rv4.39, CAMS-GLOB-AIR has been the default dataset. Registering
+at the Atmosphere Data Store is straightforward
+(https://ads.atmosphere.copernicus.eu/user/register?destination=/cdsapp)
+(If you rather want to use older QUANTIFY dataset go to
+http://www.pa.op.dlr.de/quantify, click on
+'QUANTIFY emission inventories and scenarios', and then on
 'Register'. That page will provide information about the registration
 process and the protocol that has to be signed. Once you are registered,
 click 'Login' and provide user name and password. On the new page,
 search for 'Emissions for EMEP', which links directly to the ``Readme`` file
 and the emission data file in NetCDF format. Download the emission data
-file and place it in the input folder.
+file and place it in the input folder.)
 
 Natural |SO2|
 ~~~~~~~~~~~~~~~~~~~~
@@ -393,7 +399,7 @@ and vegetation fires are taken from the "Fire INventory from NCAR
 version 1.0" (FINNv1, Wiedinmyer et al. 2011). Data are available from
 2005, with daily resolution, on a fine :math:`1 km\times1 km` grid.
 We store these data on a slightly coarser grid (\ :math:`0.2^\circ\times 0.2^\circ`\ )
-globally for access by the EMEP/MSC-W model. To include forest fire
+globally for access by the EMEP MSC-W model. To include forest fire
 emissions set ``USE_FOREST_FIRES=.true.`` in ``config_emep.nml`` and
 download the 2012 GEOS-chem daily data
 http://bai.acom.ucar.edu/Data/fire/. The data needs to be stored with
