@@ -25,6 +25,7 @@ Here is an example of content of the most important parameters:
     runlabel2 = 'Opensource_Setup_2020',
     startdate = 2015,01,01,00,
     enddate = 2015,01,10,24,
+    spinup_enddate = 2015,01,02,06,
 
     DataPath(1) = '../input', ! define 'DataDir' keyword
 
@@ -37,8 +38,10 @@ Here is an example of content of the most important parameters:
     RUNDOMAIN = 36, 100, 50, 150, ! EECCA sub-domain
   &end
 
-In the extract above, the model is run for the period 1 January to 10 January
-2015 and the trend year used is 2015. Hours for the startdate must be an existing timestamp, often a multiple of three (hours for enddate can be chosen freely).
+In the extract above, the model is run for the period 1 January to 10 January 2015 and the trend year used is 2015,
+with output staring at 6 UTC on January 2nd.
+The ``startdate`` must correspond to a time step on the input meteorology,
+``enddate`` and ``spinup_enddate`` can be chosen freely.
 Output files will be stored with the name 'Base' and the meteorological correspond to the 'EECCA' grid.
 
 Note the definition of the meteorological input ("meteo"):
