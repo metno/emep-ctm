@@ -538,7 +538,10 @@ simpler latitude-dependent system is used (based upon DO3SE), and so
 
 ``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
 indeed any non-European runs are better off with monthly emissions for
-that particular area.
+that particular area. To disable the monthly NH3 profile from LOTOS-EUROS
+and instead use the monthly profile defined, for example, in the 
+``MonthlyFacFile``, set ``MonthlyNH3='-'`` explicitly. If not set explicitly,
+``MonthlyNH3='LOTOS'`` will be set automatically for European simulation runs.
 
 ``CONVECTION`` is difficult. In principle, all models runs should use the T
 setting, but for Europe we find it degrades the model results too much
