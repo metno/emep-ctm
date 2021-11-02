@@ -500,23 +500,36 @@ Acknowledgement:
 Time factors for emissions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Monthly and daily time factors for emission of the 7 compounds
-(CO, |NH3|\ , |NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC).
-There is one file available per compound in ASCII format.
+Monthly and daily time factors for emission can be specified for the 7
+compounds (CO, |NH3|\ , |NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC).  There is
+one file available per compound in ASCII format.
 
 The first two columns in the files represent the country code
-(http://www.emep.int/grid/country_numbers.txt), the second column
-represents an index that can be referenced by the sector definion. 
-(Orginally this index correspond to a SNAP sector). 
-In the monthly files, the 12 consecutive columns represent the time factors
-corresponding to the months of the year. In the daily files there are 7
-consecutive columns representing the time factor for each day of the
-week.
+(http://www.emep.int/grid/country_numbers.txt), the second column represents an
+index that can be referenced by the sector definion (orginally this index
+corresponded to a SNAP sector). 
 
-The file defined in ``HourlyFacFile`` includes factors for each of the eleven SNAP
-sectors for every hour (the columns) for each day of the week, see
-Simpson et al. (2012) section 6.1.2 .
-An additional file defined in ``HourlyFacSpecialsFile`` can be created by the user with modified hourly factors to be used for specific countries. The format is the same as for the default factors, except for an additional first column speicifying the country code number.
+In the monthly files (``MonthlyFacFile``), the 12 consecutive columns represent
+the time factors corresponding to the months of the year. These time factors
+are interpolated according to whether the "current" simulation day is in the
+first or second half of the month. For days in the first half of the month, the
+monthly factor is a combination of the factor of the previous month and the
+current month. For days in the second half of the month, the monthly factor
+combines the factor of the current and the next month (for details, see the
+source code).
+
+In the daily files (``DailyFacFile``) there are 7 consecutive columns
+representing the time factor for each day of the week. The monthly timefactors
+are normalized in such a way that when combined with the daily timefactors, the
+total emission stays the same.
+
+The file defined in ``HourlyFacFile`` includes factors for each of the eleven
+SNAP sectors for every hour (the columns) for each day of the week, see Simpson
+et al. (2012) section 6.1.2. An additional file defined in
+``HourlyFacSpecialsFile`` can be created by the user with modified hourly
+factors to be used for specific countries. The format is the same as for the
+default factors, except for an additional first column speicifying the country
+code number.
 
 
 Emission heights
