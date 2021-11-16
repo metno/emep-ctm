@@ -809,7 +809,7 @@ config_emep.nml settings:
     lf_src(3)%sector=0,
     lf_src(4)%species="nox ",
     lf_src(4)%sector=8,
-    Marco Olmo
+    
     ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
 
