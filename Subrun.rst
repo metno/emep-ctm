@@ -819,7 +819,7 @@ If one wants to include many species, sectors and res values, without writing on
     :caption: Local Fractions sectors arrays example
 
     USES%LocalFractions = T, ! T for computing Local Fractions
-    lf_species(1:2)%name = 'pm25','pmco','nox',
+    lf_species(1:2)%name = 'pm25','nox',
     lf_species(1)%sectors(1:) = 0, 1, 2, 8,
     lf_species(1)%res(1:) = 1, 4,
     lf_species(2)%sectors(1:) = 0, 1, 2, 8,
