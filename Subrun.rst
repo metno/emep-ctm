@@ -524,10 +524,10 @@ settings.
   USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
 
 The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
-controlling SNAP2 emissions. This requires pre-processed files of heating degree days.
+controlling residential combustion (GNFR C/SNAP2) emissions. This requires pre-processed files of heating degree days.
 Such files (DegreeDayFactors.nc) can be produced from any meteorology, but the difference in
 results even for Europe is not too significant. In other regions of the
-world emissions from SNAP2 may not be as dependent on degree-days as in
+world emissions from residential combustion may not be as dependent on degree-days as in
 Europe, and so this setting should probably be false.
 
 ``PFT_MAPS=T`` triggers the use of a global file which provides monthly

@@ -321,7 +321,7 @@ in Simpson et al (2012) and Simpson et al. (2017).
 Degree-day factor
 ~~~~~~~~~~~~~~~~~
 
-Domestic combustion which contribute to a large part of SNAP 2, varies
+Domestic combustion which contribute to a large part of GNFR C (SNAP 2), varies
 on the daily mean temperature. The variation is based on the heating
 degree-day concept. These degree days are pre-calculated for each day
 and stored in the file ``DegreeDayFactors.nc``. See Simpson et al. (2012)
