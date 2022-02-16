@@ -263,7 +263,13 @@ The files start with a description of its content followed by a list of
 the stations. For example, a sondes.dat input file may look like this:
 
 .. literalinclude:: sites.dat
-    :caption: Site location definirion (``sites.dat``) example.
+    :caption: Site location definition (``sites.dat``) example.
+
+.. literalinclude:: sitesLLHrel.dat
+    :caption: Site location definition, LatLonHrel VertCoords example.
+
+.. literalinclude:: sitesLLZ.dat
+    :caption: Site location definition, LatLonZm VertCoords example.
 
 The first line in each file is a header with file content. Then, the
 contents are described in more detail. Text strings after ``#`` are just
@@ -280,7 +286,26 @@ Coords
     or 'ModelCoords' (indices of the grid box in which the station is located).
 
 VertCoords
-    Vertical coordinate system that is used in the model (usually 'EMEPsigma').
+    Vertical coordinate system that is used in the model - see below.
+   
+The VertCoords system was changed in rv4.36, to allow several options.
+Specifying altitude rather than model coordinate is of course a
+very simple alternative, but it is also easily mis-used and mis-understood too. A site at 500m might need vertical profile and/or deposition correction if sitting on a 500m high plateau (hence it has a relative altitude of 0m, and should use iz=KMAX_MID), but if sitting on an isolated mountain in terrain of height 0m, the relative altitude would indeed to 500m and we should pick from some model level which represents that. Tricky! (Best might be to give station altitude and relative altitude in separate columns, so it is explicit at least.)
+
+
+Briefly though, one can now set the "Coords" parameter (in the header of the sites.dat input file, used to be just "LatLong") to be one of:
+
+  1. LatLonKdown  - same as older LatLong, with lat/lon coordinates, then k-number with ground level being e.g. 20
+
+  2. LatLonZm - give lat, long, then altitude in metres. The model will then compare that altitude with the model's topography, to estimate a relative altitude (Hrel). It then calculates which model layer corresponds to that altitude.
+   
+  3. LatLonHrel - give lat, long, and then your own preferred relative altitude (Hrel)
+
+  4. IJKdown - does everything in model's i, j and k coordinates
+
+In principle (3) should produce the best results, with relative altitudes calculated compared to local topography (e.g. < 5km). Option (3) also allows the same Hrel to be used regardless of the underlying meteo resolution. One can also get Hrel from the TOAR database for some sites.
+
+However, testing of these systems against e.g. diunral profiles of ozone shows rather unpredictable results in some cases, and often just using the model's surface concentrations procudes results which are as good as those based upon altitude. The new systems are very fliexble thouhg, and allow the user to explore different methodologies. 
 
 Both ``sites.dat`` and ``sondes.dat`` files are optional, but recommended.
 The species and meteorological data requested for site and sonde output are

@@ -1,0 +1,12 @@
+# "Sites: names, locations, relative elevations"
+# "lev: vertical coordinate m above local topography
+: Units index
+: Coords LatLonZ
+: DomainName NA
+#
+name ix iy lev #HEADERS
+-    index index level #SKIP
+#DATA:
+DK0005R  54.74650  10.73616      10 !  Keldsnor, 10m a.s.l
+NO0002R  58.38853   8.25200     219 !  Birkenes_II, 219m a.s.l
+SE0013R  67.88333  21.06667     475 !  Esrange, 475m a.s.l.
