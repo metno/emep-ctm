@@ -38,7 +38,7 @@ for a whole year, and sometimes with a smaller test run for e.g. April.
                         & selection of stations and compounds  &
    ``sondes_YYYY.nc``   & Vertical daily  values of a          & NetCDF [#YY]_
                         & selection of stations and compounds  &
-   ``sites_YYYY.cvs``   & ASCII version of ``sites_YYYY.nc``   & ASCII [#Old]_
+   ``sites_YYYY.cvs``   & ASCII version of ``sites_YYYY.nc``   & ASCII
    ``sondes_YYYY.csv``  & ASCII version of ``sondes_YYYY.nc``  & ASCII [#Old]_
    **Additional files**
    ``RunLog.out``       & Summary log of runs, including total emissions & ASCII
