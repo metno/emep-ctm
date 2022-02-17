@@ -699,13 +699,85 @@ Chapter 7.2 of the EMEP Status Report 1/2003 Part I (Simpson *et al.*,
 
 .. _`sec-sitessondes-input`:
 
-Site and Sonde locations for output
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Site and Sonde files
+~~~~~~~~~~~~~~~~~~~~
 
 The model provides a possibility for
 extra output data of surface concentration for a set of specified
 measurement site locations and concentrations for the vertical column
 above a set of specified locations. These site and sonde locations are
 listed in the ASCII files ``sites.dat`` and ``sondes.dat``
-files. These files can be changed by the user, this is described in
-:numref:`sec-sitesonde`.
+files. These files can be changed by the user, and provide the outputs
+described in :numref:`sec-sitesonde`.
+
+Two main options are available for the output of ASCII files for
+comparison with measurements or detailed model analysis. These are
+
+sites
+    output of surface concentrations for a set of specified measurement
+    site locations.
+
+sondes
+    output of concentrations for the vertical column above a set of
+    specified locations.
+
+Both sites and sondes are specified and handled in similar ways, in the
+module ``Sites_mod.f90``, so we treat them both together below.
+Locations are specified in the input files ``sites.dat`` and ``sondes.dat``.
+The files start with a description of its content followed by a list of
+the stations. For example, a sondes.dat input file may look like this:
+.. literalinclude:: sites.dat
+    :caption: Site location definition (``sites.dat``) example.
+
+.. literalinclude:: sitesLLHrel.dat
+    :caption: Site location definition, LatLonHrel Coords example.
+
+.. literalinclude:: sitesLLZ.dat
+    :caption: Site location definition, LatLonZm Coords example.
+
+The first line in each file is a header with file content. Then, the
+contents are described in more detail. Text strings after ``#`` are just
+clarifying comments. 'Area', e.g., is the domain to which the stations
+belong, e.g. 'Northern Hemisphere'.
+
+Text after ``:`` is read in by the model:
+
+Units
+    Either 'deg' (degrees) or 'index' (model grid indices).
+
+Coords
+    Vertical coordinate system that is used in the model - see below.
+
+The VertCoords system was changed in rv4.36, to allow several options.
+Specifying altitude rather than model coordinate is of course an obvious
+alternative to the model layer number that was previously used, but it is also easily mis-used and mis-understood too. For example, a site at 500m might need vertical profile and/or deposition correction if sitting on a 500m high plateau (hence it has a relative altitude of 0m, and should use iz=KMAX_MID), but if sitting on an isolated mountain in terrain of height 0m, the relative altitude would indeed to 500m and we should pick from some model level which represents that. Tricky! (Best might be to give station altitude and relative altitude in separate columns, so it is explicit at least.)
+
+Briefly though, one can now set the "Coords" parameter (in the header of the sites.dat input file, used to be just "LatLong") to be one of:
+
+  1. LatLonKdown  - same as older LatLong, with lat/lon coordinates, then k-number with ground level being e.g. 20
+
+  2. LatLonZm - give lat, long, then altitude in metres. The model will then compare that altitude with the model's topography, to estimate a relative altitude (Hrel). It then calculates which model layer corresponds to that altitude.
+
+  3. LatLonHrel - give lat, long, and then your own preferred relative altitude (Hrel). This relative altitude may be calculated by comparison to digital elevation model (see for example, Loibl, W.; Winiwarter, W.; Kopsca, A.; Zufger, J. & Baumann, R. Estimating the spatial distribution of ozone concentrations in complex terrain Atmos. Environ., 1994, 28, 2557-2566).
+
+  4. IJKdown - does everything in model's i, j and k coordinates
+
+In principle (3) should produce the best results, with relative altitudes calculated compared to local topography (e.g. < 5km). Option (3) also allows the same Hrel to be used regardless of the underlying meteo resolution. One can also get Hrel from the TOAR database for some sites (Schultz, MG, et al 2017 Tropospheric Ozone Assessment Report: Database
+and metrics data of global surface ozone observations. Elem Sci Anth,
+5: 58, DOI: https://doi.org/10.1525/elementa.244).
+
+However, testing of these systems against e.g. diunral profiles of ozone shows rather unpredictable results in some cases, and often just using the model's surface concentrations procudes results which are as good as those based upon altitude. The new systems are very fliexble thouhg, and allow the user to explore different methodologies.
+
+Both ``sites.dat`` and ``sondes.dat`` files are optional, but recommended.
+The species and meteorological data requested for site and sonde output are
+specified in ``Config_module.f90`` by the use of arrays.
+Only a few met fields are defined so far but more can be added into
+``Sites_mod.f90`` as required.
+
+The output files ``sites_2015.csv`` and ``sondes_2015.csv`` are comma
+separated files that can be read by excel. netcdf versions of these files
+are also provided, ``sites_2015.nc`` and ``sondes_2015.nc``.
+If you include the whole year, or the 31\ :sup:`st` December,
+``sites_2016.csv`` and ``sondes_2016.csv`` are also included in the output.
+
+
