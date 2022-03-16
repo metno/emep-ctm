@@ -50,7 +50,7 @@ an updated user guide and a full year model results for the year 2015,
 under [GPL license v3][GPLv3].
 
 You can download the source code and input data by following the instructions on the 
-[OpenSource rv4.34 (202011)][rel436] release page.
+[OpenSource rv4.36 (202011)][rel436] release page.
 
 Information on use of the model can be found in the [EMEP MSC-W model User Guide][guide]
 
