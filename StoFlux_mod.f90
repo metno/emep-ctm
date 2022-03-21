@@ -1,7 +1,7 @@
-! <StoFlux_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <StoFlux_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,8 +32,9 @@ module StoFlux_mod
   use Debug_module,          only: DEBUG, DebugCell ! -> DEBUG%GRIDVALUES
   use DO3SE_mod,             only: do3se, nSumVPD, SumVPD_LC
   use GasParticleCoeffs_mod, only: DDspec
-  use Io_Progs_mod,          only: current_date, datewrite
+  use Io_Progs_mod,          only: current_date, datewrite, print_date
   use LandDefs_mod,          only: LandType, STUBBLE, iLC_grass
+  use LandDefs_mod,          only: LandDefs ! WHEAT
   use LocalVariables_mod,    only: L, Grid
   use MicroMet_mod,          only: AerRes, Wind_at_h
   use Par_mod,               only: LIMAX, LJMAX
@@ -90,12 +91,11 @@ contains
      Sub(:)%FstO3 = 0.0
 
     ! resets whole grid at local night
-    if ( Grid%Idirect < 1.0e-6 .and. old_gsun(i,j,1)<1.0e6  ) then
-    !if ( Grid%Idirect < 1.0e-6 ) then
+    if ( Grid%Zen < 90.0  .and. old_gsun(i,j,1)<1.0e6  ) then
         SumVPD(i,j,:)        = 0.0    ! For Critical VPD stuff, wheat
         old_gsun(i,j,:)      = 1.0e99 ! "     "
     end if
-    if ( DebugCell ) call datewrite(dtxt, [Grid%Idirect, old_gsun(i,j,1) ])
+    if ( DebugCell ) call datewrite(dtxt, [Grid%Zen, old_gsun(i,j,1) ])
 
   end subroutine Setup_StoFlux
 
@@ -105,7 +105,7 @@ contains
     integer, intent(in) :: nLC
     integer, dimension(nLC), intent(in) :: iL_used
     logical, intent(in) :: debug_flag
-    logical :: dbg, dbghh
+    logical :: dbg
     character(len=*), parameter :: dtxt='CalcFST:'
 
     real :: tmp_gsun
@@ -115,21 +115,23 @@ contains
 
     i = Grid%i
     j = Grid%j
-    dbg = DEBUG%STOFLUX .and. DebugCell
-    dbghh = dbg .and. current_date%seconds == 0
+    dbg = DEBUG%STOFLUX .and. debug_flag .and. current_date%seconds == 0
+    if(dbg) write(*,*)dtxt//'START'//print_date(), nLC
 
     LC_LOOP: do iiL = 1, nLC
       iL = iL_used(iiL) 
       L = Sub(iL)
 
       Sub(iL)%FstO3       = 0.0
+      if ( dbg ) write(*,"(a,i3,2f7.1,9es10.3)") dtxt//'LOOP', iL, L%hveg, L%z0, L%g_sun
+
 
        ! take care of  temperate crops, outside growing season
       if ( L%hveg < 1.1 * L%z0 ) then 
 
-        Sub(iL)%cano3_ppb   = 0.0  !! Can't do better?
+        Sub(iL)%cano3_ppb   = 0.0  !! Mainly for printouts
         Sub(iL)%EvapTransp  = 0.0   ! evapo-transpiration. Not used anyway..
-        if ( dbghh ) call datewrite(dtxt//" hveg < z0 ", iL, [ L%hveg, L%z0 ] )
+        if ( dbg ) call datewrite(dtxt//" hveg < z0 ", iL, [ L%hveg, L%z0 ] )
 
       else !=======================
 
@@ -163,11 +165,13 @@ contains
            tmp_gsun = L%g_sun
 
            if ( SumVPD(i,j,ivpdLC) > do3se(iL)%VPDcrit ) then
-               L%g_sun = min( L%g_sun, old_gsun(i,j,ivpdLC) )
-              if( dbghh .and. abs(tmp_gsun-L%g_sun)>1.0e-6 ) call datewrite(dtxt//"SUMVPD", iL, &
-               [ do3se(iL)%VPDcrit, L%rh, L%t2C,  L%vpd, SumVPD(i,j,ivpdLC), &
-                 tmp_gsun, L%g_sun, old_gsun(i,j,ivpdLC) ] ) 
-            end if
+             L%g_sun = min( L%g_sun, old_gsun(i,j,ivpdLC) )
+
+             if( dbg .and. abs(tmp_gsun-L%g_sun)>1.0e-6 ) &
+               call datewrite(dtxt//"SUMVPD", iL, &
+                [ do3se(iL)%VPDcrit, L%rh, L%t2C,  L%vpd, SumVPD(i,j,ivpdLC) &
+                 ,tmp_gsun, L%g_sun, old_gsun(i,j,ivpdLC) ] ) 
+           end if
 
            old_gsun(i,j,ivpdLC) = L%g_sun
          end if
@@ -177,20 +181,24 @@ contains
          Sub(iL)%FstO3 = L%cano3_nmole * rc_leaf/(rb_leaf+rc_leaf) * L%g_sun 
 
        end if ! g_sun > 0.0
-       !if( dbg ) call datewrite(dtxt//" O3 ", &
-       !  [ iiL, nLC, iL ], [ L%hveg, L%g_sun, L%cano3_nmole, L%cano3_ppb ] )
 
 ! ======   CLOVER  ===========================================================
       ! For Clover we have a very special procedure, using O3 from grassland
       ! to scale the fluxes. As grassland is entered in Inputs.Landuse before
       ! clover we can assume that Fst and O3 for grassland are available and 
       ! correct
+      ! (Used for Mills, G.; Hayes, F.; Simpson, D.; Emberson, L.; Norris, D.;
+      !  Harmens, H. & Büker, P. Evidence of widespread effects of ozone on
+      !  crops and (semi-) natural vegetation in Europe (1990-2006) in relation
+      !  to AOT40- and flux-based risk maps,  
+      !  Global Change Biol., 2011, 17, 592-613.)
+
         if( LandType(iL)%is_clover) then
 
            if ( L%g_sun>0) Sub(iL)%FstO3 = &
               Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb * Sub(iL)%FstO3
 
-           if (  dbghh ) call datewrite(dtxt//"CLOVER ", iL, &
+           if (  dbg ) call datewrite(dtxt//"CLOVER ", iL, &
                  [ Sub(iL)%FstO3, Sub(iLC_grass)%cano3_ppb, &
                     Sub(iLC_grass)%cano3_ppb/Sub(iL)%cano3_ppb ] )
         end if ! clover
@@ -238,9 +246,14 @@ contains
        !                 (rb_leaf/1.6 + 0.0224*(L%t2/273.0) 
 
 
-        if ( dbghh ) call datewrite(dtxt//"VALS ", iL, &
-            [ L%hveg,L%LAI,L%g_sto,L%g_sun,&
-              u_hveg, Sub(iL)%cano3_ppb, Sub(iL)%FstO3 ] ) ! skip gvcms
+        if ( dbg ) then
+
+          call datewrite(dtxt//"VALS:"//LandDefs(iL)%name, &
+              [iL, L%SGS, L%EGS] , [ L%LAI, L%t2C, L%fSW, u_hveg,L%g_sto,L%g_sun, Sub(iL)%cano3_ppb, Sub(iL)%FstO3 ], &
+            afmt="a34,TXTDATE,3i5,4f8.2,20es14.5")  ! skip gvcms
+        end if
+
+
 
       end if
 

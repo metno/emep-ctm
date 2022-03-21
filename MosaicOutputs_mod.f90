@@ -1,7 +1,7 @@
-! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,7 +25,7 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
 ! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
-!*****************************************************************************! 
+!*****************************************************************************!
 module MosaicOutputs_mod
 use AOTx_mod,          only: Calc_AOTx, Calc_POD, VEGO3_OUTPUTS,&
                                 nOutputVegO3
@@ -62,8 +62,6 @@ public :: Add_NewMosaics
 public :: Add_MosaicOutput
 public :: find_MosaicLC
 
-INCLUDE 'mpif.h'
-
 integer, public, save :: MMC_RH, MMC_CANO3, MMC_VPD, MMC_FST, &
   MMC_USTAR, MMC_INVL, MMC_GSTO, MMC_EVAP, MMC_LAI
 
@@ -84,11 +82,11 @@ contains
 
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 subroutine Init_MosaicMMC(MOSAIC_METCONCS)
-! Set indices of mosaic metconc params for later use. Will be zero if 
+! Set indices of mosaic metconc params for later use. Will be zero if
 ! not found, but that's okay I hope...
   character(len=*), dimension(:), intent(in) :: MOSAIC_METCONCS
 
-  dbg0 = (DEBUG%MOSAICS .and. MasterProc) 
+  dbg0 = (DEBUG%MOSAICS .and. MasterProc)
 
   MMC_RH    = find_index("RH"      ,MOSAIC_METCONCS)
   MMC_CANO3 = find_index("CanopyO3",MOSAIC_METCONCS)
@@ -118,7 +116,7 @@ subroutine Add_MosaicMetConcs(MOSAIC_METCONCS,MET_LCS,iotyp, nMET)
       !------------------- Check if LC present in this array ------!
       iLC = Check_LandCoverPresent( "MET_LCS", n, MET_LCS, (ilab == 1))
       if(iLC<0) cycle  MET_LC
-      if(MOSAIC_METCONCS(ilab)(1:6)=="Canopy" .or.& 
+      if(MOSAIC_METCONCS(ilab)(1:6)=="Canopy" .or.&
          MOSAIC_METCONCS(ilab)(1:5)=="FstO3")     &
         LandType(iLC)%flux_wanted  = .true.  ! Canopy calc in StoFlux
       !-------------End of Check if LC present in this array ------!
@@ -133,7 +131,7 @@ subroutine Add_MosaicMetConcs(MOSAIC_METCONCS,MET_LCS,iotyp, nMET)
       MosaicOutput(nMosaic) = Deriv(  &
         name, "Mosaic", "METCONC", MET_LCS(n), MOSAIC_METCONCS(ilab), &
         ilab, -99,F , 1.0,  T,  iotyp )
-      
+
       select case(MOSAIC_METCONCS(ilab))
         case("USTAR"   );MosaicOutput(nMosaic)%unit = "m/s"
         case("LAI"     );MosaicOutput(nMosaic)%unit = "m2/m2"
@@ -161,7 +159,7 @@ subroutine Add_NewMosaics(Mc,nMc)
   nMc = 0
   MC_LOOP: do n = 1, size( Mc(:)%txt1 )
     !------------------- Check if LC present in this array ------!
-    if ( Mc(n)%txt1 == '-' )  cycle MC_LOOP  ! 
+    if ( Mc(n)%txt1 == '-' )  cycle MC_LOOP  !
     iLC = Check_LandCoverPresent("MMC-VG",n,Mc(:)%txt4,write_condition=.true.)
     if(iLC<0) cycle MC_LOOP
     !-------------End of Check if LC present in this array ------!
@@ -170,7 +168,7 @@ subroutine Add_NewMosaics(Mc,nMc)
     poll  = Mc(n)%txt3                                  ! O3, HNO3, ...
     lctxt = Mc(n)%txt4                                  ! Grid, SNL,..
     name = trims( 'MSC_' // typ//"_"//poll//"_"//lctxt ) ! VG_O3_GRID?
-    
+
     iadv = find_index(poll,species_adv(:)%name )
     if(iadv<1) then
       if(MasterProc) write(*,*) "MOSSPEC not found ", iadv, trim(name)
@@ -219,7 +217,7 @@ subroutine Add_MosaicVegO3(nVEGO3)
 
     veg = OutputVegO3(n)
     name = veg%name
-   
+
     select case(veg%class)
     case("POD")
       units = "mmole/m2"
@@ -236,11 +234,11 @@ subroutine Add_MosaicVegO3(nVEGO3)
     !------------------- Check if LC present in this array ------!
     iLC = Check_LandCoverPresent( "VEGO3_LCS", veg%TXTLC, .true. )
     if(iLC<0) cycle  VEGO3_LC
-    if(iLC>0) LandType(iLC)%flux_wanted  = .true. 
+    if(iLC>0) LandType(iLC)%flux_wanted  = .true.
     !-------------End of Check if LC present in this array ------!
     nVEGO3 = nVEGO3 + 1
     name = veg%name
-   
+
     nMosaic = nMosaic + 1
     call CheckStop(NMosaic>=MAX_MOSAIC_OUTPUTS,dtxt//"too many nMos..EGO3")
     if(dbg0)&
@@ -251,8 +249,8 @@ subroutine Add_MosaicVegO3(nVEGO3)
     ! Use index for veg array. No need to set iadv for VEGO3. Always O3.
     MosaicOutput(nMosaic) = Deriv( &
       name, veg%class, veg%defn, veg%TXTLC, &
-      units, n, -99, dt_scale, scale,  F, veg%iotype ) 
-   
+      units, n, -99, dt_scale, scale,  F, veg%iotype )
+
   end do VEGO3_LC !n
 end subroutine Add_MosaicVEGO3
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -343,7 +341,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
   real, dimension(:), intent(in) :: Deploss
 
   character(len=*), parameter :: dtxt='AddMosc:'
-  type(group_umap), pointer :: gmap=>null()  ! group unit mapping  
+  type(group_umap), pointer :: gmap=>null()  ! group unit mapping
   integer :: n, nadv, iLC, iEco
   integer, save :: idepO3 ! was CDDEP_O3
   integer :: imc, f2d, cdep
@@ -372,7 +370,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
   invEcoFrac(:) = 0.0
   do n=1,NDEF_ECOSYSTEMS
     if(EcoFrac(n)>1.0e-39) invEcoFrac(n)=1.0/EcoFrac(n)
-  end do 
+  end do
 
   !  Query - crops, outisde g.s. ????
   if(first_call) then  ! need to find indices
@@ -395,7 +393,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
           DEF_ECOSYSTEMS(n), EcoFrac(n), invEcoFrac(n)
       end do
       write(*,*) dtxt//"Done ECOCHECK ========================"
-    end if       
+    end if
   end if
   first_call = .false.
 
@@ -422,7 +420,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
     select case(subclass)
     case("DDEP")
       ! Eco landcovers can include several land-cover classes, see EcoSystem_mod
-      iEco = find_index(MosaicOutput(imc)%txt,DEF_ECOSYSTEMS) 
+      iEco = find_index(MosaicOutput(imc)%txt,DEF_ECOSYSTEMS)
       select case(nadv)
       case(1:NSPEC_ADV)                 ! normal advected species
         Fflux = Deploss(nadv)*sum(fluxfrac(nadv,:),Is_EcoSystem(iEco,:))
@@ -474,7 +472,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
 
     case("POD")         ! Fluxes, PODY (was AFstY)
       n =  MosaicOutput(imc)%Index !Index in VEGO3_OUPUTS
-      call Calc_POD( n, iLC, output, debug_flag) 
+      call Calc_POD( n, iLC, output, debug_flag)
       if(dbg) &
         write(*,"(2a,g12.4)") dtxt//"MYPOD ", trim(txtdate), output
 
@@ -483,9 +481,9 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
       n =  MosaicOutput(imc)%Index !Index in VEGO3_OUPUTS
       if(dbg.and. Sub(iLC)%cano3_ppb> 40.0) &
         write(*,*) dtxt//" preAOT", n,iLC, Sub(iLC)%cano3_ppb
-      call Calc_AOTx(n,iLC,output) 
+      call Calc_AOTx(n,iLC,output)
 
-    case("VG","Rs","Rns","Gns") ! could we use RG_LABELS? 
+    case("VG","Rs","Rns","Gns") ! could we use RG_LABELS?
       cdep = itot2Calc(nadv+NSPEC_SHL)  ! e.g. IXADV_O3 to calc index
       Gs   = Sub(iLC)%Gsur(cdep)
       Gns  = Sub(iLC)%Gns(cdep)
@@ -509,7 +507,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
      !  output = Gns
      !case("Rs" )
      !  if(Gs < 1.0e-44)then
-     !    output = -999.0 
+     !    output = -999.0
      !  else
      !    output = 1.0/Gs
      !  end if

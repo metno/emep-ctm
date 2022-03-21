@@ -1,7 +1,7 @@
-! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -77,8 +77,8 @@ end interface Check_LandCoverPresent
 !******   Data to be read from Phenology_inputs.dat:
 
   type, public :: land_input
-     character(len=20) :: name
-     character(len=20) :: code
+     character(len=30) :: name
+     character(len=30) :: code
      character(len=3) :: type   ! Ecocystem type, see headers
      character(len=5) :: LPJtype   ! Simplified LPJ assignment
      real    ::  hveg_max
@@ -131,6 +131,7 @@ contains
 
 !   calculates the start and end of growing season for land-use
 !   class "lu" and latitude "lat".  
+!   Topography corrections are made in Landuse_mod.
 
     integer, intent(in) :: lu         ! Land-use index
     real,    intent(in) :: lat        ! Latitude 
@@ -189,6 +190,7 @@ contains
          end do
          call open_file(IO_TMP,"r",fname,needed=.true.)
          call CheckStop(ios,dtxt//"open_file error on " // fname )
+         write(*,*) dtxt//"opened "//trim(fname)
       end if
 
       call Read_Headers(IO_TMP,errmsg,NHeaders,NKeys,Headers,Keyvalues)
@@ -202,9 +204,14 @@ contains
        nn = 0     
        do
             call read_line(IO_TMP,txtinput,ios)
+!if(MasterProc) print *, "READ LINE ",me, nn,  trim(txtinput), ios
 
             if ( ios /= 0 ) exit   ! likely end of file
-            if ( dbg ) write(*,*) dtxt//' READLINE: ------ '// trim(txtinput)
+            if ( dbg ) write(*,*) nn,  dtxt//' READLINE: ------ '// trim(txtinput)
+            if ( txtinput(1:4) == "#END" ) then
+              if(dbg) write(*,*) dtxt//"ENDofData"
+              exit
+            end if
             if ( txtinput(1:1) == "#" ) cycle
             if ( txtinput(1:2) == '"#' ) then!Common problem after saving .csv!
                  call StopAll(trim(fname)//&
@@ -212,6 +219,7 @@ contains
             end if
 
             read(unit=txtinput,fmt=*,iostat=ios) LandInput
+            if( dbg ) write(*,*) dtxt//'DBG', LandInput%code, LandInput%BiomassD
 
             call CheckStop ( ios, fname // " txt error:" // trim(txtinput) )
             n = find_index( LandInput%code, wanted_codes )!index in map data?
@@ -223,6 +231,7 @@ contains
            !############################
             LandDefs(n) = LandInput
             wanted_found(n) = .true.
+            if(MasterProc) write(*,"(a,2i3,2a20)") dtxt//'MATCH',nn, n, LandInput%code, wanted_codes(n)
             nn = nn + 1
            !############################
 
@@ -234,7 +243,7 @@ contains
 
             if ( dbg ) then
                  write(*,"(a)") trim(txtinput)
-                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") dtxt//":=> ", &
+                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") dtxt//"MATCH :=> ", &
                   n,nn, ncodes, trim(LandInput%name), trim(LandInput%code),&
                     LandDefs(n)%SGS50,LandDefs(n)%EGS50, &
                     LandDefs(n)%LAImax, LandDefs(n)%Emtp
@@ -285,9 +294,9 @@ contains
           print *, dtxt//" ERROR didn't find all codes"
           do n = 1,  ncodes
             if ( .not. wanted_found(n) ) &
-               print *, dtxt//' ERROR misses:', n, ':'//trim(wanted_codes(n))
+              print *, dtxt//' ERROR misses:'//trim(wanted_codes(n)), n,nn,ncodes
           end do
-          call StopAll( dtxt//" didn't find all codes")
+          call StopAll( dtxt//" didn't find code:"//trim(wanted_codes(n)))
        end if
 
   end subroutine Init_LandDefs

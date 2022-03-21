@@ -7,24 +7,25 @@
   enddate   = 2015,12,31,24,
 !------------------------------
   DataPath(1) = '../input',
-  EXP_NAME    = 'EMEPSTD',
 !------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
-  EmisHeightsFile       = 'DataDir/EmisHeights.txt',
-  MonthlyFacFile        = 'DataDir/MonthlyFac.POLL',
+  MonthlyFacFile        = 'DataDir/MonthlyFacs_eclipse_V6b_snap_may2021/MonthlyFacs.POLL',
+  MonthlyFacBasis       = 'ECLIPSE',
+  Monthly_timezoneFile  = 'DataDir/monthly_timezones_GLOBAL05.nc',
   DailyFacFile          = 'DataDir/DailyFac.POLL',
   HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
   EMEP_EuroBVOCFile     = 'DataDir/EMEP_EuroBVOC.nc',
-  DustFile              = 'DataDir/Dust.nc',
+  DustFile              = 'DataDir/Dust2014_month.nc',
   TopoFile              = 'DataDir/topoGRID.nc'
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
   Vertical_levelsFile   = 'DataDir/Vertical_levels20_EC.txt'
+  AircraftEmis_FLFile   = 'DataDir/AircraftEmis_FL.nc',
 !------------------------------
-  ZCMDIR                     = 'DataDir/ZCM_EmChem19',
-  SplitDefaultFile           = 'ZCMDIR/emissplit.defaults.POLL',
-  SplitSpecialsFile          = 'ZCMDIR/emissplit.specials.POLL',
+  ZCMDIR                     = 'DataDir/ZCM_EmChem19r',
+  SplitDefaultFile           = 'ZCMDIR/emissplit_defaults_POLL.csv',
+  SplitSpecialsFile          = 'ZCMDIR/emissplit_specials_POLL.csv',
   cmxbicDefaultFile          = 'ZCMDIR/CMX_BoundaryConditions.txt',
   cmxBiomassBurning_FINNv1p5 = 'ZCMDIR/CMX_BiomassBurning_FINNv1p5.txt',
   cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1.txt',
@@ -35,6 +36,7 @@
   LandCoverInputs%Do3seDefs = 'DataDir/Inputs_DO3SE.csv',
   LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
                               'DataDir/glc2000xCLMf18.nc',
+  LandCoverInputs%mapMed    = 'DataDir/medMap_0.5deg.nc',
   YieldModifications    = 'VBS-T10',
   PBL%ZiMIN             =  50.0,
 !------------------------------
@@ -46,6 +48,11 @@
   USES%n2o5HydrolysisMethod = 'Smix' ! 'Smix', 'SmixTen', 'Gamma:0.002', NOT:'OrigRiemer'
   USES%WHITECAPS        = 'Callaghan'! 'Callaghan', 'Norris', 'Monahan'
   USES%MonthlyNH3       = 'LOTOS',   ! Better monthly profile, for Europe only!
+! 2021-2022 updates:
+! CAMS81-based SOILNOX DANGER - some inventories already have fertilizer-induced soil NOx.
+! Choose one of:
+! USES%SOILNOX_METHOD = 'Total',    ! for CAMS-REG, ECLIPSE v5
+  USES%SOILNOX_METHOD = 'NoFert',   ! for EMEP/CEIP, ECLIPSE v6
 !------------------------------
   USES%SOILWATER        = T,         ! Uses SMI from meteo data
   USES%CONVECTION       = F,
@@ -63,7 +70,7 @@
   INERIS_SNAP2          = F,
 !------------------------------
   emis_inputlist(1)%name= 'DataDir/GNFRemis_EMEP01_2015.nc', ! fractions emiss format
-  emis_inputlist(2)%name= 'DataDir/OceanicEmissions_GEIA.nc',
+  emis_inputlist(2)%name= 'DataDir/DMS_SOLAS.nc',
   emis_inputlist(2)%type= 'DMS',
   EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
 !------------------------------
@@ -72,8 +79,10 @@
   BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
 !--- 'fake' vegetation for ozone POD calculations
-  FLUX_VEGS = 'IAM_CR','IAM_DF','IAM_MF','Wheat_Irrigated', 'Wheat_NonIrrig',
-  FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE'   ! Ignore these for FLUX calcs.
+  FLUX_VEGS = 'IAM_CROP','IAM_CR','IAM_DF','IAM_DF_MED', ! do not need all array elements
+              'IAM_WH','IAM_WH_MED','IAM_WH_Irrig','IAM_WH_MED_Irrig',
+              'IAM_SNL','IAM_SNL_MED',
+  FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE',  ! Ignore these for FLUX calcs.
 !-------- volcanic emissions from passive degassing and historical eruptions
   flocdef='DataDir/columnsource_location.csv',
   femsdef='DataDir/columnsource_emission.csv',
@@ -113,7 +122,7 @@
 OutputConcs=
   'HMIX'                ,'m'   ,'2d','HMIX'     ,'MISC' ,'YM',
   'T2m'                 ,'degC','2d','T2m'      ,'MISC' ,'YMD',
-  'SURF_ppbC_VOC'       ,'ppb' ,'2d','VOC'      ,'MISC' ,'YMD',
+  'NMVOC'               ,'ppbC','2d','AIR_CONCS','GROUP','YMD',
   'SO2'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
   'NH3'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
   'HNO3'                ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',

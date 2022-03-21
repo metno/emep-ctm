@@ -1,7 +1,7 @@
-! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -75,11 +75,11 @@ use Config_module,     only: MasterProc, SOURCE_RECEPTOR, & !
                             lev3d_from_surface,&
                             MAX_NUM_DERIV2D,OutputVegO3
 use Debug_module,      only: DEBUG ! => DEBUG_MY_DERIVED
-use EmisDef_mod,       only: NSECTORS, EMIS_FILE, Nneighbors
+use EmisDef_mod,       only: NSECTORS, SECTORS, EMIS_FILE
 use EmisGet_mod,       only: nrcemis, iqrc2itot
 use GridValues_mod,    only: RestrictDomain
 use Io_Nums_mod,       only: IO_NML
-use Io_Progs_mod,      only: PrintLog
+use Io_RunLog_mod,     only: PrintLog
 use MosaicOutputs_mod, only: nMosaic, MAX_MOSAIC_OUTPUTS, MosaicOutput, & !
                             Init_MosaicMMC,  Add_MosaicMetConcs, &
                             Add_NewMosaics, Add_MosaicVEGO3, Add_MosaicDDEP
@@ -138,6 +138,8 @@ character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
     ! all array members will have len=TXTLEN_DERIV
     ! Surface pressure used for crosssection
     "SURF_MAXO3","SURF_PM25water","SOMO35","PS"] 
+!JUN21AERO ST had dim(5) and :
+!    "SURF_MAXO3","SURF_PM25water","SURF_PMcowater","SOMO35","PS"]    !
 
 !============ Extra parameters for model evaluation: ===================!
 !character(len=TXTLEN_DERIV), public, parameter, dimension(13) :: &
@@ -299,7 +301,7 @@ subroutine Init_My_Deriv()
      call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
      do isec=1,NSECTORS
         if(SecEmisOutWanted(isec))then
-           write(tag_name(1),"(A,I0,A)")"Sec",isec,"_Emis_mgm2_"//trim(EMIS_FILE(i))
+           write(tag_name(1),"(A)")trim(SECTORS(isec)%longname)//"_Emis_mgm2_"//trim(EMIS_FILE(i))
            call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
         endif
      end do

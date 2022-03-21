@@ -23,7 +23,7 @@ F90 = mpif90
 F90FLAGS = -ffree-line-length-none -fdefault-real-8 -fdefault-double-8 -O2
 
 # Intel ifort compiler (comment out if gfortran used)
-F90FLAGS = -shared-intel -r8 -recursive -O2
+F90FLAGS = -r8 -IPF_fp_relaxed -assume noold_maxminloc -O2 -march=core-avx2
 
 ###################################################
 

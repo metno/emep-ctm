@@ -1,7 +1,7 @@
-! <CellMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <CellMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,7 +36,9 @@ module CellMet_mod
 !=============================================================================
 
 use CheckStop_mod,     only: CheckStop
+use Config_module,    only: KMAX_MID, KMAX_BND, PT, USES, IOU_INST, PBL
 use DerivedFields_mod, only: d_2d, f_2d
+use Functions_mod, only : Tpot_2_T
 use GridValues_mod,    only: dA,dB, glat, glon
 use Landuse_mod,       only: LandCover, ice_landcover ! Provides SGS,hveg,LAI,...
 use Landuse_mod,       only: mainly_sea
@@ -46,11 +48,11 @@ use MicroMet_mod,      only: PsiH, PsiM, AerRes       ! functions
 use MetFields_mod,     only: ps, u_ref, cc3dmax, sdepth, surface_precip, &
                             ice_nwp,fh, fl, z_mid, z_bnd, q, roa, rh2m, sst, &
                             rho_surf, th, pzpbl, t2_nwp, ustar_nwp, zen,&
-                            coszen, Idirect, Idiffuse
-use Config_module,    only: KMAX_MID, KMAX_BND, PT, USES, IOU_INST
+                            coszen
 use PhysicalConstants_mod, only: PI, CP, GRAV, KARMAN
-use SoilWater_mod,     only: fSW
+use SoilWater_mod,     only: fSW40, fSW50, fSW90 ! Not we have fSW50, fSW90 also now
 use SubMet_mod,        only: Get_SubMet, Sub
+use ZchemData_mod, only : pp, temp   ! TLEAF testing
 
 implicit none
 private
@@ -128,13 +130,9 @@ subroutine Get_CellMet(i,j,debug_flag)
   Grid%zen = zen(i,j)
   Grid%coszen = coszen(i,j)
   Grid%izen = max( 1, int ( Grid%zen + 0.5 ) )! 1 avoids zero in indices.
-  Grid%Idirect  =  Idirect(i,j)
-  Grid%Idiffuse =  Idiffuse(i,j)
 
   !**  prefer micromet signs and terminology here:
   Grid%Hd    = -fh(i,j,1)       ! Heat flux, *away from* surface
-if( debug_flag ) write(*,"(a,3es12.3,f8.2)") 'CellHd', Grid%Hd, &
-   maxval(fh(:,:,1)), minval(fh(:,:,1)), Grid%z_mid
   Grid%LE    = -fl(i,j,1)       ! Heat flux, *away from* surface
   Grid%ustar = ustar_nwp(i,j)   !  u*
   Grid%t2    = t2_nwp(i,j,1)    ! t2 , K
@@ -143,6 +141,23 @@ if( debug_flag ) write(*,"(a,3es12.3,f8.2)") 'CellHd', Grid%Hd, &
   Grid%rh2m  = rh2m(i,j,1)      !
   Grid%rho_s = rho_surf(i,j)    ! Should replace Met_mod calc. in future
 
+  if( debug_flag ) then
+
+    write(*,"(a,3es12.3,f8.2)") 'CellHd', Grid%Hd, maxval(fh(:,:,1)), &
+        minval(fh(:,:,1)), Grid%z_mid
+    write(*,"(a,9f10.3)") 'CellMet: PTterms', &  !checked, psurf=ps(i,j,1)
+       0.01*ps(i,j,1), 0.01*pp(KMAX_MID), & ! hPa
+       temp(KMAX_MID)-273.15, &
+       th(i,j,KMAX_MID,1)*Tpot_2_T( pp(KMAX_MID) )-273.15, Grid%t2C
+
+    write(*,"(a,9f10.3)") 'CellMet: Zterms', Grid%z_ref, Grid%z_mid
+
+    write(*,"(a,2f8.2,9es12.3)") 'CellRterms', Grid%t2C, &
+     Grid%ustar, Grid%Hd, Grid%LE, Grid%rh2m !, tab_esat_Pa(iT), Grid%Dair, Grid%s,  Grid%psurf*CP/(0.622*LAMBDA_W)
+
+   end if ! debug
+
+
   Grid%is_mainlysea = mainly_sea(i,j)
   Grid%is_allsea = .true. !set to false below if land found
   
@@ -150,11 +165,13 @@ if( debug_flag ) write(*,"(a,3es12.3,f8.2)") 'CellHd', Grid%Hd, &
   Grid%ice_nwp   = max( ice_nwp(i,j,1), ice_landcover(i,j) )
   Grid%snowice   = ( Grid%sdepth  > 1.0e-10 .or. Grid%ice_nwp > 1.0e-10 )
 
-  Grid%fSW       = fSW(i,j)
+  Grid%fSW40     = fSW40(i,j)
+  Grid%fSW50     = fSW50(i,j)
+  Grid%fSW90     = fSW90(i,j)
 
   ! we limit u* to a physically plausible value
   ! to prevent numerical problems
-  Grid%ustar = max( Grid%ustar, 0.1 )
+  Grid%ustar = max( Grid%ustar, PBL%MIN_USTAR_LAND)
 
   !NB: invL_nwp is already defined, with similar defintion 
   Grid%invL  = -1* KARMAN * GRAV * Grid%Hd & ! -Grid%Hd disliked by gfortran
@@ -222,7 +239,7 @@ if( debug_flag ) write(*,"(a,3es12.3,f8.2)") 'CellHd', Grid%Hd, &
      enddo
      if(.not.Grid%is_allsea)then
         !renormalize to land
-        if(land_frac >= 1.E-6)then
+        if(land_frac >= 1.E-9)then
            if(z0_out_ix>0) d_2d(z0_out_ix,i,j,IOU_INST) = &
                 d_2d(z0_out_ix,i,j,IOU_INST)/land_frac
            if(invL_out_ix>0)  d_2d(invL_out_ix,i,j,IOU_INST) = &

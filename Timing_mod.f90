@@ -1,7 +1,7 @@
-! <Timing_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Timing_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -27,19 +27,19 @@
 module My_Timing_mod
 !----------------------------------------------------------------------------
 !+
-! Timing code, Variables and text array for CPU-timing 
+! Timing code, Variables and text array for CPU-timing
 !
 ! This module may be used to collect information on either system time or
 ! CPU time. Calling Code_timer from the external routines is the standard
 ! interface. If system time is required then modify Code_timer below to
 ! use system_clock, and declare the time variables (tim_before, tim_after, etc.)
-! as integers. If CPU time is required modify Code_timer to call 
+! as integers. If CPU time is required modify Code_timer to call
 ! CPU_TIME and declare the time variables as real.
 !
 ! Code commented out or marked with !SYS is intended for system_clock
 ! Code commented out or marked with !CPU is intended for cpu_time
 !----------------------------------------------------------------------------
-use mpi,only: MPI_DOUBLE_PRECISION,MPI_MAX,MPI_MIN, MPI_COMM_WORLD,MPI_IN_PLACE
+use MPI_Groups_mod
 implicit none
 
 public :: Init_timing
@@ -56,7 +56,7 @@ character(len=30), dimension(:), allocatable, public, save :: &
 
 !/--- MAKE CHANGE HERE TO SWAP FROM SYSTEM_CLOCK TO SYSTEM_TIME
 
-logical, parameter, private ::  IS_CPU_TIME = .true.   
+logical, parameter, private ::  IS_CPU_TIME = .true.
 
 !SYS   integer, public, save :: &   !SYS
 real,    public, save :: &   !CPU
@@ -118,7 +118,7 @@ subroutine Output_timing(io, me,np,nx,ny)
      write( 6,"(a18,I8)") "Number of grids = ",nx*ny
      write(io,"(a18,2i5)")"Number of CPUs =  ", np
      write( 6,"(a18,2i5)")"Number of CPUs =  ", np
-     
+
      write(6, fmt="(39x,a)")' min time(s)  max time(s)'
      write(io,fmt="(39x,a)")' min time(s)  max time(s)'
      do n=1,NTIMING
@@ -133,7 +133,6 @@ end subroutine Output_timing
 subroutine Code_timer(call_time)
 !SYS integer, intent(inout) :: call_time      !SYS
 !SYS call system_clock(call_time)             !SYS
-  include 'mpif.h'
   real, intent(inout) :: call_time          !CPU
 ! call cpu_time(call_time)                  !CPU
   call_time=MPI_WTIME()
@@ -141,5 +140,3 @@ subroutine Code_timer(call_time)
 end subroutine Code_timer
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 endmodule My_Timing_mod
-
-

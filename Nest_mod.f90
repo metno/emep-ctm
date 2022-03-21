@@ -1,7 +1,7 @@
-! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,6 +32,7 @@ module Nest_mod
 !    'NONE':      do not read (default)
 !    'NHOUR':     read every NEST_NHOURREAD, if the files are found
 !    'START':     read at the start of run
+!    'RESTART':   read at the start of run, but not the outer frame, so as not to overwrite BC
 !  NEST_MODE_SAVE
 !    'NONE':      do not write (default)
 !    'NHOUR':     write every NEST_NHOURSAVE
@@ -73,7 +74,8 @@ use ChemDims_mod,            only: NSPEC_ADV, NSPEC_SHL
 use ChemSpecs_mod,           only: species_adv
 use GridValues_mod,          only: A_mid,B_mid, glon, glat, i_fdom, j_fdom, &
      RestrictDomain, Read_KMAX
-use Io_mod,                  only: open_file,IO_TMP,PrintLog
+use Io_mod,                  only: open_file,IO_TMP
+use Io_RunLog_mod,           only: PrintLog
 use InterpolationRoutines_mod,  only : grid2grid_coeff,point2grid_coeff
 use MetFields_mod,           only: roa
 use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
@@ -116,7 +118,7 @@ private
 logical, private, save :: mydebug =  .false.
 
 character(len=TXTLEN_SHORT),private, parameter :: &
-  READ_MODES(4)=[character(len=TXTLEN_SHORT)::'NONE','NHOUR','START','MONTH'],&
+  READ_MODES(5)=[character(len=TXTLEN_SHORT)::'NONE','NHOUR','START','RESTART','MONTH'],&
   SAVE_MODES(4)=[character(len=TXTLEN_SHORT)::'NONE','NHOUR','END','MONTH']
 character(len=TXTLEN_FILE),private, save ::  &
   filename_read_3D = 'template_read_3D',& ! Overwritten in readxn and wrtxn.
@@ -236,7 +238,7 @@ subroutine readxn(indate)
     if(MasterProc.and.oldmonth==0) write(*,*)'Nest: Initialzing IC'
     oldmonth=indate%month
     if(MasterProc) write(*,*)'Nest: New month, reset BC'
-  case('START')
+  case('START', 'RESTART')
     if(.not.first_call)return
     first_call=.false.
     filename_read_3D=date2string(NEST_template_read_3D,ndate,mode='YMDH',debug=mydebug)
@@ -362,7 +364,7 @@ subroutine wrtxn(indate, End_of_run)
      case('END')
         return
      case('MONTH')
-        if(indate%month==1.or.indate%day/=1.or.indate%hour/=0.or.indate%seconds/=0)return
+        if((indate%month==1 .and. first_call) .or.indate%day/=1.or.indate%hour/=0.or.indate%seconds/=0)return
      case default
         if(mod(indate%hour,NEST_NHOURSAVE)/=0.or.indate%seconds/=0)return
      end select
@@ -1081,6 +1083,7 @@ subroutine init_nest(ndays_indate,filename_read,native_grid,IIij,JJij,Weight,&
          if(k_ext/=k1_ext(k))k2_ext(k)=k_ext
       end do
       weight_k1(k)=(P_emep-P_ext(k2_ext(k)))/(P_ext(k1_ext(k))-P_ext(k2_ext(k)))
+      weight_k1(k)=max(0.0,min(1.0,weight_k1(k)))
       weight_k2(k)=1.0-weight_k1(k)
       if(mydebug)&
         write(*,fmt="(A,I3,2(A,I2,A,F5.2))")'Nest: level',k,&
@@ -1106,6 +1109,7 @@ subroutine init_nest(ndays_indate,filename_read,native_grid,IIij,JJij,Weight,&
         if(k_ext/=k1_ext(k))k2_ext(k)=k_ext
       end do
       weight_k1(k)=(P_emep-P_ext(k2_ext(k)))/(P_ext(k1_ext(k))-P_ext(k2_ext(k)))
+      weight_k1(k)=max(0.0,min(1.0,weight_k1(k)))
       weight_k2(k)=1.0-weight_k1(k)
       if(mydebug) &
         write(*,fmt="(A,I3,2(A,I2,A,F5.2))")'Nest: level',k,&
@@ -1793,17 +1797,31 @@ subroutine reset_3D(ndays_indate)
         end if
         CALL MPI_BCAST(data,8*GIMAX_ext*GJMAX_ext*KMAX_ext,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
         CALL MPI_BCAST(divbyroa,1,MPI_LOGICAL,0,MPI_COMM_CALC,IERROR)
-        
-        ! overwrite everything 3D (init)
-        if(divbyroa)then
-           forall (k=1:KMAX_MID, j=1:ljmax, i=1:limax) &
-                xn_adv(n,i,j,k)=(WeightData(i,j,k1_ext(k))*weight_k1(k) &
-                +WeightData(i,j,k2_ext(k))*weight_k2(k))&
-                /roa(i,j,k,1)
+
+        if (NEST_MODE_READ == 'RESTART') then
+           ! overwrite everything 3D (init), but NOT the outer frame, which is set by BC
+           if(divbyroa)then
+              forall (k=1:KMAX_MID, j=lj0:lj1, i=li0:li1) &
+                   xn_adv(n,i,j,k)=(WeightData(i,j,k1_ext(k))*weight_k1(k) &
+                   +WeightData(i,j,k2_ext(k))*weight_k2(k))&
+                   /roa(i,j,k,1)
+           else
+              forall (k=1:KMAX_MID, j=lj0:lj1, i=li0:li1) &
+                   xn_adv(n,i,j,k)=WeightData(i,j,k1_ext(k))*weight_k1(k)&
+                   +WeightData(i,j,k2_ext(k))*weight_k2(k)
+           end if
         else
-           forall (k=1:KMAX_MID, j=1:ljmax, i=1:limax) &
-                xn_adv(n,i,j,k)=WeightData(i,j,k1_ext(k))*weight_k1(k)&
-                +WeightData(i,j,k2_ext(k))*weight_k2(k)
+           ! overwrite everything 3D (init)
+           if(divbyroa)then
+              forall (k=1:KMAX_MID, j=1:ljmax, i=1:limax) &
+                   xn_adv(n,i,j,k)=(WeightData(i,j,k1_ext(k))*weight_k1(k) &
+                   +WeightData(i,j,k2_ext(k))*weight_k2(k))&
+                   /roa(i,j,k,1)
+           else
+              forall (k=1:KMAX_MID, j=1:ljmax, i=1:limax) &
+                   xn_adv(n,i,j,k)=WeightData(i,j,k1_ext(k))*weight_k1(k)&
+                   +WeightData(i,j,k2_ext(k))*weight_k2(k)
+           end if
         end if
         
      end do DO_SPEC

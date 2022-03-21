@@ -1,7 +1,7 @@
-! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -176,6 +176,7 @@ module MetFields_mod
  real,target,public, save,allocatable, dimension(:,:,:) :: &
         ps        &! Surface pressure Pa
        ,t2_nwp    & ! Temp 2 m   deg. K
+!      ,tsurf_nwp & ! skin temp deg K
        ,pbl_nwp   & ! Planetary boundary layer height (m)
        ,fh        & ! surf.flux.sens.heat W/m^2
        ,fl        & ! latent heat flux W/m^2
@@ -234,7 +235,11 @@ module MetFields_mod
   character(len=10), public, save  :: SoilWaterSource="IFS"  ! IFS or PARLAM
 
   real,target,public, save, allocatable,dimension(:,:) :: &
-    fSW     ! fSW= f(relative extractable water) =  (sw-swmin)/(swFC-swmin)
+    fSW50  &! fSW= f(relative extractable water) =  (sw-swmin)/(swFC-swmin), for
+   ,fSW40  &! for limits of 50, 40 and 90%
+   ,fSW90  &! for IAM_SNL_MED
+   ,dTleafRn & ! TESTING Tleaf - Tair
+   ,dTleafHd  ! TESTING Tleaf - Tair
 
   real,target, public, dimension(:,:), save,allocatable  ::&
          xwf  ! extension of water fraction, save after 1st call
@@ -280,7 +285,8 @@ module MetFields_mod
       ix_t2_nwp, ix_rh2m, ix_fh, ix_fl, ix_tau, ix_ustar_nwp, ix_sst, &
       ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_ice_nwp, ix_ws_10m,&
       ix_surface_precip, ix_uw, ix_ue, ix_vs, ix_vn, ix_convective_precip, &
-      ix_rain,ix_irainc,ix_irainnc, ix_elev, ix_invL, ix_pblnwp
+      ix_rain,ix_irainc,ix_irainnc, ix_elev, ix_invL, ix_pblnwp 
+! integer, public, save   :: ix_tsurf_nwp
 
   type,  public :: metfield
      character(len = 100) :: name = 'empty' !name as defined in external meteo file
@@ -697,6 +703,21 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%msize = NMET
   ix_t2_nwp=ix
 
+!  ix=ix+1
+!  met(ix)%name             = 'skin_temperature'
+!  met(ix)%dim              = 2
+!  met(ix)%frequency        = 3
+!  met(ix)%time_interpolate = .true.
+!  met(ix)%read_meteo       = .true.
+!  met(ix)%needed           = .true.
+!  met(ix)%found            = .false.
+!  allocate(tsurf_nwp(LIMAX,LJMAX,NMET))
+!  tsurf_nwp=1.0
+!  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => tsurf_nwp
+!  met(ix)%zsize = 1
+!  met(ix)%msize = NMET
+!  ix_tsurf_nwp=ix
+
   ix=ix+1
   met(ix)%name             = 'relative_humidity_2m'
   met(ix)%dim              = 2
@@ -1105,7 +1126,7 @@ if(USES%WRF_MET_NAMES)then
    met(ix_SoilWater_deep)%name    = 'SMI3'!take third level. Do not change name! (name set in Getmeteofield)
    met(ix_sdepth)%name            = 'SNOWH'!snowdepth in m
    met(ix_ice_nwp)%name           = 'SEAICE'!flag 0 or 1
-   met(ix_rh2m)%name              = 'Q2' ! 2 meter relative humidity
+   met(ix_rh2m)%name              = 'Q2' ! NB: units kg(H2O)/kg(air), has to be converted into relative to saturation
 
 !meteo model topography (assumed constant in time)
    met(ix_elev)%name             = 'HGT'
@@ -1127,8 +1148,20 @@ end if
     allocate(pwp(LIMAX,LJMAX))
     allocate(fc(LIMAX,LJMAX))
     allocate(xwf(LIMAX+2*NEXTEND,LJMAX+2*NEXTEND)) 
-    allocate(fSW(LIMAX,LJMAX))
-    fSW = 1.0
+    allocate(fSW40(LIMAX,LJMAX))
+    allocate(fSW50(LIMAX,LJMAX))
+    allocate(fSW90(LIMAX,LJMAX))
+    fSW40 = 1.0
+    fSW50 = 1.0
+    fSW90 = 1.0
+    !if ( USES%TLEAF_FROM_HD ) then
+      allocate(dTleafHd(LIMAX,LJMAX))
+      dTleafHd = 0.0
+    !end if
+    !if ( USES%TLEAF_FROM_RN ) then
+      allocate(dTleafRn(LIMAX,LJMAX))
+      dTleafRn = 0.0
+    !end if
     allocate(zen(LIMAX, LJMAX))
     allocate(coszen(LIMAX, LJMAX))
     coszen=0.0

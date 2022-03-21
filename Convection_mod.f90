@@ -1,7 +1,7 @@
-! <Convection_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Convection_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,16 +25,16 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
 module Convection_mod
-!If subsidence is included, ps3d could actually be any constant (in k), and 
+!If subsidence is included, ps3d could actually be any constant (in k), and
 ! will recover the same value after the subsidience.
 !
 !In the global report 2010 ps3d=1, and xn_adv is the mixing ratio
 !
 !We define the mass of pollutant in a level to be proportionnal to xn_adv*dp(k)
-!Note that dp(k) is defined as fixed under convection, i.e. the amount of air 
-!and dp are not consistent during convection, but rather in a transition state. 
-!In principle we can imagine that the convection is called many times with a 
-!small dt_conv, but on the other hand this will give instantaneous mixing 
+!Note that dp(k) is defined as fixed under convection, i.e. the amount of air
+!and dp are not consistent during convection, but rather in a transition state.
+!In principle we can imagine that the convection is called many times with a
+!small dt_conv, but on the other hand this will give instantaneous mixing
 !between convection and subsidience, which is not corrrect either
 !-----------------------------------------------------------------------------------
 
@@ -56,7 +56,7 @@ contains
 !Assumes xn_adv in units of mixing ratio
 !See also EMEP technical report MSC-W 1/2010 p. 11-14
 
-!xn*dp(k) = mass in level k (up to a fixed constant *g*gridarea) 
+!xn*dp(k) = mass in level k (up to a fixed constant *g*gridarea)
 
     implicit none
     real ,intent(inout):: dt_conv
@@ -68,7 +68,6 @@ contains
     real :: dp(KMAX_MID)
     integer ::k,i,j,k_fill,k1,kk,n
     logical, parameter ::masstest=.false.!normally, the mass should be conserved mathematically. Mostly to make demo.
-    INCLUDE 'mpif.h'
 
     n=3 !IXADV of species to test for mass balance (masstest)
     !UPWARD
@@ -76,17 +75,17 @@ contains
     do j=lj0,lj1
        do i=li0,li1
 
-          !-- mass_air=(dp/g)*gridarea 
+          !-- mass_air=(dp/g)*gridarea
 
           totalmass = 0.0!total colomn mass of species n
           do k=1,KMAX_MID
              dp(k)=dA(k)+dB(k)*ps(i,j,1)
              xn_air_grid(k) = 1.0 !unit mixing ratio
-             mass_air_grid0(k) =xn_air_grid(k)*dp(k) ! original mass of air 
+             mass_air_grid0(k) =xn_air_grid(k)*dp(k) ! original mass of air
              if(masstest)totalmass = totalmass + xn_adv(n,i,j,k)*dp(k)!mass of species n (without g*gridarea factor)
           end do
 
-!air is moved horizontally between a "core" and the "grid". The air from core moves upward. 
+!air is moved horizontally between a "core" and the "grid". The air from core moves upward.
           xn_air_core = 0.0
           xn_in_core = 0.0
           do k=KMAX_MID,1,-1
@@ -119,7 +118,7 @@ contains
                 end if
              else
                 !mass from core to grid - horizontal exchange
-                mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_air_core(k)               
+                mass_exchanged=(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_air_core(k)
              end if
 
              !horizontal exchange
@@ -127,14 +126,14 @@ contains
                 !mass from grid to core - horizontal exchange
                 !NB change xn_in_core before xn_adv
                 xn_in_core(:,k) = xn_in_core(:,k)-mass_exchanged*xn_adv(:,i,j,k)
-                xn_air_core(k)=xn_air_core(k)-mass_exchanged  
+                xn_air_core(k)=xn_air_core(k)-mass_exchanged
                 xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+mass_exchanged*xn_adv(:,i,j,k)
                 xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
              else
-                !NB change xn_adv before xn_in_core 
+                !NB change xn_adv before xn_in_core
                 xn_adv(:,i,j,k)=xn_adv(:,i,j,k)+(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
                 xn_in_core(:,k) = xn_in_core(:,k)-(cnvuf(i,j,k+1)-cnvuf(i,j,k))/cnvuf(i,j,k+1)*xn_in_core(:,k)
-                xn_air_core(k)=xn_air_core(k)-mass_exchanged  
+                xn_air_core(k)=xn_air_core(k)-mass_exchanged
                 xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
              end if
 
@@ -159,7 +158,7 @@ contains
           xn_air_core = 0.0
           xn_in_core = 0.0
           do k=1,KMAX_MID
-             !-- mass_air=(dp/g)*gridarea             
+             !-- mass_air=(dp/g)*gridarea
 
              xn_in_core(:,k) = 0.0
 
@@ -190,15 +189,15 @@ contains
                 !mass from grid to core - horizontal exchange
                 !NB change xn_in_core before xn_adv
                 xn_in_core(:,k) = xn_in_core(:,k)-mass_exchanged*xn_adv(:,i,j,k)
-                xn_air_core(k)=xn_air_core(k)-mass_exchanged  
+                xn_air_core(k)=xn_air_core(k)-mass_exchanged
                 xn_adv(:,i,j,k)= xn_adv(:,i,j,k)+mass_exchanged*xn_adv(:,i,j,k)
                 xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
              else
                 !mass from core to grid - horizontal exchange
-                !NB change xn_adv before xn_in_core 
+                !NB change xn_adv before xn_in_core
                 xn_adv(:,i,j,k) = xn_adv(:,i,j,k)-(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
                 xn_in_core(:,k) = xn_in_core(:,k)+(cnvdf(i,j,k+1)-cnvdf(i,j,k))/cnvdf(i,j,k)*xn_in_core(:,k)
-                xn_air_core(k) = xn_air_core(k)-mass_exchanged  
+                xn_air_core(k) = xn_air_core(k)-mass_exchanged
                 xn_air_grid(k) = xn_air_grid(k)+mass_exchanged
              end if
 
@@ -234,7 +233,7 @@ contains
           do k=1,KMAX_MID
              mass_air_grid_k_temp=0.0
              !fill level k with available mass
-             !put new xn_adv in xn_buff because xn_adv should not be changed while still used 
+             !put new xn_adv in xn_buff because xn_adv should not be changed while still used
              if(masstest)then
                 total = 0.0
                 do kk=1,KMAX_MID
@@ -248,7 +247,7 @@ contains
              do while (mass_air_grid_k_temp +xn_air_grid(k_fill)*dp(k_fill) <mass_air_grid0(k).and.k_fill<KMAX_MID)
                 !fill with entire level k_fill
                 mass_air_grid_k_temp=mass_air_grid_k_temp+xn_air_grid(k_fill)*dp(k_fill) !
-                xn_air_grid(k_fill)=xn_air_grid(k_fill)-xn_air_grid(k_fill)!ZERO remove all air from level 
+                xn_air_grid(k_fill)=xn_air_grid(k_fill)-xn_air_grid(k_fill)!ZERO remove all air from level
                 xn_buff(:,k) =  xn_buff(:,k)+ xn_adv(:,i,j,k_fill)*dp(k_fill)/dp(k)
                 xn_adv(:,i,j,k_fill) =  0.0 !now the pollutants have been removed from xn_adv, and stored into xn_buff
                 k_fill=k_fill+1
@@ -284,7 +283,7 @@ contains
                 endif
              endif
           end do
-          
+
           if(masstest)then
              !check that all mass is distributed into xn_buff. xn_air_grid and xn_adv should be empty
              if(abs(xn_air_grid(k_fill))>1.0E-12.or.k_fill/=KMAX_MID )then
@@ -298,12 +297,12 @@ contains
                 end if
              end do
           endif
-          
-!copy the end results in xn_adv          
+
+!copy the end results in xn_adv
           do k=1,KMAX_MID
              xn_adv(:,i,j,k)=xn_buff(:,k)
           end do
-          
+
           if(masstest)then
              total = 0.0
              do k=1,KMAX_MID
@@ -314,7 +313,7 @@ contains
                 stop
              endif
           end if
-          
+
        end do
     end do
 

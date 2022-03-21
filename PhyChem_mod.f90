@@ -1,7 +1,7 @@
-! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,7 +37,7 @@ use Biogenics_mod,     only: Set_SoilNOx
 use CheckStop_mod,     only: CheckStop
 use Chemfields_mod,    only: xn_adv,cfac,xn_shl
 use ChemDims_mod,      only: NSPEC_SHL
-use ChemSpecs_mod,     only: IXADV_SO2, IXADV_NH3, IXADV_O3, species
+use ChemSpecs_mod,     only: species
 use CoDep_mod,         only: make_so2nh3_24hr
 use Config_module,only: MasterProc, KMAX_MID, nmax, step_main,END_OF_EMEPDAY &
                            ,dt_advec       & ! time-step for phyche/advection
@@ -49,22 +49,25 @@ use Config_module,only: MasterProc, KMAX_MID, nmax, step_main,END_OF_EMEPDAY &
                            ,FREQ_HOURLY    & ! hourly netcdf output frequency
                            ,JUMPOVER29FEB&
                            ,IOU_HOUR, IOU_HOUR_INST, IOU_YEAR&
-                           ,fileName_O3_Top,FREQ_SITE, FREQ_SONDE
+                           ,fileName_O3_Top,FREQ_SITE, FREQ_SONDE&
+                           , O3_ix,SO2_ix,NH3_ix
 use DA_mod,            only: DEBUG_DA_1STEP
 use DA_3DVar_mod,      only: main_3dvar, T_3DVAR
-use Debug_module,      only: DEBUG   ! -> DEBUG%GRIDVALUES
+use Debug_module,      only: DEBUG, DebugCell  ! -> DEBUG%GRIDVALUES
 use Derived_mod,       only: DerivedProds, Derived, num_deriv2d
 use DerivedFields_mod, only: d_2d, f_2d
 use DryDep_mod,        only: init_drydep
-use EmisDef_mod,       only: loc_frac, loc_frac_day, loc_tot_day, loc_frac_month&
-                            , loc_tot_month,loc_frac_full,loc_tot_full, NSECTORS
+use EmisDef_mod,       only: NSECTORS
 use Emissions_mod,     only: EmisSet
 use Gravset_mod,       only: gravset
+use GravSettling_mod,  only: gravSettling ! EXPERIMENTAl!!
 use GridValues_mod,    only: debug_proc,debug_li,debug_lj,&
                             glon,glat,projection,i_local,j_local,i_fdom,j_fdom
+use Io_Progs_mod,       only: datewrite
+
 use MetFields_mod,     only: ps,roa,z_bnd,z_mid,cc3dmax, &
                             PARdbh, PARdif, fCloud, & !WN17, PAR in W/m2
-                            zen,coszen,Idirect,Idiffuse
+                            zen,coszen
 use My_Timing_mod,     only: NTIMING, Code_timer, Add_2timing, &
                              tim_before, tim_before0, tim_after
 use NetCDF_mod,        only: ReadField_CDF,Real4
@@ -75,8 +78,7 @@ use PhysicalConstants_mod, only : ATWAIR
 use Pollen_mod,        only: pollen_dump,pollen_read
 use Radiation_mod,     only: SolarSetup,       &! sets up radn params
                             ZenithAngle,      &! gets zenith angle
-                            ClearSkyRadn,     &! Idirect, Idiffuse
-                            WeissNormanPAR,   &! WN17=WeissNorman radn, 2017 work
+                            WeissNormanPAR,   &! WN17=WeissNorman radn
                             fCloudAtten,      &!
                             CloudAtten         !
 use Runchem_mod,       only: runchem   ! Calls setup subs and runs chemistry
@@ -106,6 +108,8 @@ subroutine phyche()
   real :: thour
   type(timestamp) :: ts_now !date in timestamp format
   logical,save :: first_call = .true.
+  character(len=*), parameter :: dtxt='phyche:'
+
 
   !------------------------------------------------------------------
   !     physical and  chemical routines.
@@ -114,8 +118,14 @@ subroutine phyche()
   !    using current_date we have already step_main taken into account
   thour = real(current_date%hour) + current_date%seconds/3600.0
 
+  if ( DEBUG%STOFLUX .and. debug_proc .and. first_call ) then
+   write(*,'(a,3i4,2f10.4)')dtxt//"SEIij ", me,debug_li,debug_lj,& 
+     glon(debug_li,debug_lj),glat(debug_li,debug_lj)
+  end if
+
   if(DEBUG%PHYCHEM.and.debug_proc ) then
     if(first_call)  write(*, *) "PhyChe First", me, debug_proc
+
     call debug_concs("PhyChe start ")
 
     if(current_date%hour==12) then
@@ -133,7 +143,7 @@ subroutine phyche()
      nstart=max(1,8*(daynumber-2)+current_date%hour/3)
      !first available day is 2nd January for 2010:
      if(current_date%year==2010)nstart=max(1,8*(daynumber-1)+current_date%hour/3)
-     call  ReadField_CDF(trim(fileName_O3_Top),'O3',xn_adv(IXADV_O3,:,:,1),&
+     call  ReadField_CDF(trim(fileName_O3_Top),'O3',xn_adv(O3_ix-NSPEC_SHL,:,:,1),&
           nstart=nstart,kstart=kstart,kend=kstart,&
           interpol='zero_order',debug_flag=.false.)     
   endif
@@ -173,14 +183,15 @@ subroutine phyche()
         thour, glon(debug_li,debug_lj),glat(debug_li,debug_lj), &
         zen(debug_li,debug_lj),coszen(debug_li,debug_lj)
 
-  call ClearSkyRadn(ps(:,:,1),coszen,Idirect,Idiffuse)
-
-  call CloudAtten(cc3dmax(:,:,KMAX_MID),Idirect,Idiffuse)
-
-!WN17
-! Gets PAR values, W/m2 here
+!WN17, Gets PAR values, W/m2 here
   fCloud = fCloudAtten(cc3dmax(:,:,KMAX_MID))
   call WeissNormanPAR(ps(:,:,1),coszen,fCloud,PARdbh,PARdif)
+  if ( DEBUG%STOFLUX .and. debug_proc ) then
+   call datewrite(dtxt//"SEI ", [me], [ &
+     thour, zen(debug_li,debug_lj),coszen(debug_li,debug_lj),&
+     cc3dmax(debug_li,debug_lj,KMAX_MID) ],&
+     afmt='(TXTDATE,a,i4,2f9.3,2es12.3)')
+  end if
 
   !================
   ! advecdiff_poles considers the local Courant number along a 1D line
@@ -240,6 +251,7 @@ subroutine phyche()
   call debug_concs("PhyChe post-chem ")
 
   !*********************************************************!
+  if(USES%GRAVSET) call gravSettling ! After chem/emis?? EXPERIMENTAL!
   !========================================================!
 
 
@@ -318,12 +330,12 @@ subroutine phyche()
   end if
 
   ! CoDep
-  if(modulo(current_date%hour,1)==0) & ! every hour
+  if(modulo(current_date%hour,1)==0 .and. NH3_ix>0 .and. SO2_ix>0) & ! every hour
     call make_so2nh3_24hr(current_date%hour,&
-      xn_adv(IXADV_SO2,:,:,KMAX_MID),&
-      xn_adv(IXADV_NH3,:,:,KMAX_MID),&
-      cfac(IXADV_SO2,:,:),&
-      cfac(IXADV_NH3,:,:))
+      xn_adv(SO2_ix-NSPEC_SHL,:,:,KMAX_MID),&
+      xn_adv(NH3_ix-NSPEC_SHL,:,:,KMAX_MID),&
+      cfac(SO2_ix-NSPEC_SHL,:,:),&
+      cfac(NH3_ix-NSPEC_SHL,:,:))
 
   first_call=.false.
 end subroutine phyche

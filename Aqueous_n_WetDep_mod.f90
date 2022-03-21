@@ -1,7 +1,7 @@
-! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -58,7 +58,7 @@ module Aqueous_mod
 use My_Derived_mod,    only: nOutputWdep ! number WDEP used
 use CheckStop_mod,     only: CheckStop, StopAll
 use ChemDims_mod             
-use ChemSpecs_mod             
+use ChemSpecs_mod,     only: species_adv, FIRST_SEMIVOL, LAST_SEMIVOL
 use ChemGroups_mod,    only: ChemGroups
 use Config_module,only: &
     CHEMTMIN, CHEMTMAX      &       ! -> range of temperature
@@ -68,13 +68,14 @@ use Config_module,only: &
    ,KCHEMTOP                &       ! -> top of chemistry, now k=2
    ,dt => dt_advec          &       ! -> model timestep
    ,IOU_INST                &       ! Index: instantaneous values
-   ,USES, WDEP_WANTED ! Which outputs wanted!
+   ,USES, WDEP_WANTED       &       ! Which outputs wanted!
+   ,SO2_ix, SO4_ix, NH3_ix,NH4_f_ix, NO3_f_ix, HNO3_ix ! indices that may or may not exist in species
 use Debug_module,       only: DEBUG  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH
 use DerivedFields_mod,  only: f_2d, d_2d     ! Contains Wet deposition fields
 use GasParticleCoeffs_mod, only: WetCoeffs, WDspec, WDmapping, nwdep
 use GridValues_mod,     only: gridwidth_m,xm2,dA,dB,i_fdom,j_fdom
 use Io_mod,             only: IO_DEBUG, datewrite
-use LocalFractions_mod, only: lf_wetdep
+use LocalFractions_mod, only: lf_wetdep, wetdep_lf
 use MassBudget_mod,     only : wdeploss,totwdep
 use MetFields_mod,       only: pr, roa, z_bnd, cc3d, lwc
 use MetFields_mod,       only: ps
@@ -301,7 +302,9 @@ subroutine Setup_Clouds(i,j,debug_flag)
     cloudwater,  &  ! Cloud-water (volume mixing ratio)
                     ! cloudwater = 1.e-6 same as 1.g m^-3
     pres            ! Pressure (Pa)
-  integer :: k
+  integer :: k, SO4
+
+  SO4 = SO4_ix
 
 ! Add up the precipitation in the column:
 !old defintion:
@@ -395,7 +398,7 @@ subroutine Setup_Clouds(i,j,debug_flag)
              hco3_aq(ksubcloud-1)+2.*so4_aq(ksubcloud-1)+hso3_aq(ksubcloud-1)&
              +2.*so32_aq(ksubcloud-1)+no3_aq(ksubcloud-1)-nh4_aq(ksubcloud-1)-nh3_aq(ksubcloud-1)
         write(*,*) "CLW(l_vann/l_luft) ",cloudwater(ksubcloud-1)
-        write(*,*) "xn_2d(SO4) ugS/m3 ",(xn_2d(SO4,k)*10.e12*32./AVOG,k=kcloudtop,KMAX_MID)
+        if(SO4>0)write(*,*) "xn_2d(SO4) ugS/m3 ",(xn_2d(SO4,k)*10.e12*32./AVOG,k=kcloudtop,KMAX_MID)
      end if
   end if
      
@@ -518,6 +521,20 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
   real, parameter :: Hplus55=3.162277660168379e-06! 10.0**-5.5
   real ::pHin(0:pH_ITER),pHout(0:pH_ITER)!start at zero to avoid debugger warnings for iter-1
   integer k, iter
+  integer :: SO2, SO4, NO3_f, NH4_f, NH3, HNO3
+
+  SO2 = SO2_ix
+  call CheckStop( SO2_ix<1, "Aqueous: SO2 not defined" )
+  SO4 = SO4_ix
+  call CheckStop( SO4_ix<1, "Aqueous: SO4 not defined" )
+  NH3 = NH3_ix
+  !call CheckStop( NH3_ix<1, "Aqueous: NH3 not defined" )
+  NH4_f = NH4_f_ix
+  !call CheckStop( NH4_f_ix<1, "Aqueous: NH4_f not defined" )
+  NO3_f = NO3_f_ix
+  call CheckStop( NO3_f_ix<1, "Aqueous: NO3_f not defined" )
+  HNO3 = HNO3_ix
+  call CheckStop( HNO3_ix<1, "Aqueous: HNO3 not defined" )
 
   call get_frac(cloudwater,incloud) ! => frac_aq
 
@@ -547,7 +564,11 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
                                                 !cloudwater volume mix. ratio
                                                 !so4_aq= mol/l
     no3_aq(k)= ( (xn_2d(NO3_F,k)+xn_2d(HNO3,k))*1000./AVOG)/cloudwater(k)
-    nh4_aq(k)=  ( xn_2d(NH4_F,k) *1000./AVOG )/cloudwater(k)!only nh4+ now
+    if (NH4_F>0) then
+       nh4_aq(k) =  ( xn_2d(NH4_F,k) *1000./AVOG )/cloudwater(k)!only nh4+ now
+    else
+       nh4_aq(k) =  0.0
+    end if
  !   hso3_aq(k)= 0.0 !initial, before dissolved
  !   so32_aq(k)= 0.0
  !   nh3_aq(k) = 0.0 !nh3 dissolved and ionized to nh4+(aq)
@@ -573,8 +594,12 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
       !nh4+, hco3, hso3 and so32 dissolve and ionize
       Heff_NH3= H(IH_NH3,itemp(k))*Knh3(itemp(k))*h_plus(k)/Kw(itemp(k))
       frac_aq(IH_NH3,k) = 1.0 / ( 1.0+1.0/( Heff_NH3*VfRT(k) ) )
-      nh3_aq(k)= frac_aq(IH_NH3,k)*(xn_2d(NH3,k)*1000./AVOG)/cloudwater(k)
-
+      if (NH3>0) then     
+         nh3_aq(k) = frac_aq(IH_NH3,k)*(xn_2d(NH3,k)*1000./AVOG)/cloudwater(k)
+      else
+         nh3_aq(k) = 0.0
+      end if
+      
       hco3_aq(k)= co2_aq(k) * Kco2(itemp(k))/h_plus(k)
       hso3_aq(k)= so2_aq(k) * K1(itemp(k))/h_plus(k)
       so32_aq(k)= hso3_aq(k) * K2(itemp(k))/h_plus(k)
@@ -736,7 +761,7 @@ subroutine WetDeposition(i,j,debug_flag)
         loss = loss * rho(k) ! concentration -> weight
         wdeploss(iadv) = wdeploss(iadv) + loss
         
-        if(USES%LocalFractions) call lf_wetdep(iadv, i, j, k, loss, invgridarea)
+        if(USES%LocalFractions .and. wetdep_lf(iadv)) call lf_wetdep(iadv, i, j, k, loss, invgridarea)
 
         if(DEBUG%AQUEOUS.and.debug_flag.and.pr_acc(KMAX_MID)>1.0e-5) then
           write(*,"(a50,2i4,a,9es12.2)") "DEBUG_WDEP, k, icalc, spec", k, &

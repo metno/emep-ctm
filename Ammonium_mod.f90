@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,10 +44,13 @@ module Ammonium_mod
  !     sulphate, whereas with the old indices it was only free sulphate.
  !----------------------------------------------------------------------------
  !
+ use CheckStop_mod,     only: CheckStop
  use Config_module   , only : CHEMTMIN, CHEMTMAX   &! Temp. range
                                  , PPB             &! unit factors
                                  , KCHEMTOP            &! k=2 - top of chemistry
-                                 , KMAX_MID                ! K=20 at ground
+                                 , KMAX_MID            &! K=20 at ground if 20 levels
+                                 , SO4_ix, NH4_f_ix, NO3_f_ix, NH3_ix, HNO3_ix
+
  implicit none
  private
 
@@ -196,13 +199,26 @@ module Ammonium_mod
      !   in order to have same structure as with EQSAM and MARS 
      !-------------------------------------------------------------------------
 
- use ChemSpecs_mod,         only : SO4, NH4_f, NO3_f, NH3, HNO3
+ use ChemSpecs_mod,         only : species_adv,species
  use ZchemData_mod, only :  xn => xn_2d
-
    real, dimension(KCHEMTOP:KMAX_MID)  ::  rcnh4 ! equilib. value
    real, dimension(KCHEMTOP:KMAX_MID) :: eqnh3, delteq
    real, dimension(KCHEMTOP:KMAX_MID) :: freeSO4
+   integer :: SO4, NH4_f, NO3_f, NH3, HNO3
 
+   ! may not be defined in Species, and give compiler error if defined directly in use
+   SO4 = SO4_ix
+   call CheckStop( SO4_ix<1, "SO4 not defined" )
+   NH4_f = NH4_f_ix
+   call CheckStop( NH4_f_ix<1, "NH4_f not defined" )
+   NO3_f = NO3_f_ix
+   call CheckStop( NO3_f_ix<1, "NO3_f not defined" )
+   NH3 = NH3_ix
+   call CheckStop( NH3_ix<1, "NH3 not defined" )
+   HNO3 = HNO3_ix
+   call CheckStop( HNO3_ix<1, "HNO3 not defined" )
+     
+   
    ! Sulfate not in form of (NH4)1.5SO4 or NH4NO3:
      freeSO4(:)=xn(SO4,:)-((xn(NH4_f,:)-xn(NO3_f,:))*2./3.) 
      freeSO4(:)=max(0.0,freeSO4(:))

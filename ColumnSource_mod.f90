@@ -1,7 +1,7 @@
-! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,7 +47,8 @@ use EmisDef_mod,           only: VOLCANOES_LL
 use GridValues_mod,        only: xm2,sigma_bnd,GridArea_m2,&
                                 GRIDWIDTH_M,&
                                 coord_in_processor,coord_in_gridbox
-use Io_mod,                only: open_file,read_line,IO_NML,IO_TMP,PrintLog
+use Io_mod,                only: open_file,read_line,IO_NML,IO_TMP
+use Io_RunLog_mod,         only: PrintLog
 use MetFields_mod,         only: roa, z_bnd, u_xmj, v_xmi, foundtopo, model_surf_elevation
 use NetCDF_mod,            only: GetCDF_modelgrid
 use MPI_Groups_mod
@@ -200,15 +201,16 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
   real, intent(in), optional :: REDUCE_VOLCANO
   real, dimension(NSPEC_SHL+1:NSPEC_TOT,KCHEMTOP:KMAX_MID) :: emiss
   logical, save :: first_call=.true.
+  logical :: has_new_ash
   character(len=SLEN)::&  ! Time strings in SDATE_FMT format
     sbeg=SDATE_FMT,&      ! Begin
     snow=SDATE_FMT,&      ! Now (current date)
     send=SDATE_FMT        ! End
-  integer :: v,e,itot,k1,k0,k
+  integer :: v,e,itot,k1,k0,k,lf
   real    :: uconv
   integer, save          :: iSO2=-1
   integer, pointer, save :: iASH(:)=>null()
-  real :: Ncells, frac
+  real :: frac, f
 !----------------------------!
 !
 !----------------------------!
@@ -278,33 +280,26 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
       uconv=uconv*AVOG/species(itot)%molwt                              ! --> molecules/s/cm3
 
       if(USES%PreADV)then ! spread emissions in case of strong winds
+        has_new_ash = .false.
         do k=k1,k0
-          ! only a fraction of the emission is used in each reachable gridcell
-          ! test if in range. NB: Winds have sign
-          if(Winds(k,1,v)>=0.0 .and. ((i-locdef(v)%iloc)>floor(Winds(k,1,v)) .or. (i-locdef(v)%iloc)<0))cycle
-          if(Winds(k,1,v)<=0.0 .and. ((i-locdef(v)%iloc)<floor(Winds(k,1,v)) .or. (i-locdef(v)%iloc)>0))cycle
-          if(Winds(k,2,v)>=0.0 .and. ((j-locdef(v)%jloc)>floor(Winds(k,2,v)) .or. (j-locdef(v)%jloc)<0))cycle
-          if(Winds(k,2,v)<=0.0 .and. ((j-locdef(v)%jloc)<floor(Winds(k,2,v)) .or. (j-locdef(v)%jloc)>0))cycle
+          frac = 0.0
+          do lf=0,10,1 ! distribute along 11 steps along wind-line
+            f=real(lf)/10.
+            if (nint(locdef(v)%iloc+f*Winds(k,1,v))==i .and. nint(locdef(v)%jloc+f*Winds(k,2,v))==j) then
+              frac = frac + 1./11.
+            end if
+          end do
+          if (frac <= 0.0) cycle
 
-          ! test if along the line of wind, i.e. i/j = Winds(:,1,v)/Winds(:,2,v)
-          if(abs(Winds(k,1,v))>1.E-6)then
-            if(nint((i-locdef(v)%iloc)*Winds(k,2,v)/Winds(k,1,v))/=j-locdef(v)%jloc) cycle
-          end if
+          has_new_ash = .true.
 
-          if(DEBUG%COLSRC)write(*,MSG_FMT)snow//' Vent',me,'me',v,trim(locdef(v)%id),i,"i",j,"j"
+          if(DEBUG%COLSRC)write(*,MSG_FMT)snow//' Vent',me,'me',v,trim(locdef(v)%id),i,"i",j,"j",k,"k", &
+            Winds(k,1,v), "xwind", Winds(k,2,v), "ywind", frac, "frac"
+          if(DEBUG%COLSRC)write(*,*)'including fraction ',frac,' for ',i,j,k,v,locdef(v)%iloc,locdef(v)%jloc 
 
-          Ncells=max(abs(Winds(k,1,v)),abs(Winds(k,2,v))) ! NB: not an integer
-          if(Ncells<=1.0)then
-            emiss(itot,k)=emiss(itot,k)+emsdef(v,e)%rate*uconv
-          else
-            frac=1.0/Ncells
-            if(abs(i-locdef(v)%iloc)-floor(abs(Winds(k,1,v)))==0 .and. &
-               abs(j-locdef(v)%jloc)-floor(abs(Winds(k,2,v)))==0)frac=frac*mod(Ncells,1.0) ! last cell take only what is left
-            if(DEBUG%COLSRC)write(*,*)'including fraction ',frac,' for ',i,j,k,v,locdef(v)%iloc,locdef(v)%jloc 
-
-            emiss(itot,k)=emiss(itot,k)+frac*emsdef(v,e)%rate*uconv        
-           end if
+          emiss(itot,k)=emiss(itot,k)+frac*emsdef(v,e)%rate*uconv        
         end do
+        if (.not. has_new_ash) cycle doLOC
       else
         emiss(itot,k1:k0)=emiss(itot,k1:k0)+emsdef(v,e)%rate*uconv
       end if
@@ -396,6 +391,7 @@ subroutine setRate()
     call CheckStop ( l > size(PROC_LOC) , dtxt//' NEEDS larger size for PROC_LOC')
     txtline=ADJUSTL(txtline)          ! Remove leading spaces
     if(txtline(1:1)=='#')cycle doLOC  ! Comment line
+    if ( len_trim(txtline) == 0 ) cycle doLOC  ! Empty line
     dloc=getVent(txtline)
     if(coord_in_processor(dloc%lon,dloc%lat,iloc=dloc%iloc,jloc=dloc%jloc))then
       PROC_LOC(l) = ME!The source is located on this proc 
@@ -454,6 +450,7 @@ subroutine setRate()
     if(.not.found_source)cycle doEMS  ! There is no vents on sub-domain
     txtline=ADJUSTL(txtline)          ! Remove leading spaces
     if(txtline(1:1)=='#')cycle doEMS  ! Comment line
+    if ( len_trim(txtline) == 0 ) cycle doEMS  ! Empty line
     dems=getErup(txtline)
     if(sbeg>date2string(dems%send,enddate  ).or.&         ! starts after end of run
        send<date2string(dems%sbeg,startdate).or.&         ! ends before start of run
@@ -499,7 +496,7 @@ subroutine setRate()
     if(nems(v)>0)cycle doLOCe   ! Specific found --> no need for Default
     e=nems(0)+1       ! A single default can have multiple lines, e.g.
     do                ! each line with a definition for a different specie
-      e=find_index(locdef(v)%etype,emsdef(0,:e-1)%id)
+      e=find_index(locdef(v)%etype,emsdef(0,:e-1)%id,first_only=.false.)
       if(e<1)    cycle doLOCe   ! No Default found
       if(DEBUG%COLSRC) &
         write(*,MSG_FMT)'Erup.Default',me,'Expand',&
@@ -568,7 +565,7 @@ function getVent(line) result(def)
   integer :: stat,nwords,igrp
   call wordsplit(line,size(words),words,nwords,stat,strict_separator=",",empty_words=.true.)
   call CheckStop(stat,"EMERGENCY: Wrong/Unknown line format "//trim(line))
-  call CheckStop(nwords,size(words),"EMERGENCY: Missing data in line "//trim(line))
+  call CheckStop(nwords,size(words),"EMERGENCY: getVent: Missing data in line: "//trim(line))
 !#1:NUMBER,2:NAME,3:LOCATION,4:LATITUDE,5:NS,6:LONGITUDE,7:EW,8:ELEV,9:TYPE,10:ERUPTION TYPE
 !V1702A02B,Eyjafjöll,Iceland-S,63.63,N,19.62,W,1666,Stratovolcano,S0
   read(words(4),*)lat
@@ -602,7 +599,7 @@ function getErup(line) result(def)
   real    :: base,top,rate,frac,dhh
   call wordsplit(line,size(words),words,nwords,stat,strict_separator=",",empty_words=.true.)
   call CheckStop(stat,"EMERGENCY: Wrong/Unknown line format "//trim(line))
-  call CheckStop(nwords,size(words),"EMERGENCY: Missing data in line "//trim(line))
+  call CheckStop(nwords,size(words),"EMERGENCY: getErup: Missing data in line: "//trim(line))
 !#1:TYPE/VOLCANO,2:VARIABLE,3:BASE[km],4:H[km above BASE],5:D[h],6:dM/dt[kg/s],7:m63[-],8:START[code/date],9:END[code/date],10:DESCRIPTION
 !S0       ,     ,  , 11.000,   3.00, 4e6, 0.40,SR                 ,SR+D,Silicic standard
 !V1702A02B,SO2  , 0,  8.000,  24.00,  15,     ,2010-04-14 00:00:00,SE+D,Eyja 20100414 SO2

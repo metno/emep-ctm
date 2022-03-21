@@ -1,7 +1,7 @@
-! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,12 +37,16 @@ module Derived_mod
 !  in the user-defined My_Derived_mod.
 !
 ! User-defined routines and treatments are often needed here. Here there is
-! added stuff for VOC, AOTs, accsu. In
+! added stuff for AOTs, accsu. In
 ! general such code should be added in such a way that it isn't activated if
 ! not needed. It then doesn't need to be commented out if not used.
+!  
+! a line in OutputMisc will be added to def_2d in addDeriv from Derived_mod:
+! call AddDeriv(OutputMisc(n),Is3D=Is3D) 
 !---------------------------------------------------------------------------
 
 use AeroConstants_mod, only: AERO
+use AeroFunctions_mod, only: LogNormFracBelow !=> Frac Mass below Dp
 use AOD_PM_mod,        only: AOD_init,aod_grp,wavelength,& ! group and
                                 wanted_wlen,wanted_ext3d      ! wavelengths
 use AOTx_mod,          only: Calc_GridAOTx
@@ -51,7 +55,8 @@ use CheckStop_mod,     only: CheckStop, StopAll
 use Chemfields_mod,    only: xn_adv, xn_shl, cfac,xn_bgn, AOD,  &
                             SurfArea_um2cm3, &
                             Fgas3d, & ! FSOA
-                            Extin_coeff, PM25_water, PM25_water_rh50
+                            Extin_coeff, PM25_water, PM25_water_rh50 &
+                          , PMco_water_rh50   !JUN21AERO
 use Chemfields_mod ,   only: so2nh3_24hr,Grid_snow
 use ChemDims_mod,      only: NSPEC_ADV, NSPEC_SHL,NEMIS_File
 use ChemGroups_mod          ! SIA_GROUP, PMCO_GROUP -- use tot indices
@@ -69,17 +74,18 @@ use Config_module,     only: &
   ! output types corresponding to instantaneous,year,month,day
   ,IOU_INST,IOU_YEAR,IOU_MON,IOU_DAY,IOU_HOUR,IOU_HOUR_INST,IOU_KEY &
   ,MasterProc, SOURCE_RECEPTOR, AOD_WANTED &
-  ,USES, uEMEP, startdate,enddate,&
-  HourlyEmisOut, SecEmisOutWanted, spinup_enddate, OutputMisc, WDEP_WANTED
+  ,USES, lf_src, startdate,enddate,&
+  HourlyEmisOut, DailyEmisOut, SecEmisOutWanted, spinup_enddate, &
+  OutputMisc, WDEP_WANTED, O3_ix
 
 use Debug_module,      only: DEBUG   ! -> DEBUG%DERIVED and COLSRC
 use DerivedFields_mod, only: MAXDEF_DERIV2D, MAXDEF_DERIV3D, &
                             def_2d, def_3d, f_2d, f_3d, d_2d, d_3d, VGtest_out_ix
 use EcoSystem_mod,     only: DepEcoSystem, NDEF_ECOSYSTEMS, &
                             EcoSystemFrac,FULL_ECOGRID
-use EmisDef_mod,       only: NSECTORS, EMIS_FILE, O_DMS, O_NH3, loc_frac, Nneighbors&
+use EmisDef_mod,       only: NSECTORS, EMIS_FILE, O_DMS, O_NH3&
                             ,SecEmisOut, EmisOut, SplitEmisOut, &
-                            isec2SecOutWanted
+                            isec2SecOutWanted,SECTORS
 use EmisGet_mod,       only: nrcemis,iqrc2itot
 use Functions_mod,      only: Tpot_2_T    ! Conversion function
 use GasParticleCoeffs_mod, only: DDdefs
@@ -89,7 +95,9 @@ use Io_Progs_mod,      only: datewrite
 use MetFields_mod,     only: roa,Kz_m2s,th,zen, ustar_nwp, u_ref, hmix,&
                             met, derivmet,  q, &
                             ws_10m, rh2m, z_bnd, z_mid, u_mid,v_mid,ps, t2_nwp, &
-                            SoilWater_deep, SoilWater_uppr, Idirect, Idiffuse
+                            cc3dmax, & ! SEI
+                            dTleafHd, dTleafRn, & ! TLEAF
+                            SoilWater_deep, SoilWater_uppr 
 use MosaicOutputs_mod,     only: nMosaic, MosaicOutput
 use My_Derived_mod, only : &
     wanted_deriv2d, wanted_deriv3d, & ! names of wanted derived fields
@@ -112,7 +120,7 @@ use Tabulations_mod,      only : tab_esat_Pa
 use TimeDate_mod,          only: day_of_year,daynumber,current_date,&
                                 tdif_days
 use TimeDate_ExtraUtil_mod,only: to_stamp, date_is_reached
-use LocalFractions_mod,    only: lf_av
+use LocalFractions_mod,    only: lf_av, loc_frac
 use Units_mod,             only: Units_Scale,Group_Units,&
                                 to_molec_cm3 ! converts roa [kg/m3] to M [molec/cm3]
 implicit none
@@ -125,13 +133,10 @@ public  :: AddDeriv       ! Adds Deriv type to def_2d, def_3d
 public  :: AddNewDeriv    ! Creates & Adds Deriv type to def_2d, def_3d
 private :: Define_Derived
 public  :: wanted_iou     ! (iotyp, def%iotyp)
-private :: Setups
 private :: write_debug
 private :: write_debugadv
 
 public  :: Derived        ! Calculations of sums, avgs etc.
-private :: voc_2dcalc     ! Calculates sum of VOC for 2d fields
-private :: voc_3dcalc     ! Calculates sum of VOC for 3d fields
 private :: group_calc     ! Calculates sum of groups, e.g. pm25 from group array
 
 logical, private, parameter :: T = .true., F = .false. ! shorthands only
@@ -172,14 +177,6 @@ real, save, private :: fracPM25 = -999.9
 
 integer, public, allocatable, dimension(:,:), save :: nav_2d,nav_3d
 
-!-- some variables for the VOC sum done for ozone models
-!   (have no effect in non-ozone models - leave in code)
-
-integer, private, save :: nvoc   ! No. VOCs
-integer, private, dimension(NSPEC_ADV), save :: &
-         voc_index, &     ! Index of VOC in xn_adv
-         voc_carbon       ! Number of C atoms
-
 logical, private, save :: Is3D
 logical, private, save :: dbg0   ! = DEBUG%DERIVED .and. MasterProc
 logical, private, save :: dbgP   ! = DEBUG%DERIVED .and. debug_proc
@@ -189,7 +186,7 @@ character(len=100), private :: errmsg
 character(len=*), private, parameter :: HORIZ_LINE =repeat('=',78) !f2003://new_line('a') 
 
 ! NB global use of these common variables is dangerous!
-integer, private :: i,j,k,l,n, ivoc, iou, isec   ! Local loop variables
+integer, private :: i,j,k,l,n, iou, isec   ! Local loop variables
 
 ! Avoid hard codded IXADV_SPCS
  integer, private, save :: iadv_O3=-999, &
@@ -211,7 +208,8 @@ subroutine Init_Derived()
   allocate(D2_O3_DAY( LIMAX, LJMAX, NTDAY))
   D2_O3_DAY = 0.0
 
-  if(USES%LocalFractions .and. (uEMEP%HOUR_INST.or.uEMEP%HOUR)) HourlyEmisOut = .true.
+  if (USES%LocalFractions .and. (lf_src(1)%HOUR .or. lf_src(1)%HOUR_INST)) HourlyEmisOut = .true.
+  if (USES%LocalFractions .and. lf_src(1)%DAY) DailyEmisOut = .true.
 
   if(dbg0) write(*,*) dtxt//"INIT STUFF"
   call Init_My_Deriv()  !-> wanted_deriv2d, wanted_deriv3d
@@ -265,15 +263,22 @@ subroutine Init_Derived()
   if(iadv_POM_C_FFUEL>0)call Units_Scale('ug',iadv_POM_C_FFUEL,ug_POM_C_FFUEL)
 
   call Define_Derived()
-  call Setups()  ! just for VOC now
 
   iddefPMc = find_index('PMc',DDdefs(:)%name, any_case=.true.)
-  select case(nint(DDdefs(iddefPMc)%umDpgV*10))
-    case(25);fracPM25=0.37
-    case(30);fracPM25=0.27
-    case default
-      call StopAll(dtxt//' cannot set fracPM25')
-  end select
+  associate ( D=> DDdefs(iddefPMc) )
+    fracPM25 = LogNormFracBelow(D%umDpgV, D%sigma, 0.001*D%rho_p, 2.5)
+    if(MasterProc) write(*,*) dtxt//"fracPM25 ", D%umDpgV, trim(D%name), fracPM25
+  end associate ! D=> DDdefs(iddefPMc) )
+
+!  select case(nint(DDdefs(iddefPMc)%umDpgV*10))
+!    case(25);fracPM25=0.37
+!    case(30);fracPM25=0.27
+!end if
+!    case default
+!      call StopAll(dtxt//' cannot set fracPM25')
+!  end select
+  if ( USES%fPMc_specs(1) == 'NO3' ) fracPM25=0.0  
+
   if(dbg0) write(*,"(a,i4,2g12.3,i4)") dtxt//' CFAC INIT PMFRACTION Dpgv(um)',&
     iddefPMc, fracPM25, nint(10* DDdefs(iddefPMc)%umDpgV )
 
@@ -282,7 +287,7 @@ end subroutine Init_Derived
 subroutine AddNewDeriv( name,class,subclass,txt,unit,ind,f2d,&
        dt_scale,scale, avg,iotype,Is3D)
   character(len=*), intent(in) :: name    ! e.g. DDEP_SO2_m2Conif
-  character(len=*), intent(in) :: class   ! Type of data, e.g. ADV or VOC
+  character(len=*), intent(in) :: class   ! Type of data, e.g. ADV
   character(len=*), intent(in) :: subclass
   character(len=*), intent(in) :: txt     ! text where needed, e.g. "Conif"
   character(len=*), intent(in) :: unit    ! writen in netCDF output
@@ -345,7 +350,7 @@ subroutine Define_Derived()
   logical :: volunit,semivol  ! set true for volume units (e.g. ppb),group with semivol
   !FAILED logical :: outmm, outdd  ! sets time-intervals
 
-  character(len=30) :: dname, class
+  character(len=31) :: dname, class
   character(len=10) :: unittxt
   character(len=TXTLEN_SHORT) :: outname, outunit, outtyp, outdim, subclass
   character(len=*), parameter:: dtxt="DefDerived:"
@@ -363,6 +368,7 @@ subroutine Define_Derived()
 
   Is3D = .false.
   dbgP = ( DEBUG%DERIVED  .and. debug_proc )
+if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
 
 
 ! We process the various combinations of gas-species and ecosystem:
@@ -383,6 +389,17 @@ subroutine Define_Derived()
   call AddNewDeriv( "T2m","T2m",  "-","-",   "deg. C", &
                -99,  -99, F, 1.0,  T,  'YM' )
 
+  if ( USES%TLEAF_FROM_HD )  &
+    call AddNewDeriv( "dTleafHd","dTleafHd",  "-","-",   "deg. C", &
+               -99,  -99, F, 1.0,  T,  'YMDH' )
+  if ( USES%TLEAF_FROM_RN ) & 
+    call AddNewDeriv( "dTleafRn","dTleafRn",  "-","-",   "deg. C", &
+               -99,  -99, F, 1.0,  T,  'YMDH' )
+
+!CRUDE for SEI Feb 2021:
+!  call AddNewDeriv( "u_ref","u_ref",  "SURF", "-",   "m/s", &
+!               -99,  -99, F, 1.0,  T,  'YM' )
+
 ! OutputFields can contain both 2d and 3d specs.
 ! Settings for 2D and 3D are independant.
 
@@ -397,6 +414,8 @@ subroutine Define_Derived()
     subclass = '-' ! default
     Is3D = .false.
 
+    if ( dbgP)  write(*,*) dtxt//'Field'//trim(outname),trim(outtyp),trim(trim(OutputFields(ind)%txt4))
+
     if(outtyp=="MISC") then ! Simple species
       iout  = -99 ! find_index( wanted_deriv2d(i), def_2d(:)%name )
       class = trim(OutputFields(ind)%txt4)
@@ -407,7 +426,7 @@ subroutine Define_Derived()
         unittxt="m"
         Is3D=.true.
       case('SIA25','PM25','PM25X','PM25_rh50','PM25X_rh50','PM10_rh50',&
-           'PM25water','PM25_wet','PM10_wet','PM_coarse')
+           'PM25water','PMco_water','PM25_wet','PM10_wet','PM_coarse')
         iadv = -1 ! Units_Scale(iadv=-1) returns 1.0
                   ! group_calc gets the unit conversion factor from Group_Units
         call Units_Scale(outunit,iadv,unitscale,unittxt)
@@ -508,6 +527,14 @@ subroutine Define_Derived()
         end select
         Is3D      = (class(1:3)=="EXT")
         call AOD_init("Derived:"//trim(class),wlen=trim(subclass),out3d=Is3D)
+      case('VOC')
+        write(unit=errmsg,fmt="(2(A,1X,4(A,','),A),:,1X)") &
+          dtxt,&
+! txt string became too long for errmsg. Not worth expanding errmsg for this old output
+!          trim(outname),trim(outunit),'VOC','MISC',trim(outind),&
+          "VOC MISC output is no longer supported, try with",&
+          'NMVOC',trim(outunit),'AIR_CONCS','GROUP',trim(outind)
+        call CheckStop(errmsg)
       case default
          if(outdim=='3d')Is3D=.true.
          unitscale = 1.0
@@ -690,7 +717,13 @@ subroutine Define_Derived()
 ! Future option - might make use of Emis_Molwt to get mg(N)/m2
   do  ind = 1, size(EMIS_FILE)
     dname = "Emis_mgm2_" // trim(EMIS_FILE(ind))
-    if(HourlyEmisOut)then
+    if (HourlyEmisOut .and. DailyEmisOut) then
+       call AddNewDeriv( dname, "TotEmis", "-", "-", "mg/m2", &
+            ind , -99, T,  1.0e6,  F,  'YMDH' )
+    else if (DailyEmisOut) then
+       call AddNewDeriv( dname, "TotEmis", "-", "-", "mg/m2", &
+            ind , -99, T,  1.0e6,  F,  'YMD' )
+    else  if (HourlyEmisOut) then
        call AddNewDeriv( dname, "TotEmis", "-", "-", "mg/m2", &
             ind , -99, T,  1.0e6,  F,  'YMH' )
     else
@@ -703,7 +736,13 @@ subroutine Define_Derived()
   do  i = 1, NEMIS_File
      dname = "Sec_Emis_mgm2_"//trim(EMIS_FILE(i))
      isec_poll = i
-     if(HourlyEmisOut)then
+     if (HourlyEmisOut .and. DailyEmisOut) then
+        call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
+             isec_poll , -99, T,  1.0e6,  F,  'YMDH' )
+     else if (DailyEmisOut) then
+        call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
+             isec_poll , -99, T,  1.0e6,  F,  'YMD' )
+     else if (HourlyEmisOut) then
         call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
              isec_poll , -99, T,  1.0e6,  F,  'YMH' )
      else
@@ -714,9 +753,15 @@ subroutine Define_Derived()
   do isec=1,NSECTORS
      if(SecEmisOutWanted(isec))then
         do  i = 1, NEMIS_File
-           write(dname,"(A,I0,A)")"Sec",isec,"_Emis_mgm2_"//trim(EMIS_FILE(i))
+           write(dname,"(A)")trim(SECTORS(isec)%longname)//"_Emis_mgm2_"//trim(EMIS_FILE(i))
            isec_poll = (isec)*(NEMIS_File) + i
-           if(HourlyEmisOut)then
+           if (HourlyEmisOut .and. DailyEmisOut) then
+              call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
+                   isec_poll , -99, T,  1.0e6,  F,  'YMDH' )
+           else if (DailyEmisOut) then
+              call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
+                   isec_poll , -99, T,  1.0e6,  F,  'YMD' )
+           else if (HourlyEmisOut) then
               call AddNewDeriv( dname, "SecEmis", "-", "-", "mg/m2", &
                    isec_poll , -99, T,  1.0e6,  F,  'YMH' )
            else
@@ -747,6 +792,11 @@ subroutine Define_Derived()
 
   if(find_index("SURF_PM25water",def_2d(:)%name,any_case=.true.)<1)&
   call AddNewDeriv("SURF_PM25water", "PM25water", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(AERO%JUN21AERO .and. &
+     find_index("SURF_PMco_water",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_PMco_water", "PMco_water", "-", "-","ug/m3", &
                        -99 , -99, F, 1.0,   T,  'YMD' )
 
 ! As for GRIDAOT, we can use index for the threshold
@@ -805,9 +855,10 @@ Is3D = .true.
     endif
     if(ind>0)then
       f_2d(i) = def_2d(ind)
-      if(dbg0) write(*,"(2(a,i4),3(1x,a))") "Index f_2d ",i,  &
-        " = def "//trim(wanted_deriv2d(i)),ind,trim(def_2d(ind)%name),trim(def_2d(ind)%unit),&
-        trim(def_2d(ind)%class)
+      if(dbg0) write(*,"(2(a,i4),3(1x,a),2i4)") "Index f_2d ",i,  &
+        " = def:set "//trim(wanted_deriv2d(i)),ind, &
+        trim(def_2d(ind)%name),trim(def_2d(ind)%unit),&
+        trim(def_2d(ind)%class), f_2d(i)%index,  f_2d(i)%f2d
     elseif(MasterProc)then
       print *,dtxt//"D2IND OOOPS wanted_deriv2d not found: ", wanted_deriv2d(i)
       print *,dtxt//"OOOPS N,N :", num_deriv2d, Nadded2d
@@ -853,7 +904,7 @@ Is3D = .true.
       iou_list(iou)=(index(f_3d(i)%iotype,IOU_KEY(iou))>0)
     end do
   end do
-
+  
   VGtest_out_ix = 0
   if(allocated(f_2d)) &
        VGtest_out_ix = find_index("VgRatio", f_2d(:)%subclass)
@@ -899,45 +950,6 @@ function wanted_iou(iou,iotype,only_iou) result(wanted)
   end if
 end function wanted_iou
 !=========================================================================
-subroutine Setups()
-  integer :: n
-  !*** flexibility note. By making use of character-based tests such
-  !    as for "VOC" below, we achieve code which can stay for
-  !    different chemical mechanisms, without having to define non-used indices.
-
-  !*** if voc wanted, set up voc_array. Works for all ozone chemistries
-
-  if ( any(  f_2d(:)%class == "VOC" ) ) then !TMP .or. &
-  !TMP           any(  f_3d(:)%class == "VOC" )  ) then
-  ! was call Setup_VOC(), moved here Mar 2010
-  !--------------------------------------------------------
-  ! Searches through the advected species and colects the
-  ! index and carbon content of nmhc/voc species, as they are
-  ! defined in CM_ChemSpecs_mod
-  !
-  !--------------------------------------------------------
-  !====================================================================
-    nvoc = 0
-    do n = 1, NSPEC_ADV
-      if(species( NSPEC_SHL+n )%carbons > 0 .and. &
-         species( NSPEC_SHL+n )%name   /= "CO"  .and. &
-         species( NSPEC_SHL+n )%name   /= "CH4" ) then
-
-         nvoc = nvoc + 1
-         voc_index(nvoc) = n
-         voc_carbon(nvoc) = int(species( NSPEC_SHL+n )%carbons)
-      end if
-    end do
-  !====================================================================
-    !if (DEBUG  .and. MasterProc )then
-    if ( MasterProc )then
-      write(6,*) "Derived VOC setup returns ", nvoc, "vocs"
-      write(6,"(a12,/,(20i3))")  "indices ", voc_index(1:nvoc)
-      write(6,"(a12,/,(20i3))")  "carbons ", voc_carbon(1:nvoc)
-    end if
-  end if
-end subroutine Setups
-!=========================================================================
 subroutine Derived(dt,End_of_Day,ONLY_IOU)
 !*** DESCRIPTION
 !  Integration and averaging of chemical fields.
@@ -973,7 +985,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     ind2d_pmfine=-999 ,ind3d_pmfine=-999,   &
     ind2d_pmwater=-999,ind3d_pmwater=-999,  &
     ind2d_pm10=-999   ,ind3d_pm10=-999,     &
-    ind2d_pm25=-999 
+    ind2d_pm25=-999   ,ind2d_pmcowater=-999
 
   integer :: imet_tmp, ind, iadvDep
   real, pointer, dimension(:,:,:) :: met_p => null()
@@ -984,7 +996,15 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   real :: default_frac,tot_frac,loc_frac_corr
   character(len=*), parameter :: dtxt='Deriv:'
   real pp, temp, qsat
-  
+  real, save, allocatable :: D8M(:,:,:,:), D8Max(:,:,:), hourM(:,:,:),D8_26Max(:,:,:)
+
+  logical, save :: make_MaxD8M_nth = .false.
+  integer , save :: i_MaxD8M_26th = 0 !index in f_2d
+  integer , save :: i_MaxD8M_1st = 0 !index in f_2d
+  integer , save :: i_MaxD8M_2nd = 0 !index in f_2d
+  integer , save :: i_MaxD8M_3rd = 0 !index in f_2d
+  integer , save :: i_MaxD8M_4th = 0 !index in f_2d
+  integer :: i_26th, i4th, i3rd, i2nd, i1st
   if(.not. date_is_reached(spinup_enddate))return ! we do not average during spinup
 
   timefrac = dt/3600.0
@@ -1045,7 +1065,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     !if ( DEBUG .and. MasterProc .and. first_call ) then
     if(MasterProc.and.first_call)&
-      write(*,"(a,i4,1x,a,i4,1x,a)") "1st call Derived 2d", n, &
+      write(*,"(a,i4,1x,a,1x,i0,1x,a)") "1st call Derived 2d", n, &
         trim(name), ind, trim(class)
 
     select case ( class )
@@ -1143,11 +1163,11 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ( "SurfAreaSSC_um2cm3" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%SS_C,i,j)
-    end forall
+      end forall
     case ( "SurfAreaDUF_um2cm3" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%DU_F,i,j)
-    end forall
+      end forall
     case ( "SurfAreaDUC_um2cm3" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%DU_C,i,j)
@@ -1156,31 +1176,37 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ( "u_ref" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = u_ref(i,j)
-    end forall
+      end forall
+    if ( dbgP ) call write_debug(n,ind, "PUREF")
 
     case ( "SMI_deep" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = SoilWater_deep(i,j,1)
-    end forall
+      end forall
     if ( dbgP ) call write_debug(n,ind, "SoilWater_DEEP")
     case ( "SMI_uppr" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = SoilWater_uppr(i,j,1)
-    end forall
+      end forall
     if ( dbgP ) call write_debug(n,ind, "SoilWater_uppr")
 
     case ( "T2m" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = t2_nwp(i,j,1) - 273.15
-    end forall
-    case ( "Idirect" )
-      forall ( i=1:limax, j=1:ljmax )
-        d_2d( n, i,j,IOU_INST) = Idirect(i,j)
-    end forall
-    case ( "Idiffuse" )
-      forall ( i=1:limax, j=1:ljmax )
-        d_2d( n, i,j,IOU_INST) = Idiffuse(i,j)
-    end forall
+      end forall
+    case ( "dTleafHd" )
+      if ( USES%TLEAF_FROM_HD ) then
+        forall ( i=1:limax, j=1:ljmax )
+          d_2d( n, i,j,IOU_INST) = dTleafHd(i,j)
+        end forall
+        if ( dbgP ) call write_debug(n,ind, "dTleafHd")
+      end if
+    case ( "dTleafRn" )
+      if ( USES%TLEAF_FROM_RN ) then
+        forall ( i=1:limax, j=1:ljmax )
+          d_2d( n, i,j,IOU_INST) = dTleafRn(i,j)
+        end forall
+      end if
 
     case ( "XSNOW" ) ! Was not snow depth, but rather flag
       forall ( i=1:limax, j=1:ljmax )
@@ -1198,6 +1224,20 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d( n, i,j,IOU_INST) = ps(i,j,1)*0.01
         !NOT YET - keep hPa in sites:d_2d( n, i,j,IOU_INST) = ps(i,j,1)
       end forall
+    if ( dbgP ) call write_debug(n,ind, "PPSURF")
+
+    case( "o3_45m" )
+      forall ( i=1:limax, j=1:ljmax )
+         d_2d( n, i,j,IOU_INST) = xn_adv(4,i,j,KMAX_MID) 
+      end forall
+    if ( dbgP ) call write_debug(n,ind, "45mO3")
+
+    case( "CloudFrac" )
+      forall ( i=1:limax, j=1:ljmax )
+         d_2d( n, i,j,IOU_INST) = cc3dmax(i,j,KMAX_MID) 
+      end forall
+    if ( dbgP ) call write_debug(n,ind, "CloudFrac")
+
 
     case ( "HMIX", "HMIX00", "HMIX12" )
 
@@ -1211,121 +1251,126 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       end if
 
     case ( "SURF_PPB_SPEC" )
-      if(subclass=='LocFrac_corrected')then
-         do ipoll=1,uEMEP%Npoll        
-            do i=1,uEMEP%poll(ipoll)%Nix
-               if(ind==uEMEP%poll(ipoll)%ix(i))goto 44
-            enddo
-         enddo
-         if(me==0)write(*,*)'WARNING, no local fractions found for ',trim(class),' index ',ind
-         44 continue
-         if(me==0.and. first_call)then
-            write(*,*)'local fractions found for ',trim(class),&
-              ' SPCex ',ind,' name ',trim(species_adv(ind)%name),&
-              ' locfrac pollutant ',trim(uEMEP%poll(ipoll)%emis)
-            do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-             write(*,*)'local correction for sector',isec,' pollutant ',trim(species_adv(ind)%name)
-         enddo
 
-         endif
-         do j=1,ljmax
-         do i=1,limax
-         default_frac=0.0!local, but any sector that is not explicit
-         tot_frac=0.0!all local (any sector)
-         loc_frac_corr=0.0
-         !isec is sector (number between 1 and 11)
-         !iisec is index over available sectors
-         !isec_poll is an internal uEMEP index that is a combination of sector and pollutant indices 
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            if(isec/=0)then
-               default_frac = default_frac - loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-               tot_frac =  tot_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-            endif
-            if(isec==0)default_frac = default_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-         enddo
-         default_frac=max(0.0,default_frac)!in case "sec=0" not available
-         tot_frac = tot_frac + default_frac
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            if(isec/=0)then
-               loc_frac_corr=loc_frac_corr+loc_frac(isec_poll,0,0,i,j,KMAX_MID)*2!*LocEmisFac(isec)
-            endif
-         enddo
-         loc_frac_corr=loc_frac_corr+default_frac*2!*LocEmisFac_default
-         loc_frac_corr=loc_frac_corr+(1-tot_frac)! weight one for pollutants from nonlocal sources
-         
-               d_2d( n, i,j,IOU_INST) = xn_adv(ind,i,j,KMAX_MID) &
-                     * cfac(ind,i,j) * loc_frac_corr !NB: cfac also for local fractions (correct?)
-         enddo
-         enddo
-      else
+!Do not delete
+!Not upgraded to new format yet
+!      if(subclass=='LocFrac_corrected')then
+!         do ipoll=1,uEMEP%Npoll        
+!            do i=1,uEMEP%poll(ipoll)%Nix
+!               if(ind==uEMEP%poll(ipoll)%ix(i))goto 44
+!            enddo
+!         enddo
+!         if(me==0)write(*,*)'WARNING, no local fractions found for ',trim(class),' index ',ind
+!         44 continue
+!         if(me==0.and. first_call)then
+!            write(*,*)'local fractions found for ',trim(class),&
+!              ' SPCex ',ind,' name ',trim(species_adv(ind)%name),&
+!              ' locfrac pollutant ',trim(uEMEP%poll(ipoll)%emis)
+!            do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!             write(*,*)'local correction for sector',isec,' pollutant ',trim(species_adv(ind)%name)
+!         enddo
+!
+!         endif
+!         do j=1,ljmax
+!         do i=1,limax
+!         default_frac=0.0!local, but any sector that is not explicit
+!         tot_frac=0.0!all local (any sector)
+!         loc_frac_corr=0.0
+!         !isec is sector (number between 1 and 11)
+!         !iisec is index over available sectors
+!         !isec_poll is an internal uEMEP index that is a combination of sector and pollutant indices 
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            if(isec/=0)then
+!               default_frac = default_frac - loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!               tot_frac =  tot_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!            endif
+!            if(isec==0)default_frac = default_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!         enddo
+!         default_frac=max(0.0,default_frac)!in case "sec=0" not available
+!         tot_frac = tot_frac + default_frac
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            if(isec/=0)then
+!               loc_frac_corr=loc_frac_corr+loc_frac(isec_poll,0,0,i,j,KMAX_MID)*2!*LocEmisFac(isec)
+!            endif
+!         enddo
+!         loc_frac_corr=loc_frac_corr+default_frac*2!*LocEmisFac_default
+!         loc_frac_corr=loc_frac_corr+(1-tot_frac)! weight one for pollutants from nonlocal sources
+!         
+!               d_2d( n, i,j,IOU_INST) = xn_adv(ind,i,j,KMAX_MID) &
+!                     * cfac(ind,i,j) * loc_frac_corr !NB: cfac also for local fractions (correct?)
+!         enddo
+!         enddo
+!      else
          forall ( i=1:limax, j=1:ljmax )
             d_2d( n, i,j,IOU_INST) = xn_adv(ind,i,j,KMAX_MID) &
                  * cfac(ind,i,j)
          end forall
-      endif
+!      endif
       if ( dbgP ) call write_debugadv(n,ind, 1.0, "PPB OUTS")
       
     case ( "SURF_MASS_SPEC" )  ! Here we need density
 
-      if(subclass=='LocFrac_corrected')then
-         do ipoll=1,uEMEP%Npoll        
-            do i=1,uEMEP%poll(ipoll)%Nix
-               if(ind==uEMEP%poll(ipoll)%ix(i))goto 45
-            enddo
-         enddo
-         if(me==0)write(*,*)'WARNING, no local fractions found for ',trim(class),' index ',ind
-         45 continue
-         if(me==0.and. first_call)then
-            write(*,*)'local fractions found for ',trim(class),' index ',ind,&
-              ' name ',trim(species_adv(ind)%name),&
-              ' locfrac pollutant ',trim(uEMEP%poll(ipoll)%emis)
-            do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-             write(*,*)'local correction for sector',isec,' pollutant ',trim(species_adv(ind)%name)
-         enddo
-
-         endif
-         do j=1,ljmax
-         do i=1,limax
-         default_frac=0.0!local, but any sector that is not explicit
-         tot_frac=0.0!all local (any sector)
-         loc_frac_corr=0.0
-         !isec is sector (number between 1 and 11)
-         !iisec is index over available sectors
-         !isec_poll is an internal uEMEP index that is a combination of sector and pollutant indices 
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            if(isec/=0)then
-               default_frac = default_frac - loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-               tot_frac =  tot_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-            endif
-            if(isec==0)default_frac = default_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-         enddo
-         default_frac=max(0.0,default_frac)!in case "sec=0" not available
-         tot_frac = tot_frac + default_frac
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            if(isec/=0)then
-               loc_frac_corr=loc_frac_corr+loc_frac(isec_poll,0,0,i,j,KMAX_MID)*2!*LocEmisFac(isec)
-            endif
-         enddo
-         loc_frac_corr=loc_frac_corr+default_frac*2!*LocEmisFac_default
-         loc_frac_corr=loc_frac_corr+(1-tot_frac)!No correction for pollutants from other sources
-         
-               d_2d( n, i,j,IOU_INST) = xn_adv(ind,i,j,KMAX_MID) &
-                    * cfac(ind,i,j)  * density(i,j)* loc_frac_corr
-         enddo
-         enddo
-      else
+       !Do not delete
+       !Not upgraded to new format yet
+!      if(subclass=='LocFrac_corrected')then
+!         do ipoll=1,uEMEP%Npoll        
+!            do i=1,uEMEP%poll(ipoll)%Nix
+!               if(ind==uEMEP%poll(ipoll)%ix(i))goto 45
+!            enddo
+!         enddo
+!         if(me==0)write(*,*)'WARNING, no local fractions found for ',trim(class),' index ',ind
+!         45 continue
+!         if(me==0.and. first_call)then
+!            write(*,*)'local fractions found for ',trim(class),' index ',ind,&
+!              ' name ',trim(species_adv(ind)%name),&
+!              ' locfrac pollutant ',trim(uEMEP%poll(ipoll)%emis)
+!            do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!             write(*,*)'local correction for sector',isec,' pollutant ',trim(species_adv(ind)%name)
+!         enddo
+!
+!         endif
+!         do j=1,ljmax
+!         do i=1,limax
+!         default_frac=0.0!local, but any sector that is not explicit
+!         tot_frac=0.0!all local (any sector)
+!         loc_frac_corr=0.0
+!         !isec is sector (number between 1 and 11)
+!         !iisec is index over available sectors
+!         !isec_poll is an internal uEMEP index that is a combination of sector and pollutant indices 
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            if(isec/=0)then
+!               default_frac = default_frac - loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!               tot_frac =  tot_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!            endif
+!            if(isec==0)default_frac = default_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!         enddo
+!         default_frac=max(0.0,default_frac)!in case "sec=0" not available
+!         tot_frac = tot_frac + default_frac
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            if(isec/=0)then
+!               loc_frac_corr=loc_frac_corr+loc_frac(isec_poll,0,0,i,j,KMAX_MID)*2!*LocEmisFac(isec)
+!            endif
+!         enddo
+!         loc_frac_corr=loc_frac_corr+default_frac*2!*LocEmisFac_default
+!         loc_frac_corr=loc_frac_corr+(1-tot_frac)!No correction for pollutants from other sources
+!         
+!               d_2d( n, i,j,IOU_INST) = xn_adv(ind,i,j,KMAX_MID) &
+!                    * cfac(ind,i,j)  * density(i,j)* loc_frac_corr
+!         enddo
+!         enddo
+!      else
        iadvDep = ind
        if( ind == iadv_OM25p ) iadvDep=iadv_PMf
 
@@ -1352,7 +1397,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 !          'SHLSHLmcc'//trim( species(ind)%name), thour, &
 !           xn_shl(ind,debug_li,debug_lj,KMAX_MID), density(debug_li,debug_lj), to_molec_cm3
 !
-      endif
+!      endif
    ! WARNING CLASS PPB just means volume based..
     case ( "SURF_PPB_SHL" )        ! short-lived. Follows pattern of MAXSHL below
       if (  f_2d(n)%unit == "ppb"  ) then  !  NOT ENABLED SO FAR !
@@ -1376,9 +1421,14 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d( n, i,j,IOU_INST) = PM25_water_rh50(i,j)
       ind2d_pmwater = n
 
+    case ( "PMco_water" )      !water JUN21AERO
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = PMco_water_rh50(i,j)
+      ind2d_pmcowater = n
+
     case ( "PM25" )      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pmfine <1,"Missing PMFINE output for "//trim(class))
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
      end if
@@ -1392,7 +1442,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case ( "PM_coarse" )      !
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pm25 <1,"Missing PM25 output for "//trim(class))
         call CheckStop(ind2d_pm10 <1,"Missing PM10 output for "//trim(class))
      end if
@@ -1403,7 +1453,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case ( "SIA25" )   ! Need to subtract some NO3_c from SIA
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_sia <1,"Missing SIA output for "//trim(class))
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
       end if
@@ -1425,7 +1475,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case ( "PM25_rh50" )      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pmfine <1,"Missing PMFINE output for "//trim(class))
         call CheckStop(ind2d_pmwater<1,"Missing PM25water output for "//trim(class))
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
@@ -1450,7 +1500,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case("PM25X")      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pmfine <1,"Missing PMFINE output for "//trim(class))
       end if
       if(any([iadv_NO3_C,iadv_EC_C_WOOD,iadv_EC_C_FFUEL,iadv_POM_C_FFUEL]<1))then
@@ -1472,7 +1522,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case("PM25X_rh50")      ! Need to add PMFINE + fraction NO3_c + water
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pmfine <1,"Missing PMFINE output for "//trim(class))
         call CheckStop(ind2d_pmwater<1,"Missing PM25water output for "//trim(class))
       end if
@@ -1495,7 +1545,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case("PM10_rh50")      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_2d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pm10   <1,"Missing PM10 output for "//trim(class))
         call CheckStop(ind2d_pmwater<1,"Missing PM25water output for "//trim(class))
       end if
@@ -1503,6 +1553,11 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       forall(i=1:limax,j=1:ljmax) &
         d_2d(n,i,j,IOU_INST) = d_2d(ind2d_pm10   ,i,j,IOU_INST) &
                              + d_2d(ind2d_pmwater,i,j,IOU_INST)
+      if ( AERO%JUN21AERO ) then
+        forall(i=1:limax,j=1:ljmax) &
+         d_2d(n,i,j,IOU_INST) = d_2d(n,i,j,IOU_INST) + &
+           d_2d(ind2d_pmcowater,i,j,IOU_INST)   !ST EQSAM
+      end if
 
     case("AOD","AOD:GROUP","AOD:SPEC")  !/ Aerosol Optical Depth (new system)
       if(first_call)call AOD_init("Derived:"//trim(class))
@@ -1596,10 +1651,6 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         end if
       end if
 
-    case ( "VOC", "TVOC" )
-
-      call voc_2dcalc()
-
     case( "GRIDAOT" )!  Hardly used these days. The vegetation-specific
                      !  AOTs are handled in the Mosaic class and as
                      !  part of the dry dep calculations.
@@ -1633,10 +1684,173 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       if(dayfrac<0)then !only at midnight: write on d_2d
         call somo_calc( n, f_2d(n)%index, dbgP )
         d_2d(n,:,:,IOU_MON )  = d_2d(n,:,:,IOU_MON )  + d_2d(n,:,:,IOU_DAY)
-
+        if(f_2d(n)%avg) nav_2d(n,IOU_MON) = nav_2d(n,IOU_MON) + 1
         ! if(current_date%month>=4.and.current_date%month<=9)then
         d_2d(n,:,:,IOU_YEAR ) = d_2d(n,:,:,IOU_YEAR ) + d_2d(n,:,:,IOU_DAY)
+        if(f_2d(n)%avg) nav_2d(n,IOU_YEAR) = nav_2d(n,IOU_YEAR) + 1
         !NB overwritten anyway D2_O3_DAY = 0.
+      end if
+
+    case( "MaxD8M_26th", "MaxD8M_1st", "MaxD8M_2nd", "MaxD8M_3rd", "MaxD8M_4th")
+      ! do nothing, it is taken care of by "MaxD8M" case
+    case( "MaxD8M" ) ! maximum daily eight-hour mean concentration
+      if (first_call) then
+
+        if (.not. allocated(D8M)) then ! we want to go through this only once
+          iou = 0 !number of independent MaxD8M fields to output
+          do i = 1, num_deriv2d
+            if (f_2d(i)%class=="MaxD8M") then
+              ! save index of species in f_2d
+              f_2d(i)%index = find_index(f_2d(i)%txt,species_adv(:)%name, any_case=.true.)
+              call CheckStop(f_2d(i)%index<0,"MaxD8M: species "//trim(f_2d(i)%txt)//"not found")
+              !force ug/m3
+              call CheckStop(f_2d(i)%unit/="ug/m3","MaxD8M must be in units of ug/m3 ")
+              iou = iou + 1
+              ! trick to save 2 integers in one:
+              f_2d(i)%index = f_2d(i)%index  + iou * 100000
+            end if
+            if (f_2d(i)%class=="MaxD8M_26th") then
+              call CheckStop(i_MaxD8M_26th > 0, "Only one MaxD8M_26th at a time implemented!")
+              i_MaxD8M_26th = i
+              make_MaxD8M_nth = .true.
+            end if
+            if (f_2d(i)%class=="MaxD8M_1st") then
+              call CheckStop(i_MaxD8M_1st > 0, "Only one MaxD8M_nth at a time implemented!")
+              i_MaxD8M_1st = i
+              make_MaxD8M_nth = .true.
+            end if
+            if (f_2d(i)%class=="MaxD8M_2nd") then
+              call CheckStop(i_MaxD8M_2nd > 0, "Only one MaxD8M_nth at a time implemented!")
+              i_MaxD8M_2nd = i
+              make_MaxD8M_nth = .true.
+            end if
+            if (f_2d(i)%class=="MaxD8M_3rd") then
+              call CheckStop(i_MaxD8M_3rd > 0, "Only one MaxD8M_nth at a time implemented!")
+              i_MaxD8M_3rd = i
+              make_MaxD8M_nth = .true.
+            end if
+            if (f_2d(i)%class=="MaxD8M_4th") then
+              call CheckStop(i_MaxD8M_4th > 0, "Only one MaxD8M_nth at a time implemented!")
+              i_MaxD8M_4th = i
+              make_MaxD8M_nth = .true.
+            end if
+          end do
+          !we need one array to save the last 8 hourly concentrations, and one to make
+          !the average over the last hour
+          allocate(D8M(LIMAX,LJMAX,8,iou)) ! running last 8 hour values
+          allocate(D8Max(LIMAX,LJMAX,iou)) ! max value of the 8 hour mean since 00:00
+          allocate(hourM(LIMAX,LJMAX,iou)) ! hour Mean
+          if (make_MaxD8M_nth) then
+            !Note that for simplicity, we keep 26 largest , even in the case we only need
+            !the first, second, 3rd or fourth
+            !NB: for O3 only!
+            allocate(D8_26Max(26,LIMAX,LJMAX)) ! 26 highest daily values up to current date 
+            D8_26Max = 0.0 !init with low value
+          end if
+          hourM = 0.0
+          D8Max = 0.0 !init with low value
+          D8M = 0.0 !init with low value
+        end if
+      end if
+      
+      iou = f_2d(n)%index / 100000
+      ii = mod(f_2d(n)%index, 100000)
+      do j = 1,ljmax
+        do i = 1,limax
+          hourM(i,j,iou) = hourM(i,j,iou) + xn_adv(ii,i,j,KMAX_MID) * cfac(ii,i,j) * density(i,j) * 1.0e9 * species_adv(ii)%molwt/ATWAIR
+        end do
+      end do
+
+      if (current_date%seconds == 0) then
+        !one hour has past since last time here        
+        !save last hour average
+        ii = mod(current_date%hour,8) + 1 !note: this works only because 24 is a multiple of 8!
+        timefrac = dt_advec/3600.0 ! inverse of number of timesteps in an hour
+        D8M(:,:,ii,iou) =  hourM(:,:,iou) * timefrac
+        hourM(:,:,iou) = 0.0
+        tmpwork = 0.0
+        ! update max value since 01:00
+        do j = 1,ljmax
+          do i = 1,limax
+            af = 0.0
+            do l = 1, 8
+              af = af + D8M(i,j,l,iou) * 0.125 ! 8 hour average
+            end do
+            D8Max(i,j,iou) = max(D8Max(i,j,iou) , af) 
+          end do
+        end do
+        !The last period of a day ends at 00:00
+        !since the model output at the end of "EMEP day", which is different,
+        !we must save only once per day at the right time
+        if (current_date%hour == 0) then
+          
+          if (make_MaxD8M_nth .and. mod(f_2d(n)%index, 100000) == O3_ix-NSPEC_SHL) then           
+            !For O3 we keep the 26 highest values and current value            
+            do j = 1,ljmax
+              do i = 1,limax
+                !1) find smallest value stored so far
+                i_26th = 1 
+                do ii = 2, 26
+                  if (D8_26Max(ii,i,j)<D8_26Max(i_26th,i,j)) i_26th=ii
+                end do
+                if (D8Max(i,j,iou)>D8_26Max(i_26th,i,j)) then
+                  !2) Update i_26th, and D8_26Max(i_26th,i,j)
+                  D8_26Max(i_26th,i,j) = D8Max(i,j,iou)
+                  !3) find new smallest values among 26 largest
+                  i_26th = 1
+                  do ii = 2, 26
+                    if (D8_26Max(ii,i,j)<D8_26Max(i_26th,i,j)) i_26th=ii
+                  end do
+                  !4) store the required largest value of all times
+                  if (i_MaxD8M_26th > 0) then
+                    d_2d(i_MaxD8M_26th,i,j,IOU_YEAR) = D8_26Max(i_26th,i,j)
+                  endif
+                end if
+                !5) find new 4 largest values among 26 largest
+                i1st=i_26th
+                i2nd=i_26th
+                i3rd=i_26th
+                i4th=i_26th 
+                do ii = 1, 26
+                   if (D8_26Max(ii,i,j)>D8_26Max(i4th,i,j)) then
+                      if(D8_26Max(ii,i,j) > D8_26Max(i1st,i,j)) then
+                         i4th=i3rd
+                         i3rd=i2nd
+                         i2nd=i1st
+                         i1st=ii
+                      else if(D8_26Max(ii,i,j) > D8_26Max(i2nd,i,j)) then
+                         i4th=i3rd
+                         i3rd=i2nd
+                         i2nd=ii
+                      else if(D8_26Max(ii,i,j) > D8_26Max(i3rd,i,j)) then
+                         i4th=i3rd
+                         i3rd=ii
+                      else 
+                         i4th=ii
+                      endif
+                   endif
+                end do
+                
+                if (i_MaxD8M_1st > 0) d_2d(i_MaxD8M_1st,i,j,IOU_YEAR) = D8_26Max(i1st,i,j)
+                if (i_MaxD8M_2nd > 0) d_2d(i_MaxD8M_2nd,i,j,IOU_YEAR) = D8_26Max(i2nd,i,j)
+                if (i_MaxD8M_3rd > 0) d_2d(i_MaxD8M_3rd,i,j,IOU_YEAR) = D8_26Max(i3rd,i,j)
+                if (i_MaxD8M_4th > 0) d_2d(i_MaxD8M_4th,i,j,IOU_YEAR) = D8_26Max(i4th,i,j)
+                
+              end do
+            end do
+          end if
+          
+          do j = 1,ljmax
+            do i = 1,limax
+              d_2d(n,i,j,IOU_DAY) = D8Max(i,j,iou)
+              !NB: max value over month, not average over daily max:
+              d_2d(n,i,j,IOU_MON) = max(d_2d(n,i,j,IOU_MON) , D8Max(i,j,iou))
+              !NB: max value over year, not average over daily max:
+              d_2d(n,i,j,IOU_YEAR) = max(d_2d(n,i,j,IOU_YEAR), D8Max(i,j,iou))                                          
+              D8Max(i,j,iou) = 0.0
+            end do
+          end do
+        end if
       end if
 
     case("PREC","WDEP","DDEP","VG","Rs","Rns","Gns","Mosaic","POD","SPOD","AOT")
@@ -1834,7 +2048,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       call CheckStop(igrp>size(chemgroups(:)%name), &
                             "Outside GRP "//trim(f_2d(n)%name))
       ngrp = size(chemgroups(igrp)%specs)
-      if(first_call)then
+      if(first_call.and.f_2d(n)%unit=="ug/m3")then
         select case(chemgroups(igrp)%name)
           case("PMFINE"); ind2d_pmfine = n
           case("SIA");    ind2d_sia = n
@@ -1865,67 +2079,67 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
       if(subclass=='LocFrac_corrected')then
         !TO BE DEVELOPED
-         do ii= 1,ngrp
-            do ipoll=1,uEMEP%Npoll        
-               do i=1,uEMEP%poll(ipoll)%Nix
-                  if(chemgroups(igrp)%specs(ii)==uEMEP%poll(ipoll)%ix(i)+NSPEC_SHL)goto 54
-               enddo
-            enddo
-         enddo
-         if(me==0)write(*,*)'WARNING, no local fractions found for ',trim(class),' group ',chemgroups(igrp)%name
-         54 continue
-         if(me==0.and. first_call)then
-            write(*,*)'local fractions found for ',trim(class),&
-              ' group index ',igrp,' name ',trim(chemgroups(igrp)%name),&
-              ' locfrac pollutant ',trim(uEMEP%poll(ipoll)%emis)
-            do iisec=1,uEMEP%poll(ipoll)%Nsectors
-               isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-               isec=uEMEP%poll(ipoll)%sector(iisec)
-               write(*,*)'local correction for sector',isec,', pollutant ',trim(uEMEP%poll(ipoll)%emis)
-            enddo
-         endif
-
-         do j=1,ljmax
-         do i=1,limax
-         default_frac=0.0!local, but any sector that is not explicit
-         tot_frac=0.0!all local (any sector)
-         loc_frac_corr=0.0
-         !isec is sector (number between 1 and 11)
-         !iisec is index over available sectors
-         !isec_poll is an internal uEMEP index that is a combination of sector and pollutant indices 
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            if(isec/=0)then
-               default_frac = default_frac - loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-               tot_frac =  tot_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-            endif
-            if(isec==0)default_frac = default_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-         enddo
-         default_frac=max(0.0,default_frac)!in case "sec=0" not available
-         tot_frac = tot_frac + default_frac
-         if(i==5.and.j==5)then
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            write(*,*)me,' sector ',isec,' fraction ',loc_frac(isec_poll,0,0,i,j,KMAX_MID)
-         enddo
-            write(*,*)me,' remaining sectors fraction ', default_frac,' tot ',tot_frac
-         endif
-
-         do iisec=1,uEMEP%poll(ipoll)%Nsectors
-            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
-            isec=uEMEP%poll(ipoll)%sector(iisec)
-            if(isec/=0)then
-               loc_frac_corr=loc_frac_corr+loc_frac(isec_poll,0,0,i,j,KMAX_MID)*2!*LocEmisFac(isec)
-            endif
-         enddo
-         loc_frac_corr=loc_frac_corr+default_frac*2!*LocEmisFac_default
-         loc_frac_corr=loc_frac_corr+(1-tot_frac)!weight one for pollutants from other sources
-               d_2d( n, i,j,IOU_INST) = d_2d( n, i,j,IOU_INST) &
-                     * loc_frac_corr
-         enddo
-         enddo
+!         do ii= 1,ngrp
+!            do ipoll=1,uEMEP%Npoll        
+!               do i=1,uEMEP%poll(ipoll)%Nix
+!                  if(chemgroups(igrp)%specs(ii)==uEMEP%poll(ipoll)%ix(i)+NSPEC_SHL)goto 54
+!               enddo
+!            enddo
+!         enddo
+!         if(me==0)write(*,*)'WARNING, no local fractions found for ',trim(class),' group ',chemgroups(igrp)%name
+!         54 continue
+!         if(me==0.and. first_call)then
+!            write(*,*)'local fractions found for ',trim(class),&
+!              ' group index ',igrp,' name ',trim(chemgroups(igrp)%name),&
+!              ' locfrac pollutant ',trim(uEMEP%poll(ipoll)%emis)
+!            do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!               isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!               isec=uEMEP%poll(ipoll)%sector(iisec)
+!               write(*,*)'local correction for sector',isec,', pollutant ',trim(uEMEP%poll(ipoll)%emis)
+!            enddo
+!         endif
+!
+!         do j=1,ljmax
+!         do i=1,limax
+!         default_frac=0.0!local, but any sector that is not explicit
+!         tot_frac=0.0!all local (any sector)
+!         loc_frac_corr=0.0
+!         !isec is sector (number between 1 and 11)
+!         !iisec is index over available sectors
+!         !isec_poll is an internal uEMEP index that is a combination of sector and pollutant indices 
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            if(isec/=0)then
+!               default_frac = default_frac - loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!               tot_frac =  tot_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!            endif
+!            if(isec==0)default_frac = default_frac + loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!         enddo
+!         default_frac=max(0.0,default_frac)!in case "sec=0" not available
+!         tot_frac = tot_frac + default_frac
+!         if(i==5.and.j==5)then
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            write(*,*)me,' sector ',isec,' fraction ',loc_frac(isec_poll,0,0,i,j,KMAX_MID)
+!         enddo
+!            write(*,*)me,' remaining sectors fraction ', default_frac,' tot ',tot_frac
+!         endif
+!
+!         do iisec=1,uEMEP%poll(ipoll)%Nsectors
+!            isec_poll=uEMEP%poll(ipoll)%sec_poll_ishift+iisec
+!            isec=uEMEP%poll(ipoll)%sector(iisec)
+!            if(isec/=0)then
+!               loc_frac_corr=loc_frac_corr+loc_frac(isec_poll,0,0,i,j,KMAX_MID)*2!*LocEmisFac(isec)
+!            endif
+!         enddo
+!         loc_frac_corr=loc_frac_corr+default_frac*2!*LocEmisFac_default
+!         loc_frac_corr=loc_frac_corr+(1-tot_frac)!weight one for pollutants from other sources
+!               d_2d( n, i,j,IOU_INST) = d_2d( n, i,j,IOU_INST) &
+!                     * loc_frac_corr
+!         enddo
+!         enddo
       endif
       if( dbgP )then
         i= debug_li; j=debug_lj
@@ -2061,7 +2275,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case ( "PM25" )      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_3d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_3d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind3d_pmfine <1,"Missing PMFINE output for "//trim(class))
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
       end if
@@ -2074,7 +2288,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case ( "PM25_wet" )         ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_3d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_3d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind3d_pmfine <1,"Missing PMFINE output for "//trim(class))
         call CheckStop(ind3d_pmwater<1,"Missing PM25water output for "//trim(class))
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
@@ -2097,7 +2311,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case ( "SIA25" )      ! Need to subtract some NO3_c from SIA
       if(first_call)then
-        call CheckStop(f_3d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_3d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind3d_sia <1,"Missing 3D-SIA output for "//trim(class))
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
       end if
@@ -2110,7 +2324,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case("PM10_wet")      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
-        call CheckStop(f_3d(n)%unit(1:2)/="ug","Wrong unit for "//trim(class))
+        call CheckStop(f_3d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind3d_pm10   <1,"Missing PM10 output for "//trim(class))
         call CheckStop(ind3d_pmwater<1,"Missing PM25water output for "//trim(class))
       end if
@@ -2163,9 +2377,6 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_3d(n,i,j,k,IOU_INST)=xn_shl(ind,i,j,lev3d(k))&
                          *inv_air_density3D(i,j,lev3d(k))
 
-    case ( "VOC" )
-      call voc_3dcalc()
-
     case ( "3D_PPB_SPEC" )
       forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
         d_3d(n,i,j,k,IOU_INST)=xn_adv(ind,i,j,lev3d(k))
@@ -2188,7 +2399,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       call CheckStop(igrp>size(chemgroups(:)%name), &
                             "Outside GRP "//trim(f_3d(n)%name))
       ngrp = size(chemgroups(igrp)%specs)
-      if(first_call)then
+      if(first_call.and.f_3d(n)%unit=="ug/m3")then
         select case (chemgroups(igrp)%name)
           case("PMFINE"); ind3d_pmfine = n
           case("SIA");    ind3d_sia = n
@@ -2379,41 +2590,6 @@ subroutine ResetDerived(period)
 
 end subroutine ResetDerived
 !=========================================================================
-subroutine voc_2dcalc()
-!/-- Sums up voc species using the indices defined earlier in Setup_VOCs
-  integer :: ind
-
-! We initialise d_2d first, the use a simple loop
-! over voc. Some CPU could be saved by initialising
-! with the 1st voc, then looping over 2, nvoc, but who cares...
-
-  d_2d( n, 1:limax,1:ljmax,IOU_INST) =  0.0
-
-  do ivoc = 1, nvoc
-    ind = voc_index(ivoc)           ! Gives which IXADV_ to use.
-    forall(i=1:limax,j=1:ljmax) &
-      d_2d(n,i,j,IOU_INST)=d_2d(n,i,j,IOU_INST) &
-                    +xn_adv(ind,i,j,KMAX_MID) &
-                     *voc_carbon(ivoc)*cfac(ind,i,j)
-                     ! multiplied by nr. of C and "reduced to surface"
-  end do ! ivoc
-end subroutine voc_2dcalc
-!=========================================================================
-subroutine voc_3dcalc()
-!/-- as for voc_2dcalc
-  integer :: ind
-
-  d_3d(n,1:limax,1:ljmax,1:num_lev3d,IOU_INST) =  0.0
-  do ivoc = 1, nvoc
-    ind = voc_index(ivoc)
-    forall(i=1:limax,j=1:ljmax,k=1:num_lev3d)  &
-      d_3d(n,i,j,k,IOU_INST)=d_3d(n,i,j,k,IOU_INST) &
-                      +xn_adv(ind,i,j,lev3d(k))&
-                       *voc_carbon(ivoc)
-  end do ! ivoc
-
- end subroutine voc_3dcalc
-!=========================================================================
 subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
 
   !/--  calulates e.g. SIA = SO4 + pNO3_f + pNO3_c + aNH4
@@ -2513,7 +2689,14 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
 
         else ! Simple gas or particle.
 
-            if(ik==0) fac = fac * cfac(iadvDep,i,j)
+            if(ik==0) then
+               if(iadvDep<1) then
+                 print *, dtxt//"IADVDEP ", iadv, itot, nspec, &
+                     ParticlePhaseOutputs, trim(unit), semivol_wanted
+                 call StopAll(dtxt//'IADVDEP problem')
+               end if
+               fac = fac * cfac(iadvDep,i,j)
+            end if
         
         end if
 
@@ -2542,6 +2725,7 @@ end subroutine group_calc
 !=========================================================================
 subroutine somo_calc( n, iX, debug_flag )
 !/-- Calculates SOMO (8hours) values for input threshold.
+!    which is max. value per day of 8-hour running means
 
   implicit none
   integer, intent(in) :: n           ! index in Derived_mod::d_2d arrays
@@ -2574,7 +2758,6 @@ subroutine somo_calc( n, iX, debug_flag )
 
       if(debug_flag.and.i==debug_li.and.j==debug_lj)&
         write(*,"(a,2i4,f12.3)") "SOMO DEBUG ", n, iX, o3
-
 
       o3 = max( o3 - iX , 0.0 )   ! Definition of SOMOs
 

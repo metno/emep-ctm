@@ -394,131 +394,131 @@
   xnew(Ash_c) = xold(Ash_c) + dt2 * P
 
 
-!-> POM_f_wood
+!-> POM_f_Res
 
-  P = rcemis(POM_F_WOOD,k)
+  P = rcemis(POM_F_RES,k)
   
   ! L = 0.0
   
-  xnew(POM_f_wood) = xold(POM_f_wood) + dt2 * P
+  xnew(POM_f_Res) = xold(POM_f_Res) + dt2 * P
 
 
-!-> POM_c_wood
+!-> POM_c_Res
 
   ! P = 0.0
   
   ! L = 0.0
   
-  ! Nothing to do for POM_c_wood! xnew(POM_c_wood) = max(0.0, xold(POM_c_wood))
+  ! Nothing to do for POM_c_Res! xnew(POM_c_Res) = max(0.0, xold(POM_c_Res))
 
 
-!-> POM_f_ffuel
+!-> POM_f_nonRes
 
-  P = rcemis(POM_F_FFUEL,k)
+  P = rcemis(POM_F_NONRES,k)
   
   ! L = 0.0
   
-  xnew(POM_f_ffuel) = xold(POM_f_ffuel) + dt2 * P
+  xnew(POM_f_nonRes) = xold(POM_f_nonRes) + dt2 * P
 
 
-!-> POM_c_ffuel
+!-> POM_c_nonRes
 
-  P = rcemis(POM_C_FFUEL,k)
+  P = rcemis(POM_C_NONRES,k)
   
   ! L = 0.0
   
-  xnew(POM_c_ffuel) = xold(POM_c_ffuel) + dt2 * P
+  xnew(POM_c_nonRes) = xold(POM_c_nonRes) + dt2 * P
 
 
-!-> EC_f_wood_new
+!-> EC_f_Res_new
 
-  P = rcemis(EC_F_WOOD_NEW,k)
+  P = rcemis(EC_F_RES_NEW,k)
   
   L = rct(101,k)
   
-  xnew(EC_f_wood_new) = (xold(EC_f_wood_new) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(EC_f_Res_new) = (xold(EC_f_Res_new) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> EC_f_wood_age
+!-> EC_f_Res_age
 
-  P = rcemis(EC_F_WOOD_AGE,k)  &
-    + rct(101,k) * xnew(EC_f_wood_new)
+  P = rcemis(EC_F_RES_AGE,k)  &
+    + rct(101,k) * xnew(EC_f_Res_new)
   
   ! L = 0.0
   
-  xnew(EC_f_wood_age) = xold(EC_f_wood_age) + dt2 * P
+  xnew(EC_f_Res_age) = xold(EC_f_Res_age) + dt2 * P
 
 
-!-> EC_c_wood
+!-> EC_c_Res
 
-  ! P = 0.0
+  P = rcemis(EC_C_RES,k)
   
   ! L = 0.0
   
-  ! Nothing to do for EC_c_wood! xnew(EC_c_wood) = max(0.0, xold(EC_c_wood))
+  xnew(EC_c_Res) = xold(EC_c_Res) + dt2 * P
 
 
-!-> EC_f_ffuel_new
+!-> EC_f_nonRes_new
 
-  P = rcemis(EC_F_FFUEL_NEW,k)
+  P = rcemis(EC_F_NONRES_NEW,k)
   
   L = rct(101,k)
   
-  xnew(EC_f_ffuel_new) = (xold(EC_f_ffuel_new) + dt2 * P) / (1.0 + dt2 * L)
+  xnew(EC_f_nonRes_new) = (xold(EC_f_nonRes_new) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> EC_f_ffuel_age
+!-> EC_f_nonRes_age
 
-  P = rcemis(EC_F_FFUEL_AGE,k)  &
-    + rct(101,k) * xnew(EC_f_ffuel_new)
+  P = rcemis(EC_F_NONRES_AGE,k)  &
+    + rct(101,k) * xnew(EC_f_nonRes_new)
   
   ! L = 0.0
   
-  xnew(EC_f_ffuel_age) = xold(EC_f_ffuel_age) + dt2 * P
+  xnew(EC_f_nonRes_age) = xold(EC_f_nonRes_age) + dt2 * P
 
 
-!-> EC_c_ffuel
+!-> EC_c_nonRes
 
-  P = rcemis(EC_C_FFUEL,k)
+  P = rcemis(EC_C_NONRES,k)
   
   ! L = 0.0
   
-  xnew(EC_c_ffuel) = xold(EC_c_ffuel) + dt2 * P
+  xnew(EC_c_nonRes) = xold(EC_c_nonRes) + dt2 * P
 
 
-!-> pSO4f
+!-> remPPM25_nonRes
 
-  P = rcemis(PSO4F,k)
+  P = rcemis(REMPPM25_NONRES,k)
   
   ! L = 0.0
   
-  xnew(pSO4f) = xold(pSO4f) + dt2 * P
+  xnew(remPPM25_nonRes) = xold(remPPM25_nonRes) + dt2 * P
 
 
-!-> pSO4c
+!-> remPPM25_Res
 
-  P = rcemis(PSO4C,k)
+  P = rcemis(REMPPM25_RES,k)
   
   ! L = 0.0
   
-  xnew(pSO4c) = xold(pSO4c) + dt2 * P
+  xnew(remPPM25_Res) = xold(remPPM25_Res) + dt2 * P
 
 
-!-> remPPM25
+!-> remPPM_c_nonRes
 
-  P = rcemis(REMPPM25,k)
+  P = rcemis(REMPPM_C_NONRES,k)
   
   ! L = 0.0
   
-  xnew(remPPM25) = xold(remPPM25) + dt2 * P
+  xnew(remPPM_c_nonRes) = xold(remPPM_c_nonRes) + dt2 * P
 
 
-!-> remPPM_c
+!-> remPPM_c_Res
 
-  P = rcemis(REMPPM_C,k)
+  P = rcemis(REMPPM_C_RES,k)
   
   ! L = 0.0
   
-  xnew(remPPM_c) = xold(remPPM_c) + dt2 * P
+  xnew(remPPM_c_Res) = xold(remPPM_c_Res) + dt2 * P
 
 

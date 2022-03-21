@@ -1,7 +1,7 @@
-! <Rsurface_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Rsurface_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,15 +34,17 @@ use GasParticleCoeffs_mod, only: nddep, DDspec,  &
                               idcmpO3, idcmpHNO3,idcmpNH3,idcmpSO2
 use Io_Progs_mod,       only: datewrite
 use LandDefs_mod,       only: LandDefs, LandType
-! L (local) provides  t2C, rh, LAI, SAI, hveg, ustar, 
+! L (local) provides  t2C, rh, LAI, SAI, hveg, ustar,
 !      PARsun,PARshade,  (in W/m2)
 !      LAIsunfrac, RgsO, RgsS, is_water, is_forest
-! G (Grid)  provides snow, sdepth so2nh3ratio, 
+! G (Grid)  provides snow, sdepth so2nh3ratio,
 use LocalVariables_mod, only : iL, L, G => Grid
 
 use MetFields_mod, only : foundsdepth, foundice
-use MetFields_mod, only : PARdbh, PARdif  ! W/m2
+use MetFields_mod, only : coszen,PARdbh, PARdif  ! W/m2
 use Par_mod,only :me
+use PhysicalConstants_mod, only: DAY_COSZEN
+
 use Radiation_mod, only : CanopyPAR
 use SmallUtils_mod, only: find_index
 use TimeDate_mod,  only : current_date
@@ -51,22 +53,19 @@ implicit none
 private
 
 public   :: Rsurface
-!INCLUDE 'mpif.h'
 
 real, public, save :: Rinc, RigsO, GnsO, RgsS
 
- 
-    
 contains
 ! =======================================================================
 
-  subroutine Rsurface(i,j,Gsto,Rsur,errmsg,debug_arg,fsnow) 
+  subroutine Rsurface(i,j,Gsto,Rsur,errmsg,debug_arg,fsnow)
 ! =======================================================================
 !
 !     Description
 !       calculates bulk surface resistance (Rsur) for all required gases.
 !
-!       For O3 the methodology is derived from EMEP MSC_W Note 6/00; the 
+!       For O3 the methodology is derived from EMEP MSC_W Note 6/00; the
 !       following pathways apply for the surface resistance for O3:
 !
 !        -- Rinc-- Rgs      In-canopy + soil/ground cover
@@ -77,7 +76,7 @@ contains
 !       |
 !        -------- Rsto      Stomatal
 
-!     Hence, we have a surface conductance: 
+!     Hence, we have a surface conductance:
 !
 !       Gsur =      LAI +  SAI  +       1
 !                   ___    ___     ____________
@@ -93,11 +92,11 @@ contains
 !     [ Note that the O3 formulation can be written in the same way when we
 !     define GnsO = SAI/Rext + 1/(Rinc+Rgs) ]
 !
-!     Hence, for all gases, we have a surface conductance: 
+!     Hence, for all gases, we have a surface conductance:
 !
 !       Gsur =      LAI * Gsto  +  Gns
 
-!  Wesely's method for other gases was based upon deriving resistances for 
+!  Wesely's method for other gases was based upon deriving resistances for
 !  ozone and SO2 first (e.g. RgsO, RgsS for Rgs) and then scaling using
 !  effective Henry coefficients (H*) and reactivity coefficients (f0) for
 !  each gas. However, here we apply scaling to Gns, not individual resistances.
@@ -107,11 +106,11 @@ contains
 !  1. Calculate:
 !        lowTcorr         low-temperature correction
 !        Rinc             in-canopy resistance
-!        Rsur(HNO3)  
-!        Rsur(NH3)  
+!        Rsur(HNO3)
+!        Rsur(NH3)
 !        Gsto(O3)         stomatal conductance (if LAI > 0)
 !
-!       FOR EACH remaining gas (icmp is used as an index, since cmp is assumed 
+!       FOR EACH remaining gas (icmp is used as an index, since cmp is assumed
 !                               to  abbreviate "component".):
 !  2. Calculate ground surface resistance, Rgs
 !  3. if (LAI>0.1)  calculate Gext
@@ -126,7 +125,7 @@ contains
 
 ! Output:
 
-   real,dimension(:),intent(out) :: Rsur   
+   real,dimension(:),intent(out) :: Rsur
    real,dimension(:),intent(out) :: Gsto
 
    character(len=*), intent(out) :: errmsg
@@ -137,23 +136,23 @@ contains
 
  ! external resistance for Ozone
   real, parameter :: RextO =  2500.0   ! gives Gext=0.2 cm/s for LAI=5
-  real,dimension(size(Rsur)) :: Gns   
+  real,dimension(size(Rsur)) :: Gns
 
-! Here, "Gext=0.2cm/s" refers to the external conductance, G_ext, where 
-! G_ext=LAI/R_ext. In many studies, it has been assumed 
+! Here, "Gext=0.2cm/s" refers to the external conductance, G_ext, where
+! G_ext=LAI/R_ext. In many studies, it has been assumed
 ! that G_ext should be low, particularly relative to stomatal conductance g_s.
-! Results from a variety of experiments, however, have made the above 
+! Results from a variety of experiments, however, have made the above
 ! estimates  Rext0 and RextS plausible.  The above equation for G_ext has been
-! designed on the basis of these experimental results. 
+! designed on the basis of these experimental results.
 
-! Notice also that given the equations for the canopy resistance R_sur and the 
+! Notice also that given the equations for the canopy resistance R_sur and the
 ! deposition velocity V_g, V_g>=LAI/R_ext. The value of G_ext can therefore be
 ! interpreted as the minimum value for V_g.
 
     character(len=6), parameter :: dtxt='Rsurf:'
 
 ! Working values:
-   
+
     integer :: icmp             ! gaseous species, =index in DDspec list
     logical :: canopy         & ! For SAI>0, .e.g grass, forest, also in winter
         ,leafy_canopy           ! For LAI>0, only when green
@@ -162,8 +161,8 @@ contains
     real :: Rgs
     real :: GigsO
     real :: RsnowS, RsnowO !surface resistance for snow_flag, S and O3
-    real :: lowTcorr    !low temperature correction  
-    real :: lowThno3    !low temperature correction for HNO3  
+    real :: lowTcorr    !low temperature correction
+    real :: lowThno3    !low temperature correction for HNO3
     real :: GnsS, RnsS  ! for SO2
     real,  intent(out) :: fsnow ! the output is max(fsnow,fice)
     real :: fice !fraction ice_nwp cover
@@ -174,7 +173,7 @@ contains
    dbg = DEBUG%RSUR .and. debug_flag
 
 
-! START OF PROGRAMME: 
+! START OF PROGRAMME:
     errmsg = "ok"
     Sdmax = max( L%hveg/10, 0.01) !meters
     fsnow = 2 *G%sdepth/Sdmax
@@ -183,14 +182,14 @@ contains
     fice=0.01*G%ice_nwp !from percent to fraction
     fsnow = max(fsnow,fice) !if snow_flag, ice_nwp probably has snow_flag
                             !but it might be ice without snow..
-    fsnow = min(fsnow,1.0)  
+    fsnow = min(fsnow,1.0)
     fsnow = max(fsnow,0.0)
 
     if (L%is_ice) fsnow=1.0 !ice_nwp in Landuse
                             !to ensure it is treated
                             !same way as met input
                             !and not Ggs from table
-   
+
 
     if ( dbg ) call datewrite(dtxt//"snow_flag ",-1, &
            (/ L%hveg, Sdmax, G%ice_nwp, G%sdepth, fsnow /) )
@@ -209,7 +208,7 @@ contains
                                    !effectively means that it will only
                                    !kick in for T<-1
 
-  ! Rsnow for sulphur and O3, Erisman, 1994 + Zhang, 2003. Also used for ice. 
+  ! Rsnow for sulphur and O3, Erisman, 1994 + Zhang, 2003. Also used for ice.
     RsnowS = 70.0*(2.0 -L%t2C) !Used for snow_flag and ice_nwp
     if (L%t2C < -1.0) RsnowS = 700.0 !700 from Cadle,1985
     RsnowS = min(700.0,RsnowS) !Erisman 1994=500,very low.. Puts to 2000
@@ -234,14 +233,19 @@ contains
   !    g_sto 0 when snow covering canopy
 
    if ( dbg ) then
-     call datewrite(dtxt//"testcan ", iL, [ G%Idirect, L%PARsun, G%sdepth ] )
+     call datewrite(dtxt//"testcan-in ", iL, [ G%Zen, L%PARsun, G%sdepth,&
+         coszen(i,j), DAY_COSZEN ], afmt='(a,3i3,i5,1x, i2,3f9.3,2es12.3)'  )
    end if
- 
-   if( leafy_canopy  .and. G%Idirect > 0.001 .and.       &!: daytime
-                          G%sdepth< (1.0 +Sdmax) ) then   !: above snow 
+
+   if( leafy_canopy  .and. G%zen < 89.0 .and.       &!: daytime
+                          G%sdepth< (1.0 +Sdmax) ) then   !: above snow
 
      call CanopyPAR(L%LAI, G%coszen, PARdbh(i,j), PARdif(i,j), &
                     L%PARsun, L%PARshade, L%LAIsunfrac)
+     if ( dbg ) then
+       call datewrite(dtxt//"testcanpar ", iL, [ G%Zen,&
+          L%PARsun, L%PARshade, L%LAIsunfrac ], afmt='(a,3i3,i5,1x, i2,4f9.3)' )
+     end if
 
      call g_stomatal(iL, debug_flag )
 
@@ -254,11 +258,11 @@ contains
    end if ! leafy canopy and daytime
 
    if ( dbg ) call datewrite(dtxt//" gsto ", iL, &
-       [ L%LAI, G%Idirect, G%Idiffuse, L%PARsun,  L%g_sto, L%f_env ] )
+       [ L%LAI, G%Zen, L%PARsun, L%PARshade,  L%g_sto, L%f_env ] )
 
 
   !*** Calculate in-canopy resistance,  Rinc (ACPs8.6.1)
-  ! no snow corrections (or low temperature) for Rinc 
+  ! no snow corrections (or low temperature) for Rinc
 
    if  ( canopy ) then ! vegetation inside growing season
       Rinc = 14 * L%SAI * L%hveg  / L%ustar    ! Erisman's b.LAI.h/u*
@@ -277,7 +281,7 @@ contains
    RnsS = do3se(iL)%RgsS
    if(  canopy .or. L%is_veg ) RnsS = Rns_SO2
 
-   GnsS = (1.-fsnow)/(RnsS * lowTcorr) + fsnow/RsnowS 
+   GnsS = (1.-fsnow)/(RnsS * lowTcorr) + fsnow/RsnowS
 !TMP DEC7 CHECK    GnsS = min( 0.1, GnsS ) ! OCT2017 FIX
    RgsS = 1./GnsS
 
@@ -319,7 +323,7 @@ contains
 
         if ( icmp == idcmpHNO3 ) then
             lowThno3= -L%t2C *2.0
-            Rsur(icmp)  = max(10.0,lowThno3) 
+            Rsur(icmp)  = max(10.0,lowThno3)
             Gns(icmp)   =  1/Rsur(icmp) ! OCT2017 if needed???!
             cycle GASLOOP
         end if
@@ -338,7 +342,7 @@ contains
         if ( icmp == idcmpNH3 ) then
 
           if  (canopy .or. L%is_veg ) then
-            Gns(icmp) = (1.-fsnow)/(Rns_NH3 * lowTcorr) + fsnow/RsnowS 
+            Gns(icmp) = (1.-fsnow)/(Rns_NH3 * lowTcorr) + fsnow/RsnowS
             Gsto(icmp) = L%LAI*DDspec(icmp)%DxDO3 *L%g_sto
           else !OLD
             Gns(icmp) = 1.0e-5*Hstar*GnsS + f0*GnsO
@@ -355,7 +359,7 @@ contains
 
           if ( NO_CROPNH3DEP  ) then
              if ( L%is_crop .and.  L%LAI > 0.1 ) then
-               if ( dbg .and. L%is_crop ) then 
+               if ( dbg .and. L%is_crop ) then
                 write(*,"(a,i4,L2,f8.2)")  "NO_CROPDEP:"// &
                   DDspec(icmp)%name,  iL, L%is_crop, L%LAI
                end if
@@ -366,25 +370,23 @@ contains
           cycle GASLOOP
         end if  ! NH3
 
-    
+
      !-------------------------------------------------------------------------
      ! ###   3. Calculate Cuticle conductance, Gext   ################
      ! ###      and  Ground surface conductance Ggs:
 
-     ! Corrected for other species using Wesely's eqn. 7 approach. 
+     ! Corrected for other species using Wesely's eqn. 7 approach.
      ! (We identify leaf surface resistance with Rext/SAI.)
      ! but for conductances, not resistances (pragmatic, I know!)
 
-       Gns(icmp) = 1.0e-5*Hstar*GnsS + f0 * GnsO 
+       Gns(icmp) = 1.0e-5*Hstar*GnsS + f0 * GnsO
 
 
      ! ##############   4. Calculate Rsur for canopies   ###############
 
-      if ( canopy  ) then   
+      if ( canopy  ) then
          Gsto(icmp) = L%LAI*DDspec(icmp)%DxDO3 *L%g_sto
       end if
-
-!WHY?  Rgs = 1.0/Gns(icmp)  ! Eqn. (9) !hf was  f0/do3se(iL)%RgsO
 
       Rsur(icmp) = 1.0/( Gsto(icmp) + Gns(icmp)  )
 

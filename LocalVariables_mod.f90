@@ -1,7 +1,7 @@
-! <LocalVariables_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <LocalVariables_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -48,7 +48,7 @@ integer, public, save :: iL = INOT_SET              ! Landuse index
 ! -----------------------------------------------------------------------
 ! 1) Grid data which should be okay for local
 ! -----------------------------------------------------------------------
-type, public :: GridDat
+ type, public :: GridDat
   real    :: latitude     ! deg N
   real    :: longitude    ! deg E
   integer :: i            ! index
@@ -77,7 +77,9 @@ type, public :: GridDat
   real    :: rho_s        !  Air density (kg/m3) at surface, here 2m
   real    :: vpd          ! Vapour pressure deficit  (kPa) ! CHECK UNITS
   real    :: SWP          ! SWP  ! CHECK UNITS
-  real    :: fSW          ! fSW  - function for soil-water, 0--1
+  real    :: fSW40        ! fSW  - function for soil-water, 0--1
+  real    :: fSW50        ! fSW  - function for soil-water, 0--1
+  real    :: fSW90        ! fSW  - function for soil-water, 0--1
   real    :: ustar        ! friction velocity, m/s
   real    :: wstar        ! convective velocity scale, m/s
   real    :: invL         ! 1/L, where L is Obukhiov length (1/m)
@@ -88,32 +90,34 @@ type, public :: GridDat
   real    :: u_ref        ! wind speed at ref. height
   real    :: Ra_2m        !
   real    :: Ra_3m        !
+  real    :: dTleafRn     !TESTING Tleaf for IAM_DF
+  real    :: dTleaf       !TESTING Tleaf - Tair 
+  real    :: Dair         !TESTING Tleaf
+  real    :: s            !TESTING Tleaf -  d(esat)/dT
+  real    :: GsH2O        !TESTING Tleaf -  stomatal conductance H2O
   real    :: so2nh3ratio  !  for CEH deposition scheme
   real    :: surf_o3_ppb  !  for  EU AOTs, 3m O3
   real    :: surf_o3_ppb1 !   .... after deploss
 ! CoDep
   real    :: so2nh3ratio24hr  !  for CEH SO2 deposition scheme
   real    ::              & ! some on this set might not be need
-     solar     = NOT_SET  & ! => irradiance (W/m^2)
-    ,Idirectn  = NOT_SET  &   ! => irradiance (W/m^2), normal to beam
-    ,Idiffuse  = NOT_SET  & ! => diffuse solar radiation (W/m^2)
-    ,Idirect   = NOT_SET  & ! => total direct solar radiation (W/m^2)
-    ,zen       = NOT_SET  & !   Zenith angle (degrees)
-    ,coszen    = NOT_SET    ! = cos(zen)(= sinB, where B is elevation angle)
+             solar     = NOT_SET  & ! => irradiance (W/m^2)
+            ,zen       = NOT_SET  & !   Zenith angle (degrees)
+            ,coszen    = NOT_SET    ! = cos(zen)(= sinB, where B is elevation angle)
   integer :: izen = INOT_SET  ! int(zen)
   real, dimension(NLOCDRYDEP_MAX) :: &  ! for species subject to dry depostion
      Vg_ref = 0.0   & ! Grid average of Vg at ref ht. (effective Vg for cell)
     ,StoFrac = 0.0  & ! Fraction of flux (Vg) going through stomata.
     ,Vg_3m    & ! and at 3m
     ,Gsur,Gsto, Gns
-end type GridDat
+ end type GridDat
 
 type(GridDat), public, save :: Grid
 
 ! -----------------------------------------------------------------------
 ! 2) Near-surface & Sub-grid Veg/landcover data
 ! -----------------------------------------------------------------------
-type, public :: SubDat
+ type, public :: SubDat
   integer ::              &
    iL  = INOT_SET         & ! Landcover index
   ,SGS = INOT_SET         & ! Start, growing seasons (day num)
@@ -140,6 +144,8 @@ type, public :: SubDat
     ,Ra_X      = NOT_SET  & !pw: temporary name
     ,Ra_2m     = NOT_SET  &
     ,Ra_3m     = NOT_SET  &
+    ,dTfromHd  = NOT_SET  & ! TESTING Tleaf - Tair using energy partition
+    ,dTfromRn  = NOT_SET  & ! TESTING Tleaf - Tair using energy partition
     ,RgsO      = NOT_SET  & ! ground-surface resistances - set in DO3SE
     ,RgsS      = NOT_SET  & ! ground-surface resistances - set in DO3SE
     ,coverage  = NOT_SET  & ! Area covered (fraction)
@@ -168,16 +174,20 @@ type, public :: SubDat
 ! and enable concentrations at canopy height:
     ,cano3_ppb  = 0.0     & ! Use 0.0 to make d_2d behave better
     ,cano3_nmole= 0.0     & ! Use 0.0 to make d_2d behave better
-    ,FstO3      = 0.0       ! leaf O3 flux, nmole/m2/s
+    ,FstO3      = 0.0     & ! leaf O3 flux, nmole/m2/s
+! Tleaf testing
+    ,dTleaf     = 0.0     & !TESTING Tleaf
+    ,Tleaf     = NOT_SET  & !TESTING Tleaf
+    ,GsH2O     = 0.0        !TESTING TLEAF  stomatal conductance H2O,
   real, dimension(NLOCDRYDEP_MAX) :: & ! for species subject to dry depostion
      Vg_ref   &  ! Grid average of Vg at ref ht. (effective Vg for cell)
     ,Vg_eff   &  ! Grid average of Vg effective at ref ht. (effective Vg for cell)
     ,Vg_3m    &  ! and at 3m
     ,StoFrac = 0.0  & ! Fraction of flux (Vg) going through stomata.
     ,Gsur, Gsto, Gns
-end type SubDat
+ end type SubDat
 
 ! MOVED TO Mosaic type(SubDat), public, dimension(0:NLANDUSEMAX), save :: Sub
-type(SubDat), public, save :: L         ! For just one land-class
-type(SubDat), public, save :: ResetSub  ! Keeps NOT_SET values
+ type(SubDat), public, save :: L         ! For just one land-class
+ type(SubDat), public, save :: ResetSub  ! Keeps NOT_SET values
 end module LocalVariables_mod

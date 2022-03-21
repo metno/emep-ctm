@@ -20,9 +20,11 @@ FOBJ ?=	\
 	EmisDef_mod.o EmisGet_mod.o Emissions_mod.o ExternalBICs_mod.o \
 	FastJ_mod.o ForestFire_mod.o Functions_mod.o \
         GasParticleCoeffs_mod.o \
+	GravSettling_mod.o \
 	Gravset_mod.o GridAllocate_mod.o GridValues_mod.o \
 	InterpolationRoutines_mod.o \
-	Io_mod.o Io_Nums_mod.o Io_Progs_mod.o KeyValueTypes.o  LandDefs_mod.o Landuse_mod.o \
+	Io_mod.o Io_Nums_mod.o Io_Progs_mod.o Io_RunLog_mod.o \
+	KeyValueTypes.o  LandDefs_mod.o Landuse_mod.o \
 	LandPFT_mod.o LocalVariables_mod.o LocalFractions_mod.o MARS_mod.o MARS_Aero_water_mod.o \
 	MassBudget_mod.o Met_mod.o MetFields_mod.o EQSAM_mod.o MicroMet_mod.o \
 	MosaicOutputs_mod.o MPI_Groups_mod.o AerosolCalls.o \
@@ -36,6 +38,7 @@ FOBJ ?=	\
 	SubMet_mod.o Tabulations_mod.o TimeDate_mod.o TimeDate_ExtraUtil_mod.o \
 	Timefactors_mod.o Timing_mod.o \
 	Trajectory_mod.o Units_mod.o \
+	VerticalDiffusion_mod.o \
         YieldModifications_mod.o \
 	ZchemData_mod.o \
 	global2local.o PhyChem_mod.o My_3DVar_mod.o Pollen_mod.o Pollen_const_mod.o

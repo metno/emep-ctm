@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,7 +52,7 @@
     use ChemGroups_mod !,     only: RO2_POOL, RO2_GROUP
     use ChemDims_mod               ! => NSPEC_TOT, O3, NO2, etc.
     use ChemSpecs_mod              ! => NSPEC_TOT, O3, NO2, etc.
-    use ChemFields_mod,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]
+    use ChemFields_mod,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]                             
                              ,cell_tinv & ! tmp location, for Yields
                              ,NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
     use Config_module,      only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv &
@@ -62,9 +62,14 @@
     use EmisDef_mod,        only: KEMISTOP
     use GridValues_mod,     only : GRIDWIDTH_M, i_fdom, j_fdom
     use Io_mod,             only : IO_LOG, datewrite
+    use LocalFractions_mod, only: lf_chemrates, lf_chemderiv, lf_Nvert, &
+                                  x_lf, xold_lf ,xnew_lf, lf_fullchem, &
+                                  NSPEC_fullchem_lf, NSPEC_fullchem_inc_lf, &
+                                  N_lf_derivemis
     use Par_mod,            only: me, LIMAX, LJMAX
     use PhysicalConstants_mod, only:  RGAS_J
     use Precision_mod, only:  dp
+    use TimeDate_mod,  only: print_date ! for debug
     use ZchemData_mod, only: rcemis,        & ! photolysis, emissions
                              rct, rcbio, rcphot,   &
                              xn_2d,         &
@@ -79,8 +84,6 @@
   private
   public  :: chemistry        ! Runs chemical solver
 
-  INCLUDE 'mpif.h'
-  
   integer, parameter:: nchemMAX=15
   integer, parameter:: NUM_INITCHEM=5    ! Number of initial time-steps with shorter dt
   real, save::         DT_INITCHEM=20.0  ! shorter dt for initial time-steps, reduced for
@@ -107,12 +110,13 @@ contains
 
     !  Local
     integer, dimension(KCHEMTOP:KMAX_MID) :: toiter
-    integer ::  k, ichem, iter,n    ! Loop indices
+    integer ::  k, ichem, iter,n, i_lf    ! Loop indices
     integer, save ::  nchem         ! No chem time-steps
-    real(kind=dp)    ::  dt2
+    real(kind=dp)    ::  dt2, accdt2, accdt
     real(kind=dp)    ::  P, L                ! Production, loss terms
     real(kind=dp)    :: xextrapol   !help variable
     character(len=15) :: runlabel
+    character(len=*), parameter :: dtxt='chem:'
 
     ! Concentrations : xold=old, x=current, xnew=predicted
     ! - dimensioned to have same size as "x"
@@ -120,17 +124,22 @@ contains
     real(kind=dp), dimension(nchemMAX), save :: &
                         dti             ! variable timestep*(c+1)/(c+2)
     real(kind=dp), dimension(nchemMAX), save :: &
+                        dtchem          ! for DSKz
+    real(kind=dp), dimension(nchemMAX), save :: &
                         coeff1,coeff2,cc ! coefficients for variable timestep
     ! Test of precision
-     real(kind=dp) :: pi = 4.0*atan(1.0_dp)
-
+    real(kind=dp) :: pi = 4.0*atan(1.0_dp)
+    real, dimension(NSPEC_fullchem_lf+N_lf_derivemis):: L_lf,P_lf
+   
+    real, parameter :: eps1 = 1.0001
+    
 !======================================================
 
 
     if ( first_call ) then
        allocate( Dchem(NSPEC_TOT,KCHEMTOP:KMAX_MID,LIMAX,LJMAX))
        Dchem=0.0
-       call makedt(dti,nchem,coeff1,coeff2,cc)
+       call makedt(dti,nchem,coeff1,coeff2,cc,dtchem)
        if ( MasterProc ) then
            write(IO_LOG,*) "PRECISION TEST ", pi
            write(IO_LOG,"(a,i4)") 'Chem dts: nchemMAX: ', nchemMAX
@@ -169,29 +178,54 @@ contains
     do k = 2, KMAX_MID
 
        DebugCell = debug_flag .and. k==KMAX_MID
+       if ( DebugCell .and. DEBUG%VERT_DIFF) write(*,'(a,es12.3)') 'DSKzChem', xn_2d(19,20)
 
        xnew(:) = xn_2d(:,k)
 
        x(:)    = xn_2d(:,k) - Dchem(:,k,i,j)*dti(1)*1.5
        x(:)    = max (x(:), 0.0)
 
+       if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
+          !make NSPEC_fullchem_lf copy of concentrations
+          do n = 1, NSPEC_fullchem_inc_lf
+             do i_lf = 1, NSPEC_fullchem_lf+N_lf_derivemis
+                xnew_lf(i_lf,n) = xn_2d(n,k)          
+                x_lf(i_lf,n)    = xn_2d(n,k) - Dchem(n,k,i,j)*dti(1)*1.5 
+                x_lf(i_lf,n)    = max (x_lf(i_lf,n), 0.0)
+             end do  
+          end do
+          !increase slightly one of the concentrations for chemical derivatives
+          do i_lf = 1, NSPEC_fullchem_lf
+             xnew_lf(i_lf,i_lf+NSPEC_SHL) = xn_2d(i_lf+NSPEC_SHL,k) * eps1! we assume xn_i are slightly increased for pollutant i
+             x_lf(i_lf,i_lf+NSPEC_SHL)    = xn_2d(i_lf+NSPEC_SHL,k)* eps1 - Dchem(i_lf+NSPEC_SHL,k,i,j)*dti(1)*1.5 
+             x_lf(i_lf,i_lf+NSPEC_SHL)    = max (x_lf(i_lf,i_lf+NSPEC_SHL), 0.0)
+          end do
+       end if
 
        !*************************************
        !     Start of integration loop      *
        !*************************************
        if ( first_call .or. YieldModificationsInUse ) then
           cell_tinv = tinv(k)
-          if( DebugCell ) write(*,*) 'YIELD INIT ', me, k, 1/cell_tinv 
+          if( DebugCell ) write(*,*) 'YIELD INIT ', me, k, 1/cell_tinv
           call doYieldModifications('init')
        end if
 
+       if( DebugCell ) then
+         accdt2 = 0.0
+         accdt  = 0.0
+         write(*,'(a,f8.1)') dtxt//'DSKz date:'//print_date(), dt_advec
+         write(*,*) 'YIELD INIT ', me, k, 1/cell_tinv
+       end if
 
        do ichem = 1, nchem
 
           do n=1,NSPEC_TOT
 
              if ( x(n) < 0.0  .or. xnew(n) < 0.0 ) then
-               print '(a,3i4,a10,3es12.3)', 'NCHEM', me,  n, ichem, species(n)%name, x(n), xnew(n), Dchem(n,k,i,j)
+               print '(a,3i4,a10,9es12.3)', dtxt//'NCHEM', me,  n, ichem,&
+                 species(n)%name, x(n), xnew(n), Dchem(n,k,i,j),  &
+                 minval(rcemis), maxval(rcemis)
                call StopAll('NCHEM')
              end if
 
@@ -200,10 +234,28 @@ contains
              xold(n) = max( xold(n), 0.0 )
              x(n) = xnew(n)
              xnew(n) = xextrapol
-
+             
+             if (lf_fullchem .and. k > KMAX_MID-lf_Nvert .and. n <= NSPEC_fullchem_inc_lf) then
+                do i_lf = 1, NSPEC_fullchem_lf+N_lf_derivemis
+                   xextrapol = xnew_lf(i_lf,n) + (xnew_lf(i_lf,n)-x_lf(i_lf,n)) *cc(ichem)
+                   xold_lf(i_lf,n) = coeff1(ichem)*xnew_lf(i_lf,n) - coeff2(ichem)*x_lf(i_lf,n)
+                   xold_lf(i_lf,n) = max( xold_lf(i_lf,n), 0.0 )
+                   x_lf(i_lf,n) = xnew_lf(i_lf,n)
+                   xnew_lf(i_lf,n) = xextrapol
+                   if(xnew_lf(i_lf,n) < CPINIT )then
+                      xnew_lf(i_lf,n) = CPINIT
+                   end if
+                end do
+             end if
           end do
 
           dt2  =  dti(ichem) !*(1.0+cc(ichem))/(1.0+2.0*cc(ichem))
+          if ( DEBUG%RUNCHEM .and. DebugCell )  then
+            accdt2 = accdt2 + dt2
+            accdt  = accdt  + dtchem(ichem)
+            write(*,'(a,4f9.2,2i4)')dtxt//'DSKz dts:', dt2,&
+               accdt2,dtchem(ichem),accdt, ichem, nchem
+          end if
 
           where ( xnew(:) < CPINIT  )
              xnew(:) = CPINIT
@@ -214,7 +266,7 @@ contains
           if ( DEBUG%DRYRUN ) then
             ! Skip fast chemistry
           else
-
+             
             do iter = 1, toiter(k)
 !
 ! The chemistry is iterated several times, more close to the ground than aloft.
@@ -227,29 +279,32 @@ contains
 ! "slowreactions", which is not iterated or fewer times. This needs some
 ! work to draw a proper line ......
 
-                !if(k>=KCHEMTOP)then
+               !if(k>=KCHEMTOP)then
 
-                   !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                   include 'CM_Reactions1.inc'
-                   !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-
+               !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+               include 'CM_Reactions1.inc'               
+               !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+               
             end do !! End iterations
-
-           !YIELDs  Allows change of gas/aerosol yield, which currently is only used
-           !     for SOA species to be handled in CM_Reactions2
-
+            
+            if(USES%LocalFractions .and. k > KMAX_MID-lf_Nvert) then
+               call lf_chemrates(k, ichem, dtchem(ichem),xnew)
+            end if
+ 
+            !YIELDs  Allows change of gas/aerosol yield, which currently is only used
+            !for SOA species to be handled in CM_Reactions2
+            
             if ( YieldModificationsInUse ) then
-                !OLD if( DebugCell ) write(*,*) 'YIELD RUN  ', me, k, &
-                !OLD   1/cell_tinv, iter, toiter(k)
-                !OLD: if( iter == toiter(k) ) & ! runlabel='lastFastChem'
-                call doYieldModifications('run')
-           end if
-
-          !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-           include 'CM_Reactions2.inc'
-          !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-          end if ! DEBUG%DRYRUN
+               !OLD if( DebugCell ) write(*,*) 'YIELD RUN  ', me, k, &
+               !OLD   1/cell_tinv, iter, toiter(k)
+               !OLD: if( iter == toiter(k) ) & ! runlabel='lastFastChem'
+               call doYieldModifications('run')
+            end if
+            
+            !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            include 'CM_Reactions2.inc'
+            !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+         end if ! DEBUG%DRYRUN
 
        end do ! ichem
 
@@ -257,13 +312,15 @@ contains
        !     End of integration loop        *
        !*************************************
 
-
+       if(lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
+          call lf_chemderiv(i,j,k, xn_2d(1,k), xnew, eps1)
+       end if
+       
        !**  Saves tendencies Dchem and returns the new concentrations:
 
-            Dchem(:,k,i,j) = (xnew(:) - xn_2d(:,k))*dt_advec_inv
-            xn_2d(:,k) = xnew(:)
-
-
+       Dchem(:,k,i,j) = (xnew(:) - xn_2d(:,k))*dt_advec_inv
+       xn_2d(:,k) = xnew(:)
+ 
     end do ! End of vertical k-loop
 
    first_call = .false.
@@ -273,7 +330,7 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
+subroutine  makedt(dti,nchem,coeff1,coeff2,cc,dt)
 
 !=====================================================================
 ! Makes coefficients for two-step (written by Peter Wind, Febr. 2003)
@@ -287,10 +344,11 @@ subroutine  makedt(dti,nchem,coeff1,coeff2,cc)
 
  implicit none
 
- real, dimension(nchemMAX),intent(out) :: dti,coeff1,coeff2,cc
+ !DSKz real, dimension(nchemMAX),intent(out) :: dti,coeff1,coeff2,cc
+ real, dimension(nchemMAX),intent(out) :: dti,coeff1,coeff2,cc, dt
  integer,                  intent(out) :: nchem
 
- real    :: ttot, dt(nchemMAX)
+ real    :: ttot !DSKz, dt(nchemMAX)
  real :: dt_init   ! time (seconds) with initially short time-steps
  integer :: i
 !_________________________

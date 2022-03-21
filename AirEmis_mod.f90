@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -61,6 +61,7 @@ module AirEmis_mod
  
    integer,private ,parameter :: ILEV=18
    logical, parameter :: MY_DEBUG = .false.
+   real, public :: TotAircraftEmis, TotLightningEmis !totals/month in kg NO2
 
  contains
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

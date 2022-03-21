@@ -1,7 +1,7 @@
-! <PhysicalConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <PhysicalConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,7 +46,8 @@ real, public, parameter  ::    &
   ,  CP      = 1004.0          &   ! Specific heat at const. pressure
   ,  KAPPA   = RGAS_KG/CP      &   
   ,  KARMAN  = 0.41            &   ! Von Karman  (=0.35 elsehwere in code!)
-  ,  PI      = 3.141592653589793238462643383279 & ! www.verbose.net/Pi.html
+!  ,  PI      = 3.141592653589793238462643383279 & ! www.verbose.net/Pi.html
+  ,  PI      = 4 * atan(1.0)   &   ! Uses machine precision
   ,  DEG2RAD = PI/180.0        &   ! COnverts degrees to radians
   ,  RAD2DEG = 180.0/PI        &   ! COnverts radians to degrees
   ,  ROWATER = 1000.0          &   ! pw density of water kg m-3
@@ -69,17 +70,19 @@ real, public, parameter  ::  &
 
 ! CHARNOCK is used to calculate the roughness length for the 
 ! landuse category water
+! CHARNOCK = 0.032   ! Charnock's alpha:
+! see Nordeng (1986), p.31, Nordeng(1991), JGR, 96, no. C4, pp. 7167-7174.
+! In the second of these publications, Nordeng uses "m" to denote Charnock's
+! alpha whilst in the first he specifies the value 0.032.
+real, public, parameter  :: CHARNOCK = 0.0144  ! Garratt for k=0.41
 
+! Other micro-met params. Lambda and gamma are approx, but should be
+! okay over temperature range they are used for.
 real, public, parameter  :: &
-     PRANDTL = 0.71,            &   ! Prandtl number (see Garratt, 1992)
-     Sc_H20  = 0.6,             &   ! Schmidt number for water
-  CHARNOCK = 0.0144  !  From Garratt for k=0.41
-  !CHARNOCK = 0.032   ! Charnock's alpha:
-                     ! see Nordeng (1986), p.31, 
-                     ! Nordeng(1991), JGR, 96, no. C4, pp. 7167-7174.
-                     ! In the second of these publications, Nordeng uses
-                     ! "m" to denote Charnock's alpha whilst in the first
-                     ! he specifies the value 0.032.
+  PRANDTL = 0.71      & ! Prandtl number (see Garratt, 1992)
+ ,Sc_H20  = 0.6       & ! Schmidt number for water
+ ,LAMBDA_W = 2.454e6  & ! J/kg Latent heat evap water, 20degC, Jones 1992,App3
+ ,GAMMA_Psychr = 66.1   ! Pa/K Psychrometer const. at 20 degC, Jones 1992,App3
 
 ! Standard temperature :
 real, public, parameter :: T0 = 273.15   ! zero degrees Celsius in Kelvin 

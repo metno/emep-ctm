@@ -1,7 +1,7 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,10 +39,11 @@ module AerosolCalls
  use Ammonium_mod,          only: Ammonium
  use CheckStop_mod,         only: StopAll, CheckStop
  use ChemDims_mod,          only: NSPEC_SHL
- use ChemSpecs_mod
+ use ChemSpecs_mod,         only: species
  use Chemfields_mod,        only: PM25_water, PM25_water_rh50, & !H2O_eqsam, & !PMwater 
                                    cfac
- use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc, USES
+ use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc, USES,&
+                                  SO4_ix, HNO3_ix, NO3_f_ix, NH3_ix, NH4_f_ix
  use Debug_module,          only: DEBUG   ! -> DEBUG%EQUIB
  use EQSAM4clim_ml,        only :  EQSAM4clim
 ! use EQSAM_v03d_mod,        only: eqsam_v03d
@@ -101,7 +102,7 @@ contains
         !call emep2Isorropia(debug_flag)
       case default
         if( my_first_call .and. MasterProc ) then
-          write(*,*) 'WARNING: AerosolEquilib: nothing chosen:'
+          write(*,*) 'WARNING! AerosolEquilib, nothing valid chosen: '//AERO%EQUILIB
         end if
     end select
     my_first_call = .false.
@@ -190,6 +191,11 @@ contains
              coef
   integer :: k, errmark
  !-----------------------------------
+  call CheckStop( SO4_ix<1, "emep2MARS:SO4 not defined" )
+  call CheckStop( NH4_f_ix<1, "emep2MARS:NH4_f not defined" )
+  call CheckStop( HNO3_ix<1, "emep2MARS:HNO3 not defined" )
+  call CheckStop( NO3_f_ix<1, "emep2MARS:NO3_f not defined" )
+  call CheckStop( NH3_ix<1, "emep2MARS: NH3 not defined" )
 
    coef = 1.e12 / AVOG
 
@@ -198,11 +204,11 @@ contains
 
 !//.... molec/cm3 -> ug/m3
 ! Use FLOOR2 = 1.0e-8 molec/cm3 for input. Too many problems
-      so4in  = max(FLOOR2, xn_2d(SO4,k)) * species(SO4)%molwt  *coef
-      hno3in = max(FLOOR2, xn_2d(HNO3,k))* species(HNO3)%molwt *coef 
-      nh3in  = max(FLOOR2, xn_2d(NH3,k)) * species(NH3)%molwt  *coef
-      no3in  = max(FLOOR2, xn_2d(NO3_f,k)) * species(NO3_f)%molwt  *coef
-      nh4in  = max(FLOOR2, xn_2d(NH4_f,k)) * species(NH4_f)%molwt  *coef
+      so4in  = max(FLOOR2, xn_2d(SO4_ix,k)) * species(SO4_ix)%molwt  *coef
+      hno3in = max(FLOOR2, xn_2d(HNO3_ix,k))* species(HNO3_ix)%molwt *coef 
+      nh3in  = max(FLOOR2, xn_2d(NH3_ix,k)) * species(NH3_ix)%molwt  *coef
+      no3in  = max(FLOOR2, xn_2d(NO3_f_ix,k)) * species(NO3_f_ix)%molwt  *coef
+      nh4in  = max(FLOOR2, xn_2d(NH4_f_ix,k)) * species(NH4_f_ix)%molwt  *coef
 
  !--------------------------------------------------------------------------                
       if(AERO%EQUILIB=='MARS')then 
@@ -228,10 +234,10 @@ contains
         call CheckStop(aNH4out< 0.0, "XMARS: aNH4out")
       end if ! DEBUG%EQUIB
 
-      xn_2d(HNO3,k)  = max (FLOOR, gNO3out / (species(HNO3)%molwt *coef) )
-      xn_2d(NH3,k)   = max (FLOOR, gNH3out / (species(NH3)%molwt  *coef) )
-      xn_2d(NO3_f,k)  = max (FLOOR, aNO3out / (species(NO3_f)%molwt  *coef) )
-      xn_2d(NH4_f,k)  = max (FLOOR, aNH4out / (species(NH4_f)%molwt  *coef) )
+      xn_2d(HNO3_ix,k)  = max (FLOOR, gNO3out / (species(HNO3_ix)%molwt *coef) )
+      xn_2d(NH3_ix,k)   = max (FLOOR, gNH3out / (species(NH3_ix)%molwt  *coef) )
+      xn_2d(NO3_f_ix,k)  = max (FLOOR, aNO3out / (species(NO3_f_ix)%molwt  *coef) )
+      xn_2d(NH4_f_ix,k)  = max (FLOOR, aNH4out / (species(NH4_f_ix)%molwt  *coef) )
 
    end do  ! K-levels
 
@@ -286,16 +292,16 @@ contains
 
 
   if ( debug_flag  ) then ! Selected debug cell
-    write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
-               xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
+    write(*,*)'Before EQSAM',xn_2d(SO4_ix,20),xn_2d(HNO3_ix,20),&
+               xn_2d(NH3_ix,20),xn_2d(NO3_f_ix,20),xn_2d(NH4_f_ix,20)
   end if
 
 !//.... molec/cm3 -> micromoles/m**3
-    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
-    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3,KCHEMTOP:KMAX_MID) *1.e12/AVOG
-    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
-    no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
-    nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
+    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
+    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3_ix,KCHEMTOP:KMAX_MID) *1.e12/AVOG
+    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
+    no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
+    nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG
 !    aH2Oin(KCHEMTOP:KMAX_MID) = H2O_eqsam(i,j,KCHEMTOP:KMAX_MID)
     if ( iSeaSalt > 0 ) then
       NAin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
@@ -317,16 +323,16 @@ contains
 !//.... micromoles/m**3  -> molec/cm3 
 !      xn_2d(NO3,KCHEMTOP:KMAX_MID)  = FLOOR !different for ACID/OZONE
 
-      xn_2d(HNO3,KCHEMTOP:KMAX_MID)  = max(FLOOR,gNO3out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
-      xn_2d(NH3,KCHEMTOP:KMAX_MID)   = max(FLOOR,gNH3out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
-      xn_2d(NO3_f,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNO3out(KCHEMTOP:KMAX_MID)*AVOG*1.e-12 ) 
-      xn_2d(NH4_f,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNH4out(KCHEMTOP:KMAX_MID)*AVOG*1.e-12 )
-      xn_2d(SO4,KCHEMTOP:KMAX_MID)   = max(FLOOR,aSO4out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
+      xn_2d(HNO3_ix,KCHEMTOP:KMAX_MID)  = max(FLOOR,gNO3out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
+      xn_2d(NH3_ix,KCHEMTOP:KMAX_MID)   = max(FLOOR,gNH3out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
+      xn_2d(NO3_f_ix,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNO3out(KCHEMTOP:KMAX_MID)*AVOG*1.e-12 ) 
+      xn_2d(NH4_f_ix,KCHEMTOP:KMAX_MID)  = max(FLOOR,aNH4out(KCHEMTOP:KMAX_MID)*AVOG*1.e-12 )
+      xn_2d(SO4_ix,KCHEMTOP:KMAX_MID)   = max(FLOOR,aSO4out(KCHEMTOP:KMAX_MID) *AVOG*1.e-12 )
 !      H2O_eqsam(i,j,KCHEMTOP:KMAX_MID) = max(0., aH2Oout(KCHEMTOP:KMAX_MID) )
 
  if ( debug_flag ) then ! Selected debug cell
-    write(*,*)'After EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
-               xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
+    write(*,*)'After EQSAM',xn_2d(SO4_ix,20),xn_2d(HNO3_ix,20),&
+               xn_2d(NH3_ix,20),xn_2d(NO3_f_ix,20),xn_2d(NH4_f_ix,20)
   end if
 
  end subroutine emep2EQSAM
@@ -388,17 +394,17 @@ contains
 
 
   if ( debug_flag ) then ! Selected debug cell
-    write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
-               xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
+    write(*,*)'Before EQSAM',xn_2d(SO4_ix,20),xn_2d(HNO3_ix,20),&
+               xn_2d(NH3_ix,20),xn_2d(NO3_f_ix,20),xn_2d(NH4_f_ix,20)
   end if
 
 
 !//.... molec/cm3 -> micromoles/m**3
-      so4in(KMAX_MID:KMAX_MID)  = xn_2d(SO4,KMAX_MID:KMAX_MID)*1.e12/AVOG
-      hno3in(KMAX_MID:KMAX_MID) = xn_2d(HNO3,KMAX_MID:KMAX_MID)*1.e12/AVOG
-      nh3in(KMAX_MID:KMAX_MID)  = xn_2d(NH3,KMAX_MID:KMAX_MID)*1.e12/AVOG 
-      no3in(KMAX_MID:KMAX_MID)  = xn_2d(NO3_f,KMAX_MID:KMAX_MID)*1.e12/AVOG
-      nh4in(KMAX_MID:KMAX_MID)  = xn_2d(NH4_f,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      so4in(KMAX_MID:KMAX_MID)  = xn_2d(SO4_ix,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      hno3in(KMAX_MID:KMAX_MID) = xn_2d(HNO3_ix,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      nh3in(KMAX_MID:KMAX_MID)  = xn_2d(NH3_ix,KMAX_MID:KMAX_MID)*1.e12/AVOG 
+      no3in(KMAX_MID:KMAX_MID)  = xn_2d(NO3_f_ix,KMAX_MID:KMAX_MID)*1.e12/AVOG
+      nh4in(KMAX_MID:KMAX_MID)  = xn_2d(NH4_f_ix,KMAX_MID:KMAX_MID)*1.e12/AVOG
       NAin(KMAX_MID:KMAX_MID)   = xn_2d(iSeaSalt,KMAX_MID:KMAX_MID)*0.306e12/AVOG
       CLin(KMAX_MID:KMAX_MID)   = xn_2d(iSeaSalt,KMAX_MID:KMAX_MID)*0.55e12/AVOG
 
@@ -466,16 +472,16 @@ contains
 
 
   if ( debug_flag  ) then ! Selected debug cell
-    write(*,*)'Before EQSAM',xn_2d(SO4,20),xn_2d(HNO3,20),&
-               xn_2d(NH3,20),xn_2d(NO3_f,20),xn_2d(NH4_f,20)
+    write(*,*)'Before EQSAM',xn_2d(SO4_ix,20),xn_2d(HNO3_ix,20),&
+               xn_2d(NH3_ix,20),xn_2d(NO3_f_ix,20),xn_2d(NH4_f_ix,20)
   end if
 
 !//.... molec/cm3 -> micromoles/m**3
-    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
-    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3,KCHEMTOP:KMAX_MID) *1.e12/AVOG
-    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
-    no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
-    nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f,KCHEMTOP:KMAX_MID)*1.e12/AVOG
+    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
+    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3_ix,KCHEMTOP:KMAX_MID) *1.e12/AVOG
+    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
+    no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
+    nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG
     NAin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.306e12/AVOG
     CLin(KCHEMTOP:KMAX_MID)   = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*0.55e12/AVOG
 
@@ -519,7 +525,11 @@ contains
              coef
   integer :: k, errmark
  !-----------------------------------
-
+  if(AERO%EQUILIB/='MARS' .and. AERO%EQUILIB/='MARS_2900' .and. AERO%EQUILIB/='GEOSCHEM')then
+     PM25_water(i,j,:) = 0.0
+     return
+  endif
+ 
    coef = 1.e12 / AVOG
 
  !.. PM2.5 water at ambient conditions (3D)
@@ -529,11 +539,11 @@ contains
     do k = KCHEMTOP, KMAX_MID
   
 !//.... molec/cm3 -> ug/m3
-      so4in  = xn_2d(SO4,k) * species(SO4)%molwt  *coef
-      hno3in = xn_2d(HNO3,k)* species(HNO3)%molwt *coef 
-      nh3in  = xn_2d(NH3,k) * species(NH3)%molwt  *coef
-      no3in  = xn_2d(NO3_f,k) * species(NO3_f)%molwt  *coef
-      nh4in  = xn_2d(NH4_f,k) * species(NH4_f)%molwt  *coef
+      so4in  = xn_2d(SO4_ix,k) * species(SO4_ix)%molwt  *coef
+      hno3in = xn_2d(HNO3_ix,k)* species(HNO3_ix)%molwt *coef 
+      nh3in  = xn_2d(NH3_ix,k) * species(NH3_ix)%molwt  *coef
+      no3in  = xn_2d(NO3_f_ix,k) * species(NO3_f_ix)%molwt  *coef
+      nh4in  = xn_2d(NH4_f_ix,k) * species(NH4_f_ix)%molwt  *coef
 
 
  !--------------------------------------------------------------------------                
@@ -563,11 +573,11 @@ contains
     tmpr(:)  = 293.15
     k = KMAX_MID
 !//.... molec/cm3 -> ug/m3
-      so4in  = xn_2d(SO4,k) * species(SO4)%molwt  *coef *cfac(SO4-NSPEC_SHL,i,j) 
-      hno3in = xn_2d(HNO3,k)* species(HNO3)%molwt *coef *cfac(HNO3-NSPEC_SHL,i,j)
-      nh3in  = xn_2d(NH3,k) * species(NH3)%molwt  *coef *cfac(NH3-NSPEC_SHL,i,j)
-      no3in  = xn_2d(NO3_f,k) * species(NO3_f)%molwt *coef *cfac(NO3_f-NSPEC_SHL,i,j)
-      nh4in  = xn_2d(NH4_f,k) * species(NH4_f)%molwt *coef *cfac(NH4_f-NSPEC_SHL,i,j)
+      so4in  = xn_2d(SO4_ix,k) * species(SO4_ix)%molwt  *coef *cfac(SO4_ix-NSPEC_SHL,i,j) 
+      hno3in = xn_2d(HNO3_ix,k)* species(HNO3_ix)%molwt *coef *cfac(HNO3_ix-NSPEC_SHL,i,j)
+      nh3in  = xn_2d(NH3_ix,k) * species(NH3_ix)%molwt  *coef *cfac(NH3_ix-NSPEC_SHL,i,j)
+      no3in  = xn_2d(NO3_f_ix,k) * species(NO3_f_ix)%molwt *coef *cfac(NO3_f_ix-NSPEC_SHL,i,j)
+      nh4in  = xn_2d(NH4_f_ix,k) * species(NH4_f_ix)%molwt *coef *cfac(NH4_f_ix-NSPEC_SHL,i,j)
 !--------------------------------------------------------------------------                
      if(AERO%EQUILIB=='MARS')then 
          call rpmares (so4in, hno3in,no3in ,nh3in, nh4in , rlhum(k), tmpr(k),   &

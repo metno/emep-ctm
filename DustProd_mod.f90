@@ -1,7 +1,7 @@
-! <DustProd_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <DustProd_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -55,7 +55,8 @@
  use ChemSpecs_mod,      only: species
  use GridValues_mod,     only: glat, glon, i_fdom, j_fdom 
  use GridValues_mod,     only: debug_proc, debug_li, debug_lj
- use Io_mod,             only: PrintLog, datewrite
+ use Io_mod,             only: datewrite
+ use Io_RunLog_mod,      only: PrintLog
  use Landuse_mod,        only: LandCover, NLUMAX 
  use Landuse_mod,        only: water_fraction
  use LandDefs_mod,       only:  LandType

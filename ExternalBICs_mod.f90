@@ -1,7 +1,7 @@
-! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,8 @@ use ChemSpecs_mod,          only: species_adv
 use Config_module,          only: MasterProc, BC_DAYS,&
      USE_EXTERNAL_BIC,EXTERNAL_BIC_NAME,EXTERNAL_BIC_VERSION,TOP_BC,filename_eta
 use Debug_module,           only: DEBUG=>DEBUG_NEST_ICBC
-use Io_mod,                 only: PrintLog,IO_NML
+use Io_mod,                 only: IO_NML
+use Io_RunLog_mod,          only: PrintLog
 use OwnDataTypes_mod,       only: TXTLEN_SHORT
 use SmallUtils_mod,         only: find_index
 use TimeDate_mod,           only: date
@@ -52,8 +53,6 @@ end interface set_extbic
 
 integer,save, public :: &
   iw=-1, ie=-1, js=-1, jn=-1, kt=-1 ! i West/East bnd; j North/South bnd; k Top
-!  BC_DAYS=0   ! #days in one BC file, for use old BCs in a FORECAST
-              ! 0 means "do not look for old files"
 
 character(len=*),public, parameter :: &
   ICBC_FMT="(A24,'=',A24,'*',F7.2,2L2,'=',I4)"
@@ -139,15 +138,14 @@ subroutine set_extbic_id(idate)
     BC_DAYS=1   ! if BC file is not found, look for 1-day old file
   case("EVA_EU_AN","EVA_EU_FC")
     BC_DAYS=1   ! explicit MACC_EVA BC mapping version
-  case default
-    EXTERNAL_BIC_VERSION='use_any'
-    BC_DAYS=0   ! do not look for old BC files
   end select
 
 !--- Look for a ExternalBICs_bc with the correct %name and %version
   rewind(IO_NML)
   READ_NML: do
     read(IO_NML,NML=ExternalBICs_bc,iostat=ios)
+    if(DEBUG.and.MasterProc.and.ios/=0) &
+      write(*,*) "failed ExternalBICs_bc read with iostat=",ios
     if(ios/=0) exit READ_NML
     if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic","read_nml bc",&
       trim(description%name)//"/"//trim(description%version)
@@ -160,11 +158,10 @@ subroutine set_extbic_id(idate)
       exit READ_NML
     end if
   end do READ_NML
-  if(.not.EXTERNAL_BIC_SET)then
-    call PrintLog("No external BICs found",MasterProc)
-    USE_EXTERNAL_BIC=.false.
-    return
-  end if
+
+  if(.not.EXTERNAL_BIC_SET) &
+    call CheckStop(MasterProc,"No external BICs found")
+  
   if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic", &
     date2string("BCs for YYYY-MM-DD hh type",idate),&
     trim(EXTERNAL_BIC_NAME)//"/"//trim(EXTERNAL_BIC_VERSION)

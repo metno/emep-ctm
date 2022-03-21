@@ -1,7 +1,7 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -73,9 +73,10 @@ program emep_Main
   use DryDep_mod,        only: init_DryDep ! sets up dry and wet dep
   !use GasParticleCoeffs_mod, only: init_DryDep ! sets up dry and wet dep
   use GridValues_mod,    only: MIN_ADVGRIDS, GRIDWIDTH_M, Poles,&
-                              DefDebugProc, GridRead, set_EuropeanAndGlobal_Config
+                              DefDebugProc, GridRead !REM, set_EuropeanAndGlobal_Config
   use Io_mod,            only: IO_MYTIM,IO_RES,IO_LOG,IO_NML,IO_DO3SE
-  use Io_Progs_mod,      only: read_line, PrintLog
+  use Io_Progs_mod,      only: read_line
+  use Io_RunLog_mod,     only: PrintLog
   use Landuse_mod,       only: InitLandUse, SetLanduse
   use MassBudget_mod,    only: Init_massbudget, massbudget
   use Met_mod,           only: metfieldint, MetModel_LandUse, Meteoread
@@ -183,7 +184,8 @@ program emep_Main
   call DefDebugProc()               ! Sets debug_proc, debug_li, debuglj
   call assign_dtadvec(GRIDWIDTH_M)  ! set dt_advec
 
-  call set_EuropeanAndGlobal_Config() !Set config values that depend on domain coverage
+ !May 2021: Dave moved all into initial Config system
+ !REM  call set_EuropeanAndGlobal_Config() !Set config values that depend on domain coverage
 
   ! daynumber needed  for BCs, so call here to get initial
   daynumber=day_of_year(yyyy,mm,dd)
@@ -217,8 +219,8 @@ program emep_Main
   if (MasterProc.and.DEBUG%MAINCODE) print *,"Calling emissions with year",yyyy
 
   call Init_masks()
-  call Emissions(yyyy)! should be set for the enddate year, not start?
   call Init_emissions !new format
+  call Emissions(yyyy)! should be set for the enddate year, not start?
 
   call Add_2timing(3,tim_after,tim_before,"Yearly emissions read in")
 

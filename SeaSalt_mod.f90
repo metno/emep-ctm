@@ -1,7 +1,7 @@
-! <SeaSalt_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <SeaSalt_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,14 +39,15 @@
 ! Programmed by Svetlana Tsyro
 !-----------------------------------------------------------------------------
 
- use AeroFunctions_mod,     only: WetRad, cmWetRad, GbSeaSalt
+ !use AeroFunctions_mod,     only: WetRad, cmWetRad, GbSeaSalt, GerberWetRad
+ use AeroFunctions_mod,     only: GbSeaSalt, GerberWetRad
  use Biogenics_mod,         only: EMIS_BioNat, EmisNat  
  use CheckStop_mod,         only: StopAll
  use ChemSpecs_mod,         only: species
  use Config_module,         only: KMAX_MID, KMAX_BND, USES, MasterProc
  use Debug_module,          only: DEBUG  ! -> DEBUG%SEASALT
  use GridValues_mod,        only: glat, glon, i_fdom, j_fdom 
- use Io_Progs_mod,          only: PrintLog
+ use Io_RunLog_mod,         only: PrintLog
  use Landuse_mod,           only: LandCover, water_fraction
  use LocalVariables_mod,    only: Grid
  use MetFields_mod,         only: u_ref, z_bnd, z_mid, sst,  &
@@ -110,6 +111,8 @@
    real, save  ::   moleccm3s_2_kgm2h 
    real    :: ss_flux(SS_MAAR+SS_MONA), d3(SS_MAAR+SS_MONA) 
    real    :: rcss(NSS)
+  ! rv4.40 Fracs of 7th mode in fine vs coarse
+   real, save :: frac_f, frac_c
 !//---------------------------------------------------
  
   if ( my_first_call ) then 
@@ -138,6 +141,10 @@
         call init_seasalt()
     end if
     
+    ! rv4.40 Fracs of 7th mode in fine vs coarse
+    frac_f = USES%SEASALT_fFrac
+    frac_c = 1.0 - USES%SEASALT_fFrac
+
     ! For EmisNat, need kg/m2/h from molec/cm3/s
     moleccm3s_2_kgm2h =   Grid%DeltaZ * 1.0e6 * 3600.0  &! /cm3/s > /m2/hr
                           /AVOG * 1.0e-6  ! kg  after *MW
@@ -238,10 +245,10 @@
 
 ! ====    Calculate sea salt fluxes in size bins  [part/m2/s] ========
          total_flux = 0.0
-!... Fluxes of small aerosols for each size bin (M�rtensson etal,2004)
+!... Fluxes of small aerosols for each size bin (Maartensson etal,2004)
           do ii = 1, SS_MAAR
 
-               flux_help  = a(ii) * Tw + b(ii)
+               flux_help  = a(ii) * Tw + b(ii)     ! Eq(6)
   
                ss_flux(ii) = flux_help * ( log_dbin(ii+1) - log_dbin(ii) )    &
                                        * whitecap   ! * u10_341 * 3.84e-6 
@@ -295,9 +302,18 @@
             if(DEBUG%SEASALT .and. debug_flag) &
             write(6,'(a20,i5,2es13.4)') 'SSALT Flux fine ->  ',ii,d3(ii), rcss( iSSFI ) !ESX SS_prod(QSSFI,i,j)
           end do
+!.. Split 8-th section between fine and coarse
+               rcss( iSSFI) = rcss( iSSFI)  &
+                                  !DS+ 0.3* ss_flux(NFIN+1) * d3(NFIN+1) * n2m   &
+                                  + frac_f * ss_flux(NFIN+1) * d3(NFIN+1) * n2m   &
+                                  * water_fraction(i,j)
+               rcss( iSSCO ) = rcss( iSSCO )  &
+                                  !DS + 0.7* ss_flux(NFIN+1) * d3(NFIN+1) * n2m   &
+                                  + frac_c * ss_flux(NFIN+1) * d3(NFIN+1) * n2m   &
+                                  * water_fraction(i,j)
 
 !..Coarse particles emission [molec/cm3/s]
-          do ii = NFIN+1, NFIN+NCOA
+          do ii = NFIN+2, NFIN+NCOA
                rcss( iSSCO ) = rcss( iSSCO )  &
                  !!ESX SS_prod(QSSCO,i,j) = SS_prod(QSSCO,i,j)   &
                                   + ss_flux(ii) * d3(ii) * n2m   &
@@ -338,25 +354,25 @@
   ! Assignments and calculations of some help-parameters
   !------------------------------------------------------------
 
-  implicit none
-
   integer :: i
   real    :: a1, a2
   real, dimension(SS_MONA) :: Rrange, rdry
 
 !//===== Polynomial coeficients from Maartinsson et al. (2004)
   real, parameter, dimension(5) ::    &
-        C1 = (/-2.576e35,  5.932e28, -2.867e21, -3.003e13, -2.881e6 /),  &
-        C2 = (/-2.452e33,  2.404e27, -8.148e20,  1.183e14, -6.743e6 /),  &
-        C3 = (/ 1.085e29, -9.841e23,  3.132e18, -4.165e12,  2.181e6 /),  &
+       !            c4        c3        c2         c1          c0
+        C1 = (/-2.576e35,  5.932e28, -2.867e21, -3.003e13, -2.881e6 /),  & !0.02-0.145um
+        C2 = (/-2.452e33,  2.404e27, -8.148e20,  1.183e14, -6.743e6 /),  & !0.145-0.419um
+        C3 = (/ 1.085e29, -9.841e23,  3.132e18, -4.165e12,  2.181e6 /),  & !0.419-2.8
 
-        D1 = (/ 7.188e37, -1.616e31,  6.791e23,  1.829e16,  7.609e8 /),  &
-        D2 = (/ 7.368e35, -7.310e29,  2.528e23, -3.787e16,  2.279e9 /),  &
-        D3 = (/-2.859e31,  2.601e26, -8.297e20,  1.105e15, -5.800e8 /)
+       !            d4        d3        d2         d1          d0
+        D1 = (/ 7.188e37, -1.616e31,  6.791e23,  1.829e16,  7.609e8 /),  & !0.02-0.145um
+        D2 = (/ 7.368e35, -7.310e29,  2.528e23, -3.787e16,  2.279e9 /),  & !0.145-0.419um
+        D3 = (/-2.859e31,  2.601e26, -8.297e20,  1.105e15, -5.800e8 /)     !0.419-2.8
 
 !=== mikrometer in powers
   real, parameter :: MKM  = 1.e-6,  MKM2 = 1.e-12 ,  &  
-                     MKM3 = 1.e-18, MKM4 = 1.e-24 
+                     MKM3 = 1.e-18, MKM4 = 1.e-24 , invMKM = 1.0e6
  
 !//.. Size bins for Maartinsson's parameterisation (dry diameters):
   real, parameter, dimension(SS_MAAR)::    &
@@ -402,8 +418,12 @@
             + D3(3)*dp2(6:7)*MKM2   + D3(4)*DP(6:7)   *MKM + D3(5)
 
 !//====== For  Monahan et al. (1986) parameterisation  =====
+! nb ... as a rule of thumb, r0 is approximately twice r80"
+! Andreas, E. L.: A new sea spray generation function for wind
+!speeds up to 32 m s −1 , J. Phys. Oceanogr., 28, 2175–2184, 1998.
 
-     rdry(1) = 0.8    ! Diameter at 80% ca. 3.1
+
+     rdry(1) = 0.8    ! Diameter at 80% ca. 3.2
      rdry(2) = 1.5    !                     6.3
      rdry(3) = 2.5    !                     10.6
  !.. can be extended 
@@ -421,23 +441,20 @@
         !Gb          log10(0.8))+RLIM(i)**3) ** third
 
         !ds now use Gerber functions
-!STbug        radSS(i) = umWetRad(rdry(i), 0.8, GbSeaSalt)
-!STbug        lim1     = umWetRad(rlim(i+1), 0.8, GbSeaSalt)
-!STbug        lim2     = umWetRad(rlim(i), 0.8, GbSeaSalt)
-        radSS(i) = cmWetRad(rdry(i), 0.8, GbSeaSalt)
-        lim1     = cmWetRad(rlim(i+1), 0.8, GbSeaSalt)
-        lim2     = cmWetRad(rlim(i), 0.8, GbSeaSalt)
+        !radSS(i) = cmWetRad(rdry(i), 0.8, GbSeaSalt)
+        !lim1     = cmWetRad(rlim(i+1), 0.8, GbSeaSalt)
+        !lim2     = cmWetRad(rlim(i), 0.8, GbSeaSalt)
+        radSS(i) = GerberWetRad(rdry(i)*MKM, 0.8, GbSeaSalt) * invMKM
+        lim1     = GerberWetRad(rlim(i+1)*MKM, 0.8, GbSeaSalt) * invMKM
+        lim2     = GerberWetRad(rlim(i)*MKM, 0.8, GbSeaSalt) * invMKM
         Rrange(i) = lim1 - lim2       ! bin size intervals 
 
        if( DEBUG%SEASALT ) then
-         ! WetRad takes radius in m
-        write(*,"(a,i4,9g10.3)") "SSALT WETRAD ", i, radSS(i), lim1, lim2 !,  &
+         ! cmWetRad takes radius in um, WetRad takes radius in m
+        write(*,"(a,i4,9g10.3)") "SSALT WETRAD ", i, radSS(i), lim1, lim2, 1.0e6*GerberWetRad(1.0e-6*rdry(i),0.8,GbSeaSalt) !,  &
 !          WetRad(rdry(i)*MKM, 0.8, GbSeaSalt)/MKM,&
 !          WetRad(RLIM(i+1)*MKM, 0.8, GbSeaSalt)/MKM,&
 !          WetRad(RLIM(i)*MKM, 0.8, GbSeaSalt)/MKM, &
-!          umWetRad(rdry(i), 0.8, GbSeaSalt),&
-!          umWetRad(RLIM(i+1), 0.8, GbSeaSalt),&
-!          umWetRad(RLIM(i), 0.8, GbSeaSalt)
        end if
      end do
 

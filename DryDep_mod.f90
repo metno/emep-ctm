@@ -1,7 +1,7 @@
-! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -60,6 +60,7 @@ module DryDep_mod
 ! FUTURE: BiDir functionality (Dave/Roy Wichink Kruit) using Roy's methods
   
 use AeroConstants_mod,    only: AERO
+use AeroFunctions_mod,    only: GerberWetRad   !, WetSigmaAdd
 use Aero_Vds_mod,         only: SettlingVelocity, GPF_Vds300, Wesely300
 use BiDir_emep
 use BiDir_module
@@ -67,10 +68,11 @@ use Biogenics_mod,        only: SoilNH3  ! for BiDir
 use CheckStop_mod,        only: CheckStop, StopAll
 use Chemfields_mod ,      only: cfac, so2nh3_24hr,Grid_snow 
 use ChemDims_mod,         only: NSPEC_ADV, NSPEC_SHL,NDRYDEP_ADV
-use ChemSpecs_mod            ! several species needed
+use ChemSpecs_mod,        only: species, IXADV_O3, FIRST_SEMIVOL, LAST_SEMIVOL
 use Config_module,        only: dt_advec,PT, K2=> KMAX_MID, NPROC, &
                               USES, MasterProc, PPBINV, IOU_INST,&
-                              KUPPER, NLANDUSEMAX
+                              KUPPER, NLANDUSEMAX,&
+                              SO2_ix,NH3_ix,NH4_f_ix,NO3_f_ix,NO2_ix,O3_ix
 use Debug_module,         only: DEBUG, DEBUG_ECOSYSTEMS
 use DerivedFields_mod,    only: d_2d, f_2d, VGtest_out_ix
 use DO3SE_mod,            only: do3se
@@ -81,6 +83,7 @@ use GridValues_mod ,      only: GRIDWIDTH_M,xmd,xm2, glat,dA,dB, glon, &
                              debug_proc, debug_li, debug_lj, i_fdom, j_fdom
 use Io_Progs_mod,         only: datewrite
 use Landuse_mod,          only: SetLandUse, Land_codes  & 
+                             ,updateSGSmaps & 
                              ,NLUMAX &  ! Max. no countries per grid
                              ,LandCover   ! Provides codes, SGS, LAI, etc,
 use LandDefs_mod,         only: LandType, LandDefs, STUBBLE
@@ -100,7 +103,7 @@ use ZchemData_mod,        only: xn_2d,M, Fpart, Fgas
 use Sites_mod,            only: nlocal_sites, site_x, site_y, &
                                   site_name, site_gn
 use SmallUtils_mod,       only:  find_index
-use SoilWater_mod,        only: fSW !  =1.0 unless set by Met_mod
+use SoilWater_mod,        only: fSW50 !  =1.0 unless set by Met_mod
 use StoFlux_mod,          only: unit_flux, &! = sto. flux per m2
                                  lai_flux,  &! = lai * unit_flux
                                  Setup_StoFlux, Calc_StoFlux  ! subs
@@ -120,14 +123,15 @@ character(len=30),private, save :: errmsg = "ok"
 
 ! WE NEED A FLUX_CDDEP, FLUX_ADV FOR OZONE (set to 1 for non-ozone models)
 
-integer, public, parameter :: FLUX_ADV   = IXADV_O3
-integer, public, parameter :: FLUX_TOT   = O3
+!Peter: removed those as O3, NO3_f and NH4_f may not be defined in all chemistry
+!!integer, public, parameter :: FLUX_ADV   = IXADV_O3
+!integer, public, parameter :: FLUX_TOT   = O3
 
 ! WE ALSO NEED NO3_f and NH4_f for deposition.
 ! (set to one for non-no3/nh4 models)
 
-integer, public, parameter :: pNO3  = NO3_f
-integer, public, parameter :: pNH4  = NH4_f
+!integer, public, parameter :: pNO3  = NO3_f
+!integer, public, parameter :: pNH4  = NH4_f
 
 !logical, public, parameter :: COMPENSATION_PT = .false. 
 
@@ -179,6 +183,7 @@ contains
   if ( my_first_call ) then 
 
      call GetDepMapping()    ! creates DDspec, DDmapping
+     call updateSGSmaps()    ! Accounts for Topo in SGS, EGS, if Euro_Settings
      call InitGasCoeffs()    ! allocate and set DDspec  
      call InitParticleCoeffs()
      if(MasterProc) write(*,*) dtxt//" GET DEP", nddep
@@ -188,7 +193,7 @@ contains
          Vg_eff(nddep), Vg_3m(nddep), Vg_ratio(nddep), sea_ratio(nddep), Gsto(nddep) ,eff_fac(nddep))
 
      call CheckStop( NLOCDRYDEP_MAX < nddep, &
-        "Need to increase size of NLOCDRYDEP_MAX" )
+        dtxt//"Need to increase size of NLOCDRYDEP_MAX" )
 
      !Need to re-implement one day
      !A2018 nadv = 0
@@ -277,6 +282,8 @@ contains
     character(len=20), save :: fname
     integer :: nglob
     logical :: first_ddep = .true.
+    real :: r_dry, r_wet, rho_wet, Vs_dry, Vs_wet
+!    real :: S ! saturation ration = e/es ~ fRH
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !! Extra outputs sometime used. Important that this line is kept at the
@@ -298,6 +305,13 @@ contains
     ! Dry deposion rates are specified in subroutine readpar
     !
 
+    call CheckStop( O3_ix<1, "DryDep: O3 not defined" )
+    call CheckStop( SO2_ix<1, "DryDep:SO2 not defined" )
+    call CheckStop( NO2_ix<1, "DryDep:NO2 not defined" )
+    !call CheckStop( NH3_ix<1, "DryDep:NH3_f not defined" )
+    !call CheckStop( NH4_f_ix<1, "DryDep:NH4_f not defined" )
+    call CheckStop( NO3_f_ix<1, "DryDep:NO3_f not defined" )
+
 
 
    ! - Set up debugging stuff first. ---------------------------!
@@ -314,7 +328,7 @@ contains
     dbghh     =  dbg .and. iss == 0 
     dbgBD     =  DEBUG%BIDIR .and. debug_flag .and. iss == 0
     if (dbgBD) print *, "BIDIR TEST ", me, debug_flag
-
+    if (dbg.and.first_ddep ) write(*,*) "DRYDEP DBG ", me, debug_flag
 
 
      inv_gridarea = 1.0/(GRIDWIDTH_M*GRIDWIDTH_M) 
@@ -348,7 +362,7 @@ contains
     dtz      = dt_advec/Grid%DeltaZ
 
     if ( dbghh ) call datewrite(dtxt//"DMET ", daynumber, (/ Grid%zen,  &
-         1.0e-5*Grid%psurf, Grid%Idiffuse, Grid%Idirect, &
+         1.0e-5*Grid%psurf, & !F21 Grid%PARsun, Grid%PARshade, &
          Grid%Hd, Grid%LE, Grid%invL, Grid%ustar /) )
       
    !/ Initialise Grid-avg Vg for this grid square:
@@ -363,24 +377,35 @@ contains
     Sub(0)%Gsur = 0.0
     Sub(0)%Gsto = 0.0
     !Sub(0)%Gns  = 0.0
+    Sub(0)%Vg_eff  = 0.0
     Sub(0)%Vg_Ref  = 0.0
     Sub(0)%Vg_3m   = 0.0
  
     !/ SO2/NH3 for Rsur calc
-    Grid%so2nh3ratio = xn_2d(SO2,K2) / max(1.0,xn_2d(NH3,K2))
-
-    Grid%so2nh3ratio24hr = so2nh3_24hr(i,j)
-
+    if (NH3_ix > 0) then
+       Grid%so2nh3ratio = xn_2d(SO2_ix,K2) / max(1.0,xn_2d(NH3_ix,K2))
+       
+       Grid%so2nh3ratio24hr = so2nh3_24hr(i,j)
+    else
+       Grid%so2nh3ratio = xn_2d(SO2_ix,K2) ! ?
+       
+       Grid%so2nh3ratio24hr = xn_2d(SO2_ix,K2) ! ?   
+    end if
    !---------------------------------------------------------
    !> NH4NO3 deposition will need this ratio for the NH4 part
 
     no3nh4ratio = 1.0
-    if( xn_2d(pNH4,K2) > 1.0  ) then
-       no3nh4ratio = xn_2d(pNO3,K2) / xn_2d(pNH4,K2)
-       no3nh4ratio = min( 1.0,  no3nh4ratio )
+    if(NH4_f_ix > 0) then
+       if( xn_2d(NH4_f_ix,K2) > 1.0 ) then
+          no3nh4ratio = xn_2d(NO3_f_ix,K2) / xn_2d(NH4_f_ix,K2)
+          no3nh4ratio = min( 1.0,  no3nh4ratio )
+       end if
     end if
 
    !---------------------------------------------------------
+   ! DEPRECATED 2021! Now we should always have SOILNOx
+   ! emissions when running full chemistry. Added USES%NO2_COMPENSATION_PT 
+   ! to mimic old behaviour if needed.
    ! If we do not have soil NO emissions active, we use instead a 
    ! surrogate for NO2 compensation point approach, assuming 
    ! c.p.=4 ppb (actually use 1.0e11 #/cm3):        
@@ -389,16 +414,16 @@ contains
    ! Note, xn_2d has no2 in #/cm-3
  
     no2fac = 1.0
-    if ( .not. USES%SOILNOX ) then
-      no2fac = max( 1.0, xn_2d(NO2,K2) )
+    if ( .not. USES%SOILNOX .and. USES%NO2_COMPENSATION_PT  ) then
+      no2fac = max( 1.0, xn_2d(NO2_ix,K2) )
       no2fac = max(0.00001,  (no2fac-1.0e11)/no2fac)
     end if
    !---------------------------------------------------------
 
     if ( dbghh ) then
       write(*,"(a,2i4,L2,9es12.4)") dtxt//" CONCS SO2,NH3,O3,NO2 (ppb),f ", &
-       i,j, USES%SOILNOX,  xn_2d(SO2,K2)*surf_ppb, xn_2d(NH3,K2)*surf_ppb, &
-          xn_2d(O3,K2)*surf_ppb, xn_2d(NO2,K2)*surf_ppb, no2fac
+       i,j, USES%SOILNOX,  xn_2d(SO2_ix,K2)*surf_ppb, xn_2d(NH3_ix,K2)*surf_ppb, &
+          xn_2d(O3_ix,K2)*surf_ppb, xn_2d(NO2_ix,K2)*surf_ppb, no2fac
     end if
 
     call GasCoeffs(Grid%t2)             ! Sets DDdefs coeffs.
@@ -407,19 +432,43 @@ contains
 
     call Setup_StoFlux( i, j )
 
-! - can set settling velcoty here since not landuse dependent
+! - can set settling velocity here since not landuse dependent
 
     do icmp = 1, nddep
 
       if ( DDspec(icmp)%is_gas ) CYCLE
 
-      BL(icmp)%Vs = SettlingVelocity( Grid%t2, Grid%rho_ref, &
+
+
+      r_dry = 0.5*DDspec(icmp)%DpgV
+      r_wet = r_dry
+
+      if ( DDspec(icmp)%Gb>0  ) then  ! water absorbed on aerosol
+
+         r_wet = GerberWetRad( r_dry, rh2m(i,j,1), DDspec(icmp)%Gb )
+
+         rho_wet = ( 1000*r_wet**3 + r_dry**3*(DDspec(icmp)%rho_p-1000) )/r_wet**3
+       ! (Remember, L%rh not set over water)
+       !rho_wet = ( 1000*(r_wet**3 - r_dry**3) + r_dry**3 * DDspec(icmp)%rho_p )/r_wet**3
+
+         BL(icmp)%Vs = SettlingVelocity( Grid%t2, Grid%rho_ref, &
+                          DDspec(icmp)%sigma, 2*r_wet, rho_wet )
+         Vs_wet = BL(icmp)%Vs
+         Vs_dry = -999
+
+      else ! keep dry radius
+
+         BL(icmp)%Vs = SettlingVelocity( Grid%t2, Grid%rho_ref, &
              DDspec(icmp)%sigma, DDspec(icmp)%DpgV, DDspec(icmp)%rho_p )
+         Vs_dry = BL(icmp)%Vs
+         Vs_wet = -999
+
+      end if
 
       if ( dbghh ) then
         call datewrite(dtxt//" VS"//DDspec(icmp)%name, icmp, &
-           [ DDspec(icmp)%DpgV, DDspec(icmp)%sigma,  DDspec(icmp)%rho_p, &
-              BL(icmp)%Vs ] )
+           [ rh2m(i,j,1), 1.0e6*r_dry, 1.0e6*r_wet, DDspec(icmp)%rho_p, rho_wet, &
+              Vs_dry, Vs_wet ] )
       end if
     end do
 
@@ -504,10 +553,14 @@ contains
       L = Sub(iL)    ! ! Assign e.g. Sub(iL)ustar to ustar
 
       if ( dbghh ) then
-         write(6,"(a,3i3,f6.1,2i4,3f7.3,i4,9f8.3)") dtxt//"DVEG: ", &
-             nlu,iiL, iL, glat(i,j), L%SGS, L%EGS, &
+         write(6,"(a30,3i3,f6.1,2i4,3f7.3,i4,9f8.3)") adjustl(dtxt//"DVEG: "// &
+           LandDefs(iL)%code), nlu,iiL, iL, glat(i,j), L%SGS, L%EGS, &
             L%coverage, L%LAI, L%hveg,daynumber, &
-            Grid%sdepth, fSW(i,j),L%fSW,L%t2C
+            Grid%sdepth, fSW50(i,j),L%fSW,L%t2C
+
+          call datewrite(dtxt//"WHEAT"//LandDefs(iL)%name, &
+              [iL, j, daynumber, L%SGS, L%EGS] , [  L%LAI, glat(i,j),glon(i,j), L%t2C, fSW50(i,j),L%fSW,L%t2C ], &
+            afmt="a34,TXTDATE,5i5,4f8.2,20es14.5")  ! just array
 
          write(6,"(a,i4,3f7.2,7es10.2)") dtxt//"DMET SUB", &
            iL, Grid%ustar, L%ustar, L%rh,  Grid%invL, &
@@ -520,8 +573,10 @@ contains
       call Rsurface(i,j,BL(:)%Gsto,BL(:)%Rsur,errmsg,debug_flag,fsnow)
 
       if(dbghh) call datewrite(dtxt//"STOFRAC "//LandDefs(iL)%name, &
-              iL, [  BL(idcmpO3)%Gsto, BL(idcmpO3)%Rsur, &
-                    BL(idcmpO3)%Gsto*BL(idcmpO3)%Rsur ] )
+              [iL, j] , [  BL(idcmpO3)%Gsto, BL(idcmpO3)%Rsur, &
+                    BL(idcmpO3)%Gsto*BL(idcmpO3)%Rsur ], &
+            afmt="a34,TXTDATE,2i5,20es14.5")  ! just array
+!            afmt="a30,DATE,2i5,20es14.5")  ! just array
 
         !Sub(iL)%g_sto = L%g_sto   ! needed elsewhere
         !Sub(iL)%g_sun = L%g_sun
@@ -547,7 +602,7 @@ contains
            if( dbg .and. first_ddep .and. icmp==idcmpNO2 ) then
              associate ( b=>BL(icmp) )
                write(*,'(a,2i4,9es10.3)')'DBGXNO2 :',icmp, iL,L%Ra_ref, b%Rb,&
-                      b%Rsur, b%Gsto, Vg_ref(icmp), no2fac, 4.0e-11*xn_2d(NO2,K2)
+                      b%Rsur, b%Gsto, Vg_ref(icmp), no2fac, 4.0e-11*xn_2d(NO2_ix,K2)
              end associate
            end if
 
@@ -564,7 +619,7 @@ contains
             else if ( .not. USES%SOILNOX .and.  icmp == idcmpNO2 ) then
 
               if( dbg .and. first_ddep .and. icmp==idcmpNO2 ) &
-                  write(*,*) 'DBGXNO2 no2fac TRIGGERED', no2fac, 4.0e-11*xn_2d(NO2,K2)
+                  write(*,*) 'DBGXNO2 no2fac TRIGGERED', no2fac, 4.0e-11*xn_2d(NO2_ix,K2)
   
               Vg_eff(icmp) = Vg_eff(icmp) * no2fac
               Vg_ref(icmp) = Vg_ref(icmp) * no2fac
@@ -705,7 +760,7 @@ contains
         !n = CDDEP_O3
         icmp = idcmpO3
         Ra_diff = L%Ra_ref - L%Ra_3m
-        c_hveg3m = xn_2d(FLUX_TOT,K2)  &     ! #/cm3 units
+        c_hveg3m = xn_2d(O3_ix,K2)  &     ! #/cm3 units
                      * ( 1.0-Ra_diff*Vg_ref(icmp) )
 
       ! Flux = Vg_ref*c_ref = Vg_h * c_h = (c_ref-c_h)/Ra(z_ref,z_h)
@@ -715,12 +770,12 @@ contains
         Ra_diff  = AerRes(max( L%hveg-L%d, STUBBLE) , Grid%z_ref-L%d,&
                     L%ustar,L%invL,KARMAN)
 
-        c_hveg = xn_2d(FLUX_TOT,K2)  &     ! #/cm3 units
+        c_hveg = xn_2d(O3_ix,K2)  &     ! #/cm3 units
                      * ( 1.0-Ra_diff*Vg_ref(icmp) )
 
         if ( DEBUG%AOT .and. debug_flag .and. iL==1 ) then
            call datewrite(dtxt//"CHVEG ", iL, &
-             (/  xn_2d(FLUX_TOT,K2)*surf_ppb, c_hveg*surf_ppb,&
+             (/  xn_2d(O3_ix,K2)*surf_ppb, c_hveg*surf_ppb,&
                  c_hveg3m * surf_ppb, 100*Vg_ref(icmp), 100*Vg_3m(icmp), &
                  L%Ra_ref, (L%Ra_ref-L%Ra_3m), Ra_diff, &
                  BL(icmp)%Rb,BL(icmp)%Rsur /) )
@@ -827,11 +882,11 @@ contains
          call CheckStop("NEGXN DEPLOSS" )
         end if
 
-        if ( ntot == O3 ) then 
+        if ( ntot == O3_ix ) then 
 
-          o3_45m = xn_2d(O3,K2)*surf_ppb !store for consistency of SPOD outputs
+          o3_45m = xn_2d(O3_ix,K2)*surf_ppb !store for consistency of SPOD outputs
           Grid%surf_o3_ppb  = o3_45m * gradient_fac( icmp )
-          Grid%surf_o3_ppb1 = ( xn_2d(O3,K2) - Deploss(nadv)) * & ! after loss
+          Grid%surf_o3_ppb1 = ( xn_2d(O3_ix,K2) - Deploss(nadv)) * & ! after loss
                gradient_fac( icmp )*surf_ppb
 
           if( dbghh ) then
@@ -845,7 +900,7 @@ contains
         xn_2d( ntot,K2) = xn_2d( ntot,K2) - DepLoss(nadv)
 
 
-        if ( ntot == FLUX_TOT ) then
+        if ( ntot == O3_ix ) then
 
           ! fraction by which xn is reduced - safety measure:
              if( xn_2d(ntot,K2)  > 1.0e-30 ) then
@@ -859,7 +914,7 @@ contains
   
              if ( DEBUG%AOT .and. debug_flag ) then !FEB2013 testing
                call datewrite(dtxt//"CHVEGX ", me, &
-                 (/ xn_2d(FLUX_TOT,K2)*surf_ppb, c_hveg*surf_ppb,&
+                 (/ xn_2d(O3_ix,K2)*surf_ppb, c_hveg*surf_ppb,&
                   c_hveg3m * surf_ppb, 100*Vg_ref(icmp), 100*Vg_3m(icmp) /) )
              end if
         end if ! not FLUXTOT
@@ -918,18 +973,18 @@ contains
           !  write(*, "(a,2i4,f8.3)") "DEBUG DryDep SET ", &
           !       n,nadv, DDepMap(icmp)%vg
           !else
-          if( ntot == O3 ) & ! O3
+          if( ntot == O3_ix ) & ! O3
             call datewrite( "DEBUG DDEPxnd: "// trim(species(ntot)%name), &
               icmp, (/ real(nadv),real(icmp), gradient_fac( icmp),&
                  xn_2d(ntot,K2), vg_fac(icmp) /) )
           !end if
         end if
 
-        if ( DEBUG%AOT .and. debug_flag .and. ntot == FLUX_TOT  ) then
+        if ( DEBUG%AOT .and. debug_flag .and. ntot == O3_ix  ) then
             write(*, "(a,3i3,i5,i3,2f9.4,f7.3)") &
              dtxt//"AOTCHXN ", imm, idd, ihh, current_date%seconds, &
-                 iL, xn_2d(FLUX_TOT,K2)*surf_ppb, &
-                  (xn_2d( FLUX_TOT,K2) + DepLoss(nadv) )*surf_ppb, &
+                 iL, xn_2d(O3_ix,K2)*surf_ppb, &
+                  (xn_2d( O3_ix,K2) + DepLoss(nadv) )*surf_ppb, &
                    gradient_fac( icmp)
         end if
      end do DCMPLOOP ! is

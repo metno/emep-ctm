@@ -1,7 +1,7 @@
-! <Pollen_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Pollen_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,6 +44,8 @@ use DerivedFields_mod,     only: f_2d,d_2d ! D2D houtly (debug) output
 use GasParticleCoeffs_mod, only: DDdefs
 use Functions_mod,         only: heaviside
 use GridValues_mod ,       only: glon, glat, debug_proc, debug_li, debug_lj
+use Io_mod,                only: IO_NML
+use Io_RunLog_mod,         only: PrintLog
 use Landuse_mod,           only: LandCover
 use LocalVariables_mod,    only: Grid
 use MetFields_mod,         only: surface_precip, ws_10m ,rh2m,t2_nwp,&
@@ -51,7 +53,7 @@ use MetFields_mod,         only: surface_precip, ws_10m ,rh2m,t2_nwp,&
 use MicroMet_mod,          only: Wind_at_h
 use Config_module,         only: KMAX_MID, DataDir, &
                                  METSTEP, MasterProc, IOU_INST, RUNDOMAIN, &
-                                 dt=>dt_advec, &
+                                 dt=>dt_advec, GRID_NAME=>GRID,&
                                  outdate=>NEST_OUTDATE,OUTDATE_NDUMP=>NEST_OUTDATE_NDUMP,&
                                  out_DOMAIN=>NEST_out_DOMAIN,&
                                  MODE_READ=>NEST_MODE_READ,&
@@ -71,7 +73,6 @@ use SmallUtils_mod,        only: find_index,key2str
 use SubMet_mod,            only: Sub
 use TimeDate_mod,          only: current_date,daynumber,date,day_of_year
 use TimeDate_ExtraUtil_mod,only: date2string,compare_date,date2nctime
-use Io_mod,                only: IO_NML, PrintLog
 use MPI_Groups_mod,        only: MasterPE,IERROR,MPI_COMM_WORLD,MPI_COMM_CALC,&
                                  MPI_INTEGER,MPI_LOGICAL,MPI_DOUBLE_PRECISION,&
                                  MPI_IN_PLACE,MPI_MIN,MPI_MAX!,MPI_ALLREDUCE
@@ -168,9 +169,21 @@ subroutine Config_Pollen()
     write(*,NML=Pollen_config)
   end if
 
-  ! expand DataDir keysword
-  template_read =key2str(template_read ,'DataDir',DataDir)
-  template_write=key2str(template_write,'DataDir',DataDir)
+  ! expand DataDir, YYYY and GRID keywords
+  birch_frac_nc  = key2str(birch_frac_nc ,'DataDir',DataDir)
+  birch_data_nc  = key2str(birch_data_nc ,'DataDir',DataDir)
+  birch_corr_nc  = key2str(birch_corr_nc ,'DataDir',DataDir)
+  birch_corr_nc  = key2str(birch_corr_nc ,'YYYY'   ,current_date%year)
+  olive_data_nc  = key2str(olive_data_nc ,'DataDir',DataDir)
+  olive_data_nc  = key2str(olive_data_nc ,'YYYY'   ,current_date%year)
+  rweed_frac_nc  = key2str(rweed_frac_nc ,'DataDir',DataDir)
+  rweed_frac_nc  = key2str(rweed_frac_nc ,'GRID'   ,GRID_NAME)
+  rweed_data_nc  = key2str(rweed_data_nc ,'DataDir',DataDir)
+  rweed_data_nc  = key2str(rweed_data_nc ,'GRID'   ,GRID_NAME)
+  grass_field_nc = key2str(grass_field_nc,'DataDir',DataDir)
+  grass_time_nc  = key2str(grass_time_nc ,'DataDir',DataDir)
+  template_read  = key2str(template_read ,'DataDir',DataDir)
+  template_write = key2str(template_write,'DataDir',DataDir)
 
   do g=1,POLLEN_NUM
     inat(g) = find_index(POLLEN_GROUP(g),EMIS_BioNat(:))
@@ -181,11 +194,17 @@ subroutine Config_Pollen()
 
     ! check gravitational setling params
     select case(POLLEN_GROUP(g))
-      case(BIRCH);n=find_index('POLLb',DDdefs(:)%name)
-      case(OLIVE);n=find_index('POLLo',DDdefs(:)%name)
-      case(RWEED);n=find_index('POLLr',DDdefs(:)%name)
-      case(GRASS);n=find_index('POLLg',DDdefs(:)%name)
-    end select
+      case(RWEED)
+        n=find_index('POLL18',DDdefs(:)%name)
+      case(BIRCH)
+        n=find_index('POLL22',DDdefs(:)%name)
+      case(OLIVE)
+        n=find_index('POLL28',DDdefs(:)%name)
+      case(GRASS)
+        n=find_index('POLL32',DDdefs(:)%name)
+      case default
+        call CheckStop("Not implemented "//POLLEN_GROUP(g))
+      end select
     call CheckStop(n<0,"DDdefs misses: "//POLLEN_GROUP(g))
     call CheckStop(DDdefs(n)%umDpgV,D_POLL(g),"Wrong DDdefs%umDpgV: "//POLLEN_GROUP(g))
 !   call CheckStop(DDdefs(n)%sigma ,0.01     ,"Wrong DDdefs%sigma: "//POLLEN_GROUP(g))
@@ -258,10 +277,10 @@ subroutine pollen_flux(i,j,debug_flag)
 
   real, save, allocatable, dimension(:,:,:) :: &
     pollen_frac,   &  ! fraction of pollen (birch/olive/rweed/grass), read in
-    pollen_h_c        ! temperature treshold (birch/olive), read in
+    pollen_h_c,    &  ! temperature treshold (birch/olive), read in
+    pollen_dH         ! flowering period [degree seconds] (olive)
   real, save, allocatable, dimension(:,:) :: &
     birch_corr,     & ! correction field for p.emission, read in
-    olive_dH,       & ! flowering period [degree days]
     rweed_corr,     & ! relative productivity (PollenTotal=rweed_corr*1.7e7)
     t2_day            ! daily temperature
 
@@ -276,7 +295,7 @@ subroutine pollen_flux(i,j,debug_flag)
     t2_day(:,:)=0.0
 
     allocate(pollen_frac(LIMAX,LJMAX,POLLEN_NUM),pollen_h_c(LIMAX,LJMAX,iBIRCH:iOLIVE))
-    allocate(birch_corr(LIMAX,LJMAX),olive_dH(LIMAX,LJMAX))
+    allocate(birch_corr(LIMAX,LJMAX),pollen_dH(LIMAX,LJMAX,iOLIVE:iOLIVE))
     allocate(rweed_start(LIMAX,LJMAX),rweed_corr(LIMAX,LJMAX))
     allocate(grass_start(LIMAX,LJMAX),grass_end(LIMAX,LJMAX))
     call ReadField_CDF(birch_frac_nc,'birch_frac',pollen_frac(:,:,iBIRCH),1, &
@@ -284,7 +303,6 @@ subroutine pollen_flux(i,j,debug_flag)
     call ReadField_CDF(birch_data_nc,'h_c',pollen_h_c(:,:,iBIRCH),1, &
        interpol='conservative',needed=.true.,debug_flag=DEBUG_NC,UnDef=UnDef)
 ! birch: cross_corr for specific year
-    birch_corr_nc=date2string(birch_corr_nc,current_date,debug=DEBUG_NC.and.MasterProc)
     call ReadField_CDF(birch_corr_nc,'scale_factor',birch_corr,1, &
         interpol='conservative',needed=.false.,debug_flag=DEBUG_NC,UnDef=UnDef,found=found)
 ! birch: cross_corr default
@@ -292,18 +310,16 @@ subroutine pollen_flux(i,j,debug_flag)
       call ReadField_CDF(birch_data_nc,'cross',birch_corr,1, &
         interpol='conservative',needed=.true.,debug_flag=DEBUG_NC,UnDef=UnDef)
 ! olive
-    olive_data_nc=date2string(olive_data_nc,current_date,debug=DEBUG_NC.and.MasterProc)
     call ReadField_CDF(olive_data_nc,'olive_frac',pollen_frac(:,:,iOLIVE),1, &
         interpol='conservative',needed=.true.,debug_flag=DEBUG_NC,UnDef=UnDef)
     call ReadField_CDF(olive_data_nc,'olive_th',pollen_h_c(:,:,iOLIVE),1, &
         interpol='conservative',needed=.true.,debug_flag=DEBUG_NC,UnDef=UnDef)
-    call ReadField_CDF(olive_data_nc,'olive_len',olive_dH,1, &
+    call ReadField_CDF(olive_data_nc,'olive_len',pollen_dH(:,:,iOLIVE),1, &
         interpol='conservative',needed=.false.,debug_flag=DEBUG_NC,UnDef=UnDef,found=found)
-    if(.not.found) olive_dH(:,:) = dH_d_olive
+    if(.not.found) pollen_dH(:,:,iOLIVE) = dH_d_olive
 ! ragweed
     call ReadField_CDF(rweed_frac_nc,'fraction',pollen_frac(:,:,iRWEED),1, &
         interpol='conservative',needed=.true.,debug_flag=DEBUG_NC,UnDef=UnDef)
-    rweed_data_nc=date2string(rweed_data_nc,current_date,debug=DEBUG_NC.and.MasterProc)
     call ReadField_CDF(rweed_data_nc,'start_th',rweed_start,1, &
         interpol='conservative',needed=.true.,debug_flag=DEBUG_NC,UnDef=UnDef)
     call ReadField_CDF(rweed_data_nc,'scale',rweed_corr,1, &
@@ -322,14 +338,18 @@ subroutine pollen_flux(i,j,debug_flag)
         grass_end=grass_end+grass_start
     end if
 
+    ! negative fractions as UnDef
+    where(pollen_frac/=UnDef .and. pollen_frac<0) &
+      pollen_frac = UnDef
+
     ! reduce birch from 60 degrees north:
-    forall(ii=1:limax,jj=1:ljmax,glat(ii,jj)>=60.0) &
+    forall(ii=1:limax,jj=1:ljmax,glat(ii,jj)>=60.0 .and. pollen_frac(ii,jj,iBIRCH)/=UnDef) &
       pollen_frac(ii,jj,iBIRCH)=pollen_frac(ii,jj,iBIRCH)&
                        *MAX(0.3,1.0-0.005*(glat(ii,jj)-60.0))
 
     ! olive fraction [%] --> [1/1]
     where(pollen_frac(:,:,iOLIVE)/=UnDef) &
-      pollen_frac(:,:,iOLIVE)=pollen_frac(:,:,iOLIVE)/100.0
+      pollen_frac(:,:,iOLIVE) = pollen_frac(:,:,iOLIVE) / 100.0
 
     ! Set D2D/USET output
     call write_uset()
@@ -346,11 +366,13 @@ subroutine pollen_flux(i,j,debug_flag)
     case(iBIRCH)
       pollen_out(g)=any([pollen_frac(i,j,g),pollen_h_c(i,j,g),birch_corr(i,j)]==UnDef)
     case(iOLIVE)
-      pollen_out(g)=any([pollen_frac(i,j,g),pollen_h_c(i,j,g)]==UnDef)
+      pollen_out(g)=any([pollen_frac(i,j,g),pollen_h_c(i,j,g),pollen_dH(i,j,g)]==UnDef)
     case(iRWEED)
       pollen_out(g)=any([pollen_frac(i,j,g),rweed_start(i,j),rweed_corr(i,j)]==UnDef)
     case(iGRASS)
       pollen_out(g)=any([pollen_frac(i,j,g),grass_start(i,j),grass_end(i,j)]==UnDef)
+    case default
+      call CheckStop("Not implemented "//POLLEN_GROUP(g))
     end select
     pollen_out(g)=pollen_out(g).or..not.checkdates(daynumber,POLLEN_GROUP(g))
   end do
@@ -368,9 +390,13 @@ subroutine pollen_flux(i,j,debug_flag)
     if(pollen_out(g)) cycle
     select case(g)
     case(iBIRCH,iOLIVE)
-      call heatsum_calc(heatsum(i,j,g),t2_nwp(i,j,1),T_cutoff(g))
+      call heatsum_day(heatsum(i,j,g),t2_nwp(i,j,1),T_cutoff(g))
     case(iRWEED)
       call heatsum_rweed(heatsum(i,j,g),t2_nwp(i,j,1),daylength(glat(i,j)))
+    case(iGRASS)
+      ! nothing to do
+    case default
+      call CheckStop("Not implemented "//POLLEN_GROUP(g))
     end select
   end do
 
@@ -417,7 +443,7 @@ subroutine pollen_flux(i,j,debug_flag)
         .or.(heatsum(i,j,g)>heatsum_max)                  ! too warm season
     case(iOLIVE)  ! Olive specific emission inhibitors
       heatsum_min = (1-prob_in(g))*pollen_h_c(i,j,g)
-      heatsum_max = pollen_h_c(i,j,g) + olive_dH(i,j)
+      heatsum_max = pollen_h_c(i,j,g) + pollen_dH(i,j,g)
       pollen_out(g)=(R(i,j,g)>N_TOT(g))                 & ! out of pollen
         .or.(relhum>RH_HIGH)                            & ! too humid
         .or.(prec>prec_max)                             & ! too rainy
@@ -444,6 +470,8 @@ subroutine pollen_flux(i,j,debug_flag)
       pollen_out(g)=(R(i,j,g)>N_TOT(g))                 & ! out of pollen
         .or.(relhum>RH_HIGH)                            & ! too humid
         .or.(prec>prec_max)                               ! too rainy
+    case default
+      call CheckStop("Not implemented "//POLLEN_GROUP(g))
     end select
   end do
 
@@ -453,7 +481,7 @@ subroutine pollen_flux(i,j,debug_flag)
 !  write(*,*) "n2m_diff ", n2m(:)
 
 !------------------------
-! Emission rates: Birch,Olive,Grass
+! Emission rates: Birch,Olive,Ragweed,Grass
 !------------------------
   do g=1,POLLEN_NUM
     if(pollen_out(g)) cycle
@@ -463,7 +491,9 @@ subroutine pollen_flux(i,j,debug_flag)
       scale=scale_factor(POLLEN_GROUP(g))
     case(iGRASS);
       scale=scale_factor(GRASS//trim(grass_mode))
-    endselect
+    case default
+      call CheckStop("Not implemented "//POLLEN_GROUP(g))
+    end select
     R(i,j,g)=R(i,j,g)+N_TOT(g)*scale*dt       ! pollen grains released so far
     rcpoll=N_TOT(g)*scale*pollen_frac(i,j,g)  ! pollen grains production [grains/m2/s]
     EmisNat(inat(g),i,j)      = rcpoll*kgm2h(g) ! [kg/m2/h]
@@ -480,7 +510,7 @@ contains
 !------------------------
 function scale_factor(spc) result(scale)
   character(len=*), intent(in)  :: spc
-  real :: scale, dH_olive, sec_since_sunrise, seasLen
+  real :: scale, dH_secs, sec_since_sunrise, seasLen
   integer :: g
 
   scale=f_wind(u10,Grid%wstar)           & ! wind dependence
@@ -495,9 +525,9 @@ function scale_factor(spc) result(scale)
       *f_out(R(i,j,g),N_TOT(g),PROB_OUT(g))               ! prob. flowering end
   case(OLIVE)
     g=iOLIVE
-    dH_olive = olive_dH(i,j)*86400.0   ! Flowering period [degree seconds] olive
+    dH_secs = pollen_dH(i,j,g)*86400.0       ! Flowering period [degree seconds]
     scale = scale &
-      *(t2_nwp(i,j,1)-T_cutoff(g))/dH_olive &
+      *(t2_nwp(i,j,1)-T_cutoff(g))/dH_secs &
       *f_in(heatsum(i,j,g),pollen_h_c(i,j,g),PROB_IN(g)) &! prob. flowering start
       *f_out(R(i,j,g),N_TOT(g),PROB_OUT(g))               ! prob. flowering end
   case(RWEED)
@@ -548,7 +578,7 @@ subroutine write_uset()
       case("heatsum")
         call CheckStop(g,[1,size(heatsum,DIM=3)],&
           "USET: '"//trim(f_2d(n)%subclass)//"' out of bounds!")
-        f_2d(n)%unit="degree day"
+        f_2d(n)%unit="degreedays"
         f_2d(n)%scale=1.0
         n2d_heatsum(g)=n
       case("pollen_left")
@@ -565,7 +595,7 @@ subroutine write_uset()
         n2d_emiss(g)=n
       case default
         cycle
-      endselect
+      end select
     end do
     return
   end if
@@ -579,14 +609,14 @@ subroutine write_uset()
   end do
 end subroutine write_uset
 end subroutine pollen_flux
-subroutine heatsum_calc(hsum,t2,T_cutoff)
+subroutine heatsum_day(hsum,t2,T_cutoff)
 ! The temperature needs to be over the cutoff temperature
   real, intent(inout) :: hsum
   real, intent(in) :: t2,T_cutoff ! degreedays
   real             :: ff
   ff = DIM(t2,T_cutoff) ! same as MAX(t2-T_cutoff,0.0)
   hsum = hsum + ff*dt/(3600*24)      ! seconds to days
-end subroutine heatsum_calc
+end subroutine heatsum_day
 subroutine heatsum_rweed(hsum,t2,daylen)
   real, intent(inout) :: hsum    ! degreedays
   real, intent(in) :: t2,daylen  ! deg K,date%hours
@@ -748,7 +778,7 @@ function f_gamma_w_tails(relTime,relDt) result(ff)
 contains
 real function rate(a,x)
   real, intent(in) :: a,x
-  rate=a*sum(scales*(x-timesRel)**powers,MASK=(x>timesRel))
+  rate=a*sum(scales*DIM(x,timesRel)**powers,MASK=(x>timesRel))
 end function rate
 end function f_gamma_w_tails
 function f_wind(u,wstar) result(ff)

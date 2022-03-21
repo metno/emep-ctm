@@ -370,19 +370,6 @@
   xnew(MACRO2) = (xold(MACRO2) + dt2 * P) / (1.0 + dt2 * L)
 
 
-!-> TERPO2
-
-  P = rct(75,k) * xnew(APINENE) * xnew(OH)  &
-    + rct(77,k) * xnew(TERPOOH) * xnew(OH)  &
-    + rct(79,k) * xnew(APINENE) * xnew(NO3)
-  
-  L = rct(48,k) * xnew(NO)  &
-    + 2.3e-12 * xnew(NO3)  &
-    + rct(76,k) * xnew(HO2)
-  
-  xnew(TERPO2) = (xold(TERPO2) + dt2 * P) / (1.0 + dt2 * L)
-
-
 !-> RO2POOL
 
   ! P = 0.0
@@ -422,15 +409,6 @@
     + 1.0e-11 * xnew(RO2POOL)
   
   xnew(CH3CO3) = (xold(CH3CO3) + dt2 * P) / (1.0 + dt2 * L)
-
-
-!-> NMVOC
-
-  ! P = 0.0
-  
-  ! L = 0.0
-  
-  ! Nothing to do for NMVOC! xnew(NMVOC) = max(0.0, xold(NMVOC))
 
 
 !-> O3
@@ -1193,6 +1171,19 @@
     + rct(79,k) * xnew(NO3)
   
   xnew(APINENE) = (xold(APINENE) + dt2 * P) / (1.0 + dt2 * L)
+
+
+!-> TERPO2
+
+  P = rct(75,k) * xnew(APINENE) * xnew(OH)  &
+    + rct(77,k) * xnew(TERPOOH) * xnew(OH)  &
+    + rct(79,k) * xnew(APINENE) * xnew(NO3)
+  
+  L = rct(48,k) * xnew(NO)  &
+    + 2.3e-12 * xnew(NO3)  &
+    + rct(76,k) * xnew(HO2)
+  
+  xnew(TERPO2) = (xold(TERPO2) + dt2 * P) / (1.0 + dt2 * L)
 
 
 !-> TERPOOH

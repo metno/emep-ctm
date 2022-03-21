@@ -1,7 +1,7 @@
-! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,12 +41,14 @@ module Debug_module
     ,BCS             = .false. & ! BoundaryConditions
     ,BIO             = .false. & ! Biogenic emissions
     ,BIDIR           = .false. & ! FUTURE Bi-directional exchange
+    ,BLM             = .false. & ! Produces matrix of differnt Kz and Hmix
     ,COLUMN          = .false. & ! Used in Derived_mod for column integration
     ,COLSRC          = .false. & ! Volcanic emissions and Emergency scenarios
     ,DERIVED         = .false. & !
     ,DRYDEP          = .false. & ! 
     ,DRYRUN          = .false. & ! Skips fast chemistry to save some CPU
     ,EMISSIONS       = .false. & ! 
+    ,EMISTIMEFACS    = .false. &
     ,EQUIB           = .false. &   !MARS, EQSAM etc.
     ,FORESTFIRE      = .false. &
     ,GETEMIS         = .false. &
@@ -54,6 +56,7 @@ module Debug_module
     ,GRIDVALUES      = .false. &
     ,HOURLY_OUTPUTS  = .false. & !
     ,IOPROG          = .false. &
+    ,Kz              = .false. &
     ,LANDDEFS        = .false. &
     ,MAINCODE        = .false. & !< debugs main code (emepctm) driver
     ,MET             = .false. &
@@ -71,8 +74,10 @@ module Debug_module
     ,SETUP_1DBIO     = .false. &
     ,SITES           = .false. & ! set also DEBUG%SITE below
     ,SOILNOX         = .false. &
+    ,SOILWATER       = .false. &
     ,SOLVER          = .false. &
     ,STOFLUX         = .false. &
+    ,VERT_DIFF       = .false. &
     ,VDS             = .false.
   ! integer debug options allow different levels of verbosity
    integer               :: &
@@ -94,15 +99,12 @@ type(emep_debug), public, save :: DEBUG
 ! Older style, awaiting conversion
 logical, public, parameter ::    &
    DEBUG_ADV            = .false. &
-  ,DEBUG_BLM            = .false. & ! Produces matrix of differnt Kz and Hmix
   ,DEBUG_DERIVED        = .false. &
   ,DEBUG_ECOSYSTEMS     = .false. &
   ,DEBUG_EMISSTACKS     = .false. &
-  ,DEBUG_Kz             = .false. &
   !!,DEBUG_DRYDEP         = .false. &
     ,DEBUG_MY_DRYDEP    = .false. &
     ,DEBUG_CLOVER       = .false. &
-  ,DEBUG_EMISTIMEFACS   = .false. &
   ,DEBUG_LANDIFY        = .false. &
   ,DEBUG_MASS           = .false. &
   ,DEBUG_NEST           = .false. &
@@ -114,7 +116,6 @@ logical, public, parameter ::    &
   ,DEBUG_OUT_HOUR       = .false. & ! Debug Output_hourly.f90
     ,DEBUG_DUST           = .false. & ! Skips fast chemistry to save some CPU
     ,DEBUG_WETDEP       = .false. &
-  ,DEBUG_RB             = .false. &
-  ,DEBUG_SOILWATER      = .false. 
+  ,DEBUG_RB             = .false.
 
 end module Debug_module

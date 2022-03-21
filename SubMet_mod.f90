@@ -1,7 +1,7 @@
-! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,16 +35,17 @@ module SubMet_mod
 !  The sub-grid part of this module is also undergoing constant change!!
 !=============================================================================
 
-use BLPhysics_mod, only: MIN_USTAR_LAND
+!F21 use BLPhysics_mod, only: MIN_USTAR_LAND
 use CheckStop_mod, only: StopAll, CheckStop
-use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES &
+use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES, PBL &
                       , Zmix_ref !height at which concentration above different landuse are considered equal 
 use Debug_module,  only: DEBUG     !Needs DEBUG_RUNCHEM and DEBUG%SUBMET to get debug_flag
+use DO3SE_mod, only: do3se
 use Functions_mod, only: T_2_Tpot  !needed if FluxPROFILE == Ln95
 use LandDefs_mod,   only: LandType, LandDefs
 use Landuse_mod,    only: LandCover
 use LocalVariables_mod, only: Grid, SubDat
-use MetFields_mod, only: ps        !needed if FluxPROFILE == Ln95
+use MetFields_mod, only: ps, fSW40, fSW50, fSW90        !needed if FluxPROFILE == Ln95
 use MicroMet_mod, only:  PsiM, AerRes    !functions
 use MicroMet_mod, only:  Launiainen1995
 use PhysicalConstants_mod, only: PI, RGAS_KG, CP, GRAV, KARMAN, CHARNOCK, T0
@@ -143,10 +144,17 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
         Sub(iL)%is_forest = LandType(iL)%is_forest
         Sub(iL)%is_crop   = LandType(iL)%is_crop   
 
-        Sub(iL)%fSW    = Grid%fSW ! probably  not needed, but safest
+        Sub(iL)%fSW    = Grid%fSW50 ! probably  not needed, but safest
 
        ! For Mills et al, GCB, 2018 we used irrigated wheat:
-        if( index( LandDefs(iL)%name , 'Irrigated' ) > 0 ) Sub(iL)%fSW = 1.0
+        if( index( LandDefs(iL)%name , '_Irrig' ) > 0 ) then
+          Sub(iL)%fSW = 1.0
+        else if ( do3se(iL)%SMICrit > 0.6 ) then
+          Sub(iL)%fSW = Grid%fSW90
+        else if ( do3se(iL)%SMICrit < 0.49) then
+          Sub(iL)%fSW = Grid%fSW40
+          if ( dbg) write(*,*) 'SUBSW40 ', iL, do3se(iL)%SMICrit, Sub(iL)%fSW
+        end if
 
 
      ! If NWP thinks this is a sea-square, but we anyway have land,
@@ -253,6 +261,11 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
 
    else if ( FluxPROFILE == "Iter" ) then
 
+if ( PBL%NEUTRAL_USTAR_START ) then
+        Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
+         (log( Sub(iL)%z_refd/Sub(iL)%z0 ))
+end if
+
     do iter = 1, NITER 
 
         ! ****
@@ -301,7 +314,7 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
               !  PsiM( Sub(iL)%z_refd*Sub(iL)%invL )
            end if
 
-       Sub(iL)%ustar = max( Sub(iL)%ustar, MIN_USTAR_LAND )
+       Sub(iL)%ustar = max( Sub(iL)%ustar, PBL%MIN_USTAR_LAND )
     end do ! iter
   else
      call StopAll(dtxt//"Incorrect FluxPROFILE")
@@ -359,7 +372,26 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
 
 !  *****  Calculate rh and vpd  *********
 
-!  
+!The equation below relies on the following assumptions: epsilon=0.622
+!and L=2.5x10^6 Joules/Kg, where "epsilon" and "L" denote the ratio of 
+!the gas constants for dry air against water vapour and the latent
+!heat of vaporization, respectively.
+
+
+     esat = ESAT0 * exp(0.622*2.5e6*((1.0/T0) - (1.0/Sub(iL)%t2))/RGAS_KG )
+
+!Calculating RH near veg, and VPD
+!Feb 2021 change. Just use NWP rh2m, instead of latent heat calculation
+! Simplifies the code, and seems more consistent with use of T2m from NWP,
+! and as we have only grid-average LE to work with.
+
+
+    if ( USES%RH_FROM_NWP ) then 
+     e=Grid%rh2m * esat
+     Sub(iL)%rh = Grid%rh2m
+
+    else ! Calculate RGH at 2m for each land-cover (original method)
+
 !....The model has the specific humidity qw_ref for the lowest model layer as 
 !    an input obtained from the NWP model.  We now correct this down to 
 !    z_0+d metres above the ground using q(z_0+d) = q(z2) + Q*Ra_ref,
@@ -378,13 +410,6 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
 
        e = qw * Grid%psurf/0.622
 
-!The equation below relies on the following assumptions: epsilon=0.622
-!and L=2.5x10^6 Joules/Kg, where "epsilon" and "L" denote the ratio of 
-!the gas constants for dry air against water vapour and the latent
-!heat of vaporization, respectively.
-
-
-     esat = ESAT0 * exp(0.622*2.5e6*((1.0/T0) - (1.0/Sub(iL)%t2))/RGAS_KG )
 
     if (  dbg ) write(*,"(a15,2f12.6,2f12.3)") dtxt//"water", Grid%qw_ref,&
       qw, Sub(iL)%LE, 100.0*e/esat
@@ -399,6 +424,11 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
      !e = min(esat,e)          ! keeps rh <= 1
      Sub(iL)%rh = e/esat
      Sub(iL)%rh = min(1.0,Sub(iL)%rh)! keeps rh <= 1
+
+    end if ! USES%RH_FROM_NWP 
+
+! Just use NWP rh
+    if (dbg) write(6,"(a22,2f12.4,2es12.4)") dtxt//"RH2", Sub(iL)%rh, Grid%rh2m, e,Grid%rh2m * esat
 
 !  ****  leaf sat. vapour pressure
 

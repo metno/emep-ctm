@@ -1,7 +1,7 @@
-! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -53,27 +53,28 @@ module Met_mod
 
 use BLPhysics_mod,         only: &
    KZ_MINIMUM, KZ_SBL_LIMIT, PIELKE   &
-!NWPHMIX  ,HmixMethod, UnstableKzMethod, StableKzMethod, KzMethod  &
-  , UnstableKzMethod, StableKzMethod, KzMethod  &
-  ,USE_MIN_KZ              & ! From old code, is it needed?
-  ,MIN_USTAR_LAND          & ! sets u* > 0.1 m/s over land
+  !NOW in PBL , UnstableKzMethod, StableKzMethod , KzMethod  &
+  !NOW in PBL ,USE_MIN_KZ              & ! From old code, is it needed?
   ,OB_invL_LIMIT           & !
   ,Test_BLM                & ! Tests all Kz, Hmix routines
   ,JericevicRiB_Hmix0      & ! Used, now allows shallow SBL
+  ,JericevicRiB_Hmix0_surfT  &
   ,SeibertRiB_Hmix_3d      &
   ,BrostWyngaardKz         &
   ,JericevicKz             &
+  ,SILAMKz                 & 
+  ,TROENKz                 &
   ,TI_Hmix                 &
   ,PielkeBlackadarKz       &
   ,O_BrienKz               &
-  ,NWP_Kz                  & ! Kz from meteo
+  !NOW in PBL , ,NWP_Kz                  & ! Kz from meteo
   ,Kz_m2s_toSigmaKz        &
   ,Kz_m2s_toEtaKz        &
   ,SigmaKz_2_m2s
 
-use CheckStop_mod,         only: CheckStop
+use CheckStop_mod,         only: CheckStop, StopAll
 use Config_module,    only: PASCAL, PT, Pref, METSTEP  &
-     ,PBL & ! Has ZiMIN, ZiMAX, HmixMethod
+     ,PBL & ! Has ZiMIN, ZiMAX, HmixMethod, MIN_USTAR_LAND
      ,KMAX_BND, KMAX_MID, MasterProc, nmax  &
      ,GRID & !HIRHAM,EMEP,EECCA etc.
      ,TEGEN_DATA, USES &
@@ -82,8 +83,7 @@ use Config_module,    only: PASCAL, PT, Pref, METSTEP  &
      ,LANDIFY_MET,MANUAL_GRID  &
      ,CW_THRESHOLD,RH_THRESHOLD, CW2CC, JUMPOVER29FEB, meteo, startdate&
      ,SoilTypesFile, Soil_TegenFile, TopoFile, SurfacePressureFile
-use Debug_module,       only: DEBUG,DEBUG_BLM, DEBUG_Kz, &
-                              DEBUG_SOILWATER, DEBUG_LANDIFY 
+use Debug_module,       only: DEBUG, DEBUG_LANDIFY 
 use FastJ_mod,          only: setup_phot_fastj,rcphot_3D
 use Functions_mod,      only: Exner_tab, Exner_nd
 use Functions_mod,      only: T_2_Tpot, StandardAtmos_kPa_2_km 
@@ -94,7 +94,8 @@ use GridValues_mod,     only: glat, xm_i, xm_j, xm2         &
        ,KMAX_MET,External_Levels_Def,k1_met,k2_met,x_k1_met,rot_angle&
        ,Read_KMAX,remake_vertical_levels_interpolation_coeff
 
-use Io_mod ,            only: ios, datewrite, PrintLog, IO_LOG
+use Io_mod ,            only: ios, datewrite, IO_LOG
+use Io_RunLog_mod,      only: PrintLog
 use Landuse_mod,        only: water_fraction, water_frac_set, &
                                 likely_coastal, mainly_sea
 use MetFields_mod
@@ -111,7 +112,8 @@ use Par_mod,               only: MAXLIMAX,MAXLJMAX,GIMAX,GJMAX, me  &
 use PhysicalConstants_mod, only: KARMAN, KAPPA, RGAS_KG, CP, GRAV
 use TimeDate_mod,          only: current_date, date,nmdays, &
      add_secs,timestamp, make_timestamp, make_current_date
-use NetCDF_mod,        only: ReadField_CDF,vertical_interpolate,GetCDF_modelgrid,ReadTimeCDF
+use NetCDF_mod,        only: ReadField_CDF,vertical_interpolate,&
+                         GetCDF_modelgrid,ReadTimeCDF,printCDF
 use netcdf
 use TimeDate_ExtraUtil_mod,only: nctime2date,date2string,date2nctime
 
@@ -343,7 +345,7 @@ subroutine MeteoRead()
   integer :: INFO,i_large,j_large
   logical, save:: ps_in_hPa = .true.
   logical, save:: precip_accumulated = .false.
-  
+  logical, save:: rh2m_in_percent  = .true.
   if(.not. first_call)then
      if(current_date%seconds /= 0 .or. (mod(current_date%hour,METSTEP)/=0) )return
   endif
@@ -691,6 +693,10 @@ subroutine MeteoRead()
 
   lwc = 0.6e-6*cc3d
 
+  if(foundprecip .and. USES%NO_3DPRECIP)then
+    call PrintLog("WARNING: ignoring 3D precipitations", MasterProc)
+    foundprecip=.false.
+  end if
   if(.not.foundprecip)then
     !Will construct 3D precipitations from 2D precipitations
     if(write_now)write(*,*)'WARNING: deriving 3D precipitations from 2D precipitations '
@@ -728,10 +734,10 @@ subroutine MeteoRead()
        CALL MPI_ALLREDUCE(minprecip, x_out, 1,MPI_DOUBLE_PRECISION, &
             MPI_MIN, MPI_COMM_CALC, IERROR)
        minprecip=x_out
-       if(minprecip<-10)then
+       if(minprecip<-1)then
           if(me==0)write(*,*)'WARNING: found negative precipitations. '&
-             ,'set precipitations to zero!',minprecip
-          surface_precip = 0.0
+             ,' accumulated precipitations restarted!',minprecip
+          surface_precip = max(0.0,surface_precip*0.001/(METSTEP*3600))
        else
           surface_precip = max(0.0, & ! get only the variation. mm ->m/s
              (surface_precip - surface_precip_old))*0.001/(METSTEP*3600)
@@ -920,7 +926,7 @@ subroutine MeteoRead()
   end if
 
   ! Kz from meteo
-  if(NWP_Kz) then
+  if(PBL%NWP_Kz) then
     if(foundKz_met)then
       Kz_met=max(0.0,Kz_met)  ! only positive Kz
     elseif(MasterProc.and.first_call)then
@@ -932,7 +938,17 @@ subroutine MeteoRead()
   ndim=2
 
   if(foundrh2m)then
-    rh2m(:,:,nr) = 0.01 * rh2m(:,:,nr)  ! Convert from % to fraction
+     ! correct for rh2m in  % units or fraction
+     if(first_call)then
+        if(maxval(rh2m)<1.1)then
+           rh2m_in_percent = .false.
+           if(write_now)write(*,*)'Asuming rh2m in fraction units'
+        else
+           if(write_now)write(*,*)'Asuming rh2m in percent units'
+           rh2m_in_percent = .true.
+        endif
+     endif
+    if (rh2m_in_percent) rh2m(:,:,nr) = 0.01 * rh2m(:,:,nr)  ! Convert from % to fraction
   else
     if(MasterProc.and.first_call)&
       write(*,*)'WARNING: relative_humidity_2m not found'
@@ -952,6 +968,18 @@ subroutine MeteoRead()
     ! rough conversion wrf->SMI . Can be improved!
     SoilWater_uppr(:,:,nr)=(SoilWater_uppr(:,:,nr)-0.05)*3
     SoilWater_deep(:,:,nr)=(SoilWater_deep(:,:,nr)-0.05)*3
+    !convert from kg H2O per kg Air (kg/kg) into relative humidity (relative to saturation) 
+    do j=1,ljmax
+       do i=1,limax
+          temperature = t2_nwp(i,j,nr)
+          !saturation water pressure
+          swp = 611.2*exp(17.67*(temperature-273.15)/(temperature-29.65))
+          !water pressure
+          wp = rh2m(i,j,nr)*ps(i,j,nr)/0.622
+          rh2m(i,j,nr)= wp/swp
+          rh2m(i,j,nr)=min(1.0,max(0.0,rh2m(i,j,nr)))
+       end do
+    end do
   end if
 
   if(LANDIFY_MET)then
@@ -1021,7 +1049,7 @@ subroutine MeteoRead()
       foundSMI1=.false.
       do isw = 1, size(possible_soilwater_uppr)
         namefield=possible_soilwater_uppr(isw)
-        if((DEBUG_SOILWATER.or.first_call).and.MasterProc) &
+        if((DEBUG%SOILWATER.or.first_call).and.MasterProc) &
                write(*,*) "Met_mod: soil water search ",isw,trim(namefield)
         call Getmeteofield(meteoname,namefield,nrec,ndim,unit,validity,&
                SoilWater_uppr(:,:,nr),needed=met(ix_SoilWater_uppr)%needed,found=foundSoilWater_uppr)
@@ -1143,6 +1171,12 @@ subroutine MeteoRead()
     SoilWater_deep(:,:,nr) = max(0.0, SoilWater_deep(:,:,nr) )
     SoilWater_uppr(:,:,nr) = min(1.0, SoilWater_uppr(:,:,nr))
     SoilWater_deep(:,:,nr) = min(1.0, SoilWater_deep(:,:,nr) )
+    where ( water_fraction > 0.999 )
+      SoilWater_uppr(:,:,nr) = 1.0
+      SoilWater_deep(:,:,nr) = 1.0
+    end where
+    if(MasterProc .and. first_call) write(*,*) 'SEISMI', water_frac_set, &
+          minval(water_fraction), maxval(water_fraction)
 
   end if ! USES%SOILWATER
 
@@ -1562,7 +1596,7 @@ subroutine met_derived(nt)
   where ( mainly_sea )
      ustar_nwp = max( ustar_nwp, 1.0e-5 )
   elsewhere
-     ustar_nwp = max( ustar_nwp, MIN_USTAR_LAND )
+     ustar_nwp = max( ustar_nwp, PBL%MIN_USTAR_LAND )
   end where
 
   forall( i=1:limax, j=1:ljmax )
@@ -1641,12 +1675,13 @@ subroutine BLPhysics()
   real, dimension(KMAX_MID) :: Kz_nwp
   real    :: Kz_min, stab_h
 
-  integer i,j,k,nr
+  integer i,j,k,nr, ii, jj
   real :: theta2
   logical :: debug_flag
   logical,save :: first_call = .true.
+  character(len=*), parameter :: dtxt='MetBL:'
 
-  call CheckStop(KZ_SBL_LIMIT < 1.01*KZ_MINIMUM, "SBLlimit too low! in Met_mod")
+  call CheckStop(KZ_SBL_LIMIT < 1.01*KZ_MINIMUM, dtxt//"SBLlimit too low! in Met_mod")
 
   ! Preliminary definitions
   nr = 2
@@ -1671,19 +1706,21 @@ subroutine BLPhysics()
   end do
 
 
-  if ( debug_proc .and. DEBUG_Kz) then
-    i = debug_iloc
-    j = debug_jloc
-    write(*,"(a,i4,2f12.5)") "TESTNR th ",nr,th(i,j,20,[1,nr])
-    write(*,"(a,i4,2f12.5,es10.2)") "TESTNR fh ",nr,fh(i,j,[1,nr]),invL_nwp(i,j)
-    write(*,"(a,i4,2es10.2)") "TESTNR ps ",nr,ps(i,j,[1,nr])
+  ii=-999; jj= -999 ! shorthands for debug_i(j)loc 
+  if ( debug_proc .and. DEBUG%Kz) then
+    ii = debug_iloc
+    jj = debug_jloc
+    write(*,"(a,i4,2f12.5)") dtxt//"TESTNR th ",nr,th(ii,jj,20,[1,nr])
+    write(*,"(a,i4,2f12.5,es10.2)") dtxt//"TESTNR fh ",&
+       nr, fh(ii,jj,[1,nr]),invL_nwp(ii,jj)
+    write(*,"(a,i4,2es10.2)") dtxt//"TESTNR ps ",nr,ps(ii,jj,[1,nr])
   end if
 
   !..................................
   ! Start choice of Kz and Hmix methods
   !..................................
 
-  if (NWP_Kz .and. foundKz_met ) then  ! read from met data
+  if (PBL%NWP_Kz .and. foundKz_met ) then  ! read from met data
     ! LAter we should remove Kz_met and Kz_m2s
     forall(i=1:limax,j=1:ljmax,k=2:KMAX_MID)
       SigmaKz(i,j,k,nr)=Kz_met(i,j,k,nr)/(60*60*METSTEP)
@@ -1693,13 +1730,13 @@ subroutine BLPhysics()
 
     if( debug_proc ) Kz_nwp(:) = Kz_m2s(debug_iloc,debug_jloc,:) !for printout
 
-    if( debug_proc .and. DEBUG_Kz)then
-      write(6,*) '*** After Set SigmaKz', sum(SigmaKz(:,:,:,nr)), &
+    if( debug_proc .and. DEBUG%Kz)then
+      write(6,*) dtxt//'*** After Set SigmaKz', sum(SigmaKz(:,:,:,nr)), &
          minval(SigmaKz(:,:,:,nr)), maxval(SigmaKz(:,:,:,nr)), &
-         DEBUG_Kz, 'NWP_Kz:',NWP_Kz, &
+         DEBUG%Kz, 'NWP_Kz:',PBL%NWP_Kz, &
         '*** After convert to z',sum(Kz_m2s(:,:,:)), &
         minval(Kz_m2s(:,:,:)), maxval(Kz_m2s(:,:,:))
-      write(6,*) 'After Set SigmaKz KTOP', Kz_met(debug_iloc,debug_jloc,1,nr)
+      write(6,*) dtxt//'After Set SigmaKz KTOP', Kz_met(ii,jj,1,nr)
     end if
 
   else   ! Not NWP Kz. Must calculate
@@ -1711,7 +1748,7 @@ subroutine BLPhysics()
     do j=1,ljmax
       do i=1,limax
 
-        debug_flag = ( DEBUG_Kz .and. debug_proc .and. &
+        debug_flag = ( DEBUG%Kz .and. debug_proc .and. &
              i == debug_iloc .and. j == debug_jloc )
 
         call PielkeBlackadarKz ( &
@@ -1763,16 +1800,34 @@ subroutine BLPhysics()
                 z_mid(i,j,:), th(i,j,:,nr),  pzpbl(i,j))
           end do
         end do
+!     elseif ( PBL%HmixMethod == "JcRb_surfT" ) then   
+!        do i=1,limax
+!          do j=1,ljmax
+!            theta2 = tsurf_nwp(i,j,nr) * T_2_Tpot(ps(i,j,nr)) !use tsurf
+!            call JericevicRiB_Hmix0_surfT(&
+!                u_mid(i,j,:), v_mid(i,j,:),  &
+!                z_mid(i,j,:), th(i,j,:,nr), theta2, invL_nwp(i,j), pzpbl(i,j))
+!          end do
+!        end do
+      elseif ( PBL%HmixMethod == "JcRb_t2m" ) then   
+        do i=1,limax
+          do j=1,ljmax
+            theta2 = t2_nwp(i,j,nr) * T_2_Tpot(ps(i,j,nr)) !use t2
+            call JericevicRiB_Hmix0_surfT(& ! call same method but use t2
+                u_mid(i,j,:), v_mid(i,j,:),  &
+                z_mid(i,j,:), th(i,j,:,nr), theta2, invL_nwp(i,j), pzpbl(i,j))
+          end do
+        end do
       elseif ( PBL%HmixMethod == "NWP" ) then ! NWPHMIX
         do i=1,limax
           do j=1,ljmax
              pzpbl(i,j) = pbl_nwp(i,j,1)
           end do
         end do
-        if ( DEBUG%MET .and. debug_proc) call datewrite("NWP HMIX: ", &
-           [ pbl_nwp(debug_li,debug_lj,1),pbl_nwp(debug_li,debug_lj,2) ] )
+        if ( DEBUG%MET .and. debug_proc) call datewrite(dtxt//"NWP HMIX: ", &
+           [ pbl_nwp(ii,jj,1),pbl_nwp(ii,jj,2) ] )
       else
-        call CheckStop("Need HmixMethod")
+        call CheckStop(dtxt//"Need HmixMethod")
       end if ! end of newer methods
 
      ! Set limits on Zi
@@ -1785,95 +1840,122 @@ subroutine BLPhysics()
     !..spatial smoothing of new zi: Need fixed minimum here. 100 or 50 m is okay
     !  First, we make sure coastal areas had "land-like" values.
 
-    if(LANDIFY_MET) &
-         call landify(pzpbl,"pzbpl")
-     call smoosp(pzpbl,PBL%ZiMIN,PBL%ZiMAX)
+    if(LANDIFY_MET)  call landify(pzpbl,"pzbpl")
+
+    call smoosp(pzpbl,PBL%ZiMIN,PBL%ZiMAX)
 
     !======================================================================
-    ! Kz choices:
+    ! Kz choices for stable (S) and unstable (U):
 
-    if ( KzMethod == "JG" ) then  ! Jericevic/Grisogono for both Stable/Unstable
-      do k = 2, KMAX_MID
-        do j=1,ljmax
-          do i=1,limax
-            Kz_m2s(i,j,k) = JericevicKz(z_bnd(i,j,k),pzpbl(i,j),&
-                                        ustar_nwp(i,j),Kz_m2s(i,j,k))
-          end do
-        end do
-      end do
+    select case ( PBL%KzMethod )
 
-    else ! Specify unstable, stable separately:
-      if ( StableKzMethod == "JG" ) then  ! Jericevic/Grisogono for both Stable/Unstable
-        do j=1,ljmax
-          do i=1,limax
-           if ( invL_nwp(i,j) >= OB_invL_LIMIT ) then !neutral and unstable
-             do k = 2, KMAX_MID
-               if( z_bnd(i,j,k) <  pzpbl(i,j) ) then
-                 Kz_m2s(i,j,k) = JericevicKz(z_bnd(i,j,k),pzpbl(i,j),&
-                                             ustar_nwp(i,j),Kz_m2s(i,j,k))
-               !else: keep Kz from Pielke/BLackadar
-               end if
-             end do
-           end if
-          end do
-        end do
-        if(debug_proc ) then
-          i = debug_iloc
-          j = debug_jloc
-          if(DEBUG_Kz .and. invL_nwp(i,j) >= OB_invL_LIMIT ) then
-            do k = 15, KMAX_MID
-              print "(a,i3,f7.1,3es11.3)", "DEBUG SKz_m2s",k,&
-                pzpbl(i,j), invL_nwp(i,j), ustar_nwp(i,j), Kz_m2s(i,j,k)
-             end do
-          end if
-        end if
-
-      elseif ( StableKzMethod == "BW" ) then
+      case( "JG" )  ! Jericevic/Grisogono for both S/U
         do k = 2, KMAX_MID
           do j=1,ljmax
             do i=1,limax
-              if ( invL_nwp(i,j) > 1.0e-10 ) then !stable ! leaves gap near zero
-                Kz_m2s(i,j,k) = BrostWyngaardKz(z_bnd(i,j,k),pzpbl(i,j),&
+              Kz_m2s(i,j,k) = JericevicKz(z_bnd(i,j,k),pzpbl(i,j),&
+                                        ustar_nwp(i,j),Kz_m2s(i,j,k))
+            end do
+          end do
+        end do
+
+      case( "SILAMKz" )  !SILAMKz for both S/U !qingm
+        do k = 2, KMAX_MID
+          do j=1,ljmax
+            do i=1,limax
+              Kz_m2s(i,j,k) = SILAMKz(z_bnd(i,j,k),pzpbl(i,j),&
+                                 ustar_nwp(i,j),invL_nwp(i,j),Kz_m2s(i,j,k))
+            end do
+          end do
+        end do
+
+      case ( "TROENKz" ) 
+        do k = 2, KMAX_MID
+          do j=1,ljmax
+            do i=1,limax
+              Kz_m2s(i,j,k) = TROENKz(z_bnd(i,j,k),pzpbl(i,j),&
+                                 ustar_nwp(i,j),invL_nwp(i,j),Kz_m2s(i,j,k))
+            end do
+          end do
+        end do
+
+      case ( "Mixed" ) ! Specify unstable, stable separately:
+
+        if ( PBL%StableKzMethod == "JG" ) then !Jericevic/Grisogono for both S/U
+          do j=1,ljmax
+            do i=1,limax
+              if ( invL_nwp(i,j) >= OB_invL_LIMIT ) then !neutral and unstable
+                do k = 2, KMAX_MID
+                  if( z_bnd(i,j,k) <  pzpbl(i,j) ) then
+                    Kz_m2s(i,j,k) = JericevicKz(z_bnd(i,j,k),pzpbl(i,j),&
+                                             ustar_nwp(i,j),Kz_m2s(i,j,k))
+                    !else: keep Kz from Pielke/BLackadar
+                  end if
+                end do !k
+              end if ! invL
+            end do !i
+          end do !j
+          !DS BUGS: outisde i,j loop, and orig used ii,jj
+          !if(debug_proc ) then
+           
+            !DSif(DEBUG%Kz .and. invL_nwp(i,j) >= OB_invL_LIMIT ) then
+            !DS if(DEBUG%Kz .and. invL_nwp(ii,jj) >= OB_invL_LIMIT ) then
+            !DS   do k = 15, KMAX_MID
+            !DS     write(*,"(a,i3,f7.1,3es11.3)")dtxt//" SKz_m2s",k, pzpbl(ii,jj),&
+            !DS        invL_nwp(ii,jj), ustar_nwp(ii,jj), Kz_m2s(ii,jj,k)
+            !DS   end do
+           !DS end if
+          !DSend if
+
+        elseif ( PBL%StableKzMethod == "BW" ) then
+          do k = 2, KMAX_MID
+            do j=1,ljmax
+              do i=1,limax
+                if ( invL_nwp(i,j) > 1.0e-10 ) then !stable ! leaves gap near zero
+                  Kz_m2s(i,j,k) = BrostWyngaardKz(z_bnd(i,j,k),pzpbl(i,j),&
                                 ustar_nwp(i,j),invL_nwp(i,j),Kz_m2s(i,j,k))
               !else: keep Kz from Pielke/BLackadar
+                end if
+              end do
+            end do
+          end do
+
+        else if ( PBL%StableKzMethod == "PB" ) then
+        ! no change (keep Kz from Pielke/BLackadar)
+        else
+          call CheckStop(dtxt//"Need StableKzMethod")
+        end if ! Stable Kz
+
+        if ( PBL%UnstableKzMethod == "OB" ) then
+          do j=1,ljmax
+            do i=1,limax
+              if ( invL_nwp(i,j) < OB_invL_LIMIT ) then !neutral and unstable
+                call O_BrienKz ( &     ! Original EMEP method
+                  pzpbl(i,j),  z_bnd(i,j,:),  &
+                  ustar_nwp(i,j),  invL_nwp(i,j),  &
+                  Kz_m2s(i,j,:), .false.)
               end if
             end do
           end do
-        end do
+          !DS BUGS: outisde i,j loop, and orig used ii,jj
+          !if(debug_proc) then
+          !  if(DEBUG%Kz .and. invL_nwp(ii,jj) <  OB_invL_LIMIT ) then
+          !    do k = 15, KMAX_MID
+          !      write(*,"(a,f7.1,3es10.3)") "DEBUG UKz_m2s", pzpbl(ii,jj),&
+          !       invL_nwp(ii,jj), ustar_nwp(ii,jj), Kz_m2s(ii,jj,k)
+          !    end do
+          !  end if
+          !end if
 
-      else if ( StableKzMethod == "PB" ) then
-        ! no change (keep Kz from Pielke/BLackadar)
-      else
-        call CheckStop("Need StableKzMethod")
-      end if ! Stable Kz
-
-      if ( UnstableKzMethod == "OB" ) then
-        do j=1,ljmax
-          do i=1,limax
-            if ( invL_nwp(i,j) < OB_invL_LIMIT ) then !neutral and unstable
-              call O_BrienKz ( &     ! Original EMEP method
-                pzpbl(i,j),  z_bnd(i,j,:),  &
-                ustar_nwp(i,j),  invL_nwp(i,j),  &
-                Kz_m2s(i,j,:), .false.)
-            end if
-          end do
-        end do
-        if(debug_proc) then
-          i = debug_iloc
-          j = debug_jloc
-          if(DEBUG_Kz .and. invL_nwp(i,j) <  OB_invL_LIMIT ) then
-            do k = 15, KMAX_MID
-              write(*,"(a,f7.1,3es10.3)") "DEBUG UKz_m2s", &
-                pzpbl(i,j), invL_nwp(i,j), ustar_nwp(i,j), Kz_m2s(i,j,k)
-            end do
-          end if
+        else ! PBL%UnstableKzMethod /= "OB" 
+          call StopAll(dtxt//"Need UnstableKzMethod")
         end if
 
-      else
-        call CheckStop("Need UnstableKzMethod")
-      end if
+      case default
+         call StopAll(dtxt//"Undefined KzMethod:"//PBL%KzMethod)
 
-    end if  ! Specify unstable, stable separately:
+    end select ! PBL%KzMethod
+
   end if ! NWP_Kz .and. foundKz_met
 
   forall(i=1:limax,j=1:ljmax)
@@ -1886,42 +1968,43 @@ subroutine BLPhysics()
 
   !************************************************************************!
   ! test some alternative options for Kz and Hmix
-  if( DEBUG_BLM .and. debug_proc .and. modulo( current_date%hour, 3)  == 0 &
+  if( DEBUG%BLM .and. debug_proc .and. modulo( current_date%hour, 3)  == 0 &
          .and. current_date%seconds == 0  ) then
 
-    i = debug_iloc
-    j = debug_jloc
-    p_bnd(:) = A_bnd(:)+B_bnd(:)*ps(i,j,nr)
+    p_bnd(:) = A_bnd(:)+B_bnd(:)*ps(ii,jj,nr)
 
   !************************************************************************!
   ! We test all the various options here. Pass in  data as keyword arguments
   ! to avoid possible errors!
 
     call Test_BLM( mm=current_date%month, dd=current_date%day, &
-           hh=current_date%hour, fH=fh(i,j,nr), &
-           u=u_mid(i,j,:),v=v_mid(i,j,:), zm=z_mid(i,j,:), &
-           zb=z_bnd(i,j,:), exnm=exnm(i,j,:), Kz=Kz_m2s(i,j,:), &
-           Kz_nwp=Kz_nwp(:), invL=invL_nwp(i,j), &
-           q=q(i,j,:,nr),  & ! TEST Vogel
-           ustar=ustar_nwp(i,j), th=th(i,j,:,nr), pb=p_bnd(:), zi=pzpbl(i,j))
+           hh=current_date%hour, fH=fh(ii,jj,nr), &
+           u=u_mid(ii,jj,:),v=v_mid(ii,jj,:), zm=z_mid(ii,jj,:), &
+           zb=z_bnd(ii,jj,:), exnm=exnm(ii,jj,:), Kz=Kz_m2s(ii,jj,:), &
+           Kz_nwp=Kz_nwp(:), invL=invL_nwp(ii,jj), &
+           q=q(ii,jj,:,nr),  & ! TEST Vogel
+           ustar=ustar_nwp(ii,jj), th=th(ii,jj,:,nr),&
+           pb=p_bnd(:), zi=pzpbl(ii,jj))
   !************************************************************************!
-    hs = z_bnd(i,j,KMAX_MID)
+    hs = z_bnd(ii,jj,KMAX_MID)
 
-    stab_h = min( PsiH(hs*invL_nwp(i,j)), 0.9 )
-    Kz_min = ustar_nwp(i,j)*KARMAN*hs /( 1 - stab_h  )
-    write(*,"(a,10f10.3)") "PSIH ", stab_h, fh(i,j,nr), invL_nwp(i,j), &
-             PsiH(hs*invL_nwp(i,j)),Kz_min
+    stab_h = min( PsiH(hs*invL_nwp(ii,jj)), 0.9 )
+    Kz_min = ustar_nwp(ii,jj)*KARMAN*hs /( 1 - stab_h  )
+    write(*,"(a,10f10.3)") "PSIH ", stab_h, fh(ii,jj,nr), &
+       invL_nwp(ii,jj), PsiH(hs*invL_nwp(ii,jj)),Kz_min
 
   end if ! end of debug extra options
 
 
   !***************************************************
-  if ( .not. (NWP_Kz .and. foundKz_met) ) then  ! convert to Sigma units
+  if ( .not. (PBL%NWP_Kz .and. foundKz_met) ) then  ! convert to Sigma units
 
-    call Kz_m2s_toSigmaKz (Kz_m2s(1:limax,1:ljmax,:),roa(1:limax,1:ljmax,:,nr),&
-         ps(1:limax,1:ljmax,nr),SigmaKz(1:limax,1:ljmax,:,nr))
+    call Kz_m2s_toSigmaKz (Kz_m2s(1:limax,1:ljmax,:),&
+      roa(1:limax,1:ljmax,:,nr), ps(1:limax,1:ljmax,nr), &
+      SigmaKz(1:limax,1:ljmax,:,nr))
     call Kz_m2s_toEtaKz (Kz_m2s(1:limax,1:ljmax,:),roa(1:limax,1:ljmax,:,nr),&
-         ps(1:limax,1:ljmax,nr),EtaKz(1:limax,1:ljmax,:,nr),Eta_mid,A_mid,B_mid)
+      ps(1:limax,1:ljmax,nr),EtaKz(1:limax,1:ljmax,:,nr),&
+      Eta_mid,A_mid,B_mid)
 
   end if
   !***************************************************
@@ -2550,7 +2633,7 @@ subroutine tkediff (nr)
 
       ! Calculate PBL height according to Holtslag et al. (1993)
       pblht(i,j)=0.
-      if(k.ne.KMAX_MID) then
+      if(k /= KMAX_MID) then
         fract1=(RIC-rib(k+1))/(rib(k)-rib(k+1))
         fract2=1.-fract1
         apbl=z_mid(i,j,k)*fract1
@@ -2568,7 +2651,7 @@ subroutine tkediff (nr)
         iblht(i,j)=KMAX_MID
       end if
 
-      if(pblht(i,j).le.100.) then              !Minimum of PBL height
+      if(pblht(i,j) <= 100.) then              !Minimum of PBL height
         pblht(i,j)=100.
       end if
 
@@ -2691,8 +2774,8 @@ subroutine tkediff (nr)
         eddyz(i,j,k)=eddyz(i,j,k)*((sigma_mid(k)-sigma_mid(    k-1))/   &
               (    z_mid(i,j,k)-z_mid(i,j,k-1)))**2.
       end do
-     ENDDO
-  ENDDO ! long loop
+     end do
+  end do ! long loop
 
   !     Store diffusivity coefficients into skh(i,j,k,nr) array
   do k=2,KMAX_MID
@@ -3140,6 +3223,7 @@ end subroutine Check_Meteo_Date_Type
 subroutine read_surf_elevation(ix)
 
   integer :: ix
+  character(len=10) :: src
 
   call GetCDF_modelgrid(met(ix)%name,TopoFile,met(ix)%field,&
                         1,1,1,1,needed=met(ix)%needed,found=met(ix)%found)
@@ -3150,9 +3234,15 @@ subroutine read_surf_elevation(ix)
           met(ix)%field,1,needed=.true.,interpol='zero_order')
      
      met(ix)%field=1000.0*StandardAtmos_kPa_2_km(0.001*met(ix)%field)
+     src = 'fromP'
   else
      if( me==0 )write(*,*)'Read met topography '//trim(met(ix)%name)//' from '//trim(TopoFile)//', typical value:',met(ix)%field(5,5,1,1)
+     src = 'Topo'
   endif
+  !if(MasterProc.and.DEBUG%MET) write(*,*) 'Elev:'//src,maxval(met(ix)%field(:,:,1,1))
+  if(MasterProc.and.DEBUG%MET) write(*,*) 'Elev_'//trim(TopoFile),met(ix)%needed,met(ix)%found
+  if(MasterProc.and.DEBUG%MET) write(*,*) 'Elev_'//src,maxval(met(ix)%field(:,:,1,1))
+  if(MasterProc.and.DEBUG%MET) call printCDF('Elev_'//src,met(ix)%field(:,:,1,1),'m')
 
 end subroutine read_surf_elevation
 

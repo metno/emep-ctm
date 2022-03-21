@@ -1,7 +1,7 @@
-! <YieldModifications_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <YieldModifications_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,10 +35,11 @@
 !
  module YieldModifications_mod
 
-  use CheckStop_mod,   only : StopAll
+  use CheckStop_mod,   only : CheckStop, StopAll
   use ChemFields_mod             ! => cell_tinv,  NSPEC_TOT, O3, NO2, etc.
-  use ChemSpecs_mod              ! => NSPEC_TOT, O3, NO2, etc.
-  use Config_module,   only : MasterProc,YieldModifications ! JPCIsoYield
+  use ChemSpecs_mod ,   only : species
+  use Config_module,   only : MasterProc,YieldModifications &! JPCIsoYield
+                             , C5H8_ix, NO_ix, HO2_ix
   use Debug_module,    only : DebugCell, DEBUG  !-> DEBUG%SOA
   use NumberConstants, only : UNDEF_R, UNDEF_I
   use SmallUtils_mod,  only : find_index, trims
@@ -374,53 +375,56 @@
      real          ::  fluxNO, fluxHO2, fluxRO2, fNO
      integer ::isoa
 
+     call CheckStop( NO_ix<1, "NO not defined" )
+     call CheckStop( HO2_ix<1, "HO2 not defined" )
+
      kro2no  = 2.54e-12*exp(360*cell_tinv)
      kro2ho2 = 2.91e-13*exp(1300*cell_tinv) ! will modify below
 
-     fluxNO  = kro2no*xnew(NO)
-     fluxHO2 = kro2ho2*xnew(HO2)
+     fluxNO  = kro2no*xnew(NO_ix)
+     fluxHO2 = kro2ho2*xnew(HO2_ix)
 !for later     fluxRO2 = xnew(RO2POOL)
      fluxRO2 = 0. ! initially neglect RO2+RO2-reactions
 
      fNO = 0.0   ! default, eg on 1st call
     ! Loop over bins.
      isoa=1  ! Xylenes
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCOXY(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNOXY(:) = YCOXY(:) * Yemep(isoa)%ratio
 
      isoa=2  ! Alkanes
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCALK(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNALK(:) = YCALK(:) * Yemep(isoa)%ratio
 
      isoa=3  ! Alkenes
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCOLE(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNOLE(:) = YCOLE(:) * Yemep(isoa)%ratio
 
      isoa=4  ! Isop
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCISOP(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNISOP(:) = YCISOP(:) * Yemep(isoa)%ratio
 
      isoa=5  ! terp
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCTERP(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNTERP(:) = YCTERP(:) * Yemep(isoa)%ratio
 
      isoa=6  ! IVOC
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCIVOC(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNIVOC(:) = YCIVOC(:) * Yemep(isoa)%ratio
 
      isoa=8 ! Benzene
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCBENZ(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNBENZ(:) = YCBENZ(:) * Yemep(isoa)%ratio
 
      isoa=9 ! Toluene
-     if(xnew(NO)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
+     if(xnew(NO_ix)>1.0 ) fNO  = fluxNO/(fluxNO+fluxHO2*Yemep(isoa)%fHO2RO2+fluxRO2*Yemep(isoa)%kRO2 )
      YCTOL(:) = fno * Yemep(isoa)%highnox(:) + (1-fNO) * Yemep(isoa)%lownox(:)
      YNTOL(:) = YCTOL(:) * Yemep(isoa)%ratio
 
@@ -554,9 +558,9 @@
      dmt =xnew(i_mt)
      ratio = diso /(1.0+diso + dmt )
 
-     if ( dbg ) then
+     if ( dbg .and. C5H8_ix>0) then
         write(*,"(4a,4es12.3)") dtxt, DEBUG%datetxt, "====", &
-             dtxt, diso,dmt, ratio, xnew(C5H8)
+             dtxt, diso,dmt, ratio, xnew(C5H8_ix)
      end if
 
      if ( ratio < 0.01 )  then    ! exact to 3 sig figs

@@ -1,7 +1,7 @@
-! <MassBudget_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <MassBudget_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -37,13 +37,14 @@ use Config_module,    only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d field
                               MasterProc,       & ! Master processor
                               dt_advec,         & ! time-step
                               PT,               & ! Pressure at top
-                              USES, FOUND_OCEAN_DMS,&
+                              USES, DMS,&
                               EXTENDEDMASSBUDGET
 use Debug_module,     only: DEBUG_MASS
 use EmisDef_mod,      only: O_NH3, O_DMS
 use GridValues_mod,   only: xmd, &  
                               gridwidth_m,dA,dB,debug_proc,debug_li,debug_lj
-use Io_mod,           only: IO_LOG, PrintLog, datewrite
+use Io_mod,           only: IO_LOG, datewrite
+use Io_RunLog_mod,    only: PrintLog
 use MetFields_mod,    only: ps            ! surface pressure
 ! do not use "only", because MPI_IN_PLACE does not behave well on certain
 ! versions of gfortran(?), and MPI stuff clearly inidcated anyway
@@ -411,7 +412,7 @@ subroutine massbudget()
      close(iomb)
   end if  ! MasterProc
 
-  if(FOUND_OCEAN_DMS)then
+  if(DMS%FileFound)then
      ! update dms budgets
      CALL MPI_ALLREDUCE(MPI_IN_PLACE, O_DMS%sum_month, 1,&
           MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)

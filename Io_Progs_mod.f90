@@ -1,7 +1,7 @@
-! <Io_Progs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <Io_Progs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,11 +30,6 @@
 !    is designed for EMEP format input files, using specific headers.
 !    Read_Headers can also be used to check that all required columns
 !    are available, or to read files with columns in arbitray positions.
-!
-! Language: F-compliant, except system calls in Self_Test
-! (Can be run with F is test-input file created manually
-!  and system calls commented out, as here)
-!  Dave Simpson, 1999-2007
 !_____________________________________________________________________________
 
 use CheckStop_mod,           only: CheckStop
@@ -46,8 +41,8 @@ use MPI_Groups_mod,          only : MPI_INTEGER, MPI_CHARACTER, MPI_COMM_CALC, I
 use KeyValueTypes,           only: KeyVal, KeyValue, LENKEYVAL
 use OwnDataTypes_mod,        only: TXTLEN_NAME
 use Par_mod,                 only: me, limax,ljmax
-use SmallUtils_mod,          only: wordsplit, WriteArray
-use TimeDate_mod,            only: date,current_date
+use SmallUtils_mod,          only: wordsplit, WriteArray, str_replace
+use TimeDate_mod,            only: date,current_date, print_date
 use TimeDate_ExtraUtil_mod,  only: date2string
 implicit none
 
@@ -60,7 +55,7 @@ public :: open_file     !  checks that file exists and opens if required
 public :: Read_Headers  !  Reads header information from input files
 public :: Read2D        !  Reads x,y,z data for simple case
 public :: Read2DN       !  Reads x,y,z1...z2 data for simple case
-public :: PrintLog      !  writes message to both RunLog and unit 6
+!public :: PrintLog      !  writes message to both RunLog and unit 6
 public :: datewrite     ! writes date then data - helper sub
 private :: datewrite_ia,&   ! int, array vesion
            datewrite_iia,&  !  array of ints and reals version
@@ -80,21 +75,21 @@ end interface datewrite
 
 contains
 !-------------------------------------------------------------------------
-subroutine PrintLog(txt,OutputProc,ioOption)
-  character(len=*), intent(in) :: txt
-  logical, intent(in), optional :: OutputProc  !typically MasterProc, me==0
-  integer, intent(in), optional :: ioOption    !use for other files
-  logical :: ok2print
-  integer :: io
-  ok2print = .true.
-  if ( present(OutputProc) ) ok2print = OutputProc
-  if ( ok2print) then
-    io = IO_LOG
-    if ( present(ioOption) ) io = ioOption
-    write(*,fmt='(A)')  trim(txt)
-    write(io,fmt='(A)')  trim(txt)
-  end if
-end subroutine PrintLog
+!subroutine PrintLog(txt,OutputProc,ioOption)
+!  character(len=*), intent(in) :: txt
+!  logical, intent(in), optional :: OutputProc  !typically MasterProc, me==0
+!  integer, intent(in), optional :: ioOption    !use for other files
+!  logical :: ok2print
+!  integer :: io
+!  ok2print = .true.
+!  if ( present(OutputProc) ) ok2print = OutputProc
+!  if ( ok2print) then
+!    io = IO_LOG
+!    if ( present(ioOption) ) io = ioOption
+!    write(*,fmt='(A)')  trim(txt)
+!    write(io,fmt='(A)')  trim(txt)
+!  end if
+!end subroutine PrintLog
 !-------------------------------------------------------------------------
 subroutine read_line(io_in,txt,status,label,printif)
 !  Reads one line of input on host (MasterProc), broadcasts to other processors
@@ -515,23 +510,32 @@ subroutine Read2DN(fname,Ndata,data2d,CheckValues,HeadersRead)
   end if
 end subroutine Read2DN
 !-------------------------------------------------------------------------
-subroutine datewrite_ia (txt,ii,array,txt_pattern)
+subroutine datewrite_ia (txt,ii,array,txt_pattern,afmt)
   ! to write out date, integer + supplied data array
   character(len=*), intent(in) :: txt
   integer, intent(in) :: ii  ! any old integer. Often needed
   real, dimension(:), intent(in) :: array
   logical, intent(in), optional :: txt_pattern
+  character(len=*), intent(in), optional :: afmt
+  character(len=100):: fmt !  ="(a,3i3,i5,1x, i0, 20es14.5)" ! default
   logical :: use_pattern=.false.
-  use_pattern=.false.;if(present(txt_pattern))use_pattern=txt_pattern
+  use_pattern=.false.
+  if(present(txt_pattern))use_pattern=txt_pattern
+
+  fmt="(a,3i3,i5,1x, i0, 20es14.5)" ! default
   if(use_pattern)then
     write(*,"(a,1x, i0, 20es11.2)") "dw:" // date2string(txt,current_date), &
       ii, array
   else
-    write(*,"(a,3i3,i5,1x, i0, 20es14.5)") "dw:" // trim(txt), &
+    if (present(afmt)) then
+      fmt=afmt
+    end if
+    write(*,fmt) adjustl("dw:" // txt), &
       current_date%month, current_date%day, current_date%hour, &
       current_date%seconds, ii, array
   end if
 end subroutine datewrite_ia
+!-----------------------------------------------------------------------------
 subroutine datewrite_a (txt,array,txt_pattern)
   ! to write out date + supplied data array
   character(len=*), intent(in) :: txt
@@ -548,14 +552,17 @@ subroutine datewrite_a (txt,array,txt_pattern)
       current_date%seconds, array
   end if
 end subroutine datewrite_a
-subroutine datewrite_iia (txt,ii,array,txt_pattern)
+!-----------------------------------------------------------------------------
+subroutine datewrite_iia (txt,ii,array,txt_pattern,afmt)
   ! to write out date, integer + supplied data array
   character(len=*), intent(in) :: txt
   integer,  dimension(:), intent(in) :: ii  ! arrays of integers, max 5
   real, dimension(:), intent(in) :: array
   logical, intent(in), optional :: txt_pattern
+  character(len=*), intent(in), optional :: afmt
+  character(len=100):: fmt="(a,3i3,i5,1x, 5i5, 20es11.2)" ! default
   logical :: use_pattern=.false.
-  integer :: Ni
+  integer :: Ni, i
   integer,  dimension(5):: iout ! arrays of integers, max 5
   Ni = size(ii)
   call CheckStop(Ni>5, "Too many integers in datewrite: only coded for 5")
@@ -567,9 +574,17 @@ subroutine datewrite_iia (txt,ii,array,txt_pattern)
     write(*,"(a,1x, 5i5, 20es11.2)") "dw:" // date2string(txt,current_date), &
       iout, array
   else
-    write(*,"(a,3i3,i5,1x, 5i5, 20es11.2)") "dw:" // trim(txt), &
-      current_date%month, current_date%day, current_date%hour, &
-      current_date%seconds, iout, array
+    if (present(afmt)) then  ! e.f. "a20,DATE,3i3,5f7.2"
+      !fmt="("//trim(str_replace(afmt,"DATE","3i3,i5,1x"))//")"
+      fmt="("//trim(str_replace(afmt,"TXTDATE","a")) //")"
+      write(*,fmt) adjustl("dw:" // txt), " "//print_date(current_date), iout(1:Ni), array
+    else
+      write(*,'(a,3i3,i5,1x,88i5)',advance='NO') "dw:" // trim(txt), &
+       current_date%month, current_date%day, current_date%hour, &
+       current_date%seconds,ii
+      write(*,"(20es11.2)") array
+    end if
+       
   end if
 end subroutine datewrite_iia
 !-------------------------------------------------------------------------

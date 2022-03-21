@@ -1,7 +1,7 @@
-! <AOTnPOD_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.36>
+! <AOTnPOD_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2020 met.no
+!*  Copyright (C) 2007-2022 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -282,7 +282,8 @@ contains
 
    ! Add fluxes if Y exceeded:
 
-     pod  = max(L%FstO3 - Y,0.0)
+     !D21 pod  = max(L%FstO3 - Y,0.0)
+     pod  = max(L%FstO3 - Y,0.0) * do3se(iLC)%PODscale
 
     if ( dbg ) then
        write(txt,"(a,L1)") "Rel", VEGO3_OUTPUTS(iO3cl)%RelSGS
