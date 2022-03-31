@@ -82,7 +82,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'emep-ctm'
-copyright = '2007-2020 met.no'
+copyright = '2007-2022 met.no'
 author = 'Norwegian Meteorological Institute'
 title = "EMEP/MSC-W Model Unofficial User's Guide"
 

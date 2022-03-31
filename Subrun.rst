@@ -22,7 +22,7 @@ Here is an example of content of the most important parameters:
     GRID = 'EECCA',
     iyr_trend = 2015,
     runlabel1 = 'Base',
-    runlabel2 = 'Opensource_Setup_2020',
+    runlabel2 = 'Opensource_Setup_2022',
     startdate = 2015,01,01,00,
     enddate = 2015,01,10,24,
     spinup_enddate = 2015,01,02,06,
@@ -63,7 +63,7 @@ Base run
 To run the model you need access to the executable (``emepctm``) and the ``config_emep.nml`` files.
 The path to the other input files are defined by defaults or set in the ``config_emep.nml`` file.
 
-To run the model you can either run interactively (mostly for short run), using somthing similar to (it depends on your system):
+To run the model you can either run interactively (mostly for short run), using something similar to (it depends on your system):
 
 ``mpirun emepctm``
 
