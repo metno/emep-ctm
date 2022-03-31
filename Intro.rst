@@ -2,7 +2,7 @@ Welcome to EMEP
 ================
 
 This guide gives a brief documentation of the EMEP/MSC-W model version
-rv4.36. It is intended primarily as a guide on how to run the model, and
+rv4.45. It is intended primarily as a guide on how to run the model, and
 to help users wishing to understand or change the model in terms of
 domains, outputs, chemistry, etc.
 
@@ -98,11 +98,11 @@ Model code
 ----------
 
 
-The latest release Open Source of the EMEP/MSC-W model is `version rv4_36`__.
+The latest release Open Source of the EMEP/MSC-W model is `version rv4_45`__.
 This and previous releases can be found on the `releases section`__
 of the EMEP/MSC-W Open Source `github page`__.
 
-.. __: https://github.com/metno/emep-ctm/releases/tag/rv4_36
+.. __: https://github.com/metno/emep-ctm/releases/tag/rv4_45
 .. __: https://github.com/metno/emep-ctm/releases
 .. __: https://github.com/metno/emep-ctm
 
@@ -120,12 +120,12 @@ the release page, the preferred retrieval method is via the `catalog tool`_ as f
     # make it executable and run it
     chmod +x catalog.py
 
-    # download the source code for rv4_36 release
-    catalog.py -R rv4_36 --source
+    # download the source code for rv4_45 release
+    catalog.py -R rv4_45 --source
 
 
 The model source code, makefiles, and a copy of the license file
-will be placed under the directory ``EMEP_MSC-W_model.rv4.36.OpenSource/source/``.
+will be placed under the directory ``EMEP_MSC-W_model.rv4.45.OpenSource/source/``.
 An overview of the files is given in :numref:`tab-modelfiles`.
 
 .. csv-table:: Model source files
@@ -141,7 +141,7 @@ An overview of the files is given in :numref:`tab-modelfiles`.
 
 
 In addition there is a run script called ``modrun.sh``, which will be
-placed in the ``EMEP_MSC-W_model.rv4.36.OpenSource`` directory. The run script,
+placed in the ``EMEP_MSC-W_model.rv4.45.OpenSource`` directory. The run script,
 ``modrun.sh``, can easily be modified to work on your computer system.
 
 .. _`sec-modelgrid`:

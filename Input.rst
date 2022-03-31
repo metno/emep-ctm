@@ -29,9 +29,9 @@ Download the input via the catalog tool (:numref:`sec-ModelCode`) as follows:
     catalog.py --input
 
 The meteorology files will be placed under
-``EMEP_MSC-W_model.rv4.36.OpenSource/meteo2015/``,
+``EMEP_MSC-W_model.rv4.45.OpenSource/meteo2015/``,
 and the remaining input files will be placed under
-``EMEP_MSC-W_model.rv4.36.OpenSource/input/``
+``EMEP_MSC-W_model.rv4.45.OpenSource/input/``
 
 This are all input files needed to run the EMEP/MSC-W model,
 except the aircraft emissions (``AircraftEmis_FL.nc``),
