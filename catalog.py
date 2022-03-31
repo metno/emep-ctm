@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Open Source EMEP/MSC-W model
 simplified access to the source code, input data and benchmark results.
@@ -13,6 +12,7 @@ import tarfile
 from contextlib import closing
 from pathlib import Path
 from platform import python_version_tuple
+from textwrap import dedent
 
 assert python_version_tuple() >= ("3", "6"), "This script requires python3.6 or better"
 
@@ -61,24 +61,22 @@ def parse_arguments(args):
     """Arguments from command line"""
     from optparse import SUPPRESS_HELP, OptionGroup, OptionParser
 
-    usage = """usage: %prog [options]
+    usage = f"""
+            usage: %prog [options]
 
-Examples:
+            Examples:
 
-  Retrieve release dataset for revision REV ({REV})
-    %prog -R REV
+            Retrieve release dataset for revision REV ({"|".join(_CONST["RELEASE"])})
+                %prog -R REV
 
-  Get Only the source code and user guide for revision REV
-    %prog -R REV --source --docs
+            Get Only the source code and user guide for revision REV
+                %prog -R REV --source --docs
 
-  Download meteorological input for YEAR ({MET})
-    %prog -Y YEAR --meteo
-""".format(
-        REV="|".join(_CONST["RELEASE"]),
-        MET="|".join(str(y) for y in _CONST["METYEAR"]),
-    )
+            Download meteorological input for YEAR ({"|".join(str(y) for y in _CONST["METYEAR"])})
+                %prog -Y YEAR --meteo
+            """
 
-    parser = OptionParser(usage, version=_CONST["VERSION"])
+    parser = OptionParser(dedent(usage), version=_CONST["VERSION"])
     parser.set_defaults(verbose=1)
     parser.add_option(
         "-q",
@@ -117,7 +115,7 @@ Examples:
         action="append",
         dest="status",
         help=SUPPRESS_HELP,
-    )  # help="YEAR's status report")
+    )
     group.add_option(
         "-Y",
         "--year",
@@ -189,7 +187,7 @@ Examples:
     group = OptionGroup(parser, "Download options", "")
     group.add_option(
         "--yes",
-        default=True,
+        default=True,  # help="YEAR's status report")
         action="store_false",
         dest="ask",
         help="Don't ask before start downloading/unpacking",
