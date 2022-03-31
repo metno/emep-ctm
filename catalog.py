@@ -50,7 +50,7 @@ _CONST = {
     "FTP": "ftp://ftp.met.no/projects/emep/OpenSource",
     "GIT": "https://github.com/metno/emep-ctm/",
     "DOC": "https://emep-ctm.readthedocs.io/",
-    "RTD": "https://buildmedia.readthedocs.org/media/pdf/emep-ctm",
+    "RTD": "https://emep-ctm.readthedocs.io/_/downloads/en",
     "CSV": Path(__file__).parent / "catalog.csv",  # list all files from all releases
     "RAW": "https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",  # catalog on the repo
     "TMPDIR": "./downloads",  # temp path for downloads
@@ -437,6 +437,10 @@ class DataPoint:
                     if not user_consent("    Do you wish to continue?", inspect, "yes"):
                         sys.exit(-1)
 
+        elif self.dst.name == "pdf":
+            outfile = _CONST["DATADIR"] / self.key / self.model / "emep-ctm.pdf"
+            outfile.parent.mkdir(parents=True, exist_ok=True)
+            self.dst.rename(outfile)
         else:
             outfile = _CONST["DATADIR"] / self.key / self.dst.name
             if verbose > 1:

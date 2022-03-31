@@ -575,7 +575,7 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 201906,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201511.tar.bz2,EMEP_MSC-W_model.rv4.33.OpenSource/meteo2015/EECCA/,1870633545,7974005f821a027182815c9fc1dd857f
 201906,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201512.tar.bz2,EMEP_MSC-W_model.rv4.33.OpenSource/meteo2015/EECCA/,1929643105,a14ff455b75a737b75853a7a2b475ede
 201906,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201513.tar.bz2,EMEP_MSC-W_model.rv4.33.OpenSource/meteo2015/EECCA/,116011382,22bf5f96f7e428b71159c6dac1e7ff8a
-201906,docs,,rv4_33,{RTD}/ug4_33/emep-ctm.pdf,,552654,74baa08290adfc721639b047193567eb
+201906,docs,,rv4_33,{RTD}/ug4_33/pdf/,,552654,74baa08290adfc721639b047193567eb
 202001,input,2015,rv4_34,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2339512944,23f11f17dc23e128e5d5ae674755128d
 202001,input,2017,rv4_34,{FTP}/{REL}/input_data/pollen_input_files.tar.bz2,,6818730,104b13d7b21e74ea6241b9482461cd83
 202001,source,2020,rv4_34,{GIT}/archive/{MOD}.tar.gz,,784809,0b642b53fce4f786bd5dc37336b275d1
@@ -612,6 +612,7 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 202011,source,2020,rv4_36,{GIT}/archive/{MOD}.tar.gz,,798393,76e8449aa021bfe3daa04274fba07605
 202011,output,2015,rv4_36,{FTP}/{REL}/model_results_rv4_36_2015/Base_model_rv4_36_results_EECCA.tar.bz2,,2597919720,bf67711e172c42aab08a87aca1f14f67
 202011,output,2017,rv4_36,{FTP}/{REL}/model_results_rv4_36_2017/Pollen_model_rv4_36_results_MACC14.tar.bz2,,624358134,76f059303333b2839bfe1db05940b90b
+202011,docs,,rv4_36,{RTD}/ug4_36/pdf/,,554765,3f6ffee1cac9c861a077ec16201ea77a
 202011,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201501.tar.bz2,EMEP_MSC-W_model.rv4.36.OpenSource/meteo2015/EECCA/,1927109491,b8c23b105968adcefb91e06e66397cfa
 202011,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201502.tar.bz2,EMEP_MSC-W_model.rv4.36.OpenSource/meteo2015/EECCA/,1748761600,a98e532ebca02a72d40e1971cc24084b
 202011,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201503.tar.bz2,EMEP_MSC-W_model.rv4.36.OpenSource/meteo2015/EECCA/,1922556203,9e158b8c291b32d7916b270b2fd45c74
@@ -642,6 +643,7 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 202203,source,2020,rv4_45,{GIT}/archive/{MOD}.tar.gz,,831637,79c5874a23ba146238fc1a7c0ac89565
 202203,output,2015,rv4_45,{FTP}/{REL}/model_results_rv4_45_2015/Base_model_rv4_45_results_EECCA.tar.bz2,,2601881294,d8cf6471820794b7d466df41169a45b0
 202203,output,2017,rv4_45,{FTP}/{REL}/model_results_rv4_45_2017/Pollen_model_rv4_45_results_MACC14.tar.bz2,,733300982,3ef6e178ba90f407c642de25afe1d22e
+202203,docs,,rv4_45,{RTD}/ug4_45/pdf/,,413203,a60cea0ac2b8118e3949cf93e2dfa3d4
 202203,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201501.tar.bz2,EMEP_MSC-W_model.rv4.45.OpenSource/meteo2015/EECCA/,1927109491,b8c23b105968adcefb91e06e66397cfa
 202203,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201502.tar.bz2,EMEP_MSC-W_model.rv4.45.OpenSource/meteo2015/EECCA/,1748761600,a98e532ebca02a72d40e1971cc24084b
 202203,meteo,2015,EECCA,{FTP}/meteo/{YEAR}/{MOD}/meteo201503.tar.bz2,EMEP_MSC-W_model.rv4.45.OpenSource/meteo2015/EECCA/,1922556203,9e158b8c291b32d7916b270b2fd45c74
