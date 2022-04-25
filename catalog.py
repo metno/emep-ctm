@@ -322,7 +322,9 @@ class DataPoint:
         self.tag = self.tag.format_map(kwargs)
         kwargs.update(TAG=self.tag)
         self.src = src.format_map(kwargs)
-        self.dst = Path(dst.format_map(kwargs))
+        if isinstance(dst, str):
+            dst = dst.format_map(kwargs)
+        self.dst = Path(dst)
         if self.dst.name == "":
             self.dst /= Path(self.src).name
 
