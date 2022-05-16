@@ -155,10 +155,8 @@ from sector 10 (the emission from agriculture) in the UK is shown in
 
 Or alternative syntax using country ISO short names:
 
-:numref:`reduction-femis_country`.
-
 .. code-block:: text
-    :name: reduction-femis
+    :name: reduction-femis_country
     :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
 
     Name sector sox  nox  co   voc  nh3  pm25   pmco
