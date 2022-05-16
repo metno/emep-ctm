@@ -159,7 +159,7 @@ Or alternative syntax using country ISO short names:
     :name: reduction-femis_country
     :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
 
-    Name sector sox  nox  co   voc  nh3  pm25   pmco
+    Name       sector sox  nox  co   voc  nh3  pm25   pmco
     Country UK  10    1.0  1.0  1.0  1.0  0.5  1.0    1.0
 
 Instead of entire countries, reductions can also be specified by coordinates (and combined with country reductions).
