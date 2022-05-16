@@ -114,8 +114,8 @@ The path to this file can be set in config_emep.nml, ``femisFile = /my/path/femi
     :name: base-femis
     :caption: ``femis.dat`` for a base run.
 
-    Name  7  sox  nox  co   voc  nh3  pm25   pmco
-    27    0  1.0  1.0  1.0  1.0  1.0  1.0    1.0
+    Name sector  sox  nox  co   voc  nh3  pm25   pmco
+    27     0     1.0  1.0  1.0  1.0  1.0  1.0    1.0
 
 This base run example means that there are (1.0), no emission reductions
 of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the UK.
@@ -139,20 +139,30 @@ of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the U
    the given pollutants. For example, 0.7 would mean 70% of the original
    emission, thus 30% reduction.
 
--  The number ("7") following the first text ("Name") in the first line
-   gives the number of pollutants treated in the file.
+-  The first line is important, it must consist of two words followed
+   by the names of the pollutants emitted (in any order).
 
 An example of ``femis.dat`` file describing 50% reduced emission of |NH3|
 from sector 10 (the emission from agriculture) in the UK is shown in
-:numref:`reduction-femis`.
+:numref:`reduction-femis` and :numref:`reduction-femis_country`.
 
 .. code-block:: text
     :name: reduction-femis
     :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
 
-    Name  7  sox  nox  co   voc  nh3  pm25   pmco
-    27   10  1.0  1.0  1.0  1.0  0.5  1.0    1.0
+    Name sector  sox  nox  co   voc  nh3  pm25   pmco
+    27    10     1.0  1.0  1.0  1.0  0.5  1.0    1.0
 
+Or alternative syntax using country ISO short names:
+
+:numref:`reduction-femis_country`.
+
+.. code-block:: text
+    :name: reduction-femis
+    :caption: ``femis.dat`` for 50% |NH3| reduction from sector 10 over UK.
+
+    Name sector sox  nox  co   voc  nh3  pm25   pmco
+    Country UK  10    1.0  1.0  1.0  1.0  0.5  1.0    1.0
 
 Instead of entire countries, reductions can also be specified by coordinates (and combined with country reductions).
 The line with coordinate corrections must start with the keyword ``lonlat``.
