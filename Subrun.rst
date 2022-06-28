@@ -34,6 +34,7 @@ Here is an example of content of the most important parameters:
   !------------------------------
     EmisDir = 'DataDir/GRID',
     emis_inputlist(1)%name= 'EmisDir/gridPOLL', !example of ASCII type
+    emis_inputlist(1)%type = 'GNFR_CAMSsectors',
   !--------Sub domain x0, x1, y0, y1
     RUNDOMAIN = 36, 100, 50, 150, ! EECCA sub-domain
   &end
@@ -219,6 +220,7 @@ Sets of countries can in principle be defined; for now only the set
     :caption: Mixed emission configuration example.
 
     emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
+    emis_inputlist(1)%type = 'GNFR_CAMSsectors',
     emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
     emis_inputlist(1)%incl(1:) = 'NO','SE','FI',
     emis_inputlist(2)%excl(1:) = 'NO','SE','FI',
@@ -763,6 +765,8 @@ The values for split, emission release height and timefactors can be defined thr
 
 The name in the first column (GNFR_CAMS) should match the sector name defined in the emission file, or be given in the config_emep.nml (see example below).
 The second name can be chosen by the user (it will be used if SecEmisOutWanted is T)), the third name is the variable name ending in the netcdf emission file (the start being the name of the pollutant) only implemented for "fraction" format, the first number refers to the index used for time factors, the second number the index in the Emis_h array, the third number is the index used in the split files. The long name in the second last column is a longer description, and the last column refers to the species to be included for this sector (if they exist in the emission file).
+
+From version 4.45 and onwards, sector type or names are compulsory for each emission file. This can be given either in the config_emep.nml or in the NetCDF file.
 
 Here is an example of how to define a new sector with a new height distribution, used by emissions given in a separate file.
 
