@@ -629,7 +629,7 @@ Note about species: These can be interpreted in one of three categories
   1. emitted species (nox,sox,pm25 ...) with sector (1...11 (or 13)) (“sector species”)
   2. individual species (SO2, NO, NO2, ...) with sector. The species MUST be one of the splitted species.
      These will be treated as one of the “sector species”  from 1. (but not splitted of course).
-     Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2”.
+     Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2” and NO "as NO2". You can correct the units using the factor attribute.
   3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified).
      No timefactors, vertical realease heights or splits are applied.
      In this case the emissions are summed up in setup_rcemis (not in EmisSet)
