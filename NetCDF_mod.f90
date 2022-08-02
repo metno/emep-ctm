@@ -89,7 +89,7 @@ use Par_mod,            only : me,GIMAX,GJMAX,MAXLIMAX, MAXLJMAX, &
 use PhysicalConstants_mod,  only : PI, EARTH_RADIUS
 use TimeDate_mod,       only: nmdays,leapyear ,current_date, date,julian_date
 use TimeDate_ExtraUtil_mod,only: date2nctime
-use SmallUtils_mod,      only: wordsplit, find_index
+use SmallUtils_mod,      only: wordsplit, find_index, str_replace
 
 implicit none
 
@@ -318,7 +318,9 @@ subroutine Create_CDF_sondes(fileName,NSpec,NSpec_Att,SpecDef,&
         "NetCDF_mod: wordsplit error:: "//trim(MetaData(0,n)))
       select case(auxL(2))
       case("c","C","s","S") ! string/char attribute
-        call check(nf90_put_att(ncFileID,nf90_global,trim(auxL(1)),trim(auxL(3))),&
+         if(auxL(1)=="meteo_source")&
+         auxL(3) = trim(str_replace(auxL(3),"|",":"))
+       call check(nf90_put_att(ncFileID,nf90_global,trim(auxL(1)),trim(auxL(3))),&
                    "MetaData="//trim(MetaData(0,n)))
       case("i","I","n","N") ! integer attribute
         read(auxL(3),*)auxI(1)

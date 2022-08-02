@@ -71,7 +71,7 @@ use OwnDataTypes_mod,    only: TXTLEN_NAME
 use Par_mod,            only : li0,lj0,li1,lj1 &
                                 ,GIMAX,GJMAX,IRUNBEG,JRUNBEG&
                                 ,GI0,GI1,GJ0,GJ1,me,LIMAX,LJMAX
-use SmallUtils_mod,     only : find_index !, str_replace
+use SmallUtils_mod,     only : find_index, str_replace
 use Tabulations_mod,    only : tab_esat_Pa
 use TimeDate_mod,       only : current_date, print_date
 use TimeDate_ExtraUtil_mod,   only : date2string
@@ -994,7 +994,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       call CheckStop(NattributesMAX<NMetaData,'NattributesMAX too small')
       
       write(MetaData(0,1),"(A,':C:',A)")"File_Type",trim(fname)
-      write(MetaData(0,2),"(A,':C:',A)")"meteo_source",trim(meteo)
+      write(MetaData(0,2),"(A,':C:',A)")"meteo_source",trim(str_replace(meteo,":","|"))
       write(MetaData(0,3),"(A,':I:',I0)")"Number_of_hours_bewtween_outputs",f
       write(MetaData(0,4),"(A,':I:',I0)")"Number_of_stations_defined",NStations
       write(MetaData(0,5),"(A,':I:',I0)")"Model_domain_x_size",GIMAX
