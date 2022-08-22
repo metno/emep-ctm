@@ -11,10 +11,9 @@ import sys
 import tarfile
 from contextlib import closing
 from pathlib import Path
-from platform import python_version_tuple
 from textwrap import dedent
 
-assert python_version_tuple() >= ("3", "6"), "This script requires python3.6 or better"
+assert sys.version_info >= (3, 6), "This script requires python3.6 or better"
 
 _CONST = {
     "VERSION": "0.2.0",  # script version
