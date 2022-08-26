@@ -16,7 +16,7 @@ from textwrap import dedent
 assert sys.version_info >= (3, 6), "This script requires python3.6 or better"
 
 _CONST = {
-    "VERSION": "0.2.0",  # script version
+    "VERSION": "0.2.1",  # script version
     "RELEASE": [  # released model versions
         "rv3",
         "v201106",
@@ -45,8 +45,8 @@ _CONST = {
         2015,
         2017,
     ],
-    "THREDDS": "https://thredds.met.no/thredds/fileServer/data/EMEP/OpenSource",
-    "FTP": "ftp://ftp.met.no/projects/emep/OpenSource",
+    "THREDDS": "https://projects.met.no/emep/Thredds_Meteo",
+    "FTP": "https://projects.met.no/emep",
     "GIT": "https://github.com/metno/emep-ctm/",
     "DOC": "https://emep-ctm.readthedocs.io/",
     "RTD": "https://emep-ctm.readthedocs.io/_/downloads/en",
