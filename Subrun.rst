@@ -603,7 +603,8 @@ List of file attributes (default in parenthesis):
   - units ('NOTSET') will be used as default for sources units if set.
   - apply_femis (true) whether to apply the femis reductions to the sources of this file.
   - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
-  - country_ISO ('NOTSET') will be used as default for sources units if set.
+  - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
+  - country_ISO ('NOTSET') will be used as default for sources country if set.
   - sector (-1) will be used as default for sources sector if set.
   - sectorsName ('NOTSET') . Should match one of the SECTORS%name defined ('GNFR_CAMS' for example).
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
@@ -614,6 +615,7 @@ List of source attributes:
   - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc) 
   - factor (1.0) multiplicative factor. Can be used to change units to model definitions. Comes on top of the file multiplicative factors and possibly other factors.
   - units (‘mg/m2/h’) Units *after* the factor multiplication. 
+  - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
   - country_ISO (‘N/A’) the country code, as defined in Country_mod.f90 (for example ‘FR’ for France). ‘N/A’ is a valid code, but it does not correspond to any country.
   - apply_femis (true) whether to apply the femis reductions to this source.
   - include_in_local_fractions (true) whether to take this source into account for the local fraction calculations
