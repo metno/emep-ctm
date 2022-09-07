@@ -560,8 +560,6 @@ convection are so complex and the paramererisation is very uncertain.
 Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
 which may be changed to allow more or less influence of this variable.
 
-The model will test the area covered, and if the area covered regions outside "Europe" (extended), it will automatically set 
-``USES%PFT_MAPS=T``, ``USES%DEGREEDAY_FACTORS=F`` , ``USES%EURO_SOILNOX=F`` and ``USES%GLOBAL_SOILNOX=T``.
 
 New emission format
 -------------------
