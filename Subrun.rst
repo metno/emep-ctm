@@ -521,7 +521,7 @@ settings.
   USES%PFT_MAPS = F,
   USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
   USES%CONVECTION = F, 
-  USES%EURO_SOILNOX = T, ! diff for global + Euro
+  USES%SOILNOX_METHOD = 'NoFert',  ! If using ECLIPSEv6
 
 .. code-block:: text
   :caption: Typical non-European/global settings.
@@ -530,8 +530,6 @@ settings.
   USES%PFT_MAPS = T,    ! PFT LAI tests
   USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
   USES%CONVECTION = T,
-  USES%EURO_SOILNOX = F, ! diff for global + Euro runs
-  USES%GLOBAL_SOILNOX = T, ! diff for global + Euro runs
 
 The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
 controlling residential combustion (GNFR C/SNAP2) emissions. This requires pre-processed files of heating degree days.
@@ -559,6 +557,23 @@ and we use F. The problem is likely that the sub-grid processes behind
 convection are so complex and the paramererisation is very uncertain.
 Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
 which may be changed to allow more or less influence of this variable.
+
+config: SOILNOX
+---------------
+
+
+.. code-block:: text
+  :caption: Soil-NO settings.
+
+  USES%SOILNOX_METHOD = 'NoFert',  ! If using ECLIPSEv6 or EMEP European
+  USES%SOILNOX_METHOD = 'Total',   ! If using ECLIPSEv5
+
+The model makes use of global 0.5 degree data from the CAMS81 project, but the user needs
+to specify the data to be used from this system. 
+The choice, between ``Total``  and ``NoFert`` depends
+on the anthropogenic emission inventory in use. If this anthropogenic inventory
+already includes fertlizer-induced soil NO emissions, then the  ``NoFert`` data from
+the soil-NO system is used. If not, choose ``Total``.
 
 
 New emission format
