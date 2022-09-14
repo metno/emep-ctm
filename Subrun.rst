@@ -857,7 +857,10 @@ The corresponding lf_src values will then be added to the already defined lf_src
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
 
-Local fractions can also be used to make traditional Source Receptor (or blame) matrices, in a single run.
+Local Fractions for Source Receptor style runs
+----------------------------------------------
+
+Local fractions can also be used to make traditional Source Receptor (or blame) matrices, in a single run. (the %res flag is then not used)
 
 .. code-block:: Fortran
     :caption: Local Fractions Country source receptor type example
