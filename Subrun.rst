@@ -236,7 +236,7 @@ from emis_inputlist(2)%name will be included).
 The specified pollutants must already be defined in ``CM_EmisFiles.inc``.
 NOTE: the PollName functionality does not work in version rv4_32!
 It is possible to disregard the "lonlat" reductions introduced by ``femis.dat`` for specific emissions. To do this use the "use_lonlat_femis" flag.
-Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``
+Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``. ``use_lonlat_femis = F`` will switch off the reductions, therefore the lonlat coordinate in ``femis.dat`` should match the domain covered by ``emislist.POLL``.
 
 .. code-block:: Fortran
     :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(1)%name``.
