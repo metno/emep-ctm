@@ -925,5 +925,18 @@ The full Ozone chemistry can be included. This option is under development, and 
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
     
+    
+Technical
+=========
+
+Time steps
+----------
+There are three types of timesteps in the model: ``METSTEP``, ``dt_advec`` and ``dtchem``.
+
+``METSTEP`` is the time interval between two readings of the meteorological file. It is not set by the user, but uses whatever is used as meteorological input. It must be a divisor of 24. 3 hours is standard, but other intervals are used too.
+
+``dt_advec`` is the "time splitting" interval, i.e. the time between two sequences of advection-chemsitry/emissions-deposition. Note that the name is misleading, the advection can have a smaller internal timestep if it is requird by the Courant number. Its value must be an entire fraction of one hour (its value is in units of seconds). It is determined by the model using the grid resolution. For a gridresolution larger than 61 km it is 1800s, or 1200s if larger than 21km or 900s if larger than 11km or 600s if larger than 6km or 300s if larger than 2km or 100s if smaller than 2km. Those value can be overriden by defining it in ``config_emep.nml``. You can check the value in the standard output ("advection time step (dt_advec) set to: 1200 seconds").
+
+The values of ``dtchem`` are the internal Chemistry timesteps. It is variable: usually the first 5 small 20 seconds steps, then 10 larger timesteps, so that the sum of all ``dtchem`` timesteps is exactly equal to ``dt_advec``. They are printed out in standard output. Note that emissions are included as a source in  the Chemistry, and thus have the same timesteps. 
 
 
