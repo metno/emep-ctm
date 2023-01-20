@@ -616,7 +616,7 @@ List of file attributes (default in parenthesis):
   - apply_femis (true) whether to apply the femis reductions to the sources of this file.
   - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
   - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
-  - country_ISO ('NOTSET') will be used as default for sources country if set.
+  - country_ISO ('NOTSET') will be used as default for sources country ISO code (for example ‘FR’ for France) if set.
   - sector (-1) will be used as default for sources sector if set.
   - sectorsName ('NOTSET') . Should match one of the SECTORS%name defined ('GNFR_CAMS' for example).
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
