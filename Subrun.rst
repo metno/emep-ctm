@@ -654,11 +654,12 @@ Note about species: These can be interpreted in one of three categories
   :caption: Read a field named "emis_tra" from a file "/path/ECLIPSE_V6a_CLE_base_PM25.nc".
 
   Emis_sourceFiles(1)%filename = '/path/ECLIPSE_V6a_CLE_base_PM25.nc',
+  Emis_sourceFiles(1)%sectorsName = 'GNFR',
   Emis_sourceFiles(1)%projection = 'lon lat',
   Emis_sourceFiles(1)%periodicity = 'yearly',  
   Emis_sourceFiles(1)%source(1)%varname='emis_tra',
   Emis_sourceFiles(1)%source(1)%species='pm25',
-  Emis_sourceFiles(1)%source(1)%sector=7,
+  Emis_sourceFiles(1)%source(1)%sector=6,
   Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
   Emis_sourceFiles(1)%source(1)%units='kg',
 
