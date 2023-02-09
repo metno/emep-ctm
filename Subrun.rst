@@ -579,20 +579,19 @@ New emission format
 -------------------
 
 A new more general and (hopefully) easy to use format for emissions has been introduced.
-It is still in a developing phase, so changes and errors may occur.
 
 In the new format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
 For now the main constraint is that a source is any 2D field (possibly+time).
 The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
-The file and sources can be characterized by a set of variables. In genereal these variable can be set by, and in order of increasing priority:
+The file and sources can be characterized by a set of variables. In general these variable can be set by, and in order of increasing priority:
   1. Default value
   2. Global attribute read in the netcdf file
   3. Variable attribute read in the netcdf file
   4. Value set for Emis_sourceFiles(i)%XXX in config_emep.nml
   5. Value set for Emis_sourceFiles(i)%source(s)%XXX in config_emep.nml
   
-Exception to the priority rule are:
+Exceptions to the priority rule are:
   * maskID cannot be set by attributes in the netcdf file
   * the file and source 'factor' are on top of each other, not replaced
   * boolean parameters (like apply_femis), are used as "and" (i.e. if any is false, the result is false) 
@@ -618,7 +617,7 @@ List of file attributes (default in parenthesis):
   - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
   - country_ISO ('NOTSET') will be used as default for sources country ISO code (for example ‘FR’ for France) if set.
   - sector (-1) will be used as default for sources sector if set.
-  - sectorsName ('NOTSET') . Should match one of the SECTORS%name defined ('GNFR_CAMS' for example).
+  - sectorsName ('NOTSET') . It must be set to one of the SECTORS%name defined ('GNFR_CAMS' for example).
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
 
