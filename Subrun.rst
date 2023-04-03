@@ -311,8 +311,8 @@ i.e. overwrite new BC with old ones.)
         write after each month (used for checkpoint/restart for instance).
 
 The name of the file to write to is defined by ``NEST_template_write`` (also in ``Model_config``).
-The name of the file to read to IC data from is defined by ``NEST_template_read_IC``.
-The name of the file to read to BC data from is defined by ``NEST_template_read_BC``; it can be the same file as ``NEST_template_read_IC``.
+The name of the file to read to IC data from is defined by ``NEST_template_read_3D``.
+The name of the file to read to BC data from is defined by ``NEST_template_read_BC``; it can be the same file as ``NEST_template_read_3D``.
 If for example NEST_NHOURSAVE=3, but  NEST_NHOURREAD = 1, the data is interpolated in time to get a smooth transition between the 3-hourly values (recommended).
 
 In addition, 3D outputs can be asked for at specific date. Example:
