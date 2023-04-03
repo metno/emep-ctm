@@ -315,6 +315,20 @@ The name of the file to read to IC data from is defined by ``NEST_template_read_
 The name of the file to read to BC data from is defined by ``NEST_template_read_BC``; it can be the same file as ``NEST_template_read_IC``.
 If for example NEST_NHOURSAVE=3, but  NEST_NHOURREAD = 1, the data is interpolated in time to get a smooth transition between the 3-hourly values (recommended).
 
+In addition, 3D outputs can be asked for at specific date. Example:
+
+.. code-block:: text
+    :name: nest-dump-config
+    :caption: Write 3D at specific dates example.
+
+    &Model_config
+    [...]
+      NEST_OUTDATE_NDUMP    = 2,          ! choose two dates
+      NEST_outdate(1)= 2019,01,01,00,     ! save at end of the 2018 year
+      NEST_outdate(2)= 2018,05,17,00,     ! save also 17th of May 2018
+    &end
+ 
+
 Example write BCs
 ~~~~~~~~~~~~~~~~~
 
@@ -902,6 +916,8 @@ Instead of defining countries in the emission files, one can define "source regi
     lf_country%sector_list(1:1)=0,
     lf_src(1)%species="pm25",
     lf_src(1)%type='country',
+    mask2name(1)='Oslo',     !map id numbers to names (for use in output)
+    mask2name(2)='Eigersund',
     
 If a value is within the min and max range, but does not appear in the mask file, it will not be taken into account (meaning it is ok to specify a range that covers all the masks values, even if some values are not defined on the mask) 
 
@@ -925,6 +941,8 @@ The full Ozone chemistry can be included. This option is under development, and 
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
     
+    
+ 
     
 Technical
 =========
