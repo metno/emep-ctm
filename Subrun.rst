@@ -631,7 +631,7 @@ List of file attributes (default in parenthesis):
   - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
   - country_ISO ('NOTSET') will be used as default for sources country ISO code (for example ‘FR’ for France) if set.
   - sector (-1) will be used as default for sources sector if set.
-  - sectorsName ('NOTSET') . It must be set to one of the SECTORS%name defined ('GNFR_CAMS' for example).
+  - SECTORS_NAME or sectorsName ('GNFR_CAMS') . It must be set to one of the SECTORS%name defined ('GNFR_CAMS' for example).
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
 
