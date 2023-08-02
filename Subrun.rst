@@ -589,13 +589,11 @@ already includes fertlizer-induced soil NO emissions, then the  ``NoFert`` data 
 the soil-NO system is used. If not, choose ``Total``.
 
 
-New emission format
--------------------
+Country Variable (CV) format
+----------------------------
 
-A new more general and (hopefully) easy to use format for emissions has been introduced.
-
-In the new format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
-For now the main constraint is that a source is any 2D field (possibly+time).
+In the CV format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
+A source can be any 2D field. It can also be a 3D field, if the third dimension is the sector. The sources are associated to country through a country code or a country code. 
 The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
 The file and sources can be characterized by a set of variables. In general these variable can be set by, and in order of increasing priority:
@@ -647,6 +645,7 @@ List of source attributes:
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
 
+If a dimension with name "sector" is found, it is assumed that the third dimension of emission variables represent the sector idex.
 
 The idea is that only variables that clearly are required in a specific context need to be set;
 if the value can be inferred from other information, the code should do it.
