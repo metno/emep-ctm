@@ -1,0 +1,3622 @@
+[
+    {
+        "cname": "Not_defined",
+        "code": "N/A",
+        "gains": "-",
+        "icode": 67,
+        "is_sea": false,
+        "timezone": 67,
+        "timezone_h": 67,
+        "timefac": -100
+    },
+    {
+        "cname": "Albania",
+        "code": "AL",
+        "gains": "ALBA",
+        "icode": 1,
+        "is_sea": false,
+        "timezone": 1,
+        "timezone_h": 1,
+        "timefac": 1
+    },
+    {
+        "cname": "Austria",
+        "code": "AT",
+        "gains": "AUST",
+        "icode": 2,
+        "is_sea": false,
+        "timezone": 2,
+        "timezone_h": 2,
+        "timefac": 1
+    },
+    {
+        "cname": "Belgium",
+        "code": "BE",
+        "gains": "BELG",
+        "icode": 3,
+        "is_sea": false,
+        "timezone": 3,
+        "timezone_h": 3,
+        "timefac": 1
+    },
+    {
+        "cname": "Bulgaria",
+        "code": "BG",
+        "gains": "BULG",
+        "icode": 4,
+        "is_sea": false,
+        "timezone": 4,
+        "timezone_h": 4,
+        "timefac": 2
+    },
+    {
+        "cname": "Former Czechoslovakia",
+        "code": "FCS",
+        "gains": "-",
+        "icode": 5,
+        "is_sea": false,
+        "timezone": 5,
+        "timezone_h": 5,
+        "timefac": 1
+    },
+    {
+        "cname": "Denmark",
+        "code": "DK",
+        "gains": "DENM",
+        "icode": 6,
+        "is_sea": false,
+        "timezone": 6,
+        "timezone_h": 6,
+        "timefac": 1
+    },
+    {
+        "cname": "Greenland",
+        "code": "GL",
+        "gains": "GRL",
+        "icode": 601,
+        "is_sea": false,
+        "timezone": 6,
+        "timezone_h": 6,
+        "timefac": -2
+    },
+    {
+        "cname": "Finland",
+        "code": "FI",
+        "gains": "FINL",
+        "icode": 7,
+        "is_sea": false,
+        "timezone": 7,
+        "timezone_h": 7,
+        "timefac": 2
+    },
+    {
+        "cname": "France",
+        "code": "FR",
+        "gains": "FRAN",
+        "icode": 8,
+        "is_sea": false,
+        "timezone": 8,
+        "timezone_h": 8,
+        "timefac": 1
+    },
+    {
+        "cname": "Former East Germany",
+        "code": "GDR",
+        "gains": "-",
+        "icode": 9,
+        "is_sea": false,
+        "timezone": 9,
+        "timezone_h": 9,
+        "timefac": 1
+    },
+    {
+        "cname": "Former Fed. Rep. of Germany",
+        "code": "FRG",
+        "gains": "-",
+        "icode": 10,
+        "is_sea": false,
+        "timezone": 10,
+        "timezone_h": 10,
+        "timefac": 1
+    },
+    {
+        "cname": "Greece",
+        "code": "GR",
+        "gains": "GREE",
+        "icode": 11,
+        "is_sea": false,
+        "timezone": 11,
+        "timezone_h": 11,
+        "timefac": 2
+    },
+    {
+        "cname": "Hungary",
+        "code": "HU",
+        "gains": "HUNG",
+        "icode": 12,
+        "is_sea": false,
+        "timezone": 12,
+        "timezone_h": 12,
+        "timefac": 1
+    },
+    {
+        "cname": "Iceland",
+        "code": "IS",
+        "gains": "ICEL",
+        "icode": 13,
+        "is_sea": false,
+        "timezone": 13,
+        "timezone_h": 13,
+        "timefac": 0
+    },
+    {
+        "cname": "Ireland",
+        "code": "IE",
+        "gains": "IREL",
+        "icode": 14,
+        "is_sea": false,
+        "timezone": 14,
+        "timezone_h": 14,
+        "timefac": 0
+    },
+    {
+        "cname": "Italy",
+        "code": "IT",
+        "gains": "ITAL",
+        "icode": 15,
+        "is_sea": false,
+        "timezone": 15,
+        "timezone_h": 15,
+        "timefac": 1
+    },
+    {
+        "cname": "Luxembourg",
+        "code": "LU",
+        "gains": "LUXE",
+        "icode": 16,
+        "is_sea": false,
+        "timezone": 16,
+        "timezone_h": 16,
+        "timefac": 1
+    },
+    {
+        "cname": "Netherlands",
+        "code": "NL",
+        "gains": "NETH",
+        "icode": 17,
+        "is_sea": false,
+        "timezone": 17,
+        "timezone_h": 17,
+        "timefac": 1
+    },
+    {
+        "cname": "Norway",
+        "code": "NO",
+        "gains": "NORW",
+        "icode": 18,
+        "is_sea": false,
+        "timezone": 18,
+        "timezone_h": 18,
+        "timefac": 1
+    },
+    {
+        "cname": "Poland",
+        "code": "PL",
+        "gains": "POLA",
+        "icode": 19,
+        "is_sea": false,
+        "timezone": 19,
+        "timezone_h": 19,
+        "timefac": 1
+    },
+    {
+        "cname": "Portugal",
+        "code": "PT",
+        "gains": "PORT",
+        "icode": 20,
+        "is_sea": false,
+        "timezone": 20,
+        "timezone_h": 20,
+        "timefac": 0
+    },
+    {
+        "cname": "Romania",
+        "code": "RO",
+        "gains": "ROMA",
+        "icode": 21,
+        "is_sea": false,
+        "timezone": 21,
+        "timezone_h": 21,
+        "timefac": 2
+    },
+    {
+        "cname": "Spain",
+        "code": "ES",
+        "gains": "SPAI",
+        "icode": 22,
+        "is_sea": false,
+        "timezone": 22,
+        "timezone_h": 22,
+        "timefac": 1
+    },
+    {
+        "cname": "Sweden",
+        "code": "SE",
+        "gains": "SWED",
+        "icode": 23,
+        "is_sea": false,
+        "timezone": 23,
+        "timezone_h": 23,
+        "timefac": 1
+    },
+    {
+        "cname": "Switzerland",
+        "code": "CH",
+        "gains": "SWIT",
+        "icode": 24,
+        "is_sea": false,
+        "timezone": 24,
+        "timezone_h": 24,
+        "timefac": 1
+    },
+    {
+        "cname": "Turkey",
+        "code": "TR",
+        "gains": "TURK",
+        "icode": 25,
+        "is_sea": false,
+        "timezone": 25,
+        "timezone_h": 25,
+        "timefac": 2
+    },
+    {
+        "cname": "Former USSR",
+        "code": "SU",
+        "gains": "-",
+        "icode": 26,
+        "is_sea": false,
+        "timezone": 26,
+        "timezone_h": 26,
+        "timefac": -100
+    },
+    {
+        "cname": "United Kingdom",
+        "code": "GB",
+        "gains": "UNKI",
+        "icode": 27,
+        "is_sea": false,
+        "timezone": 27,
+        "timezone_h": 27,
+        "timefac": 0
+    },
+    {
+        "cname": "Volcanoes",
+        "code": "VUL",
+        "gains": "-",
+        "icode": 28,
+        "is_sea": false,
+        "timezone": 28,
+        "timezone_h": 28,
+        "timefac": 1
+    },
+    {
+        "cname": "Remaining land areas",
+        "code": "REM",
+        "gains": "-",
+        "icode": 29,
+        "is_sea": false,
+        "timezone": 29,
+        "timezone_h": 29,
+        "timefac": 1
+    },
+    {
+        "cname": "The Baltic Sea",
+        "code": "BAS",
+        "gains": "-",
+        "icode": 30,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "The North Sea",
+        "code": "NOS",
+        "gains": "-",
+        "icode": 31,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "Remaining NE Atlantic Ocean",
+        "code": "ATL",
+        "gains": "-",
+        "icode": 32,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "The Mediterranean Sea",
+        "code": "MED",
+        "gains": "-",
+        "icode": 33,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "The Black Sea",
+        "code": "BLS",
+        "gains": "-",
+        "icode": 34,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "Natural marine sources",
+        "code": "NAT",
+        "gains": "-",
+        "icode": 35,
+        "is_sea": false,
+        "timezone": 35,
+        "timezone_h": 35,
+        "timefac": -100
+    },
+    {
+        "cname": "Kola/Karelia",
+        "code": "RUO",
+        "gains": "KOLK",
+        "icode": 36,
+        "is_sea": false,
+        "timezone": 36,
+        "timezone_h": 36,
+        "timefac": 4
+    },
+    {
+        "cname": "St.Petersburg/Novgorod-Pskov",
+        "code": "RUP",
+        "gains": "RUSS",
+        "icode": 37,
+        "is_sea": false,
+        "timezone": 37,
+        "timezone_h": 37,
+        "timefac": 4
+    },
+    {
+        "cname": "Kaliningrad",
+        "code": "RUA",
+        "gains": "KALI",
+        "icode": 38,
+        "is_sea": false,
+        "timezone": 38,
+        "timezone_h": 38,
+        "timefac": 3
+    },
+    {
+        "cname": "Belarus",
+        "code": "BY",
+        "gains": "BELA",
+        "icode": 39,
+        "is_sea": false,
+        "timezone": 39,
+        "timezone_h": 39,
+        "timefac": 3
+    },
+    {
+        "cname": "Ukraine",
+        "code": "UA",
+        "gains": "UKRA",
+        "icode": 40,
+        "is_sea": false,
+        "timezone": 40,
+        "timezone_h": 40,
+        "timefac": 2
+    },
+    {
+        "cname": "Moldova",
+        "code": "MD",
+        "gains": "MOLD",
+        "icode": 41,
+        "is_sea": false,
+        "timezone": 41,
+        "timezone_h": 41,
+        "timefac": 2
+    },
+    {
+        "cname": "Rest of Russia",
+        "code": "RUR",
+        "gains": "RUSS",
+        "icode": 42,
+        "is_sea": false,
+        "timezone": 42,
+        "timezone_h": 42,
+        "timefac": 4
+    },
+    {
+        "cname": "Estonia",
+        "code": "EE",
+        "gains": "ESTO",
+        "icode": 43,
+        "is_sea": false,
+        "timezone": 43,
+        "timezone_h": 43,
+        "timefac": 2
+    },
+    {
+        "cname": "Latvia",
+        "code": "LV",
+        "gains": "LATV",
+        "icode": 44,
+        "is_sea": false,
+        "timezone": 44,
+        "timezone_h": 44,
+        "timefac": 2
+    },
+    {
+        "cname": "Lithuania",
+        "code": "LT",
+        "gains": "LITH",
+        "icode": 45,
+        "is_sea": false,
+        "timezone": 45,
+        "timezone_h": 45,
+        "timefac": 2
+    },
+    {
+        "cname": "Czech",
+        "code": "CZ",
+        "gains": "CZRE",
+        "icode": 46,
+        "is_sea": false,
+        "timezone": 46,
+        "timezone_h": 46,
+        "timefac": 1
+    },
+    {
+        "cname": "Slovakia",
+        "code": "SK",
+        "gains": "SKRE",
+        "icode": 47,
+        "is_sea": false,
+        "timezone": 47,
+        "timezone_h": 47,
+        "timefac": 1
+    },
+    {
+        "cname": "Slovenia",
+        "code": "SI",
+        "gains": "SLOV",
+        "icode": 48,
+        "is_sea": false,
+        "timezone": 48,
+        "timezone_h": 48,
+        "timefac": 1
+    },
+    {
+        "cname": "Croatia",
+        "code": "HR",
+        "gains": "CROA",
+        "icode": 49,
+        "is_sea": false,
+        "timezone": 49,
+        "timezone_h": 49,
+        "timefac": 1
+    },
+    {
+        "cname": "Bosnia and Herzegovina",
+        "code": "BA",
+        "gains": "BOHE",
+        "icode": 50,
+        "is_sea": false,
+        "timezone": 50,
+        "timezone_h": 50,
+        "timefac": 1
+    },
+    {
+        "cname": "Serbia and Montenegro",
+        "code": "CS",
+        "gains": "SEMO",
+        "icode": 51,
+        "is_sea": false,
+        "timezone": 51,
+        "timezone_h": 51,
+        "timefac": 1
+    },
+    {
+        "cname": "Macedonia",
+        "code": "MK",
+        "gains": "MACE",
+        "icode": 52,
+        "is_sea": false,
+        "timezone": 52,
+        "timezone_h": 52,
+        "timefac": 1
+    },
+    {
+        "cname": "Kazakstan",
+        "code": "KZ",
+        "gains": "KAZA",
+        "icode": 53,
+        "is_sea": false,
+        "timezone": 53,
+        "timezone_h": 53,
+        "timefac": -100
+    },
+    {
+        "cname": "Georgia",
+        "code": "GE",
+        "gains": "GEOR",
+        "icode": 54,
+        "is_sea": false,
+        "timezone": 54,
+        "timezone_h": 54,
+        "timefac": 4
+    },
+    {
+        "cname": "Cyprus",
+        "code": "CY",
+        "gains": "CYPR",
+        "icode": 55,
+        "is_sea": false,
+        "timezone": 55,
+        "timezone_h": 55,
+        "timefac": 2
+    },
+    {
+        "cname": "Armenia",
+        "code": "AM",
+        "gains": "ARME",
+        "icode": 56,
+        "is_sea": false,
+        "timezone": 56,
+        "timezone_h": 56,
+        "timefac": 4
+    },
+    {
+        "cname": "Malta",
+        "code": "MT",
+        "gains": "MALT",
+        "icode": 57,
+        "is_sea": false,
+        "timezone": 57,
+        "timezone_h": 57,
+        "timefac": 1
+    },
+    {
+        "cname": "Other Asian areas",
+        "code": "ASI",
+        "gains": "-",
+        "icode": 58,
+        "is_sea": false,
+        "timezone": 58,
+        "timezone_h": 58,
+        "timefac": -100
+    },
+    {
+        "cname": "Lichtenstein",
+        "code": "LI",
+        "gains": "-",
+        "icode": 59,
+        "is_sea": false,
+        "timezone": 59,
+        "timezone_h": 59,
+        "timefac": 1
+    },
+    {
+        "cname": "Germany",
+        "code": "DE",
+        "gains": "GERM",
+        "icode": 60,
+        "is_sea": false,
+        "timezone": 60,
+        "timezone_h": 60,
+        "timefac": 1
+    },
+    {
+        "cname": "Russian Federation",
+        "code": "RU",
+        "gains": "RUSS",
+        "icode": 61,
+        "is_sea": false,
+        "timezone": 61,
+        "timezone_h": 61,
+        "timefac": -100
+    },
+    {
+        "cname": "Monaco",
+        "code": "MC",
+        "gains": "-",
+        "icode": 62,
+        "is_sea": false,
+        "timezone": 62,
+        "timezone_h": 62,
+        "timefac": 1
+    },
+    {
+        "cname": "North Africa",
+        "code": "NOA",
+        "gains": "-",
+        "icode": 63,
+        "is_sea": false,
+        "timezone": 63,
+        "timezone_h": 63,
+        "timefac": 1
+    },
+    {
+        "cname": "European Community",
+        "code": "EU",
+        "gains": "-",
+        "icode": 64,
+        "is_sea": false,
+        "timezone": 64,
+        "timezone_h": 64,
+        "timefac": 1
+    },
+    {
+        "cname": "USA",
+        "code": "US",
+        "gains": "-",
+        "icode": 65,
+        "is_sea": false,
+        "timezone": 65,
+        "timezone_h": 65,
+        "timefac": -100
+    },
+    {
+        "cname": "Canada",
+        "code": "CA",
+        "gains": "-",
+        "icode": 66,
+        "is_sea": false,
+        "timezone": 66,
+        "timezone_h": 66,
+        "timefac": -100
+    },
+    {
+        "cname": "Not_defined",
+        "code": "N/A",
+        "gains": "-",
+        "icode": 67,
+        "is_sea": false,
+        "timezone": 67,
+        "timezone_h": 67,
+        "timefac": -100
+    },
+    {
+        "cname": "Kyrgyzstan",
+        "code": "KG",
+        "gains": "-",
+        "icode": 68,
+        "is_sea": false,
+        "timezone": 68,
+        "timezone_h": 68,
+        "timefac": 6
+    },
+    {
+        "cname": "Azerbaijan",
+        "code": "AZ",
+        "gains": "-",
+        "icode": 69,
+        "is_sea": false,
+        "timezone": 69,
+        "timezone_h": 69,
+        "timefac": 4
+    },
+    {
+        "cname": "Atlantic outside. EMEP",
+        "code": "ATX",
+        "gains": "-",
+        "icode": 70,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "Russian Fed. outside emep",
+        "code": "RUX",
+        "gains": "-",
+        "icode": 71,
+        "is_sea": false,
+        "timezone": 42,
+        "timezone_h": 42,
+        "timefac": -100
+    },
+    {
+        "cname": "Serbia",
+        "code": "RS",
+        "gains": "-",
+        "icode": 72,
+        "is_sea": false,
+        "timezone": 72,
+        "timezone_h": 72,
+        "timefac": 1
+    },
+    {
+        "cname": "Montenegro",
+        "code": "ME",
+        "gains": "-",
+        "icode": 73,
+        "is_sea": false,
+        "timezone": 73,
+        "timezone_h": 73,
+        "timefac": 1
+    },
+    {
+        "cname": "Rest of extended Russian Federation (in the extended EMEP domain",
+        "code": "RFE",
+        "gains": "-",
+        "icode": 74,
+        "is_sea": false,
+        "timezone": 74,
+        "timezone_h": 74,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest of Kazakhstan (in the extended EMEP domain",
+        "code": "KZE",
+        "gains": "-",
+        "icode": 75,
+        "is_sea": false,
+        "timezone": 75,
+        "timezone_h": 75,
+        "timefac": -100
+    },
+    {
+        "cname": "Uzbekistan (in the original EMEP domain",
+        "code": "UZ",
+        "gains": "-",
+        "icode": 76,
+        "is_sea": false,
+        "timezone": 76,
+        "timezone_h": 76,
+        "timefac": -100
+    },
+    {
+        "cname": "Turkmenistan (in the original EMEP domain",
+        "code": "TM",
+        "gains": "-",
+        "icode": 77,
+        "is_sea": false,
+        "timezone": 77,
+        "timezone_h": 77,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest of  Uzbekistan (in the extended EMEP domain",
+        "code": "UZE",
+        "gains": "-",
+        "icode": 78,
+        "is_sea": false,
+        "timezone": 78,
+        "timezone_h": 78,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest of Turkmenistan (in the extended EMEP domain",
+        "code": "TME",
+        "gains": "-",
+        "icode": 79,
+        "is_sea": false,
+        "timezone": 79,
+        "timezone_h": 79,
+        "timefac": -100
+    },
+    {
+        "cname": "Caspian Sea (in the original EMEP domain",
+        "code": "CAS",
+        "gains": "-",
+        "icode": 80,
+        "is_sea": false,
+        "timezone": 80,
+        "timezone_h": 80,
+        "timefac": -100
+    },
+    {
+        "cname": "Tajikistan (in the extended EMEP domain",
+        "code": "TJ",
+        "gains": "-",
+        "icode": 81,
+        "is_sea": false,
+        "timezone": 81,
+        "timezone_h": 81,
+        "timefac": -100
+    },
+    {
+        "cname": "Aral Lake (in the original EMEP domain",
+        "code": "ARL",
+        "gains": "-",
+        "icode": 82,
+        "is_sea": false,
+        "timezone": 82,
+        "timezone_h": 82,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest of Aral Lake (in the extended EMEP domain",
+        "code": "ARE",
+        "gains": "-",
+        "icode": 83,
+        "is_sea": false,
+        "timezone": 83,
+        "timezone_h": 83,
+        "timefac": -100
+    },
+    {
+        "cname": "Modified remaining Asian areas (in the original EMEP domain",
+        "code": "ASM",
+        "gains": "-",
+        "icode": 84,
+        "is_sea": false,
+        "timezone": 84,
+        "timezone_h": 84,
+        "timefac": -100
+    },
+    {
+        "cname": "Remaining extended Asian areas (in the extended EMEP domain",
+        "code": "ASE",
+        "gains": "-",
+        "icode": 85,
+        "is_sea": false,
+        "timezone": 85,
+        "timezone_h": 85,
+        "timefac": -100
+    },
+    {
+        "cname": "Arctic Ocean (in the extended EMEP domain",
+        "code": "AOE",
+        "gains": "-",
+        "icode": 86,
+        "is_sea": false,
+        "timezone": 86,
+        "timezone_h": 86,
+        "timefac": -100
+    },
+    {
+        "cname": "Extended EMEP-external part of Russian Federation",
+        "code": "RFX",
+        "gains": "-",
+        "icode": 87,
+        "is_sea": false,
+        "timezone": 87,
+        "timezone_h": 87,
+        "timefac": -100
+    },
+    {
+        "cname": "Extended EMEP-external part of Asia",
+        "code": "ASX",
+        "gains": "-",
+        "icode": 88,
+        "is_sea": false,
+        "timezone": 88,
+        "timezone_h": 88,
+        "timefac": -100
+    },
+    {
+        "cname": "Extended EMEP-external part of Pacific Ocean",
+        "code": "PAX",
+        "gains": "-",
+        "icode": 89,
+        "is_sea": false,
+        "timezone": 89,
+        "timezone_h": 89,
+        "timefac": -100
+    },
+    {
+        "cname": "Extended EMEP-external part of Arctic Ocean",
+        "code": "AOX",
+        "gains": "-",
+        "icode": 90,
+        "is_sea": false,
+        "timezone": 90,
+        "timezone_h": 90,
+        "timefac": 9
+    },
+    {
+        "cname": "EMEP-external part of North Africa",
+        "code": "NAX",
+        "gains": "-",
+        "icode": 91,
+        "is_sea": false,
+        "timezone": 91,
+        "timezone_h": 91,
+        "timefac": -100
+    },
+    {
+        "cname": "Kazakhstan (all",
+        "code": "KZT",
+        "gains": "-",
+        "icode": 92,
+        "is_sea": false,
+        "timezone": 92,
+        "timezone_h": 92,
+        "timefac": -100
+    },
+    {
+        "cname": "Russian Federeation (all",
+        "code": "RUE",
+        "gains": "-",
+        "icode": 93,
+        "is_sea": false,
+        "timezone": 93,
+        "timezone_h": 93,
+        "timefac": -100
+    },
+    {
+        "cname": "Uzbekistan (all",
+        "code": "UZT",
+        "gains": "-",
+        "icode": 94,
+        "is_sea": false,
+        "timezone": 94,
+        "timezone_h": 94,
+        "timefac": -100
+    },
+    {
+        "cname": "Turkmenistan  (all",
+        "code": "TMT",
+        "gains": "-",
+        "icode": 95,
+        "is_sea": false,
+        "timezone": 95,
+        "timezone_h": 95,
+        "timefac": -100
+    },
+    {
+        "cname": "Asian areas in the EMEP domain",
+        "code": "AST",
+        "gains": "-",
+        "icode": 96,
+        "is_sea": false,
+        "timezone": 96,
+        "timezone_h": 96,
+        "timefac": -100
+    },
+    {
+        "cname": "Area with temporal NMR-NH3 emissions",
+        "code": "NMR",
+        "gains": "-",
+        "icode": 98,
+        "is_sea": false,
+        "timezone": 98,
+        "timezone_h": 98,
+        "timefac": 1
+    },
+    {
+        "cname": "Biomass burning (wild",
+        "code": "BB",
+        "gains": "-",
+        "icode": 101,
+        "is_sea": false,
+        "timezone": 101,
+        "timezone_h": 101,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest of Africa and Asia",
+        "code": "RAA",
+        "gains": "-",
+        "icode": 170,
+        "is_sea": false,
+        "timezone": 170,
+        "timezone_h": 170,
+        "timefac": -100
+    },
+    {
+        "cname": "Ships",
+        "code": "SEA",
+        "gains": "-",
+        "icode": 171,
+        "is_sea": false,
+        "timezone": 171,
+        "timezone_h": 171,
+        "timefac": -100
+    },
+    {
+        "cname": "not country-specific land based emissions",
+        "code": "LANDX",
+        "gains": "-",
+        "icode": 199,
+        "is_sea": false,
+        "timezone": 199,
+        "timezone_h": 199,
+        "timefac": -100
+    },
+    {
+        "cname": "Afghanistan",
+        "code": "AFGH",
+        "gains": "-",
+        "icode": 201,
+        "is_sea": false,
+        "timezone": 201,
+        "timezone_h": 201,
+        "timefac": -100
+    },
+    {
+        "cname": "Argentina",
+        "code": "ARGE",
+        "gains": "-",
+        "icode": 202,
+        "is_sea": false,
+        "timezone": 202,
+        "timezone_h": 202,
+        "timefac": -100
+    },
+    {
+        "cname": "Australia",
+        "code": "AUTR",
+        "gains": "-",
+        "icode": 203,
+        "is_sea": false,
+        "timezone": 203,
+        "timezone_h": 203,
+        "timefac": -100
+    },
+    {
+        "cname": "Bangladesh",
+        "code": "BANG",
+        "gains": "-",
+        "icode": 204,
+        "is_sea": false,
+        "timezone": 204,
+        "timezone_h": 204,
+        "timefac": -100
+    },
+    {
+        "cname": "Bhutan",
+        "code": "BHUT",
+        "gains": "-",
+        "icode": 205,
+        "is_sea": false,
+        "timezone": 205,
+        "timezone_h": 205,
+        "timefac": -100
+    },
+    {
+        "cname": "Brazil",
+        "code": "BRAZ",
+        "gains": "-",
+        "icode": 206,
+        "is_sea": false,
+        "timezone": 206,
+        "timezone_h": 206,
+        "timefac": -100
+    },
+    {
+        "cname": "Brunei",
+        "code": "BRUN",
+        "gains": "-",
+        "icode": 207,
+        "is_sea": false,
+        "timezone": 207,
+        "timezone_h": 207,
+        "timefac": -100
+    },
+    {
+        "cname": "Cambodia",
+        "code": "CAMB",
+        "gains": "-",
+        "icode": 208,
+        "is_sea": false,
+        "timezone": 208,
+        "timezone_h": 208,
+        "timefac": -100
+    },
+    {
+        "cname": "Chile",
+        "code": "CHIL",
+        "gains": "-",
+        "icode": 209,
+        "is_sea": false,
+        "timezone": 209,
+        "timezone_h": 209,
+        "timefac": -100
+    },
+    {
+        "cname": "China",
+        "code": "CHIN",
+        "gains": "-",
+        "icode": 210,
+        "is_sea": false,
+        "timezone": 210,
+        "timezone_h": 210,
+        "timefac": -100
+    },
+    {
+        "cname": "Former_USSR_(Asia",
+        "code": "FSUA",
+        "gains": "-",
+        "icode": 211,
+        "is_sea": false,
+        "timezone": 211,
+        "timezone_h": 211,
+        "timefac": -100
+    },
+    {
+        "cname": "India",
+        "code": "INDI",
+        "gains": "-",
+        "icode": 212,
+        "is_sea": false,
+        "timezone": 212,
+        "timezone_h": 212,
+        "timefac": -100
+    },
+    {
+        "cname": "Indonesia",
+        "code": "INDO",
+        "gains": "-",
+        "icode": 213,
+        "is_sea": false,
+        "timezone": 213,
+        "timezone_h": 213,
+        "timefac": -100
+    },
+    {
+        "cname": "Israel",
+        "code": "ISRA",
+        "gains": "ISR",
+        "icode": 214,
+        "is_sea": false,
+        "timezone": 214,
+        "timezone_h": 214,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan",
+        "code": "JAPA",
+        "gains": "-",
+        "icode": 215,
+        "is_sea": false,
+        "timezone": 215,
+        "timezone_h": 215,
+        "timefac": -100
+    },
+    {
+        "cname": "Laos",
+        "code": "LAOS",
+        "gains": "-",
+        "icode": 216,
+        "is_sea": false,
+        "timezone": 216,
+        "timezone_h": 216,
+        "timefac": -100
+    },
+    {
+        "cname": "Malaysia",
+        "code": "MALA",
+        "gains": "-",
+        "icode": 217,
+        "is_sea": false,
+        "timezone": 217,
+        "timezone_h": 217,
+        "timefac": -100
+    },
+    {
+        "cname": "Mexico",
+        "code": "MEXI",
+        "gains": "-",
+        "icode": 218,
+        "is_sea": false,
+        "timezone": 218,
+        "timezone_h": 218,
+        "timefac": -100
+    },
+    {
+        "cname": "Middle_East",
+        "code": "MIDE",
+        "gains": "-",
+        "icode": 219,
+        "is_sea": false,
+        "timezone": 219,
+        "timezone_h": 219,
+        "timefac": -100
+    },
+    {
+        "cname": "Mongolia",
+        "code": "MONG",
+        "gains": "-",
+        "icode": 220,
+        "is_sea": false,
+        "timezone": 220,
+        "timezone_h": 220,
+        "timefac": -100
+    },
+    {
+        "cname": "Myanmar",
+        "code": "MYAN",
+        "gains": "-",
+        "icode": 221,
+        "is_sea": false,
+        "timezone": 221,
+        "timezone_h": 221,
+        "timefac": -100
+    },
+    {
+        "cname": "Nepal",
+        "code": "NEPA",
+        "gains": "-",
+        "icode": 222,
+        "is_sea": false,
+        "timezone": 222,
+        "timezone_h": 222,
+        "timefac": -100
+    },
+    {
+        "cname": "New_Zealand",
+        "code": "NZEL",
+        "gains": "-",
+        "icode": 223,
+        "is_sea": false,
+        "timezone": 223,
+        "timezone_h": 223,
+        "timefac": -100
+    },
+    {
+        "cname": "North_Africa_Libya_Tunisia_Algeria_Sudan_Morocco",
+        "code": "NAFR",
+        "gains": "-",
+        "icode": 224,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "North_Korea",
+        "code": "KORN",
+        "gains": "-",
+        "icode": 225,
+        "is_sea": false,
+        "timezone": 225,
+        "timezone_h": 225,
+        "timefac": -100
+    },
+    {
+        "cname": "Other_Africa",
+        "code": "OAFR",
+        "gains": "-",
+        "icode": 226,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Other_Latin_America",
+        "code": "OLAM",
+        "gains": "-",
+        "icode": 227,
+        "is_sea": false,
+        "timezone": 227,
+        "timezone_h": 227,
+        "timefac": -100
+    },
+    {
+        "cname": "Pakistan",
+        "code": "PAKI",
+        "gains": "-",
+        "icode": 228,
+        "is_sea": false,
+        "timezone": 228,
+        "timezone_h": 228,
+        "timefac": -100
+    },
+    {
+        "cname": "Philippines",
+        "code": "PHIL",
+        "gains": "-",
+        "icode": 229,
+        "is_sea": false,
+        "timezone": 229,
+        "timezone_h": 229,
+        "timefac": -100
+    },
+    {
+        "cname": "Singapore",
+        "code": "SING",
+        "gains": "-",
+        "icode": 230,
+        "is_sea": false,
+        "timezone": 230,
+        "timezone_h": 230,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Africa",
+        "code": "SAFR",
+        "gains": "-",
+        "icode": 231,
+        "is_sea": false,
+        "timezone": 231,
+        "timezone_h": 231,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Korea",
+        "code": "KORS",
+        "gains": "-",
+        "icode": 232,
+        "is_sea": false,
+        "timezone": 232,
+        "timezone_h": 232,
+        "timefac": -100
+    },
+    {
+        "cname": "Sri_Lanka",
+        "code": "SRIL",
+        "gains": "-",
+        "icode": 233,
+        "is_sea": false,
+        "timezone": 233,
+        "timezone_h": 233,
+        "timefac": -100
+    },
+    {
+        "cname": "Taiwan",
+        "code": "TAIW",
+        "gains": "-",
+        "icode": 234,
+        "is_sea": false,
+        "timezone": 234,
+        "timezone_h": 234,
+        "timefac": -100
+    },
+    {
+        "cname": "Thailand",
+        "code": "THAI",
+        "gains": "-",
+        "icode": 235,
+        "is_sea": false,
+        "timezone": 235,
+        "timezone_h": 235,
+        "timefac": -100
+    },
+    {
+        "cname": "Vietnam",
+        "code": "VIET",
+        "gains": "-",
+        "icode": 236,
+        "is_sea": false,
+        "timezone": 236,
+        "timezone_h": 236,
+        "timefac": -100
+    },
+    {
+        "cname": "Egypt",
+        "code": "EGYP",
+        "gains": "-",
+        "icode": 237,
+        "is_sea": false,
+        "timezone": 237,
+        "timezone_h": 237,
+        "timefac": -100
+    },
+    {
+        "cname": "Hanoi",
+        "code": "Hanoi",
+        "gains": "-",
+        "icode": 238,
+        "is_sea": false,
+        "timezone": 238,
+        "timezone_h": 238,
+        "timefac": -100
+    },
+    {
+        "cname": "North Vietnam",
+        "code": "NVIET",
+        "gains": "-",
+        "icode": 239,
+        "is_sea": false,
+        "timezone": 239,
+        "timezone_h": 239,
+        "timefac": -100
+    },
+    {
+        "cname": "South Vietnam",
+        "code": "SVIET",
+        "gains": "-",
+        "icode": 240,
+        "is_sea": false,
+        "timezone": 240,
+        "timezone_h": 240,
+        "timefac": -100
+    },
+    {
+        "cname": "Bolivia",
+        "code": "BOLV",
+        "gains": "-",
+        "icode": 241,
+        "is_sea": false,
+        "timezone": 241,
+        "timezone_h": 241,
+        "timefac": -100
+    },
+    {
+        "cname": "Caribbean",
+        "code": "CARB",
+        "gains": "-",
+        "icode": 242,
+        "is_sea": false,
+        "timezone": 242,
+        "timezone_h": 242,
+        "timefac": -100
+    },
+    {
+        "cname": "Central America",
+        "code": "CEAM",
+        "gains": "-",
+        "icode": 243,
+        "is_sea": false,
+        "timezone": 243,
+        "timezone_h": 243,
+        "timefac": -100
+    },
+    {
+        "cname": "Colombia",
+        "code": "COLO",
+        "gains": "-",
+        "icode": 244,
+        "is_sea": false,
+        "timezone": 244,
+        "timezone_h": 244,
+        "timefac": -100
+    },
+    {
+        "cname": "Ecuador",
+        "code": "ECUA",
+        "gains": "-",
+        "icode": 245,
+        "is_sea": false,
+        "timezone": 245,
+        "timezone_h": 245,
+        "timefac": -100
+    },
+    {
+        "cname": "Paraguay",
+        "code": "PARA",
+        "gains": "-",
+        "icode": 246,
+        "is_sea": false,
+        "timezone": 246,
+        "timezone_h": 246,
+        "timefac": -100
+    },
+    {
+        "cname": "Peru",
+        "code": "PERU",
+        "gains": "-",
+        "icode": 247,
+        "is_sea": false,
+        "timezone": 247,
+        "timezone_h": 247,
+        "timefac": -100
+    },
+    {
+        "cname": "Uruguay",
+        "code": "URUG",
+        "gains": "-",
+        "icode": 248,
+        "is_sea": false,
+        "timezone": 248,
+        "timezone_h": 248,
+        "timefac": -100
+    },
+    {
+        "cname": "Venezuela",
+        "code": "VENE",
+        "gains": "-",
+        "icode": 249,
+        "is_sea": false,
+        "timezone": 249,
+        "timezone_h": 249,
+        "timefac": -100
+    },
+    {
+        "cname": "Iran",
+        "code": "IRAN",
+        "gains": "IRN",
+        "icode": 250,
+        "is_sea": false,
+        "timezone": 250,
+        "timezone_h": 250,
+        "timefac": -100
+    },
+    {
+        "cname": "Saudi Arabia",
+        "code": "SAAR",
+        "gains": "-",
+        "icode": 251,
+        "is_sea": false,
+        "timezone": 251,
+        "timezone_h": 251,
+        "timefac": -100
+    },
+    {
+        "cname": "International ships",
+        "code": "INTSHIPS",
+        "gains": "-",
+        "icode": 350,
+        "is_sea": true,
+        "timezone": 350,
+        "timezone_h": 350,
+        "timefac": -100
+    },
+    {
+        "cname": "International Flights",
+        "code": "AIRCRAFT",
+        "gains": "-",
+        "icode": 900,
+        "is_sea": true,
+        "timezone": 900,
+        "timezone_h": 900,
+        "timefac": -100
+    },
+    {
+        "cname": "Kosovo",
+        "code": "KOSO",
+        "gains": "KOSO",
+        "icode": 373,
+        "is_sea": false,
+        "timezone": 373,
+        "timezone_h": 373,
+        "timefac": -100
+    },
+    {
+        "cname": "Oceania",
+        "code": "OCEC",
+        "gains": "-",
+        "icode": 393,
+        "is_sea": false,
+        "timezone": 393,
+        "timezone_h": 393,
+        "timefac": -100
+    },
+    {
+        "cname": "Baltic EU cargo outs.12",
+        "code": "BA2",
+        "gains": "-",
+        "icode": 302,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic ROW cargo outs. 12",
+        "code": "BA3",
+        "gains": "-",
+        "icode": 303,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic EU cargo ins. 12",
+        "code": "BA4",
+        "gains": "-",
+        "icode": 304,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic ROW cargo ins. 12",
+        "code": "BA5",
+        "gains": "-",
+        "icode": 305,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic EU ferries outs.12",
+        "code": "BA6",
+        "gains": "-",
+        "icode": 306,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic ROW ferries outs. 12",
+        "code": "BA7",
+        "gains": "-",
+        "icode": 307,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic EU ferries ins. 12",
+        "code": "BA8",
+        "gains": "-",
+        "icode": 308,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "Baltic ROW ferries ins. 12",
+        "code": "BA9",
+        "gains": "-",
+        "icode": 309,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea EU cargo outs.12",
+        "code": "NS2",
+        "gains": "-",
+        "icode": 312,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea ROW cargo outs. 12",
+        "code": "NS3",
+        "gains": "-",
+        "icode": 313,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea EU cargo ins. 12",
+        "code": "NS4",
+        "gains": "-",
+        "icode": 314,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea ROW cargo ins. 12",
+        "code": "NS5",
+        "gains": "-",
+        "icode": 315,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea EU ferries outs.12",
+        "code": "NS6",
+        "gains": "-",
+        "icode": 316,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea ROW ferries outs. 12",
+        "code": "NS7",
+        "gains": "-",
+        "icode": 317,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea EU ferries ins. 12",
+        "code": "NS8",
+        "gains": "-",
+        "icode": 318,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "N. Sea ROW ferries ins. 12",
+        "code": "NS9",
+        "gains": "-",
+        "icode": 319,
+        "is_sea": true,
+        "timezone": 31,
+        "timezone_h": 31,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant EU cargo outs.12",
+        "code": "AT2",
+        "gains": "-",
+        "icode": 322,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant ROW cargo outs. 12",
+        "code": "AT3",
+        "gains": "-",
+        "icode": 323,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant EU cargo ins. 12",
+        "code": "AT4",
+        "gains": "-",
+        "icode": 324,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant ROW cargo ins. 12",
+        "code": "AT5",
+        "gains": "-",
+        "icode": 325,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant EU ferries outs.12",
+        "code": "AT6",
+        "gains": "-",
+        "icode": 326,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant ROW ferries outs. 12",
+        "code": "AT7",
+        "gains": "-",
+        "icode": 327,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant EU ferries ins. 12",
+        "code": "AT8",
+        "gains": "-",
+        "icode": 328,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Atlant ROW ferries ins. 12",
+        "code": "AT9",
+        "gains": "-",
+        "icode": 329,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite EU cargo outs.12",
+        "code": "ME2",
+        "gains": "-",
+        "icode": 332,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite ROW cargo outs. 12",
+        "code": "ME3",
+        "gains": "-",
+        "icode": 333,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite EU cargo ins. 12",
+        "code": "ME4",
+        "gains": "-",
+        "icode": 334,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite ROW cargo ins. 12",
+        "code": "ME5",
+        "gains": "-",
+        "icode": 335,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite EU ferries outs.12",
+        "code": "ME6",
+        "gains": "-",
+        "icode": 336,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite ROW ferries outs. 12",
+        "code": "ME7",
+        "gains": "-",
+        "icode": 337,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite EU ferries ins. 12",
+        "code": "ME8",
+        "gains": "-",
+        "icode": 338,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "Medite ROW ferries ins. 12",
+        "code": "ME9",
+        "gains": "-",
+        "icode": 339,
+        "is_sea": true,
+        "timezone": 33,
+        "timezone_h": 33,
+        "timefac": 1
+    },
+    {
+        "cname": "B. Sea EU cargo outs.12",
+        "code": "BL2",
+        "gains": "-",
+        "icode": 342,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea ROW cargo outs. 12",
+        "code": "BL3",
+        "gains": "-",
+        "icode": 343,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea EU cargo ins. 12",
+        "code": "BL4",
+        "gains": "-",
+        "icode": 344,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea ROW cargo ins. 12",
+        "code": "BL5",
+        "gains": "-",
+        "icode": 345,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea EU ferries outs.12",
+        "code": "BL6",
+        "gains": "-",
+        "icode": 346,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea ROW ferries outs. 12",
+        "code": "BL7",
+        "gains": "-",
+        "icode": 347,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea EU ferries ins. 12",
+        "code": "BL8",
+        "gains": "-",
+        "icode": 348,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "B. Sea ROW ferries ins. 12",
+        "code": "BL9",
+        "gains": "-",
+        "icode": 349,
+        "is_sea": true,
+        "timezone": 34,
+        "timezone_h": 34,
+        "timefac": 2
+    },
+    {
+        "cname": "Unefined",
+        "code": "HT1000",
+        "gains": "-",
+        "icode": 1000,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": -100
+    },
+    {
+        "cname": "Int. ships",
+        "code": "N_ATL",
+        "gains": "-",
+        "icode": 1002,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "USA and Canada",
+        "code": "USCA",
+        "gains": "-",
+        "icode": 1003,
+        "is_sea": true,
+        "timezone": 65,
+        "timezone_h": 65,
+        "timefac": -100
+    },
+    {
+        "cname": "EU and Turkey",
+        "code": "EU_TU",
+        "gains": "-",
+        "icode": 1004,
+        "is_sea": true,
+        "timezone": 64,
+        "timezone_h": 64,
+        "timefac": 1
+    },
+    {
+        "cname": "S. Asia India Pak.",
+        "code": "S_ASIA_IP",
+        "gains": "-",
+        "icode": 1005,
+        "is_sea": true,
+        "timezone": 212,
+        "timezone_h": 212,
+        "timefac": -100
+    },
+    {
+        "cname": "China Korea Japan",
+        "code": "CHCORJAP",
+        "gains": "-",
+        "icode": 1006,
+        "is_sea": true,
+        "timezone": 210,
+        "timezone_h": 210,
+        "timefac": -100
+    },
+    {
+        "cname": "Thail. Indon. Malay",
+        "code": "TAINDOMA",
+        "gains": "-",
+        "icode": 1007,
+        "is_sea": true,
+        "timezone": 210,
+        "timezone_h": 210,
+        "timefac": -100
+    },
+    {
+        "cname": "Austr N. Zeal. ++",
+        "code": "AUSTR",
+        "gains": "-",
+        "icode": 1008,
+        "is_sea": true,
+        "timezone": 203,
+        "timezone_h": 203,
+        "timefac": -100
+    },
+    {
+        "cname": "N. Africa",
+        "code": "NAFRI",
+        "gains": "-",
+        "icode": 1009,
+        "is_sea": true,
+        "timezone": 64,
+        "timezone_h": 64,
+        "timefac": 1
+    },
+    {
+        "cname": "Rest Africa",
+        "code": "RAFRI",
+        "gains": "-",
+        "icode": 1010,
+        "is_sea": true,
+        "timezone": 64,
+        "timezone_h": 64,
+        "timefac": 1
+    },
+    {
+        "cname": "Middle East",
+        "code": "MIDEAST",
+        "gains": "-",
+        "icode": 1011,
+        "is_sea": true,
+        "timezone": 25,
+        "timezone_h": 25,
+        "timefac": 2
+    },
+    {
+        "cname": "C. Am. Carib",
+        "code": "HTCEAM",
+        "gains": "-",
+        "icode": 1012,
+        "is_sea": true,
+        "timezone": 243,
+        "timezone_h": 243,
+        "timefac": -100
+    },
+    {
+        "cname": "S. America",
+        "code": "HTSOAM",
+        "gains": "-",
+        "icode": 1013,
+        "is_sea": true,
+        "timezone": 227,
+        "timezone_h": 227,
+        "timefac": -100
+    },
+    {
+        "cname": "Russ Bel. Ukr",
+        "code": "HTRUBU",
+        "gains": "-",
+        "icode": 1014,
+        "is_sea": true,
+        "timezone": 39,
+        "timezone_h": 39,
+        "timefac": -100
+    },
+    {
+        "cname": "C. Asia",
+        "code": "HTCASI",
+        "gains": "-",
+        "icode": 1015,
+        "is_sea": true,
+        "timezone": 92,
+        "timezone_h": 92,
+        "timefac": -100
+    },
+    {
+        "cname": "Pol. N 66",
+        "code": "HTPOLA",
+        "gains": "-",
+        "icode": 1016,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": -100
+    },
+    {
+        "cname": "S. Pol .S 60",
+        "code": "HTSPOL",
+        "gains": "-",
+        "icode": 1017,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": -100
+    },
+    {
+        "cname": "undefined",
+        "code": "HT1018",
+        "gains": "-",
+        "icode": 1018,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": -100
+    },
+    {
+        "cname": "undefined",
+        "code": "HT1019",
+        "gains": "-",
+        "icode": 1019,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": -100
+    },
+    {
+        "cname": "undefined",
+        "code": "HT1020",
+        "gains": "-",
+        "icode": 1020,
+        "is_sea": true,
+        "timezone": 30,
+        "timezone_h": 30,
+        "timefac": -100
+    },
+    {
+        "cname": "Bangladesh:Dhaka",
+        "code": "BANG_DHAK",
+        "gains": "-",
+        "icode": 252,
+        "is_sea": false,
+        "timezone": 252,
+        "timezone_h": 252,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest_of_Bangladesh",
+        "code": "BANG_REST",
+        "gains": "-",
+        "icode": 253,
+        "is_sea": false,
+        "timezone": 253,
+        "timezone_h": 253,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Anhui",
+        "code": "CHIN_ANHU",
+        "gains": "-",
+        "icode": 254,
+        "is_sea": false,
+        "timezone": 254,
+        "timezone_h": 254,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Beijing",
+        "code": "CHIN_BEIJ",
+        "gains": "-",
+        "icode": 255,
+        "is_sea": false,
+        "timezone": 255,
+        "timezone_h": 255,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Chongqing",
+        "code": "CHIN_CHON",
+        "gains": "-",
+        "icode": 256,
+        "is_sea": false,
+        "timezone": 256,
+        "timezone_h": 256,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Fujian",
+        "code": "CHIN_FUJI",
+        "gains": "-",
+        "icode": 257,
+        "is_sea": false,
+        "timezone": 257,
+        "timezone_h": 257,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Gansu",
+        "code": "CHIN_GANS",
+        "gains": "-",
+        "icode": 258,
+        "is_sea": false,
+        "timezone": 258,
+        "timezone_h": 258,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Guangdong",
+        "code": "CHIN_GUAD",
+        "gains": "-",
+        "icode": 259,
+        "is_sea": false,
+        "timezone": 259,
+        "timezone_h": 259,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Guangxi",
+        "code": "CHIN_GUAX",
+        "gains": "-",
+        "icode": 260,
+        "is_sea": false,
+        "timezone": 260,
+        "timezone_h": 260,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Guizhou",
+        "code": "CHIN_GUIZ",
+        "gains": "-",
+        "icode": 261,
+        "is_sea": false,
+        "timezone": 261,
+        "timezone_h": 261,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Hainan",
+        "code": "CHIN_HAIN",
+        "gains": "-",
+        "icode": 262,
+        "is_sea": false,
+        "timezone": 262,
+        "timezone_h": 262,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Hebei",
+        "code": "CHIN_HEBE",
+        "gains": "-",
+        "icode": 263,
+        "is_sea": false,
+        "timezone": 263,
+        "timezone_h": 263,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Heilongjiang",
+        "code": "CHIN_HEIL",
+        "gains": "-",
+        "icode": 264,
+        "is_sea": false,
+        "timezone": 264,
+        "timezone_h": 264,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Henan",
+        "code": "CHIN_HENA",
+        "gains": "-",
+        "icode": 265,
+        "is_sea": false,
+        "timezone": 265,
+        "timezone_h": 265,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Hong_Kong_&_Macau",
+        "code": "CHIN_HONG",
+        "gains": "-",
+        "icode": 266,
+        "is_sea": false,
+        "timezone": 266,
+        "timezone_h": 266,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Hubei",
+        "code": "CHIN_HUBE",
+        "gains": "-",
+        "icode": 267,
+        "is_sea": false,
+        "timezone": 267,
+        "timezone_h": 267,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Hunan",
+        "code": "CHIN_HUNA",
+        "gains": "-",
+        "icode": 268,
+        "is_sea": false,
+        "timezone": 268,
+        "timezone_h": 268,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Jilin",
+        "code": "CHIN_JILI",
+        "gains": "-",
+        "icode": 269,
+        "is_sea": false,
+        "timezone": 269,
+        "timezone_h": 269,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Jiangsu",
+        "code": "CHIN_JINU",
+        "gains": "-",
+        "icode": 270,
+        "is_sea": false,
+        "timezone": 270,
+        "timezone_h": 270,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Jiangxi",
+        "code": "CHIN_JINX",
+        "gains": "-",
+        "icode": 271,
+        "is_sea": false,
+        "timezone": 271,
+        "timezone_h": 271,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Liaoning",
+        "code": "CHIN_LIAO",
+        "gains": "-",
+        "icode": 272,
+        "is_sea": false,
+        "timezone": 272,
+        "timezone_h": 272,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Inner_Mongolia",
+        "code": "CHIN_NEMO",
+        "gains": "-",
+        "icode": 273,
+        "is_sea": false,
+        "timezone": 273,
+        "timezone_h": 273,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Ningxia",
+        "code": "CHIN_NINX",
+        "gains": "-",
+        "icode": 274,
+        "is_sea": false,
+        "timezone": 274,
+        "timezone_h": 274,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Qinghai",
+        "code": "CHIN_QING",
+        "gains": "-",
+        "icode": 275,
+        "is_sea": false,
+        "timezone": 275,
+        "timezone_h": 275,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Shaanxi",
+        "code": "CHIN_SHAA",
+        "gains": "-",
+        "icode": 276,
+        "is_sea": false,
+        "timezone": 276,
+        "timezone_h": 276,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Shanghai",
+        "code": "CHIN_SHAN",
+        "gains": "-",
+        "icode": 277,
+        "is_sea": false,
+        "timezone": 277,
+        "timezone_h": 277,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Shandong",
+        "code": "CHIN_SHND",
+        "gains": "-",
+        "icode": 278,
+        "is_sea": false,
+        "timezone": 278,
+        "timezone_h": 278,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Shanxi",
+        "code": "CHIN_SHNX",
+        "gains": "-",
+        "icode": 279,
+        "is_sea": false,
+        "timezone": 279,
+        "timezone_h": 279,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Sichuan",
+        "code": "CHIN_SICH",
+        "gains": "-",
+        "icode": 280,
+        "is_sea": false,
+        "timezone": 280,
+        "timezone_h": 280,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Tianjin",
+        "code": "CHIN_TIAN",
+        "gains": "-",
+        "icode": 281,
+        "is_sea": false,
+        "timezone": 281,
+        "timezone_h": 281,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Tibet_(Xizang",
+        "code": "CHIN_TIBE",
+        "gains": "-",
+        "icode": 282,
+        "is_sea": false,
+        "timezone": 282,
+        "timezone_h": 282,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Xinjiang",
+        "code": "CHIN_XING",
+        "gains": "-",
+        "icode": 283,
+        "is_sea": false,
+        "timezone": 283,
+        "timezone_h": 283,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Yunnan",
+        "code": "CHIN_YUNN",
+        "gains": "-",
+        "icode": 284,
+        "is_sea": false,
+        "timezone": 284,
+        "timezone_h": 284,
+        "timefac": -100
+    },
+    {
+        "cname": "China:Zhejiang",
+        "code": "CHIN_ZHEJ",
+        "gains": "-",
+        "icode": 285,
+        "is_sea": false,
+        "timezone": 285,
+        "timezone_h": 285,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Andhra_Pradesh",
+        "code": "INDI_ANPR",
+        "gains": "-",
+        "icode": 286,
+        "is_sea": false,
+        "timezone": 286,
+        "timezone_h": 286,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Assam",
+        "code": "INDI_ASSA",
+        "gains": "-",
+        "icode": 287,
+        "is_sea": false,
+        "timezone": 287,
+        "timezone_h": 287,
+        "timefac": -100
+    },
+    {
+        "cname": "India:West_Bengal",
+        "code": "INDI_BENG",
+        "gains": "-",
+        "icode": 288,
+        "is_sea": false,
+        "timezone": 288,
+        "timezone_h": 288,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Bihar",
+        "code": "INDI_BIHA",
+        "gains": "-",
+        "icode": 289,
+        "is_sea": false,
+        "timezone": 289,
+        "timezone_h": 289,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Chhattisgarh",
+        "code": "INDI_CHHA",
+        "gains": "-",
+        "icode": 290,
+        "is_sea": false,
+        "timezone": 290,
+        "timezone_h": 290,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Delhi",
+        "code": "INDI_DELH",
+        "gains": "-",
+        "icode": 291,
+        "is_sea": false,
+        "timezone": 291,
+        "timezone_h": 291,
+        "timefac": -100
+    },
+    {
+        "cname": "India:North_East_(excl._Assam",
+        "code": "INDI_EHIM",
+        "gains": "-",
+        "icode": 292,
+        "is_sea": false,
+        "timezone": 292,
+        "timezone_h": 292,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Goa",
+        "code": "INDI_GOA",
+        "gains": "-",
+        "icode": 293,
+        "is_sea": false,
+        "timezone": 293,
+        "timezone_h": 293,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Gujarat",
+        "code": "INDI_GUJA",
+        "gains": "-",
+        "icode": 294,
+        "is_sea": false,
+        "timezone": 294,
+        "timezone_h": 294,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Haryana",
+        "code": "INDI_HARY",
+        "gains": "-",
+        "icode": 295,
+        "is_sea": false,
+        "timezone": 295,
+        "timezone_h": 295,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Himachal_Pradesh",
+        "code": "INDI_HIPR",
+        "gains": "-",
+        "icode": 296,
+        "is_sea": false,
+        "timezone": 296,
+        "timezone_h": 296,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Jharkhand",
+        "code": "INDI_JHAR",
+        "gains": "-",
+        "icode": 297,
+        "is_sea": false,
+        "timezone": 297,
+        "timezone_h": 297,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Karnataka",
+        "code": "INDI_KARN",
+        "gains": "-",
+        "icode": 298,
+        "is_sea": false,
+        "timezone": 298,
+        "timezone_h": 298,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Kerala",
+        "code": "INDI_KERA",
+        "gains": "-",
+        "icode": 299,
+        "is_sea": false,
+        "timezone": 299,
+        "timezone_h": 299,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Maharashtra-Dadra-Nagar-Haveli-Daman-Diu",
+        "code": "INDI_MAHA",
+        "gains": "-",
+        "icode": 300,
+        "is_sea": false,
+        "timezone": 300,
+        "timezone_h": 300,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Madhya_Pradesh",
+        "code": "INDI_MAPR",
+        "gains": "-",
+        "icode": 351,
+        "is_sea": false,
+        "timezone": 351,
+        "timezone_h": 351,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Orissa",
+        "code": "INDI_ORIS",
+        "gains": "-",
+        "icode": 352,
+        "is_sea": false,
+        "timezone": 352,
+        "timezone_h": 352,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Punjab",
+        "code": "INDI_PUNJ",
+        "gains": "-",
+        "icode": 353,
+        "is_sea": false,
+        "timezone": 353,
+        "timezone_h": 353,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Rajasthan",
+        "code": "INDI_RAJA",
+        "gains": "-",
+        "icode": 354,
+        "is_sea": false,
+        "timezone": 354,
+        "timezone_h": 354,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Tamil_Nadu",
+        "code": "INDI_TAMI",
+        "gains": "-",
+        "icode": 355,
+        "is_sea": false,
+        "timezone": 355,
+        "timezone_h": 355,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Uttaranchal",
+        "code": "INDI_UTAN",
+        "gains": "-",
+        "icode": 356,
+        "is_sea": false,
+        "timezone": 356,
+        "timezone_h": 356,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Uttar_Pradesh",
+        "code": "INDI_UTPR",
+        "gains": "-",
+        "icode": 357,
+        "is_sea": false,
+        "timezone": 357,
+        "timezone_h": 357,
+        "timefac": -100
+    },
+    {
+        "cname": "India:Jammu_and_Kashmir",
+        "code": "INDI_WHIM",
+        "gains": "-",
+        "icode": 358,
+        "is_sea": false,
+        "timezone": 358,
+        "timezone_h": 358,
+        "timefac": -100
+    },
+    {
+        "cname": "Indonesia:Jakarta",
+        "code": "INDO_JAKA",
+        "gains": "-",
+        "icode": 359,
+        "is_sea": false,
+        "timezone": 359,
+        "timezone_h": 359,
+        "timefac": -100
+    },
+    {
+        "cname": "Indonesia:Java",
+        "code": "INDO_JAVA",
+        "gains": "-",
+        "icode": 360,
+        "is_sea": false,
+        "timezone": 360,
+        "timezone_h": 360,
+        "timefac": -100
+    },
+    {
+        "cname": "Indonesia:Rest_of_Indonesia",
+        "code": "INDO_REST",
+        "gains": "-",
+        "icode": 361,
+        "is_sea": false,
+        "timezone": 361,
+        "timezone_h": 361,
+        "timefac": -100
+    },
+    {
+        "cname": "Indonesia:Sumatra",
+        "code": "INDO_SUMA",
+        "gains": "-",
+        "icode": 362,
+        "is_sea": false,
+        "timezone": 362,
+        "timezone_h": 362,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan:Chugoku-Shikoku",
+        "code": "JAPA_CHSH",
+        "gains": "-",
+        "icode": 363,
+        "is_sea": false,
+        "timezone": 363,
+        "timezone_h": 363,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan:Chubu",
+        "code": "JAPA_CHUB",
+        "gains": "-",
+        "icode": 364,
+        "is_sea": false,
+        "timezone": 364,
+        "timezone_h": 364,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan:Hokkaido-Tohoku",
+        "code": "JAPA_HOTO",
+        "gains": "-",
+        "icode": 365,
+        "is_sea": false,
+        "timezone": 365,
+        "timezone_h": 365,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan:Kanto",
+        "code": "JAPA_KANT",
+        "gains": "-",
+        "icode": 366,
+        "is_sea": false,
+        "timezone": 366,
+        "timezone_h": 366,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan:Kinki",
+        "code": "JAPA_KINK",
+        "gains": "-",
+        "icode": 367,
+        "is_sea": false,
+        "timezone": 367,
+        "timezone_h": 367,
+        "timefac": -100
+    },
+    {
+        "cname": "Japan:Kyushu-Okinawa",
+        "code": "JAPA_KYOK",
+        "gains": "-",
+        "icode": 368,
+        "is_sea": false,
+        "timezone": 368,
+        "timezone_h": 368,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Korea:North",
+        "code": "KORS_NORT",
+        "gains": "-",
+        "icode": 369,
+        "is_sea": false,
+        "timezone": 369,
+        "timezone_h": 369,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Korea:Pusan",
+        "code": "KORS_PUSA",
+        "gains": "-",
+        "icode": 370,
+        "is_sea": false,
+        "timezone": 370,
+        "timezone_h": 370,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Korea:Seoul-Inchon",
+        "code": "KORS_SEOI",
+        "gains": "-",
+        "icode": 371,
+        "is_sea": false,
+        "timezone": 371,
+        "timezone_h": 371,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Korea:South",
+        "code": "KORS_SOUT",
+        "gains": "-",
+        "icode": 372,
+        "is_sea": false,
+        "timezone": 372,
+        "timezone_h": 372,
+        "timefac": -100
+    },
+    {
+        "cname": "Malaysia:Kuala_Lumpur",
+        "code": "MALA_KUAL",
+        "gains": "-",
+        "icode": 374,
+        "is_sea": false,
+        "timezone": 374,
+        "timezone_h": 374,
+        "timefac": -100
+    },
+    {
+        "cname": "Malaysia:Peninsular_Malaysia",
+        "code": "MALA_PENM",
+        "gains": "-",
+        "icode": 375,
+        "is_sea": false,
+        "timezone": 375,
+        "timezone_h": 375,
+        "timefac": -100
+    },
+    {
+        "cname": "Malaysia:Sarawak-Sabah",
+        "code": "MALA_SASA",
+        "gains": "-",
+        "icode": 376,
+        "is_sea": false,
+        "timezone": 376,
+        "timezone_h": 376,
+        "timefac": -100
+    },
+    {
+        "cname": "Pakistan:Karachi",
+        "code": "PAKI_KARA",
+        "gains": "-",
+        "icode": 377,
+        "is_sea": false,
+        "timezone": 377,
+        "timezone_h": 377,
+        "timefac": -100
+    },
+    {
+        "cname": "Pakistan:NW_Frontier_Provinces-Baluchistan",
+        "code": "PAKI_NMWP",
+        "gains": "-",
+        "icode": 378,
+        "is_sea": false,
+        "timezone": 378,
+        "timezone_h": 378,
+        "timefac": -100
+    },
+    {
+        "cname": "Pakistan:Punjab",
+        "code": "PAKI_PUNJ",
+        "gains": "-",
+        "icode": 379,
+        "is_sea": false,
+        "timezone": 379,
+        "timezone_h": 379,
+        "timefac": -100
+    },
+    {
+        "cname": "Pakistan:Sind",
+        "code": "PAKI_SIND",
+        "gains": "-",
+        "icode": 380,
+        "is_sea": false,
+        "timezone": 380,
+        "timezone_h": 380,
+        "timefac": -100
+    },
+    {
+        "cname": "Philipinnes:Bicol-Visayas-Mindanao",
+        "code": "PHIL_BVMI",
+        "gains": "-",
+        "icode": 381,
+        "is_sea": false,
+        "timezone": 381,
+        "timezone_h": 381,
+        "timefac": -100
+    },
+    {
+        "cname": "Philipinnes:Luzon",
+        "code": "PHIL_LUZO",
+        "gains": "-",
+        "icode": 382,
+        "is_sea": false,
+        "timezone": 382,
+        "timezone_h": 382,
+        "timefac": -100
+    },
+    {
+        "cname": "Philipinnes:Metropolitan_Manila",
+        "code": "PHIL_MANI",
+        "gains": "-",
+        "icode": 383,
+        "is_sea": false,
+        "timezone": 383,
+        "timezone_h": 383,
+        "timefac": -100
+    },
+    {
+        "cname": "Russia:Asian_part",
+        "code": "RUSS_ASIA",
+        "gains": "-",
+        "icode": 384,
+        "is_sea": false,
+        "timezone": 384,
+        "timezone_h": 384,
+        "timefac": -100
+    },
+    {
+        "cname": "Russia:European_part",
+        "code": "RUSS_EURO",
+        "gains": "RUSS",
+        "icode": 385,
+        "is_sea": false,
+        "timezone": 385,
+        "timezone_h": 385,
+        "timefac": -100
+    },
+    {
+        "cname": "Thailand:Bangkok_Metropolitan_Region",
+        "code": "THAI_BANG",
+        "gains": "-",
+        "icode": 386,
+        "is_sea": false,
+        "timezone": 386,
+        "timezone_h": 386,
+        "timefac": -100
+    },
+    {
+        "cname": "Thailand:Central_Valley",
+        "code": "THAI_CVAL",
+        "gains": "-",
+        "icode": 387,
+        "is_sea": false,
+        "timezone": 387,
+        "timezone_h": 387,
+        "timefac": -100
+    },
+    {
+        "cname": "Thailand:NE_Plateau",
+        "code": "THAI_NEPL",
+        "gains": "-",
+        "icode": 388,
+        "is_sea": false,
+        "timezone": 388,
+        "timezone_h": 388,
+        "timefac": -100
+    },
+    {
+        "cname": "Thailand:N_Highlands",
+        "code": "THAI_NHIG",
+        "gains": "-",
+        "icode": 389,
+        "is_sea": false,
+        "timezone": 389,
+        "timezone_h": 389,
+        "timefac": -100
+    },
+    {
+        "cname": "Thailand:S_Peninsula",
+        "code": "THAI_SPEN",
+        "gains": "-",
+        "icode": 390,
+        "is_sea": false,
+        "timezone": 390,
+        "timezone_h": 390,
+        "timefac": -100
+    },
+    {
+        "cname": "Iran:Rest_of_Iran",
+        "code": "IRAN_REST",
+        "gains": "-",
+        "icode": 391,
+        "is_sea": false,
+        "timezone": 391,
+        "timezone_h": 391,
+        "timefac": -100
+    },
+    {
+        "cname": "Iran:Teheran",
+        "code": "IRAN_TEHR",
+        "gains": "-",
+        "icode": 392,
+        "is_sea": false,
+        "timezone": 392,
+        "timezone_h": 392,
+        "timefac": -100
+    },
+    {
+        "cname": "Vietnam:Bac_Ninh",
+        "code": "VIET_BNIH",
+        "gains": "-",
+        "icode": 470,
+        "is_sea": false,
+        "timezone": 239,
+        "timezone_h": 239,
+        "timefac": -100
+    },
+    {
+        "cname": "Vietnam:Hung_Yen",
+        "code": "VIET_HYEN",
+        "gains": "-",
+        "icode": 471,
+        "is_sea": false,
+        "timezone": 239,
+        "timezone_h": 239,
+        "timefac": -100
+    },
+    {
+        "cname": "Vietnam:Other_Ha_Noi_Capital_Region",
+        "code": "VIET_OCAR",
+        "gains": "-",
+        "icode": 472,
+        "is_sea": false,
+        "timezone": 239,
+        "timezone_h": 239,
+        "timefac": -100
+    },
+    {
+        "cname": "Vietnam:Other_Northern_Vietnam",
+        "code": "VIET_ONOR",
+        "gains": "-",
+        "icode": 473,
+        "is_sea": false,
+        "timezone": 239,
+        "timezone_h": 239,
+        "timefac": -100
+    },
+    {
+        "cname": "Alaska",
+        "code": "USAM_ALAS",
+        "gains": "-",
+        "icode": 474,
+        "is_sea": false,
+        "timezone": 65,
+        "timezone_h": 65,
+        "timefac": -100
+    },
+    {
+        "cname": "United_States_(without_Alaska",
+        "code": "USAM_REST",
+        "gains": "-",
+        "icode": 475,
+        "is_sea": false,
+        "timezone": 65,
+        "timezone_h": 65,
+        "timefac": -100
+    },
+    {
+        "cname": "Egypt:Cairo_area",
+        "code": "EGYP_CAIR",
+        "gains": "-",
+        "icode": 476,
+        "is_sea": false,
+        "timezone": 63,
+        "timezone_h": 63,
+        "timefac": -100
+    },
+    {
+        "cname": "Egypt_(remaining",
+        "code": "EGYP_REST",
+        "gains": "-",
+        "icode": 477,
+        "is_sea": false,
+        "timezone": 63,
+        "timezone_h": 63,
+        "timefac": -100
+    },
+    {
+        "cname": "Algeria_Libya_Morocco_Tunisia_Western_Sahara",
+        "code": "NAFR_WHOL",
+        "gains": "-",
+        "icode": 478,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "Lagos_State_(Nigeria",
+        "code": "NIGE_LAGO",
+        "gains": "-",
+        "icode": 479,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Ogun_Osun_Oyo_states_(Nigeria",
+        "code": "NIGE_OLAG",
+        "gains": "-",
+        "icode": 480,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Nigeria_excl_Lagos_Ogun_Osun_Oyo",
+        "code": "NIGE_REST",
+        "gains": "-",
+        "icode": 481,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Africa:Greater_Johannesburg",
+        "code": "SAFR_JOBG",
+        "gains": "-",
+        "icode": 482,
+        "is_sea": false,
+        "timezone": 231,
+        "timezone_h": 231,
+        "timefac": -100
+    },
+    {
+        "cname": "South_Africa_(remaining",
+        "code": "SAFR_REST",
+        "gains": "-",
+        "icode": 483,
+        "is_sea": false,
+        "timezone": 231,
+        "timezone_h": 231,
+        "timefac": -100
+    },
+    {
+        "cname": "Rest_of_Southern_Africa",
+        "code": "RSAF_WHOL",
+        "gains": "-",
+        "icode": 484,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Eastern_Africa",
+        "code": "EAFR_WHOL",
+        "gains": "-",
+        "icode": 485,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Western_Africa",
+        "code": "WAFR_WHOL",
+        "gains": "-",
+        "icode": 486,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Kenya",
+        "code": "KENY_WHOL",
+        "gains": "-",
+        "icode": 487,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Tanzania",
+        "code": "TANZ_WHOL",
+        "gains": "-",
+        "icode": 488,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "Nigeria",
+        "code": "NIGE_WHOL",
+        "gains": "-",
+        "icode": 489,
+        "is_sea": false,
+        "timezone": 226,
+        "timezone_h": 226,
+        "timefac": -100
+    },
+    {
+        "cname": "DE:BERLIN",
+        "code": "BERLIN",
+        "gains": "-",
+        "icode": 401,
+        "is_sea": false,
+        "timezone": 60,
+        "timezone_h": 401,
+        "timefac": 1
+    },
+    {
+        "cname": "BE:BRUSSEL",
+        "code": "BRUSSEL",
+        "gains": "-",
+        "icode": 402,
+        "is_sea": false,
+        "timezone": 3,
+        "timezone_h": 402,
+        "timefac": 1
+    },
+    {
+        "cname": "DK:COPENHAGEN",
+        "code": "COPENHAGEN",
+        "gains": "-",
+        "icode": 403,
+        "is_sea": false,
+        "timezone": 6,
+        "timezone_h": 403,
+        "timefac": 1
+    },
+    {
+        "cname": "ES:MADRID",
+        "code": "MADRID",
+        "gains": "-",
+        "icode": 404,
+        "is_sea": false,
+        "timezone": 22,
+        "timezone_h": 404,
+        "timefac": 1
+    },
+    {
+        "cname": "FI:HELSINKI",
+        "code": "HELSINKI",
+        "gains": "-",
+        "icode": 405,
+        "is_sea": false,
+        "timezone": 7,
+        "timezone_h": 405,
+        "timefac": 2
+    },
+    {
+        "cname": "FR:PARIS",
+        "code": "PARIS",
+        "gains": "-",
+        "icode": 406,
+        "is_sea": false,
+        "timezone": 8,
+        "timezone_h": 406,
+        "timefac": 1
+    },
+    {
+        "cname": "GR:ATHENS",
+        "code": "ATHENS",
+        "gains": "-",
+        "icode": 407,
+        "is_sea": false,
+        "timezone": 11,
+        "timezone_h": 407,
+        "timefac": 2
+    },
+    {
+        "cname": "HU:BUDAPEST",
+        "code": "BUDAPEST",
+        "gains": "-",
+        "icode": 408,
+        "is_sea": false,
+        "timezone": 12,
+        "timezone_h": 408,
+        "timefac": 1
+    },
+    {
+        "cname": "IE:DUBLIN",
+        "code": "DUBLIN",
+        "gains": "-",
+        "icode": 409,
+        "is_sea": false,
+        "timezone": 14,
+        "timezone_h": 409,
+        "timefac": 0
+    },
+    {
+        "cname": "IT:MILAN",
+        "code": "MILAN",
+        "gains": "-",
+        "icode": 410,
+        "is_sea": false,
+        "timezone": 15,
+        "timezone_h": 410,
+        "timefac": 1
+    },
+    {
+        "cname": "NO:OSLO",
+        "code": "OSLO",
+        "gains": "-",
+        "icode": 411,
+        "is_sea": false,
+        "timezone": 18,
+        "timezone_h": 411,
+        "timefac": 1
+    },
+    {
+        "cname": "NL:AMSTERDAM",
+        "code": "AMSTERDAM",
+        "gains": "-",
+        "icode": 412,
+        "is_sea": false,
+        "timezone": 17,
+        "timezone_h": 412,
+        "timefac": 1
+    },
+    {
+        "cname": "PL:WARSAW",
+        "code": "WARSAW",
+        "gains": "-",
+        "icode": 413,
+        "is_sea": false,
+        "timezone": 19,
+        "timezone_h": 413,
+        "timefac": 1
+    },
+    {
+        "cname": "PT:LISBON",
+        "code": "LISBON",
+        "gains": "-",
+        "icode": 414,
+        "is_sea": false,
+        "timezone": 20,
+        "timezone_h": 414,
+        "timefac": 0
+    },
+    {
+        "cname": "GB:LONDON",
+        "code": "LONDON",
+        "gains": "-",
+        "icode": 415,
+        "is_sea": false,
+        "timezone": 27,
+        "timezone_h": 415,
+        "timefac": 0
+    },
+    {
+        "cname": "SE:STOCKHOLM",
+        "code": "STOCKHOLM",
+        "gains": "-",
+        "icode": 416,
+        "is_sea": false,
+        "timezone": 23,
+        "timezone_h": 416,
+        "timefac": 1
+    },
+    {
+        "cname": "CH:GENEVA",
+        "code": "GENEVA",
+        "gains": "-",
+        "icode": 417,
+        "is_sea": false,
+        "timezone": 24,
+        "timezone_h": 417,
+        "timefac": 1
+    },
+    {
+        "cname": "Iraq",
+        "code": "IRQ",
+        "gains": "IRQ",
+        "icode": 110,
+        "is_sea": false,
+        "timezone": 219,
+        "timezone_h": 219,
+        "timefac": -100
+    },
+    {
+        "cname": "Jordan",
+        "code": "JOR",
+        "gains": "JOR",
+        "icode": 111,
+        "is_sea": false,
+        "timezone": 219,
+        "timezone_h": 219,
+        "timefac": -100
+    },
+    {
+        "cname": "Kuwait",
+        "code": "KWT",
+        "gains": "KWT",
+        "icode": 112,
+        "is_sea": false,
+        "timezone": 251,
+        "timezone_h": 251,
+        "timefac": -100
+    },
+    {
+        "cname": "Lebanon",
+        "code": "LBN",
+        "gains": "LBN",
+        "icode": 113,
+        "is_sea": false,
+        "timezone": 219,
+        "timezone_h": 219,
+        "timefac": -100
+    },
+    {
+        "cname": "Libya",
+        "code": "LBY",
+        "gains": "LBY",
+        "icode": 114,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "Morocco",
+        "code": "MAR",
+        "gains": "MAR",
+        "icode": 115,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "Palestine",
+        "code": "PSE",
+        "gains": "PSE",
+        "icode": 116,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "Syrian Arab Rep.",
+        "code": "SYR",
+        "gains": "SYR",
+        "icode": 117,
+        "is_sea": false,
+        "timezone": 219,
+        "timezone_h": 219,
+        "timefac": -100
+    },
+    {
+        "cname": "Tunisia",
+        "code": "TUN",
+        "gains": "TUN",
+        "icode": 118,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "Algeria",
+        "code": "DZA",
+        "gains": "DZA",
+        "icode": 119,
+        "is_sea": false,
+        "timezone": 224,
+        "timezone_h": 224,
+        "timefac": -100
+    },
+    {
+        "cname": "Greenland Sea",
+        "code": "GRS",
+        "gains": "-",
+        "icode": 501,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "Barents Sea",
+        "code": "BAR",
+        "gains": "-",
+        "icode": 502,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "Norwegian Sea",
+        "code": "NWS",
+        "gains": "-",
+        "icode": 503,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "English Channel",
+        "code": "ENC",
+        "gains": "-",
+        "icode": 504,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "Irish Sea",
+        "code": "IRC",
+        "gains": "-",
+        "icode": 505,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "Kara Sea",
+        "code": "KAR",
+        "gains": "-",
+        "icode": 506,
+        "is_sea": true,
+        "timezone": 32,
+        "timezone_h": 32,
+        "timefac": -100
+    },
+    {
+        "cname": "Persian Gulf",
+        "code": "PSG",
+        "gains": "-",
+        "icode": 507,
+        "is_sea": true,
+        "timezone": 507,
+        "timezone_h": 507,
+        "timefac": -100
+    }
+]
