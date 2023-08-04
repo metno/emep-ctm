@@ -596,6 +596,8 @@ In the CV format, emissions are organised in a number of files (Emis_sourceFiles
 A source can be any 2D field. It can also be a 3D field, if the third dimension is the sector. The sources are associated to country through a country code or a country code. 
 The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
+The code directory contain a Python script that can create an emission file in this format: ``emissions_TXT2ncCV.py``
+
 The file and sources can be characterized by a set of variables. In general these variable can be set by, and in order of increasing priority:
   1. Default value
   2. Global attribute read in the netcdf file
