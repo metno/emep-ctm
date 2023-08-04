@@ -169,33 +169,8 @@ Acknowledgement:
 Gridded emissions
 ~~~~~~~~~~~~~~~~~
 
-Since 2015 different formats of gridded emissions can be used and
-mixed (with some restrictions) under one common framework. See the
-section ``Defining own sectors``
-
-The different formats that are presently supported are:
-
-"Old style" ASCII emissions format (no more in use):
-    Total yearly emissions.
-
-    The gridded emission files contain 16 columns where the first column
-    represents the country code
-    (http://www.emep.int/grid/country_numbers.txt), the second and the
-    third columns are the :math:`i` and :math:`j` indices of the EMEP grid, the
-    fourth and fifth columns are the total emissions from low and high
-    sources, and the last 11 columns contain emissions from 10
-    anthropogenic SNAP sectors.
-
-    The advantage of the ASCII emissions format, is that they are easy to
-    modify, and the interpretation of the numbers is straightforward. The
-    main disadvantage of the ASCII emissions format, is that they are
-    only valid for one specific grid projection. Visualization of these
-    emissions, needs also some more efforts.
-
-Countrywise NetCDF emissions:
-    Yearly totals.
-
-    Each country and sector has its own NetCDF field.
+Gridded emissions in NetCDF care be used in conjunction with sector definitions.
+See section ``Defining own sectors`` and ``Country Variable (CV) format``
 
     The main advantage of NetCDF emissions is that all the information
     about the data (projection, units) is given in the same file. This
@@ -204,46 +179,6 @@ Countrywise NetCDF emissions:
     simple tools, like ncview. The data is simple to interpret and it is
     possible to add new countries to an existing file (with appropriate
     tools).
-
-    The disadvantage of countrywise NetCDF emissions, is that there are
-    quite a large number of fields, with most of the data being zero.
-    NetCDF will compress the data, but it will still take some time for
-    the model to read all the data.
-
-"Fraction type" NetCDF emissions:
-    Yearly totals.
-
-    The total emissions are stored in one gridded map, and in addition
-    information about which country the emission belongs to.
-
-    The main advantage of "fraction type" NetCDF emissions, is that they
-    will keep the grid flexibility, have a more compact form and be
-    faster to read in.
-
-    The disadvantage is that the interpretation of the content of the
-    fields is more difficult and it is hard, for instance, to add a new
-    country to the file. Total emissions and coverage of countries can
-    easily be visualized, but not emissions from one single country.
-
-    Description of main fields for "fraction type" NetCDF Emissions
-    :numref:`tab-emisdata`
-
-    .. csv-table:: Description of main fields for "fraction type" NetCDF Emissions
-        :name: tab-emisdata
-        :header: **Variable name**, **Description**
-        :delim: &
-
-        ``Ncodes``               & Number of countries sharing the same grid cell
-        ``poll_secNN``           & Pollutant from each sector
-        ``Codes``                & Country code number
-        ``fractions_poll_secNN`` & Fraction of emissions to assign to one country
-
-Monthly "fraction type" NetCDF emissions.
-    \
-
-    This is similar to the yearly NetCDF emissions, but
-    there are 12 monthly values for each field.
-
 
 
 Global Ozone
