@@ -1,7 +1,7 @@
 ! <MicroMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute

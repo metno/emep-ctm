@@ -1,7 +1,7 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -563,7 +563,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
   real :: x1,x2,x3,x4,P0,x,y,mpi_out,r,t
   logical::found_hybrid=.false.,found_metlevels=.false.
   real :: CEN_LAT, CEN_LON,P_TOP_MET, WRF_DY
-  real :: rb,rl,rp,dx,dy,dy2,glmax,glmin,v2(2),glon_fdom1,glat_fdom1,lat
+  real :: P,rb,rl,rp,dx,dy,dy2,glmax,glmin,v2(2),glon_fdom1,glat_fdom1,lat
   integer :: iloc_start, iloc_end,jloc_start, jloc_end
 
   real, dimension(-1:LIMAX+2,-1:LJMAX+2)::xm,xm_i_ext,xm_j_ext
@@ -720,6 +720,11 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
         call check(nf90_inq_varid(ncid=ncFileID, name="projection_lambert", varID=varID))
         call check(nf90_get_att(ncFileID,varID,"earth_radius",earth_radius_lambert))
       endif
+      if(MasterProc)then
+        if(abs(earth_radius - earth_radius_lambert)>1.0)&
+            write(*,*)'WARING: Using a new Earth Radius ',earth_radius_lambert
+      end if
+      earth_radius = earth_radius_lambert
       !status = nf90_get_att(ncFileID,nf90_global,"standard_parallel",(/lat_stand1_lambert,lat_stand2_lambert/))!standard latitude at which mapping factor=1
       !default lat_stand1_lambert=lat_stand2_lambert=lat0_lambert
       lat_stand1_lambert = lat0_lambert
@@ -1083,7 +1088,8 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
         if(MasterProc)write(*,*)"Vertical levels from met, P at level boundaries:"
       end if
       do k=1,KMAX_MET+1
-        if(MasterProc)write(*,44)k, A_bnd_met(k)+P0*B_bnd_met(k)
+         P=A_bnd_met(k)+P0*B_bnd_met(k)
+        if(MasterProc)write(*,44)k, P, 'Pa', 1000*StandardAtmos_kPa_2_km(P/1000), 'm '
       end do
     else
       call check(nf90_get_var(ncFileID, varID, P0 ))
@@ -1097,14 +1103,18 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
         call check(nf90_get_var(ncFileID, varID, B_bnd_met, count=(/KMAX_MET/) )) !read mid values!
         A_bnd_met(KMAX_MET+1)=0.0
         B_bnd_met(KMAX_MET+1)=1.0
+        !NB: even if we store A_bnd_met, they do not need to make sense, only
+        !    mid values (defined as values in the middle of the bnd pressures) are actually used
+        ! if not all levels are present in the metfile, the bnd values will not make sense.
         do k=KMAX_MET,1,-1
           A_bnd_met(k)=A_bnd_met(k+1)-2.0*(A_bnd_met(k+1)-A_bnd_met(k))!from mid to bnd values!
           B_bnd_met(k)=B_bnd_met(k+1)-2.0*(B_bnd_met(k+1)-B_bnd_met(k))!from mid to bnd values!
         end do
         
-        if(MasterProc)write(*,*)'Metdata pressure at level boundaries:'
-        do k=1,KMAX_MET+1
-          if(MasterProc)write(*,44)k, A_bnd_met(k)+P0*B_bnd_met(k)
+        if(MasterProc)write(*,*)'Metdata at mid levels:'
+        do k=1,KMAX_MET
+           P=0.5*(A_bnd_met(k)+A_bnd_met(k+1))+0.5*P0*(B_bnd_met(k)+B_bnd_met(k+1))
+           if(MasterProc)write(*,44)k, P, 'Pa', 1000*StandardAtmos_kPa_2_km(P/1000), 'm '
         end do
         found_metlevels=.true.
         
@@ -1146,17 +1156,21 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     end do
     sigma_mid =B_mid!for Hybrid coordinates sigma_mid=B if A*P0=PT-sigma_mid*PT
     
-    if(MasterProc)write(*,*)"Model pressure and height at level boundaries: (assuming standard atmosphere)"
+    if(MasterProc)write(*,*)"Model pressure and height at level boundaries: (assuming standard atmosphere and P0=Pref)"
     do k=1,KMAX_MID+1
 44    FORMAT(i4,F12.2,A3,F12.2,A3)
-      if(MasterProc)write(*,44)k, A_bnd(k)+P0*B_bnd(k),'Pa',1000*StandardAtmos_kPa_2_km((A_bnd(k)+P0*B_bnd(k))/1000),'m '
+      if(MasterProc)write(*,44)k, A_bnd(k)+P0*B_bnd(k),'Pa',1000*StandardAtmos_kPa_2_km((A_bnd(k)+Pref*B_bnd(k))/1000),'m '
     end do
     !test if the top is within the height defined in the meteo files
-    if(MasterProc.and.External_Levels_Def.and.(A_bnd(1)+P0*B_bnd(1)+0.01<A_bnd_met(1)+P0*B_bnd_met(1)))then
-      write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+P0*B_bnd(1)
-      write(*,*)'Pressure at top defined in meteo files is ',A_bnd_met(1)+P0*B_bnd_met(1)
-      write(*,*)'Pressure at op must be higher (lower altitude) than top defined in meteo '
-      call StopAll('Top level too high! Change values in '//trim(Vertical_levelsFile))
+    if(MasterProc.and.External_Levels_Def)then
+       if(A_bnd(3)+P0*B_bnd(3)+0.01<0.5*(A_bnd_met(1)+A_bnd_met(2))+0.5*P0*(B_bnd_met(1)+B_bnd_met(2)))then
+          write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+Pref*B_bnd(1)
+          write(*,*)'Pressure at 2nd highest level is ',A_bnd(2)+Pref*B_bnd(2)
+          write(*,*)'Pressure at 3rd highest level is ',A_bnd(3)+Pref*B_bnd(3)
+          write(*,*)'Pressure at middle of highest met level is ',0.5*(A_bnd_met(1)+A_bnd_met(2))+0.5*P0*(B_bnd_met(1)+B_bnd_met(2))
+          write(*,*)'Pressure at top must be higher (lower altitude) than top defined in meteo '
+          call StopAll('Top level too high! Change values in '//trim(Vertical_levelsFile))
+       end if
     end if
     
     !test if the levels can cope with highest mountains (400 hPa)
@@ -1171,9 +1185,9 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
     
     !test if the lowest levels is thick enough (twice height of highest vegetation?) about 550 Pa = about 46m
     !Deposition scheme is not designes for very thin lowest levels
-    if(MasterProc.and.A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1)-(A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID))<550.0)then
-      write(*,*)'WARNING: lowest level very shallow; ',A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1) -&
-      (A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID)),'Pa'
+    if(MasterProc.and.A_bnd(KMAX_MID+1)+Pref*B_bnd(KMAX_MID+1)-(A_bnd(KMAX_MID)+Pref*B_bnd(KMAX_MID))<550.0)then
+      write(*,*)'WARNING: lowest level very shallow; ',A_bnd(KMAX_MID+1)+Pref*B_bnd(KMAX_MID+1) -&
+      (A_bnd(KMAX_MID)+Pref*B_bnd(KMAX_MID)),'Pa'
 !      call StopAll('Lowest level too thin! Change vertical levels definition in '//trim(Vertical_levelsFile))
     end if
     
@@ -1349,7 +1363,7 @@ subroutine DefDebugProc()
     "dp" , "d_li", "d_lj", "i_fdom(li0)","i_fdom(li1)", &
     "j_fdom(lj0)", "j_fdom(lj1)"
     
-    write(*,"(a,2i4,5i4,L2,2i4,4i12)") "GridValues debug:", &
+    write(*,"(a,2i5,5i4,L2,2i4,4i12)") "GridValues debug:", &
     DEBUG%IJ(1), DEBUG%IJ(2), me, li0, li1, lj0, lj1, &
     debug_proc , debug_li, debug_lj, &
     i_fdom(li0),i_fdom(li1), j_fdom(lj0), j_fdom(lj1)
@@ -1863,17 +1877,28 @@ subroutine coord_check(msg,lon,lat,fix)
      call range_check(trim(msg)//" lon",lon,(/-180.0,180.0/),fatal=.true.)
   end if
 end subroutine coord_check
-function coord_in_domain(domain,lon,lat,iloc,jloc,iglob,jglob) result(in)
+function coord_in_domain(domain,lon,lat,iloc,jloc,iglob,jglob,fix) result(in)
   !-------------------------------------------------------------------!
   ! Is coord (lon/lat) is inside global domain|local domain|grid cell?
+  ! Some longitude range errors can be corrected when fix=.true. (default),
+  ! this will reset the 'lon' argument to a value in [-180,180) ;
+  ! to prevent 'lon' from being changed, use 'fix=.false.'.
   !-------------------------------------------------------------------!
   character(len=*), intent(in) :: domain
   real, intent(inout) :: lon,lat
   integer, intent(inout),optional :: iloc,jloc
   integer, intent(out)  ,optional :: iglob,jglob
+  logical, intent(in)   ,optional :: fix
   logical :: in
   integer :: i,j
-  call coord_check("coord_in_"//trim(domain),lon,lat,fix=.true.)
+  logical :: with_fix
+  ! by default fix values of 'lon' to be inside [-180,180),
+  ! if necessary prevent this using optional flag:
+  with_fix = .true.
+  if ( present(fix) ) with_fix = fix
+  ! check:
+  call coord_check("coord_in_"//trim(domain),lon,lat,fix=with_fix)
+  ! convert to grid cell indices:
   call lb2ij(lon,lat,i,j)
   if(present(iglob))iglob=i
   if(present(jglob))jglob=j
@@ -2148,9 +2173,9 @@ subroutine remake_vertical_levels_interpolation_coeff(filename)
       if(MasterProc)write(*,44)k, A_bnd(k)+P0*B_bnd(k)
     end do
     !test if the top is within the height defined in the meteo files
-    if(MasterProc.and.External_Levels_Def.and.(A_bnd(1)+P0*B_bnd(1)+0.01<A_bnd_met(1)+P0*B_bnd_met(1)))then
-      write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+P0*B_bnd(1)
-      write(*,*)'Pressure at top defined in meteo files is ',A_bnd_met(1)+P0*B_bnd_met(1)
+    if(MasterProc.and.External_Levels_Def.and.(A_bnd(1)+Pref*B_bnd(1)+0.01<A_bnd_met(1)+Pref*B_bnd_met(1)))then
+      write(*,*)'Pressure at top of defined levels is ',A_bnd(1)+Pref*B_bnd(1)
+      write(*,*)'Pressure at top defined from meteo files is ',A_bnd_met(1)+P0*B_bnd_met(1)
       write(*,*)'Pressure at op must be higher (lower altitude) than top defined in meteo '
       call StopAll('Top level too high! Change values in '//trim(Vertical_levelsFile))
     end if
@@ -2167,9 +2192,9 @@ subroutine remake_vertical_levels_interpolation_coeff(filename)
     
     !test if the lowest levels is thick enough (twice height of highest vegetation?) about 550 Pa = about 46m
     !Deposition scheme is not designes for very thin lowest levels
-    if(MasterProc.and.A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1)-(A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID))<550.0)then
+    if(MasterProc.and.A_bnd(KMAX_MID+1)+Pref*B_bnd(KMAX_MID+1)-(A_bnd(KMAX_MID)+Pref*B_bnd(KMAX_MID))<550.0)then
       write(*,*)'WARNING: lowest level very shallow; ',A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1) -&
-      (A_bnd(KMAX_MID)+P0*B_bnd(KMAX_MID)),'Pa'
+      (A_bnd(KMAX_MID)+Pref*B_bnd(KMAX_MID)),'Pa'
 !      call StopAll('Lowest level too thin! Change vertical levels definition in '//trim(Vertical_levelsFile))
     end if
     

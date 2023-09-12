@@ -1,7 +1,7 @@
-! <GasParticleCoeffs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <GasParticleCoeffs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -586,7 +586,7 @@ if(MasterProc) print *, "DDDEF ", DDdefs(2)%name, DDdefs(2)%Dx
       WDspec(icmp)%name   = WDdefs(idef)%name
       WDspec(icmp)%W_sca  = WDdefs(idef)%W_sca
       WDspec(icmp)%W_sub  = WDdefs(idef)%W_sub
-      if(MasterProc) write(*,fmt) "GasPart:WD_Coeffs: "//WDspec(icmp)%name
+      if(MasterProc) write(*,*) "GasPart:WD_Coeffs: "//trim(WDspec(icmp)%name)
     end do
   end subroutine WetCoeffs
 

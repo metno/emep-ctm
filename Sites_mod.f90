@@ -1,7 +1,7 @@
-! <Sites_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Sites_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -994,6 +994,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       call CheckStop(NattributesMAX<NMetaData,'NattributesMAX too small')
       
       write(MetaData(0,1),"(A,':C:',A)")"File_Type",trim(fname)
+      ! replace ":" characters on meteo_souurce with "|" in order to avoid problems with wordsplit
       write(MetaData(0,2),"(A,':C:',A)")"meteo_source",trim(str_replace(meteo,":","|"))
       write(MetaData(0,3),"(A,':I:',I0)")"Number_of_hours_bewtween_outputs",f
       write(MetaData(0,4),"(A,':I:',I0)")"Number_of_stations_defined",NStations

@@ -1,7 +1,7 @@
-! <PhysicalConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <PhysicalConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -40,9 +40,10 @@ real , public, parameter ::         &
 
                                         ! NB. ( J = N m2 = kg m2 s-2 )
                                         !       M = mol l-1
+real, public :: EARTH_RADIUS = 6.37e6 ! Is redefined if Lambert projection is used
+
 real, public, parameter  ::    &
      GRAV    = 9.807           &   ! Gravity, m s-2
-  ,  EARTH_RADIUS = 6.37e6     &   ! 
   ,  CP      = 1004.0          &   ! Specific heat at const. pressure
   ,  KAPPA   = RGAS_KG/CP      &   
   ,  KARMAN  = 0.41            &   ! Von Karman  (=0.35 elsehwere in code!)

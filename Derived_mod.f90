@@ -1,7 +1,7 @@
-! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,6 +50,8 @@ use AeroFunctions_mod, only: LogNormFracBelow !=> Frac Mass below Dp
 use AOD_PM_mod,        only: AOD_init,aod_grp,wavelength,& ! group and
                                 wanted_wlen,wanted_ext3d      ! wavelengths
 use AOTx_mod,          only: Calc_GridAOTx
+!PW: removed use BiDir_module,     only : Bidir_2d
+use BiDir_emep,       only : Bidir_Derived
 use Biogenics_mod,     only: EmisNat, NEMIS_BioNat, EMIS_BioNat
 use CheckStop_mod,     only: CheckStop, StopAll
 use Chemfields_mod,    only: xn_adv, xn_shl, cfac,xn_bgn, AOD,  &
@@ -57,7 +59,7 @@ use Chemfields_mod,    only: xn_adv, xn_shl, cfac,xn_bgn, AOD,  &
                             Fgas3d, & ! FSOA
                             Extin_coeff, PM25_water, PM25_water_rh50 &
                           , PMco_water_rh50   !JUN21AERO
-use Chemfields_mod ,   only: so2nh3_24hr,Grid_snow
+use Chemfields_mod ,   only: so2nh3_24hr,Grid_snow, Dobson, pH
 use ChemDims_mod,      only: NSPEC_ADV, NSPEC_SHL,NEMIS_File
 use ChemGroups_mod          ! SIA_GROUP, PMCO_GROUP -- use tot indices
 use ChemSpecs_mod           ! IXADV_ indices etc
@@ -85,7 +87,7 @@ use EcoSystem_mod,     only: DepEcoSystem, NDEF_ECOSYSTEMS, &
                             EcoSystemFrac,FULL_ECOGRID
 use EmisDef_mod,       only: NSECTORS, EMIS_FILE, O_DMS, O_NH3&
                             ,SecEmisOut, EmisOut, SplitEmisOut, &
-                            isec2SecOutWanted,SECTORS
+                            isec2SecOutWanted,SECTORS, Emis_CO_Profile
 use EmisGet_mod,       only: nrcemis,iqrc2itot
 use Functions_mod,      only: Tpot_2_T    ! Conversion function
 use GasParticleCoeffs_mod, only: DDdefs
@@ -97,7 +99,7 @@ use MetFields_mod,     only: roa,Kz_m2s,th,zen, ustar_nwp, u_ref, hmix,&
                             ws_10m, rh2m, z_bnd, z_mid, u_mid,v_mid,ps, t2_nwp, &
                             cc3dmax, & ! SEI
                             dTleafHd, dTleafRn, & ! TLEAF
-                            SoilWater_deep, SoilWater_uppr 
+                            SoilWater_deep, SoilWater_uppr ,invL_nwp
 use MosaicOutputs_mod,     only: nMosaic, MosaicOutput
 use My_Derived_mod, only : &
     wanted_deriv2d, wanted_deriv3d, & ! names of wanted derived fields
@@ -265,10 +267,12 @@ subroutine Init_Derived()
   call Define_Derived()
 
   iddefPMc = find_index('PMc',DDdefs(:)%name, any_case=.true.)
-  associate ( D=> DDdefs(iddefPMc) )
-    fracPM25 = LogNormFracBelow(D%umDpgV, D%sigma, 0.001*D%rho_p, 2.5)
-    if(MasterProc) write(*,*) dtxt//"fracPM25 ", D%umDpgV, trim(D%name), fracPM25
-  end associate ! D=> DDdefs(iddefPMc) )
+  !associate ( D=> DDdefs(iddefPMc) ) !does not work with gfortran
+  fracPM25 = LogNormFracBelow(DDdefs(iddefPMc)%umDpgV, &
+       DDdefs(iddefPMc)%sigma, 2.5, 0.001*DDdefs(iddefPMc)%rho_p)
+  if(MasterProc) write(*,*) dtxt//"fracPM25 ", DDdefs(iddefPMc)%umDpgV, &
+       trim(DDdefs(iddefPMc)%name), fracPM25
+  !end associate ! D=> DDdefs(iddefPMc) )
 
 !  select case(nint(DDdefs(iddefPMc)%umDpgV*10))
 !    case(25);fracPM25=0.37
@@ -388,6 +392,22 @@ if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
 
   call AddNewDeriv( "T2m","T2m",  "-","-",   "deg. C", &
                -99,  -99, F, 1.0,  T,  'YM' )
+!BIDIR
+!AddNewDeriv( 		name,	class,	subclass,	txt,	unit,&
+!			ind,	f2d,	dt_scale,	scale, 	avg,	iotype,	Is3D)
+  call AddNewDeriv( "ugXTOT ","ugXTOT",  "-","-",   "ug/m3", &
+               -99,  -99,  F,  1.0,  T,   'YMD' )
+  call AddNewDeriv( "ugNH3_3m ","ugNH3_3m",  "-","-",   "ug/m3", &
+               -99,  -99,  F,  1.0,  T,   'YMD' )
+  call AddNewDeriv( "ugXH3_3m ","ugXH3_3m",  "-","-",   "ug/m3", &
+               -99,  -99,  F,  1.0,  T,   'YMD' )
+!!Hazelhos, autumn 2019: Added BiDir_NHx_Emissions
+!DS see Emis_BioNatNH3
+!  call AddNewDeriv( "BiDir_NHx_Emissions ", "USET", "-", &
+!      "NH3 emissions BiDir", "ugN/m2/h", &
+!               -99,  -99,  F,   1.0, T, 'YMDI' )
+!END BIDIR
+
 
   if ( USES%TLEAF_FROM_HD )  &
     call AddNewDeriv( "dTleafHd","dTleafHd",  "-","-",   "deg. C", &
@@ -420,7 +440,7 @@ if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
       iout  = -99 ! find_index( wanted_deriv2d(i), def_2d(:)%name )
       class = trim(OutputFields(ind)%txt4)
       select case(class)
-      case ('Z_MID','Z','Z_BND','Zlev','dZ_BND','dZ')
+      case ('Z_MID','Z','Z_BND','Zlev','dZ_BND','dZ','EmFFprof')
         iadv = -1
         unitscale=1.0
         unittxt="m"
@@ -835,10 +855,21 @@ Is3D = .true.
       call AddNewDeriv("D3_Zmid", "Z_MID", "-", "-", "m", &
                       -99 , -99, F, 1.0,   T, 'YMD',    Is3D  )
 
+    case ("EmFFprof")
+      if(find_index("EmFFprof",def_3d(:)%name,any_case=.true.)<1)&
+      call AddNewDeriv("EmFFprof", "EmFFprof", "-", "-", "m", &
+                      -99 , -99, F, 1.0,   T, 'YMD',    Is3D  )
+
      case ("D3_Zlev")
       if(find_index("D3_Zlev",def_3d(:)%name,any_case=.true.)<1)&
       call AddNewDeriv("D3_Zlev", "Z_BND", "-", "-", "m", &
            -99 , -99, F, 1.0,   T, 'YMD',    Is3D  )
+
+!    case ("D3_EmF_CO_")
+!      call AddNewDeriv("D3_EmF_CO","CO_Fire_Prof", "-","-",   "kg/m2", &
+!         -99, -99, F,  1.0,  F,  'YMD',     Is3D )
+ 
+
 
     end select
   end do
@@ -904,7 +935,7 @@ Is3D = .true.
       iou_list(iou)=(index(f_3d(i)%iotype,IOU_KEY(iou))>0)
     end do
   end do
-  
+
   VGtest_out_ix = 0
   if(allocated(f_2d)) &
        VGtest_out_ix = find_index("VgRatio", f_2d(:)%subclass)
@@ -991,7 +1022,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   real, pointer, dimension(:,:,:) :: met_p => null()
 
   logical, allocatable, dimension(:)   :: ingrp
-  integer :: wlen,ispc,kmax,iem
+  integer :: wlen,ispc,kmax,iem, nerr=0
   integer :: isec_poll,isec,iisec,ii,ipoll,itemp
   real :: default_frac,tot_frac,loc_frac_corr
   character(len=*), parameter :: dtxt='Deriv:'
@@ -1005,6 +1036,10 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   integer , save :: i_MaxD8M_3rd = 0 !index in f_2d
   integer , save :: i_MaxD8M_4th = 0 !index in f_2d
   integer :: i_26th, i4th, i3rd, i2nd, i1st
+  integer, save :: count_AvgMDA8_m=0,count_AvgMDA8_y=0
+  integer, save :: count_AvgMDA8AprSep_m=0,count_AvgMDA8AprSep_y=0
+  real :: w_m,w_y !weights
+
   if(.not. date_is_reached(spinup_enddate))return ! we do not average during spinup
 
   timefrac = dt/3600.0
@@ -1080,15 +1115,24 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       imet_tmp = find_index(subclass, met(:)%name ) ! subclass has meteo name from MetFields
       if( imet_tmp > 0 ) then
         !Note: must write bounds explicitly for "special2d" to work
-        met_p => met(imet_tmp)%field(1:limax,1:ljmax,1:1,1)
+         if(met(imet_tmp)%dim==3) then
+            met_p => met(imet_tmp)%field(1:limax,1:ljmax,KMAX_MID:KMAX_MID,1) !take lowest level
+         else 
+            met_p => met(imet_tmp)%field(1:limax,1:ljmax,1:1,1)
+         end if
       else
         imet_tmp = find_index(subclass, derivmet(:)%name )
-        if( imet_tmp > 0 ) met_p => derivmet(imet_tmp)%field(1:limax,1:ljmax,1:1,1)
+        if ( imet_tmp > 0 )then
+          if(met(imet_tmp)%dim==3) then
+            met_p => derivmet(imet_tmp)%field(1:limax,1:ljmax,KMAX_MID:KMAX_MID,1) !take lowest level
+          else 
+            met_p => derivmet(imet_tmp)%field(1:limax,1:ljmax,1:1,1)
+          end if
+        end if
       end if
 
       if( imet_tmp > 0 ) then
          kmax=1
-         if(met(imet_tmp)%dim==3)kmax=KMAX_MID!take lowest level
          if( MasterProc.and.first_call) write(*,*) "MET2D"//trim(name), &
               imet_tmp, met_p(1,1,kmax),loc(met(imet_tmp)%field(1,1,1,1))
          forall ( i=1:limax, j=1:ljmax )
@@ -1194,6 +1238,15 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = t2_nwp(i,j,1) - 273.15
       end forall
+!BIDIR
+     case( "ugXTOT", "ugNH3_3m", "ugXH3_3m") !, "BiDir_NHx_Emissions" )
+      if ( USES%BIDIR ) then
+       call BiDir_Derived(class,n,limax,ljmax,nerr)
+       if (debug_proc) call write_debug(n,ind, class )
+       call CheckStop(nerr>0,'BIDIR ERROR'//trim(class) )
+      end if
+!END BIDIR
+
     case ( "dTleafHd" )
       if ( USES%TLEAF_FROM_HD ) then
         forall ( i=1:limax, j=1:ljmax )
@@ -1213,6 +1266,16 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d( n, i,j,IOU_INST) = Grid_snow(i,j)
       end forall
 
+    case ( "TotDobs" ) ! Dobson populated in CloudJ_mod.f90
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = Dobson(i,j)
+      end forall
+
+    case ( "pH_surface" ) ! surface pH from AerosolCalls
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = pH(i,j)
+      end forall
+
     case ( "SNratio" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = min(3.0,so2nh3_24hr(i,j))
@@ -1224,14 +1287,22 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d( n, i,j,IOU_INST) = ps(i,j,1)*0.01
         !NOT YET - keep hPa in sites:d_2d( n, i,j,IOU_INST) = ps(i,j,1)
       end forall
-    if ( dbgP ) call write_debug(n,ind, "PPSURF")
+      if ( dbgP ) call write_debug(n,ind, "PPSURF")
 
-    case( "o3_45m" )
-      forall ( i=1:limax, j=1:ljmax )
-         d_2d( n, i,j,IOU_INST) = xn_adv(4,i,j,KMAX_MID) 
-      end forall
-    if ( dbgP ) call write_debug(n,ind, "45mO3")
-
+   case ( "phih" )
+       ind = f_2d(n)%index !height 
+       do j=1,ljmax
+          do i=1,limax
+             if (invl_nwp(i,j) < 0) then
+                !As in Garratt and Obrien for phih, so with Prandtl number
+                d_2d( n, i,j,IOU_INST) = 1.0/sqrt(1-16.*ind*invl_nwp(i,j)) 
+             else
+                !As in Garratt, Prandtl number is 1 in stable boundary layer
+                d_2d( n, i,j,IOU_INST) = 1+5.*ind*invl_nwp(i,j) 
+             end if
+          end do
+       end do
+       
     case( "CloudFrac" )
       forall ( i=1:limax, j=1:ljmax )
          d_2d( n, i,j,IOU_INST) = cc3dmax(i,j,KMAX_MID) 
@@ -1693,18 +1764,18 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
     case( "MaxD8M_26th", "MaxD8M_1st", "MaxD8M_2nd", "MaxD8M_3rd", "MaxD8M_4th")
       ! do nothing, it is taken care of by "MaxD8M" case
-    case( "MaxD8M" ) ! maximum daily eight-hour mean concentration
+    case( "MaxD8M" , "AvgMDA8", "AvgMDA8AprSep") ! maximum daily eight-hour mean concentration
       if (first_call) then
 
         if (.not. allocated(D8M)) then ! we want to go through this only once
-          iou = 0 !number of independent MaxD8M fields to output
+          iou = 0 !number of independent MaxD8M fields to output. for simplicity we add again the same if both MaxD8M and AvgMDA8 are chosen
           do i = 1, num_deriv2d
-            if (f_2d(i)%class=="MaxD8M") then
+            if (f_2d(i)%class=="MaxD8M" .or. f_2d(i)%class=="AvgMDA8" .or. f_2d(i)%class=="AvgMDA8AprSep" ) then
               ! save index of species in f_2d
               f_2d(i)%index = find_index(f_2d(i)%txt,species_adv(:)%name, any_case=.true.)
-              call CheckStop(f_2d(i)%index<0,"MaxD8M: species "//trim(f_2d(i)%txt)//"not found")
+              call CheckStop(f_2d(i)%index<0,"D8M: species "//trim(f_2d(i)%txt)//"not found")
               !force ug/m3
-              call CheckStop(f_2d(i)%unit/="ug/m3","MaxD8M must be in units of ug/m3 ")
+              call CheckStop(f_2d(i)%unit/="ug/m3",trim(f_2d(i)%class)//" must be in units of ug/m3 ")
               iou = iou + 1
               ! trick to save 2 integers in one:
               f_2d(i)%index = f_2d(i)%index  + iou * 100000
@@ -1761,7 +1832,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         end do
       end do
 
-      if (current_date%seconds == 0) then
+      if (current_date%seconds == 0 .and. .not. first_call) then
         !one hour has past since last time here        
         !save last hour average
         ii = mod(current_date%hour,8) + 1 !note: this works only because 24 is a multiple of 8!
@@ -1840,16 +1911,54 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
             end do
           end if
           
-          do j = 1,ljmax
-            do i = 1,limax
-              d_2d(n,i,j,IOU_DAY) = D8Max(i,j,iou)
-              !NB: max value over month, not average over daily max:
-              d_2d(n,i,j,IOU_MON) = max(d_2d(n,i,j,IOU_MON) , D8Max(i,j,iou))
-              !NB: max value over year, not average over daily max:
-              d_2d(n,i,j,IOU_YEAR) = max(d_2d(n,i,j,IOU_YEAR), D8Max(i,j,iou))                                          
-              D8Max(i,j,iou) = 0.0
+          if (class=="MaxD8M") then
+
+            do j = 1,ljmax
+              do i = 1,limax
+                if(LENOUT2D>=IOU_DAY)d_2d(n,i,j,IOU_DAY) = D8Max(i,j,iou)
+                !NB: max value over month, not average over daily max:
+                if(LENOUT2D>=IOU_MON)d_2d(n,i,j,IOU_MON) = max(d_2d(n,i,j,IOU_MON) , D8Max(i,j,iou))
+                !NB: max value over year, not average over daily max:
+                d_2d(n,i,j,IOU_YEAR) = max(d_2d(n,i,j,IOU_YEAR), D8Max(i,j,iou))                                          
+                D8Max(i,j,iou) = 0.0
+              end do
             end do
-          end do
+
+         else if (class=="AvgMDA8") then
+            !NB: at the end of the first day (day 2 hour 00:00), we actually start to write in the next month
+            if (current_date%day == 2) count_AvgMDA8_m = 0
+            count_AvgMDA8_m = count_AvgMDA8_m + 1
+            count_AvgMDA8_y = count_AvgMDA8_y + 1
+            w_m = 1.0/count_AvgMDA8_m
+            w_y = 1.0/count_AvgMDA8_y
+            do j = 1,ljmax
+              do i = 1,limax
+                if(LENOUT2D>=IOU_DAY)d_2d(n,i,j,IOU_DAY) = D8Max(i,j,iou)
+                !average. makw weight according to already counted days
+                if(LENOUT2D>=IOU_MON)d_2d(n,i,j,IOU_MON) = (1.0-w_m) * d_2d(n,i,j,IOU_MON) + w_m * D8Max(i,j,iou)
+                d_2d(n,i,j,IOU_YEAR) = (1.0-w_y) * d_2d(n,i,j,IOU_YEAR) + w_y * D8Max(i,j,iou)
+                D8Max(i,j,iou) = 0.0
+              end do
+            end do
+
+          else if ( class=="AvgMDA8AprSep" ) then
+            !NB: at the end of the first day (day 2 hour 00:00), we actually start to write in the next month
+            if (current_date%day == 2) count_AvgMDA8AprSep_m = 0 
+            if (current_date%day == 2) count_AvgMDA8AprSep_y = 0 
+            count_AvgMDA8AprSep_m = count_AvgMDA8AprSep_m + 1!for monthes we output all anyway!
+            if(current_date%month>=4 .and. current_date%month<=9)count_AvgMDA8AprSep_y = count_AvgMDA8AprSep_y + 1
+            w_m = 1.0/count_AvgMDA8AprSep_m
+            w_y = 1.0/count_AvgMDA8AprSep_y
+            do j = 1,ljmax
+              do i = 1,limax
+                if(LENOUT2D>=IOU_DAY)d_2d(n,i,j,IOU_DAY) = D8Max(i,j,iou)
+                !average. makw weight according to already counted days   
+                if(LENOUT2D>=IOU_MON)d_2d(n,i,j,IOU_MON) = (1.0-w_m) * d_2d(n,i,j,IOU_MON) + w_m * D8Max(i,j,iou)
+                if(current_date%month>=4 .and. current_date%month<=9) d_2d(n,i,j,IOU_YEAR) = (1.0-w_y) * d_2d(n,i,j,IOU_YEAR) + w_y * D8Max(i,j,iou)
+                D8Max(i,j,iou) = 0.0
+              end do
+            end do
+          end if
         end if
       end if
 
@@ -2474,7 +2583,11 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_3d(n,i,j,k,IOU_INST)=SUM(Extin_coeff(:,i,j,lev3d(k),wlen),MASK=ingrp)
       deallocate(ingrp)
 
-    case("USET")
+    case("EmFFprof")
+      forall(i=1:limax,j=1:ljmax,k=1:num_lev3d) &
+           d_3d(n,i,j,k,IOU_INST) = Emis_CO_Profile(i,j,lev3d(k))
+
+   case("USET")
       if(dbgP) write(*,"(a18,i4,a12,a4,es12.3)")"USET d_3d",&
         n, f_3d(n)%name, " is ", d_3d(n,debug_li,debug_lj,num_lev3d,IOU_INST)
 
@@ -2482,7 +2595,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       write(*,"(a,2i3,3a)") "*** NOT FOUND",n,ind, trim(f_3d(n)%name),&
                ";Class:", trim(f_3d(n)%class)
       write(unit=errmsg,fmt=*) "Derived 3D class NOT FOUND", n, ind, &
-                       trim(f_3d(n)%name),trim(f_3d(n)%class)
+                       trim(f_3d(n)%name)," ",trim(f_3d(n)%class)," ",trim(class)
       call CheckStop( errmsg )
     end select
 
@@ -2632,7 +2745,7 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
   ParticlePhaseOutputs = ( (index(f_2d(n)%name, 'ug_PM' )>0) .or. &
                            (index(f_2d(n)%name, 'ugC_PM')>0) )
 
-  if( dbgP ) &
+  if( dbgP .and. first_call ) &
     write(*,"(a,L1,3i4,2a16,L2,i4)") dtxt//"SGROUP:",debug_proc,me,ik, kk, &
       trim(chemgroups(igrp)%name), trim(unit), semivol_wanted, iadv_OM25p
 
@@ -2667,7 +2780,7 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
         !  trim(species(itot)%name), FIRST_SEMIVOL, LAST_SEMIVOL
 
         !if(all([semivol_wanted,itot>=FIRST_SEMIVOL,itot<=LAST_SEMIVOL])) then
-        if ( dbgPt  ) write(*,'(a,3i4)')dtxt//'IOM_choice '//trim((f_2d(n)%name))//&
+        if ( dbgPt .and. first_call  ) write(*,'(a,3i4)')dtxt//'IOM_choice '//trim((f_2d(n)%name))//&
              ':'//trim(species(itot)%name), index(f_2d(n)%name, 'ug_PM' ), nspec, size(gspec)
 
         if(itot>=FIRST_SEMIVOL .and. itot<=LAST_SEMIVOL) then
@@ -2702,7 +2815,7 @@ subroutine group_calc( g2d, density, unit, ik, igrp,semivol)
 
 
         !if(all([first_semivol_call,debug_proc,chemgroups(igrp)%name=='BSOA']))&
-        if ( dbgPt  ) &
+        if ( dbgPt .and. first_call  ) &
           write(*,"(2(1x,a25),L2,2i4,1x, 2es12.3, f12.5)") &
             dtxt//"GRP fac "//trim(chemgroups(igrp)%name), &
              trim(species(itot)%name), semivol_wanted, nspec, itot, &

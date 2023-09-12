@@ -24,6 +24,7 @@ character(len=15), save, dimension(NEMIS_Specs), public :: EMIS_Specs = (/ &
 , "FFIRE_OM       " &
 , "FFIRE_BC       " &
 , "FFIRE_REMPPM25 " &
+, "FFIRE_C        " &
 , "SEASALT_F      " &
 , "SEASALT_C      " &
 , "DUST_WB_F      " &
@@ -50,6 +51,12 @@ character(len=15), save, dimension(NEMIS_Specs), public :: EMIS_Specs = (/ &
 , "SQT_SOA_NV     " &
 , "POLLEN_BIRCH   " &
 , "POLLEN_OLIVE   " &
+, "POLLEN_ALDER   " &
 , "POLLEN_RWEED   " &
 , "POLLEN_GRASS   " &
+, "POLLEN_MUGWORT1" &
+, "POLLEN_MUGWORT2" &
+, "POLLEN_MUGWORT3" &
+, "POLLEN_MUGWORT4" &
+, "POLLEN_MUGWORT5" &
 /)

@@ -1,0 +1,58 @@
+# BiomassBurning mapping FINNv2.5 to EmChem19a
+#  Column-1 gives FINN species ,
+#  Column-2 gives the product of two numbers:
+#    1) MW if needed to get to kg/day. Not needed for FINNv2.5,1.5
+#       (Some FINN emissions are given with mass basis, kg/day, so just
+#         set to 1.0. Others are given as mole/day, so multiply by MW/1000
+#         to get kg/day)
+#    2) mass fraction of FINN emissions assign to EMEP species (usually 1.0)
+#  Column-3 gives EMEP species
+#
+# Notes
+# ! FINN v1.5  GEOS-CHEM 2015 changes: excludes 1 species:
+# ! and needs one less EMEP species  C5H8
+#  !  'ISOP'    0.068  1.0    'C5H8'         #
+# ! FINN v1.5  GEOS-CHEM 2015 changes: added 8 species:
+# ! and needs 3 more EMEP species = C2H4  OXYL  MGLYOX
+# ! FINN v2.5 added PM10, from which we calculate ffire_c = PM10-PM25
+#----------------------------------------------------------------------------#
+#  Finn       mw      fac   emep             Comment
+    'CO  ',   0.028,  1.0,  'CO',            #
+    'NO  ',   0.030,  1.0,  'NO',            #
+    'NO2 ',   0.046,  1.0,  'NO2',           #
+    'SO2 ',   0.064,  1.0,  'SO2',           #
+    'NH3 ',   0.017,  1.0,  'NH3',           #
+    'ACET',   0.058,  1.0,  'C2H6',          # acetone 
+    'ALD2',   0.044,  1.0,  'CH3CHO',        #
+    'ALK4',   0.058,  1.0,  'NC4H10',        #
+    'C2H6',   0.030,  1.0,  'C2H6',          #
+    'C3H8',   0.044,  1.0,  'NC4H10',        # 
+    'CH2O',   0.030,  1.0,  'HCHO',          #
+    'MEK ',   0.072,  1.0,  'MEK',           #
+    'PRPE',   0.042,  1.0,  'C3H6',          # 
+    'C2H4',   0.028,  1.0,  'C2H4',          # v1.5  new EMEP
+    'GLYC',   0.060,  1.0,  'CH3CHO',        # v1.5 hydroxy-acetaldehyde? HOCH2CHO
+    'HAC' ,   0.074,  1.0,  'ACETOL',        # v1.5 hydroxy-acetone  changed M to 74!
+    'BENZ',   0.078,  1.0,  'BENZENE',       # v1.5  new EMEP
+    'TOLU',   0.092,  1.0,  'TOLUENE',       # v1.5
+    'XYLE',   0.106,  1.0,  'OXYL',          # v1.5
+    'MGLY'    0.072,  1.0,  'MGLYOX',        # v1.5  new EMEP
+# BiomassBurning mapping FINNv1.5 to ffire_OM, ffire_BC, ffire_remPPM25
+#
+# FFire PM species only here, see FFireTracers for ffire_CO tracer if wanted.
+# 
+# The tricky bit: we read in BC, OC and PM25 from FINN, but want BC, OM and
+# rempPM25 for EmChem19a , CRI etc. We solve this by using FINN's
+# OC to estimate OM (factor 1.7), and subtracting both BC and OM from
+# PM25 to get remPM25.   (ForestFire_mod will prevent zeros)
+#----------------------------------------------------------------------------#
+#  Finn       mw      fac   emep             Comment
+    'PM25',   1.000,  1.0,  'ffire_rempPM25',# !  Will need to subtract OM  BC
+    'OC  ',   1.700,  1.0,  'ffire_OM',      # ! Uses OM/OC=1.7, see above
+    'BC  ',   1.000,  1.0,  'ffire_BC',      #
+    'OC  ',   -1.70,  1.0,  'ffire_rempPM25',# ! Will subtract OM
+    'BC  ',   -1.00,  1.0,  'ffire_rempPM25',# ! Will subtract BC
+# v2.5 update:
+    'PM10',   1.000,  1.0,  'ffire_c',# !  Will need to subtract PM25 to get coarse mode
+    'PM25',   -1.00,  1.0,  'ffire_c',# !  Subtracted.
+#----------------------------------------------------------------------------#

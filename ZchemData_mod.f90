@@ -1,7 +1,7 @@
-! <ZchemData_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <ZchemData_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -59,6 +59,8 @@
      ,rcbio             & !< Emissions rate coeff.  molec/cm3/s (BVOC, soil-NO, etc.)
      ,rcphot              !< Photolysis rates
 
+  real, public, save, allocatable, dimension(:,:,:,:) :: rcphotslice ! store time-slice of J-vals
+
   real, public, allocatable, dimension(:,:), save :: &
        xn_2d            ! Concentrations [molecules/cm3]
 
@@ -79,6 +81,8 @@
       ,M                   & ! M - atmospheric conc. (was amk)
       ,o2, n2              & ! oxygen, nitrogen
       ,h2o                 & ! water
+      ,methane             & ! ch4
+      ,hydrogen            & ! hydrogen gas
       ,temp                & ! temperature
       ,tinv                & ! inverse temp
       ,cN2O5               & ! mol speed, N2O5

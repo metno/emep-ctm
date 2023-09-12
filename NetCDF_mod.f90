@@ -1,7 +1,7 @@
-! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -318,9 +318,10 @@ subroutine Create_CDF_sondes(fileName,NSpec,NSpec_Att,SpecDef,&
         "NetCDF_mod: wordsplit error:: "//trim(MetaData(0,n)))
       select case(auxL(2))
       case("c","C","s","S") ! string/char attribute
-         if(auxL(1)=="meteo_source")&
-         auxL(3) = trim(str_replace(auxL(3),"|",":"))
-       call check(nf90_put_att(ncFileID,nf90_global,trim(auxL(1)),trim(auxL(3))),&
+        ! ":" characters on meteo_souurce where replaced with "|" in order to avoid problems with wordsplit
+        if(auxL(1)=="meteo_source")&
+          auxL(3) = trim(str_replace(auxL(3),"|",":"))
+        call check(nf90_put_att(ncFileID,nf90_global,trim(auxL(1)),trim(auxL(3))),&
                    "MetaData="//trim(MetaData(0,n)))
       case("i","I","n","N") ! integer attribute
         read(auxL(3),*)auxI(1)
@@ -2997,8 +2998,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
      if(data3D)then
         call check(nf90_inquire_dimension(ncid = ncFileID, dimID = dimids(3), name=name ))
-        call CheckStop(name/='k'.and.name/='N'.and.name/='lev'.and.name/='height'.and.name/='tsteps',&
-          "vertical coordinate (k, lev, N or height) not found")
+        call CheckStop(name/='k'.and.name/='N'.and.name/='lev'.and.name/='height'.and.name/='tsteps'.and.name/='sector',&
+          "unexpected third coordinate (k, lev, N, height or sector) not found. found "//trim(name))
      end if
 
      !NB: we assume regular grid
@@ -5163,6 +5164,8 @@ end subroutine vertical_interpolate
       cdfstatus = nf90_get_att(ncFileID,nf90_global,'SECTORS_NAME',sector_name)
       call check(nf90_close(ncFileID))
       if (cdfstatus == nf90_noerr) cdf_sector_name = trim(sector_name)
+   else
+      call StopAll('Did not find file '//trim(filename))
    end if
 
  end subroutine ReadSectorName

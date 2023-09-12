@@ -1,7 +1,7 @@
-! <DerivedFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <DerivedFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,7 +33,7 @@ module DerivedFields_mod
   private
 
   integer, public, parameter ::  &
-       MAXDEF_DERIV2D = 488 & ! Max. No. 2D derived fields to be defined
+       MAXDEF_DERIV2D = 1000 & ! Max. No. 2D derived fields to be defined
       ,MAXDEF_DERIV3D = 230    ! Max. No. 3D derived fields to be defined
 
 

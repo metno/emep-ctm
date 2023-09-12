@@ -1,7 +1,7 @@
-! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -224,6 +224,7 @@ type, public :: Emis_id_type
    character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' !country name, for example FR for France, as defined in Country_mod
    character(len=TXTLEN_NAME) :: periodicity = 'NOTSET' !how often fresh values must be read from the netcdf file
    character(len=TXTLEN_NAME) :: timevalidity = 'NOTSET' !if the time refers to the start, middle or end of the period
+   integer :: countrycode = -1 ! number identifying country in the emission file
    integer :: sector = -1 !sector as defined in this file
    integer :: sector_idx = -1 ! internal index used in SECTORS (set by model)
    integer :: species_ix = -1 ! internal index for species
@@ -260,6 +261,7 @@ type, public :: Emis_sourceFile_id_type
    character(len=TXTLEN_NAME) :: units = 'NOTSET'! default units
    character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' ! default country name
    character(len=TXTLEN_NAME) :: sectorsName = 'NOTSET' !
+   integer :: countrycode = -1 ! number identifying country in the emission file
    integer :: sector = -1 !default sector
    logical :: apply_femis = .true. !whether the general femis.dat should be applied to sources from this file
    logical :: include_in_local_fractions = .true. !if this is to be accounted in the local fractions (uEMEP)
@@ -291,7 +293,9 @@ type, public :: EmisFile_id_type
    character(len=TXTLEN_NAME) :: units = 'NOTSET'! default units
    character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' ! default country name
    character(len=TXTLEN_NAME) :: sectorsName ='NOTSET' !SNAP or GNFR_CAMS or user defined name
+   integer :: countrycode = -1 !default countrycode
    integer :: sector = -1 !default sector
+   integer :: nsectors = 1 !Number of sectors stored in each variable. Will only change how many sources are read at each variable read
    character(len=TXTLEN_NAME) :: mask_ID = 'NOTSET' ! set to ID of mask, if to be applied. Will then be default for all sources in file .NB: not read from attributes
    character(len=TXTLEN_NAME) :: mask_ID_reverse = 'NOTSET' ! set to ID of mask, if to be applied as reversed. Will then be default for all sources in file .NB: not read from attributes
    integer :: ncFileID = -1 !internal: shows the netcdf file ID if the file is open, or must be < 0.
@@ -345,13 +349,14 @@ type, public :: lf_sources
   character(len=TXTLEN_NAME) :: name = 'NOTSET' ! name as it appears in output. Only for "relative" type
   integer :: dist = -1 ! window dimension, if defined
   integer :: res = 1  ! half size of the single source square (square size is 2*res+1 x 2*res+1 )
-  integer :: Nvert = -1 ! vertical extend of the tracking/local rwindow
+  integer :: Nvert = 7 ! vertical extend of the tracking/local rwindow
   integer :: sector = 0 ! sector for this source. Zero is sum of all sectors
   integer :: poll = 1 !index of pollutant in loc_tot (set by model). One poll for all sources related to that poll
   integer :: start = 1 ! first position index in lf_src (set by model)
   integer :: end = 1 ! last position index in lf_src (set by model)
   integer :: iem = 0 ! index of emitted pollutant, emis (set by model)
   integer :: iem_deriv = 0 ! index of emitted pollutant to track, emis (set by model)
+  integer :: iem_lf ! index of emitted internal for LF (1 for nox, 2 for voc)
   integer :: Npos = 0 ! number of position indices in lf_src (set by model)
   integer :: Nsplit = 0 ! into how many species the emitted pollutant is split into (set by model)
   integer :: species_ix = -1 !species index, if single pollutant (for example NO or NO2, instead of nox)
@@ -363,6 +368,7 @@ type, public :: lf_sources
   integer :: country_ix = -1 !Internal country index. Does not have any meaning outside of code
   logical :: DryDep = .false. ! if drydep is to be outputed
   logical :: WetDep = .false. ! if wetdep is to be outputed
+  logical :: MDA8 = .false. ! if MDA8 is to be outputed
   logical     :: YEAR =.true.! Output frequency
   logical     :: MONTH =.false.
   logical     :: make_fracsum =.false.

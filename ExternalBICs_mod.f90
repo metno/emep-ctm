@@ -1,7 +1,7 @@
-! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -122,11 +122,13 @@ subroutine set_extbic_id(idate)
       EXTERNAL_BIC_VERSION='IFS_MOZ_fnyp'
     case(2014091800:2019120123)  ! 2014-09-18 00:00 to 2019-12-31 23:00
       EXTERNAL_BIC_VERSION='IFS_CMP_g4e2'
-    case(2020010100:)            ! from 2020-01-01 00:00
+    case(2020010100:2023062723)  ! 2020-01-01 00:00 to 2023-06-27 23:00
       EXTERNAL_BIC_VERSION='IFS_CMP_46r1'
+    case(2023062800:)            ! from 2023-06-28 00:00
+      EXTERNAL_BIC_VERSION='IFS_CMP_48r1'
     end select
     BC_DAYS=5   ! if BC file is not found, look for 1..5-day old files
-  case("IFS_MOZ_f7kn","IFS_MOZ_fkya","IFS_MOZ_fnyp","IFS_CMP_g4e2","IFS_CMP_46r1")
+  case("IFS_MOZ_f7kn","IFS_MOZ_fkya","IFS_MOZ_fnyp","IFS_CMP_g4e2","IFS_CMP_46r1","IFS_CMP_48r1")
     BC_DAYS=5   ! explicit MACC_ENS BC mapping version
   case("MACC_EVA","REANALYSIS")  ! GRG & AER    
     select case (idate(1))

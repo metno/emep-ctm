@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -52,7 +52,7 @@
     use ChemGroups_mod !,     only: RO2_POOL, RO2_GROUP
     use ChemDims_mod               ! => NSPEC_TOT, O3, NO2, etc.
     use ChemSpecs_mod              ! => NSPEC_TOT, O3, NO2, etc.
-    use ChemFields_mod,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]                             
+    use ChemFields_mod,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]
                              ,cell_tinv & ! tmp location, for Yields
                              ,NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
     use Config_module,      only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv &
@@ -62,8 +62,9 @@
     use EmisDef_mod,        only: KEMISTOP
     use GridValues_mod,     only : GRIDWIDTH_M, i_fdom, j_fdom
     use Io_mod,             only : IO_LOG, datewrite
-    use LocalFractions_mod, only: lf_chemrates, lf_chemderiv, lf_Nvert, &
-                                  x_lf, xold_lf ,xnew_lf, lf_fullchem, &
+    use LocalFractions_mod, only: lf_chem_emis_deriv, lf_Nvert, &
+                                  L_lf,P_lf,x_lf, xold_lf ,xnew_lf, lf_fullchem, &
+                                  Dchem_lf, xn_shl_lf, rcemis_lf, lf_rcemis,&
                                   NSPEC_fullchem_lf, NSPEC_fullchem_inc_lf, &
                                   N_lf_derivemis
     use Par_mod,            only: me, LIMAX, LJMAX
@@ -106,11 +107,11 @@ contains
 
     logical, save ::  first_call = .true.
 
-    real(kind=dp), parameter ::  CPINIT = 0.0 ! 1.0e-30  ! small value for init
+    real(kind=dp), parameter ::  CPINIT = 0.0 ! small value for init
 
     !  Local
     integer, dimension(KCHEMTOP:KMAX_MID) :: toiter
-    integer ::  k, ichem, iter,n, i_lf    ! Loop indices
+    integer ::  k, ichem, iter,n, i_lf, Nd    ! Loop indices
     integer, save ::  nchem         ! No chem time-steps
     real(kind=dp)    ::  dt2, accdt2, accdt
     real(kind=dp)    ::  P, L                ! Production, loss terms
@@ -129,10 +130,9 @@ contains
                         coeff1,coeff2,cc ! coefficients for variable timestep
     ! Test of precision
     real(kind=dp) :: pi = 4.0*atan(1.0_dp)
-    real, dimension(NSPEC_fullchem_lf+N_lf_derivemis):: L_lf,P_lf
-   
-    real, parameter :: eps1 = 1.0001
-    
+
+    real, parameter :: eps1 =  0.999
+
 !======================================================
 
 
@@ -175,7 +175,7 @@ contains
     !   minus Dchem because the current may be changed by
     !   processes outside the chemistry:
 
-    do k = 2, KMAX_MID
+    do k = KCHEMTOP, KMAX_MID
 
        DebugCell = debug_flag .and. k==KMAX_MID
        if ( DebugCell .and. DEBUG%VERT_DIFF) write(*,'(a,es12.3)') 'DSKzChem', xn_2d(19,20)
@@ -185,21 +185,55 @@ contains
        x(:)    = xn_2d(:,k) - Dchem(:,k,i,j)*dti(1)*1.5
        x(:)    = max (x(:), 0.0)
 
+       if (USES%LocalFractions .and. k > KMAX_MID-lf_Nvert) then
+          !make rcemis_lf and N_lf_derivemis
+          call lf_rcemis(i,j,k,eps1-1.0)
+       endif
        if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
-          !make NSPEC_fullchem_lf copy of concentrations
-          do n = 1, NSPEC_fullchem_inc_lf
-             do i_lf = 1, NSPEC_fullchem_lf+N_lf_derivemis
-                xnew_lf(i_lf,n) = xn_2d(n,k)          
-                x_lf(i_lf,n)    = xn_2d(n,k) - Dchem(n,k,i,j)*dti(1)*1.5 
-                x_lf(i_lf,n)    = max (x_lf(i_lf,n), 0.0)
-             end do  
+          !compute chemistry with small changes in input concentrations
+
+          Nd = NSPEC_fullchem_lf + N_lf_derivemis !shorter
+
+          !Careful sometimes the only difference between xnew and xnew_lf are from initial values (Dchem_lf and/or xn_shl_lf)
+          !Saving the specific lf values for them can lead to instabilities.
+          !Therefore if the concentrations are low compared to the deltas, we fix them to same values as base case.
+          do n = 1, NSPEC_SHL
+             do i_lf = 1, NSPEC_fullchem_lf
+                if(abs(xn_shl_lf(i_lf,n,k,i,j)- xnew(n))*100<xnew(n))then
+                   xnew_lf(i_lf,n) = xn_shl_lf(i_lf,n,k,i,j)
+                   x_lf(i_lf,n)    = xn_shl_lf(i_lf,n,k,i,j) - Dchem_lf(i_lf,n,k,i,j)*dti(1)*1.5
+                   x_lf(i_lf,n)    = max (x_lf(i_lf,n), 0.0)
+                else
+                   xnew_lf(i_lf,n) = xnew(n)
+                   x_lf(i_lf,n)    = x(n)
+                end if
+             end do
           end do
+
+          do n = NSPEC_SHL + 1, NSPEC_fullchem_inc_lf
+             do i_lf = 1, NSPEC_fullchem_lf
+                xnew_lf(i_lf,n) = xn_2d(n,k)
+                x_lf(i_lf,n)    = xn_2d(n,k) - Dchem_lf(i_lf,n,k,i,j)*dti(1)*1.5
+                x_lf(i_lf,n)    = max (x_lf(i_lf,n), 0.0)
+             end do
+          end do
+          !for emissions we use Dchem and not Dchem_lf. Because in some situations
+          !the xnew_lf does not change because of emissions, but because of
+          !differences in Dchem_lf only -> creates large derivatives.
+          do n = 1, NSPEC_fullchem_inc_lf
+             do i_lf = NSPEC_fullchem_lf + 1, NSPEC_fullchem_lf + N_lf_derivemis
+                xnew_lf(i_lf,n) = xnew(n)
+                x_lf(i_lf,n)    = x(n)
+             end do
+          end do
+
           !increase slightly one of the concentrations for chemical derivatives
           do i_lf = 1, NSPEC_fullchem_lf
-             xnew_lf(i_lf,i_lf+NSPEC_SHL) = xn_2d(i_lf+NSPEC_SHL,k) * eps1! we assume xn_i are slightly increased for pollutant i
-             x_lf(i_lf,i_lf+NSPEC_SHL)    = xn_2d(i_lf+NSPEC_SHL,k)* eps1 - Dchem(i_lf+NSPEC_SHL,k,i,j)*dti(1)*1.5 
+             xnew_lf(i_lf,i_lf+NSPEC_SHL) = xn_2d(i_lf+NSPEC_SHL,k) * eps1
+             x_lf(i_lf,i_lf+NSPEC_SHL)    = xn_2d(i_lf+NSPEC_SHL,k) * eps1 - Dchem_lf(i_lf,i_lf+NSPEC_SHL,k,i,j)*dti(1)*1.5
              x_lf(i_lf,i_lf+NSPEC_SHL)    = max (x_lf(i_lf,i_lf+NSPEC_SHL), 0.0)
           end do
+
        end if
 
        !*************************************
@@ -234,9 +268,9 @@ contains
              xold(n) = max( xold(n), 0.0 )
              x(n) = xnew(n)
              xnew(n) = xextrapol
-             
+
              if (lf_fullchem .and. k > KMAX_MID-lf_Nvert .and. n <= NSPEC_fullchem_inc_lf) then
-                do i_lf = 1, NSPEC_fullchem_lf+N_lf_derivemis
+                do i_lf = 1, Nd
                    xextrapol = xnew_lf(i_lf,n) + (xnew_lf(i_lf,n)-x_lf(i_lf,n)) *cc(ichem)
                    xold_lf(i_lf,n) = coeff1(ichem)*xnew_lf(i_lf,n) - coeff2(ichem)*x_lf(i_lf,n)
                    xold_lf(i_lf,n) = max( xold_lf(i_lf,n), 0.0 )
@@ -261,12 +295,13 @@ contains
              xnew(:) = CPINIT
           end where
 
+
 !== Here comes all chemical reactions
 !=============================================================================
           if ( DEBUG%DRYRUN ) then
             ! Skip fast chemistry
           else
-             
+
             do iter = 1, toiter(k)
 !
 ! The chemistry is iterated several times, more close to the ground than aloft.
@@ -279,28 +314,22 @@ contains
 ! "slowreactions", which is not iterated or fewer times. This needs some
 ! work to draw a proper line ......
 
-               !if(k>=KCHEMTOP)then
+               !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+               include 'CM_Reactions1.inc'
+               !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-               !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-               include 'CM_Reactions1.inc'               
-               !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-               
             end do !! End iterations
-            
-            if(USES%LocalFractions .and. k > KMAX_MID-lf_Nvert) then
-               call lf_chemrates(k, ichem, dtchem(ichem),xnew)
-            end if
- 
+
             !YIELDs  Allows change of gas/aerosol yield, which currently is only used
             !for SOA species to be handled in CM_Reactions2
-            
+
             if ( YieldModificationsInUse ) then
                !OLD if( DebugCell ) write(*,*) 'YIELD RUN  ', me, k, &
                !OLD   1/cell_tinv, iter, toiter(k)
                !OLD: if( iter == toiter(k) ) & ! runlabel='lastFastChem'
                call doYieldModifications('run')
             end if
-            
+
             !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
             include 'CM_Reactions2.inc'
             !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -312,15 +341,40 @@ contains
        !     End of integration loop        *
        !*************************************
 
+       if (USES%LocalFractions .and. k > KMAX_MID-lf_Nvert) then
+          !make rcemis_lf and N_lf_derivemis
+          call lf_chem_emis_deriv(i,j,k, xn_2d(1,k), xnew, eps1)
+       endif
        if(lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
-          call lf_chemderiv(i,j,k, xn_2d(1,k), xnew, eps1)
+          !save tendencies for each derivative
+          do n = 1, NSPEC_SHL
+             do i_lf = 1, NSPEC_fullchem_lf
+                 Dchem_lf(i_lf,n,k,i,j) = (xnew_lf(i_lf,n) - xn_shl_lf(i_lf,n,k,i,j) )*dt_advec_inv
+              end do
+          end do
+          do n = NSPEC_SHL+1, NSPEC_fullchem_inc_lf
+             do i_lf = 1, NSPEC_fullchem_lf
+                Dchem_lf(i_lf,n,k,i,j) = (xnew_lf(i_lf,n) - xn_2d(n,k) )*dt_advec_inv
+             end do
+          end do
+          !save shl
+          do n = 1, NSPEC_SHL
+             do i_lf = 1, NSPEC_fullchem_lf
+                 xn_shl_lf(i_lf,n,k,i,j) = xnew_lf(i_lf,n) !save short lives for each derivatives
+              end do
+          end do
+          do i_lf = 1, NSPEC_fullchem_lf
+             Dchem_lf(i_lf,i_lf+NSPEC_SHL,k,i,j) = (xnew_lf(i_lf,i_lf+NSPEC_SHL) - xn_2d(i_lf+NSPEC_SHL,k) * eps1)*dt_advec_inv
+          end do
+
+
        end if
-       
+
        !**  Saves tendencies Dchem and returns the new concentrations:
 
        Dchem(:,k,i,j) = (xnew(:) - xn_2d(:,k))*dt_advec_inv
        xn_2d(:,k) = xnew(:)
- 
+
     end do ! End of vertical k-loop
 
    first_call = .false.

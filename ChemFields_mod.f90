@@ -1,7 +1,7 @@
-! <ChemFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <ChemFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -97,6 +97,10 @@ private
   real, save, allocatable, public :: &
      Grid_snow(:,:) !snow_flag fraction in grid
 
+  real, save, allocatable, public :: &
+     Dobson(:,:) !total ozone, mostly stratospheric ozone from IFS
+  real, save, allocatable, public :: &
+     pH(:,:) !total ozone, mostly stratospheric ozone from IFS
   real, save, public :: cell_tinv  ! 1/temp,  tmp location
 
   public ::alloc_ChemFields
@@ -127,6 +131,10 @@ contains
     so2nh3_24hr=0.0
     allocate(Grid_snow(LIMAX,LJMAX))
     Grid_snow=0.0
+    allocate(Dobson(LIMAX,LJMAX)) 
+    Dobson=0.0
+    allocate(pH(LIMAX,LJMAX)) 
+    pH=0.0
     allocate(xn_2d_bgn(1,KCHEMTOP:KMAX_MID))
 
     allocate(xn_2d(NSPEC_TOT,KCHEMTOP:KMAX_MID))
@@ -137,6 +145,9 @@ contains
 
     allocate(rcphot(NRCPHOTextended,KCHEMTOP:KMAX_MID))
     rcphot = 0.0
+
+    allocate(rcphotslice(NRCPHOTextended,KCHEMTOP:KMAX_MID,LIMAX,LJMAX))
+    rcphotslice = 0.0
 
     allocate(rcbio(NATBIO%Nrcbio,KCHEMTOP:KMAX_MID))
     rcbio = 0.0
@@ -157,6 +168,7 @@ contains
     allocate(deltaZcm(KCHEMTOP:KMAX_MID))
     rcemis = 0.0
     allocate(rh(KCHEMTOP:KMAX_MID),M(KCHEMTOP:KMAX_MID),o2(KCHEMTOP:KMAX_MID))
+    allocate(methane(KCHEMTOP:KMAX_MID),hydrogen(KCHEMTOP:KMAX_MID))
     allocate(n2(KCHEMTOP:KMAX_MID),h2o(KCHEMTOP:KMAX_MID),temp(KCHEMTOP:KMAX_MID))
     allocate(tinv(KCHEMTOP:KMAX_MID),pp(KCHEMTOP:KMAX_MID))
     allocate(itemp(KCHEMTOP:KMAX_MID))

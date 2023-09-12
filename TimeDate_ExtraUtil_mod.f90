@@ -1,7 +1,7 @@
-! <TimeDate_ExtraUtil_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <TimeDate_ExtraUtil_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -486,7 +486,7 @@ subroutine secs1970_to_int(id,nsecs,msg)
 end subroutine secs1970_to_int
 
 subroutine days1900_to_ts(ts,ndays,msg)
-!calculate date from seconds that have passed since the start of the year 1900
+!calculate date from days that have passed since the start of the year 1900
   type(timestamp), intent(out)            :: ts
   real(kind=8), intent(in)                :: ndays
   character(len=*), intent(in), optional  :: msg

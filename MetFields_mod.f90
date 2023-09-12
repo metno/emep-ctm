@@ -1,7 +1,7 @@
-! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -135,7 +135,9 @@ module MetFields_mod
        th      &  ! Potential teperature  ( deg. k )
 !       ,q      &  ! Specific humidity
        ,roa    &  ! kg/m3
-       ,cw_met    ! cloudwater from meteo file (not always defined!)
+       ,cw_met  &  ! cloudwater from meteo file (not always defined!)
+       ,cc3d    & ! 3-d cloud cover (cc3d),
+       ,ciw_met ! ice cloudwater from meteo file (not always defined!)
   real,target,public, save,allocatable, dimension(:,:,:,:) :: &
         EtaKz    &! vertical diffusivity in Eta coords
        ,SigmaKz  &! vertical diffusivity in sigma coords
@@ -150,9 +152,7 @@ module MetFields_mod
   ! since pr,cc3d,cc3dmax,cnvuf,cnvdf used only for 1 time layer - define without NMET
   real,target,public, save,allocatable, dimension(:,:,:) :: &
         pr      & ! Precipitation in mm/s "passing" the layer
-       ,cc3d    & ! 3-d cloud cover (cc3d),
        ,cc3dmax & ! and maximum for layers above a given layer
-       ,lwc     & !liquid water content
   ! QUERY - should xksig be MID, not BND? Is it needed at all?
        ,Kz_m2s     ! estimated Kz, in intermediate sigma levels, m2/s
 
@@ -188,9 +188,11 @@ module MetFields_mod
        ,sdepth          & !  Snowdepth, m
        ,ice_nwp         & ! QUERY why real?
        ,sst       &  ! SST Sea Surface Temprature- ONLY from 2002 in PARLAM
+       ,u10    &  ! wind speed 10m x direction
+       ,v10    &  ! wind speed 10m y direction
        ,ws_10m    &  ! wind speed 10m
-       ,hmix         ! same as pzpbl, but interpolated in time
-
+       ,hmix      &  ! same as pzpbl, but interpolated in time
+       ,buff3D       ! can be used for temporary storage 
  real,target,public, save,allocatable, dimension(:,:) :: &
      u_ref             & ! wind speed m/s at 45m (real, not projected)
     ,rho_surf          & ! Surface density
@@ -269,6 +271,7 @@ module MetFields_mod
     ,foundv10_met= .false.   & ! false if no v10 from meteorology
     ,foundprecip= .false.    & ! false if no precipitationfrom meteorology
     ,foundcloudwater= .false.& !false if no cloudwater found
+    ,foundcloudicewater= .false.& !false if no ice cloudwater found
     ,foundSMI1= .true.& ! false if no Soil Moisture Index level 1 (shallow)
     ,foundSMI3= .true.& ! false if no Soil Moisture Index level 3 (deep)
     ,foundrain= .false.& ! false if no rain found or used
@@ -280,12 +283,13 @@ module MetFields_mod
 
 ! specific indices of met
   integer, public, save   :: ix_u_xmj,ix_v_xmi, ix_q, ix_th, ix_cc3d, ix_pr, &
-      ix_cw_met, ix_cnvuf, ix_cnvdf, ix_Kz_met, ix_roa, ix_SigmaKz, ix_EtaKz,&
-      ix_Etadot, ix_cc3dmax, ix_lwc, ix_Kz_m2s, ix_u_mid, ix_v_mid, ix_ps, &
+      ix_cw_met, ix_ciw_met, ix_cnvuf, ix_cnvdf, ix_Kz_met, ix_roa, ix_SigmaKz, ix_EtaKz,&
+      ix_Etadot, ix_cc3dmax, ix_Kz_m2s, ix_u_mid, ix_v_mid, ix_ps, &
       ix_t2_nwp, ix_rh2m, ix_fh, ix_fl, ix_tau, ix_ustar_nwp, ix_sst, &
-      ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_ice_nwp, ix_ws_10m,&
+      ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_ice_nwp, &
+      ix_ws_10m, ix_u10, ix_v10,&
       ix_surface_precip, ix_uw, ix_ue, ix_vs, ix_vn, ix_convective_precip, &
-      ix_rain,ix_irainc,ix_irainnc, ix_elev, ix_invL, ix_pblnwp 
+      ix_rain,ix_irainc,ix_irainnc, ix_elev, ix_invL, ix_pblnwp, ix_buff3D 
 ! integer, public, save   :: ix_tsurf_nwp
 
   type,  public :: metfield
@@ -313,7 +317,6 @@ module MetFields_mod
   type(metfield),  public :: derivmet(20)  !DSA15 To put the metfields derived from NWP, eg for output
   logical, target :: metfieldfound(NmetfieldsMax)=.false. !default for met(ix)%found 
   integer, public, save   :: Nmetfields! number of fields defined in met
-  integer, public, save   :: N3Dmetfields! number of 3D fields defined in met
   real,target, public,save,allocatable, dimension(:,:,:) :: uw,ue
   real,target, public,save,allocatable, dimension(:,:,:) :: vs,vn
 
@@ -409,15 +412,15 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%name             = '3D_cloudcover'
   met(ix)%dim              = 3
   met(ix)%frequency        = 3
-  met(ix)%time_interpolate = .false.
+  met(ix)%time_interpolate = .true.
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundcc3d 
-  allocate(cc3d(LIMAX,LJMAX,KMAX_MID))
+  allocate(cc3d(LIMAX,LJMAX,KMAX_MID,NMET))
   cc3d=0.0
-  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cc3d
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => cc3d
   met(ix)%zsize = KMAX_MID
-  met(ix)%msize = 1
+  met(ix)%msize = NMET
   ix_cc3d=ix
 
   ix=ix+1
@@ -439,8 +442,8 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%name             = 'cloudwater'
   met(ix)%dim              = 3
   met(ix)%frequency        = 3
-  met(ix)%time_interpolate = .false.
-  met(ix)%read_meteo       = .false.
+  met(ix)%time_interpolate = .true.
+  met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundcloudwater
   allocate(cw_met(LIMAX,LJMAX,KMAX_MID,NMET))
@@ -449,6 +452,21 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = NMET
   ix_cw_met=ix
+
+  ix=ix+1
+  met(ix)%name             = 'cloudice'
+  met(ix)%dim              = 3
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .true.
+  met(ix)%read_meteo       = USES%CLOUDICE 
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundcloudicewater
+  allocate(ciw_met(LIMAX,LJMAX,KMAX_MID,NMET))
+  ciw_met=0.0
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => ciw_met
+  met(ix)%zsize = KMAX_MID
+  met(ix)%msize = NMET
+  ix_ciw_met=ix
 
   ix=ix+1
   met(ix)%name             = 'convective_updraft_flux'
@@ -569,22 +587,6 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_cc3dmax=ix
-
-  ix=ix+1
-  met(ix)%name             = 'cloud_liquid_water'
-  met(ix)%dim              = 3
-  met(ix)%frequency        = 3
-  met(ix)%time_interpolate = .false.
-  met(ix)%read_meteo       = .false.
-  met(ix)%needed           = .false.
-  met(ix)%found            = .false.
-  allocate(lwc(LIMAX,LJMAX,KMAX_MID))
-  lwc=0.0
-  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => lwc
-  met(ix)%zsize = KMAX_MID
-  met(ix)%msize = 1
-  ix_lwc=ix
-
   ix=ix+1
   met(ix)%name             = 'Kz'
   met(ix)%dim              = 3
@@ -629,9 +631,22 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_v_mid=ix
+  ix=ix+1
 
-  N3Dmetfields=ix
-!  write(*,*)'number of 3D metfields: ',N3Dmetfields
+  met(ix)%name             = 'buffer_3D'
+  met(ix)%dim              = 3
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .false.
+  met(ix)%read_meteo       = .false.
+  met(ix)%needed           = .false.
+  met(ix)%found            = .false.
+  allocate(buff3D(LIMAX,LJMAX,KMAX_MID))
+  buff3D=0.0
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => buff3D
+  met(ix)%zsize = KMAX_MID
+  met(ix)%msize = 1
+  ix_buff3D=ix
+
 !________________________________________________________________
 ! 2D fields
 
@@ -868,12 +883,42 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%msize = NMET
   ix_ice_nwp=ix
 
+  !NB: some modules have their own private definition of a variable named u10
   ix=ix+1
   met(ix)%name             = 'u10'
   met(ix)%dim              = 2
   met(ix)%frequency        = 3
   met(ix)%time_interpolate = .true.
   met(ix)%read_meteo       = .true.
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundu10_met
+  allocate(u10(LIMAX,LJMAX,NMET))
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => u10
+  met(ix)%zsize = 1
+  met(ix)%msize = NMET
+  ix_u10=ix
+
+  ix=ix+1
+  met(ix)%name             = 'v10'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .true.
+  met(ix)%read_meteo       = .true.
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundv10_met
+  allocate(v10(LIMAX,LJMAX,NMET))
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => v10
+  met(ix)%zsize = 1
+  met(ix)%msize = NMET
+  ix_v10=ix
+  
+
+  ix=ix+1
+  met(ix)%name             = 'ws_10m'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .true.
+  met(ix)%read_meteo       = .false. !computed from u10 and v10
   met(ix)%needed           = .false.
   met(ix)%found            => foundws10_met
   allocate(ws_10m(LIMAX,LJMAX,NMET))
@@ -1063,6 +1108,7 @@ if(USES%WRF_MET_NAMES)then
    met(ix_th)%name                = 'T'
    met(ix_cc3d)%name              = 'CLDFRA'
    met(ix_cw_met)%name            = 'QCLOUD'
+   met(ix_ciw_met)%name           = 'QICE'
 
 !Use QRAIN to make 3D precip profiles from 2D. NB not accumulated, so cannot be used directly
   ix=ix+1
@@ -1121,7 +1167,8 @@ if(USES%WRF_MET_NAMES)then
    met(ix_fl)%name                = 'LH'
    met(ix_ustar_nwp)%name         = 'UST'
    met(ix_sst)%name               = 'SST'
-   met(ix_ws_10m)%name            = 'U10'
+   met(ix_u10)%name            = 'U10'
+   met(ix_v10)%name            = 'V10'
    met(ix_SoilWater_uppr)%name    = 'SMI1'!take first level. Do not change name! (name set in Getmeteofield)
    met(ix_SoilWater_deep)%name    = 'SMI3'!take third level. Do not change name! (name set in Getmeteofield)
    met(ix_sdepth)%name            = 'SNOWH'!snowdepth in m
@@ -1133,9 +1180,27 @@ if(USES%WRF_MET_NAMES)then
    TopoFile = date2string(meteo,startdate,mode='YMDH')
 
 !... addmore
+else 
+   !AROME definitions may be used for precipitations.
+   !Use RAIN fields to make 3D precip profiles from 2D. NB not accumulated, so cannot be used directly
+  ix=ix+1
+  met(ix)%name             = 'mass_fraction_of_rain_in_air_ml'
+  met(ix)%dim              = 3
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = .true.!to get new and old value stored
+  met(ix)%read_meteo       = .false.!set tot true if necessary
+  met(ix)%needed           = .false.
+  met(ix)%found            => foundrain
+  allocate(rain(LIMAX,LJMAX,KMAX_MID,NMET))
+  !rain=0.0 !leave commented out, so that if never used will not use memory
+  met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:NMET)  => rain
+  met(ix)%zsize = KMAX_MID
+  met(ix)%msize = 1
+  ix_rain=ix
+   
 end if
 
-  Nmetfields=ix
+Nmetfields=ix
   if(Nmetfields>NmetfieldsMax)then
      write(*,*)"Increase NmetfieldsMax! "
      stop

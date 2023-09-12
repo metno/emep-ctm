@@ -1,7 +1,7 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@ module RunChem_mod
 
   use AeroConstants_mod,only: AERO
   use AerosolCalls,     only: AerosolEquilib & !-> My_MARS, My_EQSAM, &
-                             ,Aero_water, Aero_water_rh50, Aero_water_MARS 
+                             ,Aero_water_MARS  !ST:10.01.23 ,Aero_water, Aero_water_rh50 
   use My_Timing_mod,     only: Code_timer, Add_2timing,  &
                               tim_before, tim_after
   use AOD_PM_mod,        only: AOD_Ext
@@ -54,11 +54,11 @@ module RunChem_mod
                               , OH_ix,NH3_ix,SO2_ix,SO4_ix, NO_ix, C5H8_ix
   use Debug_module,      only: DebugCell, DEBUG  & ! -> DEBUG%RUNCHEM
                               ,DEBUG_EMISSTACKS ! MKPS
-  use DefPhotolysis_mod, only: setup_phot
+  ! use DefPhotolysis_mod, only: setup_phot
   use DerivedFields_mod, only: f_2d
   use DryDep_mod,        only: drydep
   use DustProd_mod,      only: WindDust  !DUST -> USES%DUST
-  use FastJ_mod,         only: setup_phot_fastj,phot_fastj_interpolate
+  use CloudJ_mod,        only: setup_phot_cloudj, write_jvals
   use GridValues_mod,    only: debug_proc, debug_li, debug_lj, i_fdom, j_fdom
   use Io_Progs_mod,      only: datewrite
   use LocalFractions_mod,only: lf_chem,lf_aero_pre,lf_aero_pos,lf
@@ -73,10 +73,11 @@ module RunChem_mod
   use PointSource_mod,    only: pointsources, get_pointsources
   use SeaSalt_mod,       only: SeaSalt_flux
   use Setup_1d_mod,      only: setup_1d, setup_rcemis, reset_3d, sum_rcemis
-  use ZchemData_mod,only: first_call, &
+  use ZchemData_mod,only: first_call, rcphotslice, &
                               M, rct, rcemis, rcbio, rcphot, xn_2d  ! DEBUG for testing
   use SmallUtils_mod,    only: find_index
   use TimeDate_mod,      only: current_date,daynumber,print_date
+  use DefPhotolysis_mod
 !--------------------------------
   implicit none
   private
@@ -95,12 +96,17 @@ subroutine runchem()
   logical ::  Jan_1st
   logical ::  debug_flag    ! =>   Set true for selected i,j
   logical, save :: first_tstep = .true. ! J16 
+  integer, save :: photstep=-999, totday=-999
   character(len=*), parameter :: sub='RunChem:'
 ! =============================
   nmonth = current_date%month
   nday   = current_date%day
   nhour  = current_date%hour
 
+  if (daynumber > totday) then
+    totday = daynumber
+    photstep = -999
+  end if
 
   Jan_1st    = ( nmonth == 1 .and. nday == 1 )
 
@@ -156,7 +162,7 @@ subroutine runchem()
         call SeaSalt_flux(i,j,debug_flag) ! sets rcemis(SEASALT_...)
 
       if(USES%DUST)     &
-        call WindDust(i,j,debug_flag)     ! sets rcemis(DUST...)
+          call WindDust(i,j,DEBUG%DUST.and.DebugCell)     ! sets rcemis(DUST...)
 
       if ( USES%EMISSTACKS ) then
          if ( pointsources(i,j) ) call get_pointsources(i,j,DEBUG_EMISSTACKS)
@@ -171,13 +177,20 @@ subroutine runchem()
 
       call emis_massbudget_1d(i,j)   ! Adds bio/nat to rcemis
 
-      if(USES%FASTJ)then
-!         call setup_phot_fastj(i,j,errcode,0)! recalculate the column
-        !interpolate (intelligently) from 3-hourly values
-         call  phot_fastj_interpolate(i,j,errcode)
+      if(USES%CLOUDJ)then
+        if(USES%HRLYCLOUDJ) then
+          if(nhour>photstep) then
+            call setup_phot_cloudj(i,j,errcode,0) ! fills up rcphotslice
+          endif
+        else
+          call setup_phot_cloudj(i,j,errcode,0) ! fills up rcphotslice
+        endif
+        rcphot(:,:) = rcphotslice(:,:,i,j) ! populate from (hrly) slice array
       else
          call setup_phot(i,j,errcode)
       end if
+
+      call write_jvals(i,j)
 
       call CheckStop(errcode,"setup_photerror in Runchem") 
 
@@ -264,7 +277,7 @@ subroutine runchem()
       !  Check that one and only one eq is chosen
       if(mod(step_main,2)/=0) then
         if(USES%LocalFractions) call lf_aero_pre(i,j)
-        call AerosolEquilib(debug_flag)
+        call AerosolEquilib(i,j,debug_flag)
         if(USES%LocalFractions) call lf_aero_pos(i,j)
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
@@ -279,7 +292,7 @@ subroutine runchem()
         call Add_2timing(31,tim_after,tim_before,"Runchem:DryDep")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'F')
         if(USES%LocalFractions) call lf_aero_pre(i,j)
-        call AerosolEquilib(debug_flag)
+        call AerosolEquilib(i,j,debug_flag)
         if(USES%LocalFractions) call lf_aero_pos(i,j)
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'G')
@@ -307,14 +320,14 @@ subroutine runchem()
       !!  and for filter equlibration conditions (2D at surface) 
       !  T=20C and Rh=50% for comparability with gravimetric PM
 
-      if(AERO%EQUILIB_WATER=='EQSAM')then
-         !.. Water from EQSAM .......
-         call Aero_water     (i,j, debug_flag)  !  For real conditions (3D) 
-         call Aero_water_rh50(i,j, debug_flag)  !  Rh=50% T=20C                     
-      else
-         call Aero_water_MARS(i,j, debug_flag)         
-      endif
-
+!!ST:1.05.2023      if(AERO%EQUILIB_WATER=='EQSAM')then
+!         !.. Water from EQSAM: ambient and for Rh=50% T=20C 
+!         call Aero_water     (i,j, debug_flag)  !  For real conditions (3D) 
+!         call Aero_water_rh50(i,j, debug_flag)  !  Rh=50% T=20C          
+!      elseif(AERO%EQUILIB_WATER=='MARS')then
+!         call Aero_water_MARS(i,j, debug_flag)         
+!      endif
+       if(AERO%EQUILIB_WATER=='MARS')   call Aero_water_MARS(i,j, debug_flag)
       
       call check_negs(i,j,'END')
       if(i>=li0.and.i<=li1.and.j>=lj0.and.j<=lj1) then
@@ -328,6 +341,8 @@ subroutine runchem()
     end do ! j
   end do ! i
   first_tstep = .false.   ! end of first call  over all i,j
+
+  photstep = nhour
 
 end subroutine runchem
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

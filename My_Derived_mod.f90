@@ -1,7 +1,7 @@
-! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -143,11 +143,32 @@ character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
 
 !============ Extra parameters for model evaluation: ===================!
 !character(len=TXTLEN_DERIV), public, parameter, dimension(13) :: &
-character(len=TXTLEN_DERIV), public, parameter, dimension(5) :: &
+!Nov2022 Qing - adjust numbers here (from +2 to +16?)
+character(len=TXTLEN_DERIV), public, parameter, dimension(7+16) :: &
   D2_EXTRA = [character(len=TXTLEN_DERIV):: &
     ! all array members will have len=TXTLEN_DERIV
     "Area_Grid_km2","Area_Conif_Frac","Area_Decid_Frac",&
-    "Area_Seminat_Frac","Area_Crops_Frac"]
+    "Area_Forest_Frac", &
+    "Area_nonForest_Frac", &
+    "Area_Seminat_Frac","Area_Crops_Frac", &
+!Nov2022 Qing - add LCs here
+    "Area_CF_Frac", &
+    "Area_DF_Frac", &
+    "Area_NF_Frac", &
+    "Area_BF_Frac", &
+    "Area_TC_Frac", &
+    "Area_MC_Frac", &
+    "Area_RC_Frac", &
+    "Area_SNL_Frac", &
+    "Area_GR_Frac", &
+    "Area_MS_Frac", &
+    "Area_WE_Frac", &
+    "Area_TU_Frac", &
+    "Area_DE_Frac", &
+    "Area_W_Frac", &
+    "Area_ICE_Frac", &
+    "Area_U_Frac" &
+     ]
 !   "SoilWater_deep","SoilWater_uppr,&! See SMI_deep above
 !   "AreaPOLL"]                       ! Future usage. Should change name too
 
@@ -316,7 +337,12 @@ subroutine Init_My_Deriv()
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
     tag_name(1) = "Emis_mgm2_BioNatTERP"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
-!
+!2023 tests
+    tag_name(1) = "Emis_mgm2_BioNatDUST_wb_f"
+    call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
+    tag_name(1) = "Emis_mgm2_BioNatDUST_wb_c"
+    call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
+
   if(USES%BIDIR) then
     tag_name(1) = "Emis_mgm2_BioNatNH3"
     call AddArray( tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)

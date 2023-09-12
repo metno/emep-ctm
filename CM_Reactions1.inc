@@ -57,7 +57,7 @@
     + rcphot(IDHCHO_H2,k) *24. * xnew(PACALD)  &
     + rcphot(IDHCHO_H,k) *0.9 * xnew(C5DICAROOH)  &
     + rcphot(IDCH3O2H,k) * xnew(CH3OOH)  &
-    + rcphot(IDCH3O2H,k) * xnew(C2H5OOH)  &
+    + rcphot(IDCH3O2H,k) *0.5 * xnew(C2H5OOH)  &
     + rcphot(IDCH3O2H,k) * xnew(BURO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(ETRO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(CH3CO3H)  &
@@ -69,7 +69,7 @@
   
   L = rct(5,k) * xnew(HO2)  &
     + rct(6,k) * xnew(H2O2)  &
-    + rct(7,k) * xnew(H2)  &
+    + rct(7,k)  &
     + rct(13,k) * xnew(O3)  &
     + rct(20,k) * xnew(NO2)  &
     + rct(21,k) * xnew(HNO3)  &
@@ -77,7 +77,7 @@
     + rct(23,k) * xnew(HONO)  &
     + 2.0e-11 * xnew(NO3)  &
     + rct(26,k) * xnew(HO2NO2)  &
-    + rct(27,k) * xnew(CH4)  &
+    + rct(27,k)  &
     + rct(28,k) * xnew(CO)  &
     + rct(33,k) * xnew(CH3OH)  &
     + rct(34,k) * xnew(CH3OOH)  &
@@ -130,7 +130,7 @@
 !-> HO2
 
   P = rct(6,k) * xnew(OH) * xnew(H2O2)  &
-    + rct(7,k) * xnew(OH) * xnew(H2)  &
+    + rct(7,k) * xnew(OH)  &
     + rct(13,k) * xnew(O3) * xnew(OH)  &
     + 2.0e-11 * xnew(OH) * xnew(NO3)  &
     + rct(25,k) * xnew(HO2NO2)  &
@@ -178,7 +178,6 @@
     + rcphot(IDCH3CHO,k) * xnew(CH3CHO)  &
     + rcphot(IDCH3CHO,k) * xnew(NALD)  &
     + rcphot(IDMEK,k) * xnew(ACETOL)  &
-    + 0.5* rcphot(IDCHOCHO,k) * xnew(GLYOX)  &
     + rcphot(IDRCOCHO,k) * xnew(MGLYOX)  &
     + rcphot(IDHCHO_H2,k) *0.0474 * xnew(MACR)  &
     + rcphot(IDNO2,k) *0.2 * xnew(C5DICARB)  &
@@ -186,16 +185,17 @@
     + rcphot(IDHCHO_H2,k) *24. * xnew(PACALD)  &
     + rcphot(IDHCHO_H,k) *0.9 * xnew(C5DICAROOH)  &
     + rcphot(IDCH3O2H,k) * xnew(CH3OOH)  &
-    + rcphot(IDCH3O2H,k) * xnew(C2H5OOH)  &
+    + rcphot(IDCH3O2H,k) *0.5 * xnew(C2H5OOH)  &
     + 0.716* rcphot(IDCH3O2H,k) * xnew(BURO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(ETRO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(MACROOH)  &
     + rcphot(IDCH3O2H,k) * xnew(OXYO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(ISRO2H)  &
-    + 0.652* rcphot(IDMEK,k) *0.78 * xnew(SC4H9NO3)
+    + 0.652* rcphot(IDMEK,k) *0.78 * xnew(SC4H9NO3)  &
+    + rcphot(IDMEK,k) *0.78 * xnew(ISON)
   
   !-> HO2 cont.
-    P = P +   rcphot(IDMEK,k) *0.78 * xnew(ISON)  &
+    P = P +   2* rcphot(IDGLYOXA,k) * xnew(GLYOX)  &
     + AQRCK(ICLOHSO2,K)*2.00e-12 * xnew(OH) * xnew(SO2)
   
   L = rct(5,k) * xnew(OH)  &
@@ -228,7 +228,7 @@
 
 !-> CH3O2
 
-  P = rct(27,k) * xnew(CH4) * xnew(OH)  &
+  P = rct(27,k) * xnew(OH)  &
     + 0.6* rct(34,k) * xnew(CH3OOH) * xnew(OH)  &
     + 0.05* rct(40,k) * xnew(CH3CHO) * xnew(OH)  &
     + rct(42,k) * xnew(CH3CO3) * xnew(NO)  &
@@ -370,6 +370,19 @@
   xnew(MACRO2) = (xold(MACRO2) + dt2 * P) / (1.0 + dt2 * L)
 
 
+!-> TERPO2
+
+  P = rct(75,k) * xnew(APINENE) * xnew(OH)  &
+    + rct(77,k) * xnew(TERPOOH) * xnew(OH)  &
+    + rct(79,k) * xnew(APINENE) * xnew(NO3)
+  
+  L = rct(48,k) * xnew(NO)  &
+    + 2.3e-12 * xnew(NO3)  &
+    + rct(76,k) * xnew(HO2)
+  
+  xnew(TERPO2) = (xold(TERPO2) + dt2 * P) / (1.0 + dt2 * L)
+
+
 !-> RO2POOL
 
   ! P = 0.0
@@ -401,6 +414,9 @@
     + rcphot(IDHCHO_H2,k) *0.0474 * xnew(MACR)  &
     + rcphot(IDCH3O2H,k) * xnew(MEKO2H)  &
     + rcphot(IDMEK,k) * xnew(MEKO2H)
+  
+  !-> CH3CO3 cont.
+    P = P +   rcphot(IDPAN,k) * xnew(PAN)
   
   L = rct(42,k) * xnew(NO)  &
     + 4.0e-12 * xnew(NO3)  &
@@ -516,6 +532,7 @@
     + rcphot(IDCH3CHO,k) * xnew(NALD)  &
     + rcphot(IDMEK,k) *0.78 * xnew(SC4H9NO3)  &
     + rcphot(IDMEK,k) *0.78 * xnew(ISON)  &
+    + 0.7* rcphot(IDPAN,k) * xnew(PAN)  &
     + rcemis(NO2,k)
   
   L = rct(12,k) * xnew(O3)  &
@@ -535,7 +552,8 @@
   P = rct(12,k) * xnew(O3) * xnew(NO2)  &
     + rct(19,k) * xnew(N2O5)  &
     + rct(21,k) * xnew(OH) * xnew(HNO3)  &
-    + 0.333* rcphot(IDHO2NO2,k) * xnew(HO2NO2)
+    + 0.333* rcphot(IDHO2NO2,k) * xnew(HO2NO2)  &
+    + 0.3* rcphot(IDPAN,k) * xnew(PAN)
   
   L = rct(15,k) * xnew(NO)  &
     + rct(17,k) * xnew(NO2)  &
@@ -576,13 +594,11 @@
 
 !-> H2
 
-  P = 0.18* rct(51,k) * xnew(C2H4) * xnew(O3)  &
-    + 0.0684* rct(53,k) * xnew(C3H6) * xnew(O3)  &
-    + rcphot(IDHCHO_H2,k) * xnew(HCHO)
+  ! P = 0.0
   
-  L = rct(7,k) * xnew(OH)
+  ! L = 0.0
   
-  xnew(H2) = (xold(H2) + dt2 * P) / (1.0 + dt2 * L)
+  ! Nothing to do for H2! xnew(H2) = max(0.0, xold(H2))
 
 
 !-> H2O2
@@ -662,13 +678,15 @@
     + rcphot(IDHCHO_H2,k) * xnew(HCHO)  &
     + rcphot(IDCH3CHO,k) * xnew(CH3CHO)  &
     + rcphot(IDCH3CHO,k) * xnew(NALD)  &
-    + 1.9* rcphot(IDCHOCHO,k) * xnew(GLYOX)
+    + rcphot(IDRCOCHO,k) * xnew(MGLYOX)
   
   !-> CO cont.
-    P = P +   rcphot(IDRCOCHO,k) * xnew(MGLYOX)  &
-    + rcphot(IDHCHO_H2,k) *0.0474 * xnew(MACR)  &
+    P = P +   rcphot(IDHCHO_H2,k) *0.0474 * xnew(MACR)  &
     + rcphot(IDHCHO_H2,k) *24. * xnew(PACALD)  &
     + 0.5* rcphot(IDCH3O2H,k) * xnew(MACROOH)  &
+    + 2* rcphot(IDGLYOXA,k) * xnew(GLYOX)  &
+    + 2* rcphot(IDGLYOXB,k) * xnew(GLYOX)  &
+    + rcphot(IDGLYOXC,k) * xnew(GLYOX)  &
     + rcemis(CO,k)
   
   L = rct(28,k) * xnew(OH)
@@ -678,11 +696,11 @@
 
 !-> CH4
 
-  P = 0.04* rct(53,k) * xnew(C3H6) * xnew(O3)
+  ! P = 0.0
   
-  L = rct(27,k) * xnew(OH)
+  ! L = 0.0
   
-  xnew(CH4) = (xold(CH4) + dt2 * P) / (1.0 + dt2 * L)
+  ! Nothing to do for CH4! xnew(CH4) = max(0.0, xold(CH4))
 
 
 !-> C2H6
@@ -817,13 +835,13 @@
     + 7.61e-11 * xnew(HPALD) * xnew(OH)  &
     + rcphot(IDCH3CHO,k) * xnew(NALD)  &
     + rcphot(IDMEK,k) * xnew(ACETOL)  &
-    + 0.1* rcphot(IDCHOCHO,k) * xnew(GLYOX)  &
     + rcphot(IDHCHO_H2,k) *0.0474 * xnew(MACR)  &
     + rcphot(IDCH3O2H,k) * xnew(CH3OOH)  &
     + 1.56* rcphot(IDCH3O2H,k) * xnew(ETRO2H)  &
     + 0.5* rcphot(IDCH3O2H,k) * xnew(MACROOH)  &
     + rcphot(IDCH3O2H,k) * xnew(ISRO2H)  &
     + rcphot(IDMEK,k) *0.78 * xnew(ISON)  &
+    + rcphot(IDGLYOXC,k) * xnew(GLYOX)  &
     + rcemis(HCHO,k)
   
   L = rct(35,k) * xnew(OH)  &
@@ -849,7 +867,7 @@
     + 0.489* rct(53,k) * xnew(C3H6) * xnew(O3)  &
     + rct(48,k) * xnew(PRRO2) * xnew(NO)  &
     + 2.3e-12 * xnew(PRRO2) * xnew(NO3)  &
-    + rcphot(IDCH3O2H,k) * xnew(C2H5OOH)  &
+    + rcphot(IDCH3O2H,k) *0.5 * xnew(C2H5OOH)  &
     + 0.284* rcphot(IDCH3O2H,k) * xnew(BURO2H)  &
     + 0.22* rcphot(IDCH3O2H,k) * xnew(ETRO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(MEKO2H)  &
@@ -927,7 +945,9 @@
     + rcemis(GLYOX,k)
   
   L = rct(62,k) * xnew(OH)  &
-    + rcphot(IDCHOCHO,k)
+    + rcphot(IDGLYOXA,k)  &
+    + rcphot(IDGLYOXB,k)  &
+    + rcphot(IDGLYOXC,k)
   
   xnew(GLYOX) = (xold(GLYOX) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -996,7 +1016,7 @@
   P = rct(39,k) * xnew(C2H5O2) * xnew(HO2)
   
   L = 1.17e-11 * xnew(OH)  &
-    + rcphot(IDCH3O2H,k)
+    + rcphot(IDCH3O2H,k) *0.5
   
   xnew(C2H5OOH) = (xold(C2H5OOH) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -1147,7 +1167,8 @@
 
   P = rct(43,k) * xnew(CH3CO3) * xnew(NO2)
   
-  L = rct(44,k)
+  L = rct(44,k)  &
+    + rcphot(IDPAN,k)
   
   xnew(PAN) = (xold(PAN) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -1171,19 +1192,6 @@
     + rct(79,k) * xnew(NO3)
   
   xnew(APINENE) = (xold(APINENE) + dt2 * P) / (1.0 + dt2 * L)
-
-
-!-> TERPO2
-
-  P = rct(75,k) * xnew(APINENE) * xnew(OH)  &
-    + rct(77,k) * xnew(TERPOOH) * xnew(OH)  &
-    + rct(79,k) * xnew(APINENE) * xnew(NO3)
-  
-  L = rct(48,k) * xnew(NO)  &
-    + 2.3e-12 * xnew(NO3)  &
-    + rct(76,k) * xnew(HO2)
-  
-  xnew(TERPO2) = (xold(TERPO2) + dt2 * P) / (1.0 + dt2 * L)
 
 
 !-> TERPOOH
@@ -1299,6 +1307,15 @@
   xnew(POLLEN_OLIVE) = xold(POLLEN_OLIVE) + dt2 * P
 
 
+!-> POLLEN_ALDER
+
+  P = rcemis(POLLEN_ALDER,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_ALDER) = xold(POLLEN_ALDER) + dt2 * P
+
+
 !-> POLLEN_RWEED
 
   P = rcemis(POLLEN_RWEED,k)
@@ -1315,5 +1332,50 @@
   ! L = 0.0
   
   xnew(POLLEN_GRASS) = xold(POLLEN_GRASS) + dt2 * P
+
+
+!-> POLLEN_MUGWORT1
+
+  P = rcemis(POLLEN_MUGWORT1,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_MUGWORT1) = xold(POLLEN_MUGWORT1) + dt2 * P
+
+
+!-> POLLEN_MUGWORT2
+
+  P = rcemis(POLLEN_MUGWORT2,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_MUGWORT2) = xold(POLLEN_MUGWORT2) + dt2 * P
+
+
+!-> POLLEN_MUGWORT3
+
+  P = rcemis(POLLEN_MUGWORT3,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_MUGWORT3) = xold(POLLEN_MUGWORT3) + dt2 * P
+
+
+!-> POLLEN_MUGWORT4
+
+  P = rcemis(POLLEN_MUGWORT4,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_MUGWORT4) = xold(POLLEN_MUGWORT4) + dt2 * P
+
+
+!-> POLLEN_MUGWORT5
+
+  P = rcemis(POLLEN_MUGWORT5,k)
+  
+  ! L = 0.0
+  
+  xnew(POLLEN_MUGWORT5) = xold(POLLEN_MUGWORT5) + dt2 * P
 
 

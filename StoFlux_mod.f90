@@ -1,7 +1,7 @@
-! <StoFlux_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <StoFlux_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -123,7 +123,7 @@ contains
       L = Sub(iL)
 
       Sub(iL)%FstO3       = 0.0
-      if ( dbg ) write(*,"(a,i3,2f7.1,9es10.3)") dtxt//'LOOP', iL, L%hveg, L%z0, L%g_sun
+      !if ( dbg ) write(*,"(a,i3,2f7.1,9es10.3)") dtxt//'LOOP', iL, L%hveg, L%z0, L%g_sun
 
 
        ! take care of  temperate crops, outside growing season

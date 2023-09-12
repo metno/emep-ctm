@@ -351,11 +351,11 @@
 
 !-> ffire_c
 
-  ! P = 0.0
+  P = rcemis(FFIRE_C,k)
   
   ! L = 0.0
   
-  ! Nothing to do for ffire_c! xnew(ffire_c) = max(0.0, xold(ffire_c))
+  xnew(ffire_c) = xold(ffire_c) + dt2 * P
 
 
 !-> SeaSalt_f

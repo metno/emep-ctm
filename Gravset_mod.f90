@@ -1,7 +1,7 @@
-! <Gravset_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Gravset_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -34,8 +34,9 @@ use Chemfields_mod,        only: xn_adv
 use ChemDims_mod,          only: NSPEC_SHL
 use ChemGroups_mod,        only: chemgroups
 use ChemSpecs_mod,         only: species_adv
+use Functions_mod,         only: Tpot_2_T
 use DerivedFields_mod,     only: f_3d,d_3d ! debug output
-use GridValues_mod,        only: A_mid,B_mid,A_bnd,B_bnd
+use GridValues_mod,        only: A_mid,B_mid,A_bnd,B_bnd, A_bnd_met, B_bnd_met
 use MetFields_mod,         only: roa,th,ps
 use Config_module,         only: KMAX_MID,KMAX_BND,dt_advec,MasterProc,&
                                 IOU_INST,num_lev3d,lev3d
@@ -63,6 +64,7 @@ subroutine gravset()
   integer                     :: i,j,k,ash,n,b
   integer,save                :: bins=0
   logical                     :: first_call = .true.
+  real                        :: quad_a, quad_b, quad_c
 
 ! need to calculate
 ! zvis -> dynamic viscosity of air.. dependent on temperature
@@ -86,10 +88,13 @@ subroutine gravset()
     case(7)
       allocate(grav_sed(bins))
       grav_sed(:)%spec = chemgroups(ash)%specs(:)-NSPEC_SHL
-      grav_sed(:)%diameter = [0.1,0.3,1.0,3.0,10.0,30.0,100.0]*1e-6
+      !grav_sed(:)%diameter = [0.1,0.3,1.0,3.0,10.0,30.0,100.0]*1e-6
+      ! use geometric mean of bins (log-normal dist.) not upper limits
+      grav_sed(:)%diameter =  [0.1,0.2,0.5,1.7, 5.4,17.3, 55.8]*1e-6
     case(9)
       allocate(grav_sed(bins))
       grav_sed(:)%spec = chemgroups(ash)%specs(:)-NSPEC_SHL
+      ! these bins are mean with lower limit of 3 and upper of 28
       grav_sed(:)%diameter = [4.0,6.0,8.0,10.0,12.0,14.0,16.0,18.0,25.0]*1e-6
 !   case(10)
 !     allocate(grav_sed(bins))
@@ -123,38 +128,53 @@ subroutine gravset()
   do j = lj0,lj1
     do i = li0,li1
       do k = 1,KMAX_MID
-        ! dynamic viscosity of air after Prup.Klett in [Pa s]
-        tempc = th(i,j,k,1) - 273.15
-        if (tempc >= 0.0 ) then
-          zvis(k) = (1.718 + 0.0049*tempc)*1.E-5
+        p_mid(k)  = A_mid(k)+B_mid(k)*ps(i,j,1)
+        ! dynamic viscosity of air after Prup.Klett in [Pa s] (1 Pa/s = 10 Poise). [T] in celsius
+        tempc = th(i,j,k,1)* Tpot_2_T( p_mid(k) ) - 273.15
+        if (tempc >= 0. ) then
+          zvis(k) = (1.718 + 0.0049*tempc)*1.E-5 ! Eq. 10. 141a 2nd edition
         else
-          zvis(k) = (1.718 + 0.0049*tempc - 1.2E-05*(tempc**2))*1.E-5
+          zvis(k) = (1.718 + 0.0049*tempc - 1.2E-05*(tempc**2))*1.E-5 ! Eq. 10. 141b 2nd edition
         end if
 
-        ! mean free path of air (Prupp. Klett) in [10^-6 m]
-        p_mid(k) = A_mid(k)+B_mid(k)*ps(i,j,1)
-        zlair(k) = 0.066 *(1.01325E+5/p_mid(k))*(th(i,j,k,1)/293.15)*1.E-06
-
-        ! air mass auxiliary  variable --> zdp1 [kg/(m^2 *s)]
+        ! mean free path of air (Prupp. Klett) in [m], [T] in Kelvin. Eq. 10. 140 2nd edition
+        zlair(k) = 6.6e-8 *(1013.25/(p_mid(k)*1e-2))*(th(i,j,k,1) *Tpot_2_T( p_mid(k) )/293.15)
+        
+        ! populate interface pressure for later use
         p_full(k) = A_bnd(k)+B_bnd(k)*ps(i,j,1)
       end do
-      p_full(KMAX_BND) = A_bnd(KMAX_BND)+B_bnd(KMAX_BND)*ps(i,j,1)
 
+      ! air mass auxiliary variable --> zdp1 [kg/(m^2 *s)]
+      p_full(KMAX_BND) = A_bnd(KMAX_BND)+B_bnd(KMAX_BND)*ps(i,j,1)
       do k = 1,KMAX_MID
-        zdp1(k)=(p_full(k+1) - p_full(k))/(GRAV*dt_advec) ! do outside of k-loop????
+        zdp1(k)=(p_full(k+1) - p_full(k))/(GRAV*dt_advec) 
       end do
 
       do b = 1,bins
         do k = 1,KMAX_MID-1
-          knut = 2*zlair(k)/grav_sed(b)%diameter
-          ztemp = 2.*((grav_sed(b)%diameter/2)**2)*(density-roa(i,j,k,1))*GRAV/ &! roa [kg m-3]
-                  (9.*zvis(k))![m/s]
-          ! with Cunningham slip-flow correction
+          ! combine equations for terminal fall velocity (v), drag coefficient (C_d), and Reynolds number (Re) into
+          ! a single quadratic expression in v. Equations from doi:10.5194/gmd-10-1927-2017
+          !
+          ! v**2 = (4 * g * ( density_p - density_a) * d ) / (3 * C_d * density_a)
+          ! C_d = (24 / Re) * F**-0.828 + 2 * SQRT(1.07 - F)
+          ! Re = v * density_a * d / zvis
+          !
+          ! Combing the above three expressions yields
+          !
+          ! [6 * density_a * SQRT(1.07 - F)] * v**2 + [72 * zvis * F**-0.828 / d] * v + [-4 * g * (density_p - density_a) * d] = 0
+          
+          quad_a = 6.*roa(i,j,k,1)*SQRT(1.07-F) 
+          quad_b = 72.*zvis(k)*F**(-0.828)/grav_sed(b)%diameter
+          quad_c = -4.*GRAV*(density-roa(i,j,k,1))*grav_sed(b)%diameter
+
+          ! the - b + SQRT(D) term is always positive, whereas the -b - SQRT(D) term is always negative (having no physical interpretation)
+          ztemp = (-quad_b + SQRT(quad_b**2 - 4.*quad_a*quad_c)) / (2 * quad_a) 
+
+          ! Cunningham slip-flow correction; https://en.wikipedia.org/wiki/Cunningham_correction_factor
+          knut = 2*zlair(k)/grav_sed(b)%diameter 
           vt = ztemp*slinnfac*     &
               (1.+ 1.257*knut+0.4*knut*EXP(-1.1/(knut))) ![m/s]
-          Re = grav_sed(b)%diameter*vt/(zvis(k)/roa(i,j,k,1))
-          vt_old = vt
-          vt = vt/wil_hua
+
           num_sed(k)= vt
 
           ! calculation of sedimentation flux zflux[kg/(m^2 s)]=zsedl*zdp1

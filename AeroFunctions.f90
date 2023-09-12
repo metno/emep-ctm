@@ -1,7 +1,7 @@
-! <AeroFunctions.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <AeroFunctions.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -31,13 +31,13 @@
 module AeroFunctions_mod
 !____________________________________________________________________
 !
- use PhysicalConstants_mod, only : AVOG, RGAS_J, PI
+ use PhysicalConstants_mod, only : AVOG, RGAS_J, PI, ROWATER
   implicit none
   private
 
  ! From VsLogNormalCalcs.
-  public :: DpgV2DpgN ! from mass/volume Dp to number Dp
-  public :: DpgN2DpgV  ! from number Dp to mass/volume Dp
+  public :: DpgV2DpgN ! from mass/volume Dp to number Dp (geometric mean/median diam)
+  public :: DpgN2DpgV  ! from number Dp (geometric mean/median diam) to mass/volume Dp
   public :: LogNormFracBelow  ! Frac Mass below Dp
 
   public :: cMolSpeed
@@ -46,10 +46,13 @@ module AeroFunctions_mod
   public :: SurfArea_Mono
   public :: SurfArea_Poly
   public :: pmSurfArea
+  public :: pmSurfAreaSig
 
   ! Gerber functions used to get wet radius
   public :: pmH2O_gerber
+  public :: pmH2O_gerberSig
   public :: GerberWetRad
+  public :: GerberWetSig
 ! public :: WetRad
 ! public :: cmWetRad
 !  public :: WetRadS
@@ -70,6 +73,7 @@ module AeroFunctions_mod
 
    real, parameter :: SQRT_TWO = sqrt(2.0)
    real, parameter :: THIRD = 1.0/3.0
+   real, parameter :: FOUR_OVER_THREEptSEVEN = 4.0 / 3.7
 
 
   !========================================
@@ -191,6 +195,53 @@ module AeroFunctions_mod
    rwet = cm2m * ( K(1,ind)*rd**K(2,ind) / &
      (K(3,ind) *rd**K(4,ind) - log10(mrh))+rd**3) ** THIRD
   end function GerberWetRad 
+
+  elemental function GerberWetSig(rdry,sigdry,fRH,pmtype) result (sigwet)
+  real, intent(in) :: rdry, sigdry         !< m for radius 
+  real, intent(in) :: fRH                  !< humidity, 0< fRH < 1
+  integer, intent(in), optional :: pmtype  !< Type of aerosol
+  real             :: sigwet               
+
+  ! Gerber, 1985, Table 1
+  ! Plus RH limits from Gerber
+  !      C5     C6     RHlim
+  real, parameter, dimension(3,2) :: K = reshape(  &
+     [   1.345,9.681,0.99     &  ! rural, default
+       , 1.411,10.23,0.995    &  ! sea-salt NAM 2,3, rh from 3; 0.995 lim from Nenes personal comm.
+     ],(/3,2/) )
+  real, parameter ::  cm2m = 1.0e-2
+  real :: rd, mrh
+  integer :: ind
+
+  ind = 1 ! default = rural
+  if ( present(pmtype) ) ind = pmtype
+
+  mrh = max(0.01,fRH)
+  mrh = min(mrh,K(3,ind))
+  rd = rdry * 1.0e2  ! m -> cm
+  sigwet = sigdry + 0.300 * & 
+     atan(-(K(1,ind)*log10(rd) + k(2,ind) + log10(1 - mrh)) / 0.650 ) + 0.415
+ end function GerberWetSig 
+
+ elemental function LewisSchwartz(rdry,fRH) result (rwet)
+ real, intent(in) :: rdry                 !< m for radius 
+ real, intent(in) :: fRH                  !< humidity, 0< fRH < 1            
+ real :: mrh
+ real :: rwet
+
+ ! GEOS-Chem uses rdry = effective radius, defined as the average between
+ ! the lower and upper edge of their coarse mode bin. i.e., it's not effective
+ ! radius in the sense of aerosol optics
+
+ mrh = max(0.01,fRH)
+ mrh = min(mrh,0.99) ! 99% RH cap following geos-chem
+
+ ! Use equation 5 in Lewis and Schwartz (2006) for sea
+ ! salt growth.     doi:10.1016/j.atmosenv.2005.08.043
+ rwet = rdry * FOUR_OVER_THREEptSEVEN &
+    * ( ( 2.0 - mrh ) / ( 1.0 - mrh ) )**THIRD
+
+end function LewisSchwartz
   !---------------------------------------------------------------------
 
 ! elemental function WetRad(rdry,fRH,pmtype) result (rwet)
@@ -404,6 +455,56 @@ module AeroFunctions_mod
   end function pmSurfArea
 
   !---------------------------------------------------------------------
+  !> FUNCTION pmSurfAreaSig
+  !! Calculates the surface area for a given dry or (optionally) wet
+  !! aerosol, provided the dry density and concentration (micrograms/m3)
+  !! If wet radius and sigma provided, calculates surface area of wet aerosol.
+
+  elemental function pmSurfAreaSig(dry_ug,Dp,Dpw,sigma_d,sigma_w,rho_kgm3) result(S) 
+     real, intent(in) :: dry_ug        !< mass PM, dry, ug/m3
+     real, intent(in) :: Dp            !< particle diameter, m
+     real, intent(in) :: sigma_d       !< dry sigma of mode
+     real, intent(in) :: rho_kgm3      !< aerosol density, kg/m3 
+
+     real, intent(in), optional :: &
+          Dpw        &    !< wet particle diameter, m 
+         ,sigma_w         !< wet Sigma of mode
+
+     real :: S            !< Surface area, m2 per m3 air
+     real :: dryvol, rho, rdry, rwet, sigFac, totvol
+     real :: rhod, fwetvol, N0, sigw, sigd
+
+     ! uses Eq. 3 from Binkowski & Shankar 1995 for number, area and surface calcs: 
+     !
+     ! M0 = N0 * (2*r)**0 exp(0/2 * log(sig)**2) = N0       : number of aerosol per unit volume
+     ! M2 = N0 * pi * (2*r)**2 * exp(4/2 * log(sig)**2)     : surface area per unit volume
+     ! M3 = N0 * pi/6 * (2*r)**3 * exp(9/2 * log(sig)**2)   : volume per unit volume
+     ! 
+     ! to calculate wet surface area (m2) per m3, first determine M3 for dry aerosol based 
+     ! on modeled concentration and density. Then calculate N0 from dry M3 using above eq.,
+     ! and then use N0 to calculate M2 for wet aerosol.
+
+     rho = rho_kgm3                            !< kg/m3 default
+     rdry= 0.5 * Dp                            !< 0.0341 um default, in m
+     rwet= rdry
+
+     sigd = sigma_d
+     sigw = sigd
+
+     if ( present(sigma_w) ) sigw = sigma_w       ! kg/m3
+     if ( present(Dpw)     ) rwet = 0.5 * Dpw     ! m
+
+     dryvol = (dry_ug*1.0e-9)/rho   ! m3 dry PM per m3 air
+
+     ! calculate N0 from dry values using above expressions
+     N0 = dryvol / (PI / 6 * (2*rdry)**3 * exp(4.5 * log(sigd)**2))
+
+     ! use N0 to calculate wet surface area
+     S = N0 * PI * (2*rwet)**2 * exp(2 * log(sigw)**2)
+
+  end function pmSurfAreaSig
+
+  !---------------------------------------------------------------------
   !> FUNCTION pmSurfArea
   !! Calculates the surface area for a given mass of dry PM, together
   !! with sigma for log-normal
@@ -469,6 +570,50 @@ module AeroFunctions_mod
 
     !print "(A,99g12.3)", "S2", xn, rho, rdry, mw, vol, mass, S
   end function pmH2O_gerber
+
+  !---------------------------------------------------------------------
+  !> FUNCTION pmH2O_gerberSig
+  !! Calculates micrograms/m3 of water in aerosol given aerosol
+  !! dry log-normal radius, sigma, concentration and density, and its wet radius
+  !! and sigma.  
+
+elemental function pmH2O_gerberSig(dry_ug,rho_kgm3,Dp,Dpw,sigma_d,sigma_w) result(ugH2O) 
+   real, intent(in) :: dry_ug        !< mass PM, dry, ug/m3
+   real, intent(in) :: Dp            !< particle diameter, m
+   real, intent(in) :: sigma_d       !< dry sigma of mode
+   real, intent(in) :: rho_kgm3      !< aerosol density, kg/m3 
+   real, intent(in) :: Dpw           !< wet particle diameter, m
+   real, intent(in) :: sigma_w       !< wet Sigma of mode
+
+   real :: ugH2O                     !<  ug/m3 water associated with aerosol
+   real :: dryvol, rho, rdry, rwet, totvol
+   real :: rhod, fwetvol, N0
+
+   ! uses Eq. 3 from Binkowski & Shankar 1995 for number and surface calcs: 
+   !
+   ! M0 = N0 * (2*r)**0 exp(0/2 * log(sig)**2) = N0       : number of aerosol per unit volume
+   ! M3 = N0 * pi/6 * (2*r)**3 * exp(9/2 * log(sig)**2)   : volume per unit volume
+   ! 
+   ! to calculate volume (m3 per m3) of water first determine M3 for dry aerosol based 
+   ! on modeled concentration and density. Then calculate N0 from dry M3 using above eq.,
+   ! and use N0 to calculate M3 for wet aerosol.
+
+   rho = rho_kgm3                                !< kg/m3 default
+   rdry= 0.5 * Dp                                !< in m
+   rwet= 0.5 * Dpw                               !< in m
+
+   dryvol = (dry_ug*1.0e-9)/rho   ! m3 dry PM per m3 air
+
+   ! calculate N0 from dry values using above equations
+   N0 = dryvol / (PI / 6 * (2*rdry)**3 * exp(4.5 * log(sigma_d)**2))
+
+   ! use N0 to calculate wet volume
+   totvol = N0 * PI / 6 * (2*rwet)**3 * exp(4.5 * log(sigma_w)**2)  ! m3 of wet PM per m3 air
+
+   ! >0 in case something funky happens with Gerber's ATAN at RHf = 0.0 in sigma-growth func
+   ugH2O   = max(0.,(totvol-dryvol)) * ROWATER * 1.0e9  ! kg/m3 to micrograms/m3
+
+  end function pmH2O_gerberSig
 
   !----------------------------------------------------------------------
   ! Gamma for seasalt + N2O5, Evans & Jacob, 2005, Chang 2011

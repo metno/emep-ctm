@@ -1,7 +1,7 @@
-! <AOD_PM_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <AOD_PM_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -77,6 +77,8 @@ logical, public, save :: &
 !  They do not need to be present in the chemical scheme.
 !  However, the chemical scheme needs to define after one of these prototypes.
 !  If you would like other characteristics, add them here.
+!  ST(8.01.2023): Cext(SO4) was actually for H2SO4 in OPAC. 
+!               Changed to Cext for 'soluble' aerosol type (also for NO3f and NH4f)
 integer, public, parameter :: &
   DRY_MODE=0,WET_MODE=1,& ! DRY/WET extinction calculation for a specie
   NUM_CEXT=9,           & ! Total number of extinction classes (as follows)
@@ -84,10 +86,10 @@ integer, public, parameter :: &
   CEXT_SSf=3,CEXT_SSc=4,& ! Sea salt: fine,coarse
   CEXT_ECn=5,CEXT_ECa=6,& ! Elem. C: new,aged
   CEXT_EC =CEXT_ECa,    & ! Elem. C: ECn/ECa only diff Qm_abs (dry)
-  CEXT_OC =7,           & ! Org. C
-  CEXT_SO4=8,           & ! SO4
-  CEXT_NH4f=CEXT_SO4,   & ! NH4_f as SO4
-  CEXT_NO3f=CEXT_SO4,   & ! NO3_f as SO4
+  CEXT_OC =7,           & ! Org. C - Cext for soluble aerosol
+  CEXT_SO4= CEXT_OC,    & ! Cext soluble aerosol ! ST(10.01.23): 8,      & ! SO4
+  CEXT_NH4f=CEXT_OC,    & ! Cext soluble aerosol ! ST(10.01.23):CEXT_SO4,& ! NH4_f as SO4
+  CEXT_NO3f=CEXT_OC,    & ! Cext soluble aerosol ! ST(10.01.23):CEXT_SO4,& ! NO3_f as SO4
   CEXT_NO3c=9             ! NO3_c sitting on SSc:
                           ! assume rho_dry as SO4, Q and GF as SSc
 integer, private, save :: NUM_EXT=0

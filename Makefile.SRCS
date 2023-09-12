@@ -18,9 +18,10 @@ FOBJ ?=	\
 	DryDep_mod.o DustProd_mod.o EcoSystem_mod.o  \
  	emep_Main.o \
 	EmisDef_mod.o EmisGet_mod.o Emissions_mod.o ExternalBICs_mod.o \
-	FastJ_mod.o ForestFire_mod.o Functions_mod.o \
+	ForestFire_mod.o Functions_mod.o \
+	isocom.o isorev.o ISOFWD.o \
+	ModsCloudJ_mod.o CloudJ_mod.o \
         GasParticleCoeffs_mod.o \
-	GravSettling_mod.o \
 	Gravset_mod.o GridAllocate_mod.o GridValues_mod.o \
 	InterpolationRoutines_mod.o \
 	Io_mod.o Io_Nums_mod.o Io_Progs_mod.o Io_RunLog_mod.o \

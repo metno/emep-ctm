@@ -1,7 +1,7 @@
-! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -35,7 +35,7 @@ use Config_module,   only: NLANDUSEMAX, SEA_LIMIT, USES,  &
                             VEG_2dGS, VEG_2dGS_Params, &
                             NPROC, IIFULLDOM, JJFULLDOM, &
                             MasterProc, LandCoverInputs
-use Debug_module,    only: DEBUG   ! -> DEBUG%LANDUSE
+use Debug_module,    only: DEBUG, DebugCell   ! -> DEBUG%LANDUSE
 use DO3SE_mod,       only: fPhenology, Init_DO3SE
 use GridAllocate_mod,only: GridAllocate
 use GridValues_mod,  only:  glat , glon   & ! latitude,
@@ -103,7 +103,8 @@ private
          ,SumVPD    &! For critical VPD calcs, reset each day
          ,GsH2O     &! For Tleaf testing
          ,old_gsun   ! also for flux
-   logical :: has_veg 
+   logical :: has_veg
+   logical :: eur_veg  ! Needed as IAM_veg is only for Europe
  end type LandCov
  !=============================================
  type(LandCov), public, save, allocatable,dimension(:,:) :: LandCover
@@ -174,7 +175,12 @@ contains
     if(MasterProc) then
         write(*,*)  dtxt//" NLand_codes ", NLand_codes
         write(*,*)  dtxt//" Codes: ", Land_codes
-        write(*,*)  dtxt//" LandCoverInputs: ", LandCoverInputs
+        write(*,*)  dtxt//" LandCoverInputs: "
+        write(*,*)  trim(LandCoverInputs%MapFile(1))
+        write(*,*)  trim(LandCoverInputs%MapFile(2))
+        write(*,*)  trim(LandCoverInputs%LandDefs)
+        write(*,*)  trim(LandCoverInputs%Do3seDefs)
+        write(*,*)  trim(LandCoverInputs%mapMed)
     end if
 
     call Init_LandDefs(LandCoverInputs%LandDefs,NLand_codes, &
@@ -183,6 +189,7 @@ contains
     !------ 2D maps of growing season, if set in config -----------------------
 
      n2dGS    = count( VEG_2dGS(:) /= "" )
+     if(MasterProc) write(*,*)  dtxt//" n2dGS: ", n2dGS
 
     if ( n2dGS > 0 )  then
 
@@ -231,13 +238,13 @@ contains
        do j = 1, ljmax
 
           dbgij = ( debug_proc .and. i == debug_li .and. j == debug_lj )
-        dbgij = ( debug_proc .and. i == 5 .and. j == 24 ) ! Alps max
 
           do ilu= 1, LandCover(i,j)%ncodes
              lu      = LandCover(i,j)%codes(ilu)
              call CheckStop( lu < 0 .or. lu > NLANDUSEMAX , &
                   "SetLandUse out of range" )
-             if( dbgij ) write(*,*) 'ALTLU'//trim(LandDefs(lu)%code), lu, LandDefs(lu)%SGS50
+             if (dbgij) write(*,'(a,2i4,2L2,a)') 'IAMDBG', ilu, lu,&
+                 LandType(lu)%is_veg, LandType(lu)%is_iam, trim(LandDefs(lu)%name)
 
              if ( LandDefs(lu)%SGS50 > 0 ) then ! need to set growing seasons
 
@@ -263,8 +270,7 @@ contains
                 LandCover(i,j)%SGS(ilu) =  LandCover(i,j)%EGS(ilu) - 90
              end if
 
-             !TMP if ( DEBUG%LANDUSE>0 .and. dbgij ) &
-             if (  dbgij ) &
+             if ( DEBUG%LANDUSE>0 .and. dbgij ) &
                   write(*,"(a,i3,a20,3i4)")"LANDUSE: LU_SETGS", &
                   lu, LandDefs(lu)%name,&
                   LandCover(i,j)%SGS(ilu),LandCover(i,j)%ANTH(ilu), &
@@ -481,7 +487,7 @@ contains
 
           ! landcover terms look like, e.g. LC:CF:EMEP
           if( index( varname, "LC:") < 1 ) then
-            if ( mydbg ) write(*,*) trim(msg)//": Skipped, not LC"
+            if ( mydbg ) write(*,*) trim(msg)//": Skip, not LC"
             cycle ! ONLY LC: (LandCode) wanted
           end if
           call wordsplit(varname,3,ewords,nwords,err,separator=":")
@@ -507,7 +513,7 @@ contains
             trim(fname) )
             lu  = ilu
             if ( mydbg ) write(*,'(a,3i4)') &
-                dtxt//"Adding code"//ewords(2), ifile, ilu
+                dtxt//"Adding code"//trim(ewords(2)), ifile, ilu
             Land_codes(ilu) = ewords(2)    ! Landuse code found on file
           end if
 
@@ -544,7 +550,7 @@ contains
    ! MERGE inner and outer maps (Euro and Glob usually)
 
     if ( nFiles > 1 ) then  ! we need to merge
-      if ( debug_proc ) write(*,*) '(a,i3,f12.4,5i6)', "F3  START", &
+      if ( debug_proc ) write(*,'(a,i3,f12.4,5i6)'), "F3  START", &
            NLand_codes, landuse_tot(debug_li,debug_lj), me, &
                     limax, ljmax, debug_li, debug_lj
       do j = 1, ljmax
@@ -560,7 +566,7 @@ contains
                 landuse_in(i,j,ilu) = min(1.0, landuse_glob(i,j,ilu) )
                 dbgsum = dbgsum + landuse_in(i,j,ilu)
                 if ( dbgij ) then
-                   write(*, "(a,i3,3es15.6,1x,a)") "F4 ", ilu, &
+                   write(*, "(a,i3,3es15.6,1x,a)") "F4overwrite ", ilu, &
                       landuse_in(debug_li,debug_lj,ilu), &
                       landuse_tot(debug_li,debug_lj), dbgsum,&
                       trim(Land_Codes(ilu))
@@ -599,6 +605,8 @@ contains
        call CheckStop( NLand_codes>NLANDUSEMAX , dtxt//&
             " flux vegs makes NLANDUSEMAX smaller than number of landuses defined")
        Land_codes(NLand_codes) = FLUX_vegs(iam)
+       !Sep1 is_iam will be used below
+       LandType(NLand_codes)%is_iam =  FLUX_VEGS(iam)(1:4) == "IAM_" 
        iam_index(iam) = NLand_codes
        if ( mydbg ) write(*,*) dtxt//'IAM veg:'//trim(FLUX_VEGS(iam)), &
           iam, iam_index(iam)
@@ -609,12 +617,15 @@ contains
           dbgij = ( mydbg .and. i==debug_li.and.j==debug_lj )
           sum_veg = 0.0
           LandCover(i,j)%has_veg = .false.
+          LandCover(i,j)%eur_veg = .false.
           do lu = 1, NLand_codes
              if ( is_veg(lu) .and. landuse_in(i,j,lu)  > 0.0 ) then
+                if(  lu < 13 ) LandCover(i,j)%eur_veg = .true.  ! 12 is Tundra, Euro veg
                 sum_veg = sum_veg + landuse_in(i,j,lu)
              end if
-             if ( dbgij ) write(*,'(a,4i5,a13,L2,es12.3)') dtxt//'IAM add?', &
-                  me,ncalls,i,j, trim(Land_codes(lu)), is_veg(lu), sum_veg
+             if ( dbgij ) write(*,'(a,3i5,a18,2L2,es12.3)') dtxt//'IAM vegsum:', &
+                  ncalls,i,j, trim(Land_codes(lu)), is_veg(lu), &
+                    LandCover(i,j)%eur_veg, sum_veg
           end do
           if (  sum_veg < 1.0e-6 )  CYCLE
           LandCover(i,j)%has_veg = .true.
@@ -623,11 +634,18 @@ contains
 
           IAM_VEG: do iam = 1, nFluxVegs !   size( FLUX_VEGS )
              lu = iam_index(iam)
+
+             ! Only calculate IAM veg (PODs etc) over Europe
+             if (  LandType(lu)%is_iam .and.  .not. LandCover(i,j)%eur_veg )  CYCLE
+
              landuse_in(i,j,lu) = 1.0e-3/real(nFluxVegs) ! small addition
-if( index(Land_codes(lu), '_MED') > 0 ) then
-  if ( isMed(i,j) < 0.01 ) landuse_in(i,j,lu) = 0.0  ! SKIP non-Med areas
-end if
-             if ( dbgij ) write(*,*) dtxt//'IAM add:', me, lu, trim(Land_codes(lu))
+
+             if( index(Land_codes(lu), '_MED') > 0 ) then
+               if ( isMed(i,j) < 0.01 ) landuse_in(i,j,lu) = 0.0  ! SKIP non-Med areas
+             end if
+             if ( dbgij ) write(*,'(a,3i4,3L2,a)') dtxt//'IAM add:', iam, lu, &
+                iam_index(iam), nint(isMed(i,j)), LandType(lu)%is_iam, &
+                  LandCover(i,j)%eur_veg, ' '//trim(Land_codes(lu))
           end do IAM_VEG
        end do  !j
     end do  !i
@@ -696,7 +714,8 @@ end if
     filefound=.true.
     if ( DEBUG%LANDUSE>0 ) then
         CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
-        write(6,'(a,3i5)') dtxt//" me,  maxlufound, ncalls, cdf = ", &
+        !write(6,'(a,3i5)') dtxt//" me,  maxlufound, ncalls, cdf = ", &
+        if ( DebugCell ) write(6,'(a,3i5)') dtxt//" me,  maxlufound, ncalls, cdf = ", &
                                   me, maxlufound, ncalls
     end if
 

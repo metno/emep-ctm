@@ -1,7 +1,7 @@
-! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -57,14 +57,14 @@ module DryDep_mod
 ! Also, handling of dry/wet and co-dep procedure changed following discussions
 ! with CEH.
 
-! FUTURE: BiDir functionality (Dave/Roy Wichink Kruit) using Roy's methods
   
 use AeroConstants_mod,    only: AERO
 use AeroFunctions_mod,    only: GerberWetRad   !, WetSigmaAdd
 use Aero_Vds_mod,         only: SettlingVelocity, GPF_Vds300, Wesely300
-use BiDir_emep
-use BiDir_module
-use Biogenics_mod,        only: SoilNH3  ! for BiDir
+! FUTURE: BiDir functionality (Dave/Roy Wichink Kruit) using Roy's methods
+use BiDir_emep,           only: BiDir_ijInit, BiDir_ijRGs,&
+                                BiDir_ijFluxes, BiDir_ijFinish
+!use Biogenics_mod,        only: SoilNH3  ! for BiDir
 use CheckStop_mod,        only: CheckStop, StopAll
 use Chemfields_mod ,      only: cfac, so2nh3_24hr,Grid_snow 
 use ChemDims_mod,         only: NSPEC_ADV, NSPEC_SHL,NDRYDEP_ADV
@@ -73,7 +73,7 @@ use Config_module,        only: dt_advec,PT, K2=> KMAX_MID, NPROC, &
                               USES, MasterProc, PPBINV, IOU_INST,&
                               KUPPER, NLANDUSEMAX,&
                               SO2_ix,NH3_ix,NH4_f_ix,NO3_f_ix,NO2_ix,O3_ix
-use Debug_module,         only: DEBUG, DEBUG_ECOSYSTEMS
+use Debug_module,         only: DEBUG
 use DerivedFields_mod,    only: d_2d, f_2d, VGtest_out_ix
 use DO3SE_mod,            only: do3se
 use EcoSystem_mod,        only: EcoSystemFrac, Is_EcoSystem,  &
@@ -190,7 +190,8 @@ contains
 
      allocate(BL(nddep))
      allocate(gradient_fac(nddep), vg_fac(nddep), Vg_ref(nddep), &
-         Vg_eff(nddep), Vg_3m(nddep), Vg_ratio(nddep), sea_ratio(nddep), Gsto(nddep) ,eff_fac(nddep))
+         Vg_eff(nddep), Vg_3m(nddep), Vg_ratio(nddep), sea_ratio(nddep), &
+         Gsto(nddep) ,eff_fac(nddep))
 
      call CheckStop( NLOCDRYDEP_MAX < nddep, &
         dtxt//"Need to increase size of NLOCDRYDEP_MAX" )
@@ -213,7 +214,7 @@ contains
    EcoSystemFrac(:,:,:) = 0.0
    do j = 1, ljmax
      do i = 1, limax
-       debug_flag = ( DEBUG_ECOSYSTEMS .and. debug_proc .and. &
+       debug_flag = ( DEBUG%ECOSYSTEMS .and. debug_proc .and. &
           i == debug_li .and. j == debug_lj )
 
        nlc = LandCover(i,j)%ncodes
@@ -224,7 +225,7 @@ contains
               if( Is_EcoSystem(iEco,lc) ) then
                  EcoSystemFrac(iEco,i,j) = EcoSystemFrac(iEco,i,j) + coverage
                 if( debug_flag ) then
-                     write(6,"(a,2i4,a12,3f10.4)") "ECOSYS AREA ",&
+                     write(6,"(a,2i4,a18,3f10.4)") "ECOSYS AREA ",&
                      ilc, lc, "=> "//trim(DEF_ECOSYSTEMS(iEco)), &
                          coverage, EcoSystemFrac(iEco,i,j)
                 end if
@@ -272,7 +273,6 @@ contains
 
     real, dimension(NSPEC_ADV ,NLANDUSEMAX):: fluxfrac_adv
     integer, dimension(NLUMAX)  :: iL_used, iL_fluxes
-     !BIDIR SKIP    real :: wet, dry         ! Fractions
     real :: fsnow            ! snow fraction for one landuse
     real :: Vds              ! Aerosol near-surface deposition rate (m/s)
     real :: no3nh4ratio      ! Crude NH4/NO3 for Vds ammonium 
@@ -308,7 +308,7 @@ contains
     call CheckStop( O3_ix<1, "DryDep: O3 not defined" )
     call CheckStop( SO2_ix<1, "DryDep:SO2 not defined" )
     call CheckStop( NO2_ix<1, "DryDep:NO2 not defined" )
-    !call CheckStop( NH3_ix<1, "DryDep:NH3_f not defined" )
+    call CheckStop( NH3_ix<1, "DryDep:NH3_f not defined" )
     !call CheckStop( NH4_f_ix<1, "DryDep:NH4_f not defined" )
     call CheckStop( NO3_f_ix<1, "DryDep:NO3_f not defined" )
 
@@ -326,9 +326,8 @@ contains
     debug_flag= ( debug_proc .and. i == debug_li .and. j == debug_lj) 
     dbg       =  DEBUG%DRYDEP .and. debug_flag 
     dbghh     =  dbg .and. iss == 0 
-    dbgBD     =  DEBUG%BIDIR .and. debug_flag .and. iss == 0
-    if (dbgBD) print *, "BIDIR TEST ", me, debug_flag
-    if (dbg.and.first_ddep ) write(*,*) "DRYDEP DBG ", me, debug_flag
+
+    if (dbg.and.first_ddep ) write(*,*) dtxt//"DRYDEP DBG ", me, debug_flag
 
 
      inv_gridarea = 1.0/(GRIDWIDTH_M*GRIDWIDTH_M) 
@@ -344,8 +343,6 @@ contains
    ! convert molecules/cm3 to ppb for surface:
     surf_ppb   = PPBINV /M(K2)
     if (DEBUG%AOT.and.debug_flag)write(*,"(a,es12.4)")dtxt//"PPB",surf_ppb
-
-     inv_gridarea = 1.0/(GRIDWIDTH_M*GRIDWIDTH_M) 
 
    ! -----------------------------------------------------------------!
 
@@ -384,12 +381,10 @@ contains
     !/ SO2/NH3 for Rsur calc
     if (NH3_ix > 0) then
        Grid%so2nh3ratio = xn_2d(SO2_ix,K2) / max(1.0,xn_2d(NH3_ix,K2))
-       
        Grid%so2nh3ratio24hr = so2nh3_24hr(i,j)
     else
-       Grid%so2nh3ratio = xn_2d(SO2_ix,K2) ! ?
-       
-       Grid%so2nh3ratio24hr = xn_2d(SO2_ix,K2) ! ?   
+       Grid%so2nh3ratio = xn_2d(SO2_ix,K2)     ! ?  QUERY!
+       Grid%so2nh3ratio24hr = xn_2d(SO2_ix,K2) ! ?  QUERY!
     end if
    !---------------------------------------------------------
    !> NH4NO3 deposition will need this ratio for the NH4 part
@@ -449,7 +444,8 @@ contains
 
          rho_wet = ( 1000*r_wet**3 + r_dry**3*(DDspec(icmp)%rho_p-1000) )/r_wet**3
        ! (Remember, L%rh not set over water)
-       !rho_wet = ( 1000*(r_wet**3 - r_dry**3) + r_dry**3 * DDspec(icmp)%rho_p )/r_wet**3
+       !rho_wet = ( 1000*(r_wet**3 - r_dry**3) + 
+       ! r_dry**3 * DDspec(icmp)%rho_p )/r_wet**3
 
          BL(icmp)%Vs = SettlingVelocity( Grid%t2, Grid%rho_ref, &
                           DDspec(icmp)%sigma, 2*r_wet, rho_wet )
@@ -470,7 +466,12 @@ contains
            [ rh2m(i,j,1), 1.0e6*r_dry, 1.0e6*r_wet, DDspec(icmp)%rho_p, rho_wet, &
               Vs_dry, Vs_wet ] )
       end if
-    end do
+    end do ! icmp
+
+    if ( USES%BIDIR ) then !  Sets Gammas and X values for land/water
+      call BiDir_ijInit(i,j,NH3_ix)
+    end if
+
 
 
 !PW_____________________________________________________________________
@@ -492,21 +493,25 @@ contains
       end if
 
       Sub(iL)%f_phen = LandCover(i,j)%fphen(iiL) ! for POD_OUT
-      Sub(iL)%f_sun  = 0.0 ! for SPOD_OUT
-      Sub(iL)%g_sun  = 0.0 ! for SPOD_OUT
-      Sub(iL)%g_sto  = 0.0 ! for SPOD_OUT
-      Sub(iL)%f_temp = 0.0 ! for SPOD_OUT. Can 
-      Sub(iL)%f_vpd  = 0.0 ! for SPOD_OUT
+      Sub(iL)%f_sun  = 0.0 ! for SPOD_OUT  !QUERY NEEDED
+      Sub(iL)%g_sun  = 0.0 ! for SPOD_OUT  !QUERY NEEDED
+      Sub(iL)%g_sto  = 0.0 ! for SPOD_OUT  !QUERY NEEDED
+      Sub(iL)%f_temp = 0.0 ! for SPOD_OUT. Can   !QUERY NEEDED
+      Sub(iL)%f_vpd  = 0.0 ! for SPOD_OUT  !QUERY NEEDED
 
       Sub(iL)%SGS = LandCover(i,j)%SGS(iiL)   !used for AOT CHECK?
-      Sub(iL)%EGS = LandCover(i,j)%EGS(iiL)
+      Sub(iL)%EGS = LandCover(i,j)%EGS(iiL)  !QUERY NEEDED
 
       L = Sub(iL)    ! ! Assign e.g. Sub(iL)ustar to ustar
 
-
-      call Rb_gas(L%is_water, L%ustar, L%z0, BL(:)%Rb)
+     call Rb_gas(L%is_water, L%ustar, L%z0, BL(:)%Rb)
 
       call Rsurface(i,j,BL(:)%Gsto,BL(:)%Rsur,errmsg,debug_flag,fsnow)
+
+
+      if ( USES%BIDIR ) then ! overwrites Rsur
+        call BiDir_ijRGs(1,iL,BL(idcmpNH3)%Rsur,BL(idcmpNH3)%Gsto)  ! DS call 1
+      end if
 
       do icmp = 1, nddep    !DSQUERY - Check aerosol usage!
 
@@ -563,7 +568,7 @@ contains
             afmt="a34,TXTDATE,5i5,4f8.2,20es14.5")  ! just array
 
          write(6,"(a,i4,3f7.2,7es10.2)") dtxt//"DMET SUB", &
-           iL, Grid%ustar, L%ustar, L%rh,  Grid%invL, &
+           iL, Grid%ustar, L%ustar, Grid%rh2m, L%rh,  Grid%invL, & !DS added rh2m
              L%invL, L%Ra_ref, L%Ra_3m
       end if
 
@@ -571,6 +576,15 @@ contains
       call Rb_gas(L%is_water, L%ustar, L%z0, BL(:)%Rb)
 
       call Rsurface(i,j,BL(:)%Gsto,BL(:)%Rsur,errmsg,debug_flag,fsnow)
+
+      if ( USES%BIDIR ) then ! overwrites Rsur for NH3
+        call BiDir_ijRGs(2,iL,BL(idcmpNH3)%Rsur,BL(idcmpNH3)%Gsto)  ! DS call 1
+      end if
+
+      !DSQUERY NOT USED?
+      !DSX      wet =   Grid%wetarea  ! QUERY Now used for BIDIR
+      !DSX      dry =   1.0 - wet     !  "  "
+      !END BDIR
 
       if(dbghh) call datewrite(dtxt//"STOFRAC "//LandDefs(iL)%name, &
               [iL, j] , [  BL(idcmpO3)%Gsto, BL(idcmpO3)%Rsur, &
@@ -580,6 +594,7 @@ contains
 
         !Sub(iL)%g_sto = L%g_sto   ! needed elsewhere
         !Sub(iL)%g_sun = L%g_sun
+
       Sub(iL) = L  !Resets Sub with new L values frmom Rsurface
 
       Grid_snow(i,j) = Grid_snow(i,j) +  L%coverage * fsnow
@@ -609,14 +624,14 @@ contains
           ! specials, NH3 and NO2:
 
            if ( USES%BIDIR .and. icmp == idcmpNH3 ) then
+              call BiDir_ijFluxes(i,j,iL, Vg_ref(icmp), Vg_eff(icmp), &
+                       BL(icmp)%Rb, BL(icmp)%Rsur, BL(icmp)%Gsto)
 
-              call StopAll(dtxt//'NOT IMPLEMENTED YET')
-           
-           ! Surrogate for NO2 compensation point approach, 
-           ! assuming c.p.=4 ppb (ca. 1.0e11 #/cm3):        
-           ! Note, xn_2d has no2 in #/cm-3
+           else if ( .not. USES%SOILNOX .and.  icmp == idcmpNO2 ) then
 
-            else if ( .not. USES%SOILNOX .and.  icmp == idcmpNO2 ) then
+          ! Surrogate for NO2 compensation point approach, 
+          ! assuming c.p.=4 ppb (ca. 1.0e11 #/cm3):        
+          ! Note, xn_2d has no2 in #/cm-3
 
               if( dbg .and. first_ddep .and. icmp==idcmpNO2 ) &
                   write(*,*) 'DBGXNO2 no2fac TRIGGERED', no2fac, 4.0e-11*xn_2d(NO2_ix,K2)
@@ -800,7 +815,6 @@ contains
 
 
     ! Convert from Vg*f to f for grid-average:
-    !where ( Vg_ref > 1.0e-6 )
     where ( Sub(0)%Vg_ref > 1.0e-6 )
        Sub(0)%StoFrac = Sub(0)%StoFrac/Sub(0)%Vg_ref
     end where
@@ -865,9 +879,19 @@ contains
            cfac(nadv, i,j) = Fgas(ntot,K2)*gradient_fac(icmp) + &
                 Fpart(ntot,K2)*gradient_fac( idcmpPMf )
         else
+
+            ! Deposition (per grid cell! Outside the LU loop)
             DepLoss(nadv) =   vg_fac( icmp )  * xn_2d( ntot,K2)
-            cfac(nadv, i,j) = gradient_fac( icmp )
+
+            if ( USES%BIDIR .and. ntot==NH3_ix ) then
+               ! resets gradient_fac, saves concs, and adds to SoilNH3 emis:
+               call BiDir_ijFinish(i,j,gradient_fac(idcmpNH3),sumLand,&
+                        DepLoss(nadv))
+            end if
+
+            cfac(nadv, i,j) = gradient_fac( icmp )     ! Concentration ratio
         end if !SEMIVOL
+
         if( dbg .and. first_ddep ) then
            lossfrac = ( 1 - DepLoss(nadv)/(1+xn_2d( ntot,K2))) ! 1 avoids NaN
            write(*,'(a20,i4,4es10.3)') "DBGX "//trim(species(ntot)%name)&
@@ -896,6 +920,9 @@ contains
                 lossfrac, gradient_fac(icmp), L%StoFrac(ntot) /) )
           end if
         end if ! ntot==O3
+
+
+        ! the new concentrations are calculated:
 
         xn_2d( ntot,K2) = xn_2d( ntot,K2) - DepLoss(nadv)
 
@@ -1014,9 +1041,6 @@ contains
    call Add_MosaicOutput(debug_flag,i,j,convfac2,&
             itot2DDspec, fluxfrac_adv, Deploss ) 
 
-   ! SPOD outputs were put here
-
-   ! 
    if( dbg ) first_ddep = .false.
 
  end subroutine drydep

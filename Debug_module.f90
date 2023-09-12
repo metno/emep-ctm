@@ -1,7 +1,7 @@
-! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,6 +47,8 @@ module Debug_module
     ,DERIVED         = .false. & !
     ,DRYDEP          = .false. & ! 
     ,DRYRUN          = .false. & ! Skips fast chemistry to save some CPU
+    ,DUST            = .false. & ! Skips fast chemistry to save some CPU
+    ,ECOSYSTEMS      = .false. &
     ,EMISSIONS       = .false. & ! 
     ,EMISTIMEFACS    = .false. &
     ,EQUIB           = .false. &   !MARS, EQSAM etc.
@@ -100,7 +102,6 @@ type(emep_debug), public, save :: DEBUG
 logical, public, parameter ::    &
    DEBUG_ADV            = .false. &
   ,DEBUG_DERIVED        = .false. &
-  ,DEBUG_ECOSYSTEMS     = .false. &
   ,DEBUG_EMISSTACKS     = .false. &
   !!,DEBUG_DRYDEP         = .false. &
     ,DEBUG_MY_DRYDEP    = .false. &
@@ -114,7 +115,6 @@ logical, public, parameter ::    &
   ,DEBUG_NH3            = .false. & ! NH3Emis experimental
   ,DEBUG_OUTPUTCHEM     = .false. & ! Output of netcdf results
   ,DEBUG_OUT_HOUR       = .false. & ! Debug Output_hourly.f90
-    ,DEBUG_DUST           = .false. & ! Skips fast chemistry to save some CPU
     ,DEBUG_WETDEP       = .false. &
   ,DEBUG_RB             = .false.
 

@@ -2,7 +2,7 @@
   GRID      = 'EECCA',
   iyr_trend = 2015,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2020',
+  runlabel2 = 'Opensource_Setup_2023',
   startdate = 2015,01,01,00,
   enddate   = 2015,12,31,24,
 !------------------------------
@@ -10,8 +10,8 @@
 !------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
   DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
-  MonthlyFacFile        = 'DataDir/MonthlyFacs_eclipse_V6b_snap_may2021/MonthlyFacs.POLL',
-  MonthlyFacBasis       = 'ECLIPSE',
+  MonthlyFacFile        = 'DataDir/MonthlyFacs_eclipse_V6b_snap_xJun2012/MonthlyFacs.POLL',
+  MonthlyFacBasis       = 'GENEMIS',
   Monthly_timezoneFile  = 'DataDir/monthly_timezones_GLOBAL05.nc',
   DailyFacFile          = 'DataDir/DailyFac.POLL',
   HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
@@ -22,12 +22,13 @@
   SondesFile            = 'DataDir/sondes.dat',
   Vertical_levelsFile   = 'DataDir/Vertical_levels20_EC.txt'
   AircraftEmis_FLFile   = 'DataDir/AircraftEmis_FL.nc',
+  soilnox_emission_File = 'DataDir/cams81_monthly_SoilEmissions_v2.4a_GLOBAL05_Clim2000_2020.nc',
 !------------------------------
   ZCMDIR                     = 'DataDir/ZCM_EmChem19r',
   SplitDefaultFile           = 'ZCMDIR/emissplit_defaults_POLL.csv',
   SplitSpecialsFile          = 'ZCMDIR/emissplit_specials_POLL.csv',
   cmxbicDefaultFile          = 'ZCMDIR/CMX_BoundaryConditions.txt',
-  cmxBiomassBurning_FINNv1p5 = 'ZCMDIR/CMX_BiomassBurning_FINNv1p5.txt',
+  cmxBiomassBurning_FINN     = 'ZCMDIR/CMX_BiomassBurning_FINNv2p5.txt',
   cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1.txt',
 !------------------------------
   EmBio%GlobBvocMethod  = 'GLC-CLM', ! default for GLOBAL runs, not used for Europe
@@ -37,11 +38,14 @@
   LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
                               'DataDir/glc2000xCLMf18.nc',
   LandCoverInputs%mapMed    = 'DataDir/medMap_0.5deg.nc',
+  LandCoverInputs%desert    = 'DataDir/Olson_2001_DEforEmep.nc',
   YieldModifications    = 'VBS-T10',
   PBL%ZiMIN             =  50.0,
+  PBL%HmixMethod        = "JcRb_t2m",! rv4.52 default
 !------------------------------
   USES%testname         = 'EMEPSTD',
   USES%FOREST_FIRES     = F,
+  USES%FFireDispMethod  = "P800",    ! old dispersion method
   USES%EMISSTACKS       = F,         ! Reads PointSources file
   USES%DEGREEDAY_FACTORS = T,
   USES%PlumeMethod      = 'PVDI',    ! default PVDI, possible: NILU, ASMI, PVDI
@@ -65,6 +69,7 @@
   USES%POLLEN           = F,
   USES%ROADDUST         = T,
   USES%DUST             = T,
+  USES%CLOUDJ           = F,
   NETCDF_DEFLATE_LEVEL  = 4,         ! 1-9 GZIP compress, 0 no compress, -1 netcdf3
   INERIS_SNAP1          = F,
   INERIS_SNAP2          = F,
@@ -79,13 +84,15 @@
   BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
 !--- 'fake' vegetation for ozone POD calculations
-  FLUX_VEGS = 'IAM_CROP','IAM_CR','IAM_DF','IAM_DF_MED', ! do not need all array elements
+!    Note - these are only applicable to European EMEP domain. For
+!    global-scale POD calculations, contact d.simpson@met.no
+  FLUX_VEGS = 'IAM_DF','IAM_DF_MED', ! do not need all array elements
               'IAM_WH','IAM_WH_MED','IAM_WH_Irrig','IAM_WH_MED_Irrig',
               'IAM_SNL','IAM_SNL_MED',
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE',  ! Ignore these for FLUX calcs.
 !-------- volcanic emissions from passive degassing and historical eruptions
-  flocdef='DataDir/columnsource_location.csv',
-  femsdef='DataDir/columnsource_emission.csv',
+  flocdef='DataDir/columnsource_location.csv_2023',
+  femsdef='DataDir/columnsource_emission.csv_2023',
   need_topo=T, ! do not use column emissions if TopoFile not found
   NMAX_LOC=-1, ! estimate from lines in flocdef
   NMAX_EMS=-1, ! estiamte from lines in femsdef
@@ -116,6 +123,8 @@
 !-------- Sub domain for write modes
 ! NEST_out_DOMAIN  = 370, 420, 270, 320, !restrict the save data to this part
 !------------------------------
+  fileName_O3_Top   = 'NOTSET',
+  fileName_CH4_ibcs = 'NOTSET',
   USE_EXTERNAL_BIC  = F,
   EXTERNAL_BIC_NAME = 'DUMMY',
 !------------------------------
@@ -184,17 +193,15 @@ OutputConcs=
 ! 'CO'                 ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
 ! 'HCHO'               ,'mcm2','k20','COLUMN'   ,'MISC' ,'I',
 
+!    Note - these POD outputs are only applicable to European EMEP domain. For
+!    global-scale POD calculations, contact d.simpson@met.no
 OutputVegO3=
   'POD1_IAM_DF'    ,'POD', 1.0,'MM','IAM_DF',F,0,999,'YM',
-  'POD0_IAM_DF'    ,'POD', 0.0,'MM','IAM_DF',F,0,999,'YM',
-  'POD1_IAM_MF'    ,'POD', 1.0,'MM','IAM_MF',F,0,999,'YM',
-  'POD0_IAM_MF'    ,'POD', 0.0,'MM','IAM_DF',F,0,999,'YM',
-  'POD1_DF'        ,'POD', 1.0,'MM','DF    ',F,0,999,'YM',
-  'POD1_CF'        ,'POD', 1.0,'MM','CF    ',F,0,999,'YM',
-  'POD3_TC'        ,'POD', 3.0,'MM','TC    ',F,0,999,'YM',
-  'POD1_IAM_CR'    ,'POD', 1.0,'MM','IAM_CR',F,0,999,'YM',
-  'POD0_IAM_CR'    ,'POD', 0.0,'MM','IAM_CR',F,0,999,'YM',
-  'POD3_IAM_CR'    ,'POD', 3.0,'MM','IAM_CR',F,0,999,'YM',
+  'POD1_IAM_DF_MED','POD', 1.0,'MM','IAM_DF_MED',F,0,999,'YM',
+  'POD3_IAM_WH'    ,'POD', 3.0,'MM','IAM_WH',F,0,999,'YM',
+  'POD3_IAM_WH_MED','POD', 3.0,'MM','IAM_WH_MED',F,0,999,'YM',
+  'POD3_IAM_SNL'    ,'POD', 3.0,'MM','IAM_WH',F,0,999,'YM',
+  'POD3_IAM_SNL_MED','POD', 3.0,'MM','IAM_WH_MED',F,0,999,'YM',
   'MMAOT40_TC'     ,'AOT',40.0,'MM','TC    ',F,0,999,'YM',
   'MMAOT40_IAM_DF' ,'AOT',40.0,'MM','IAM_DF',F,0,999,'YM',
   'MMAOT40_IAM_MF' ,'AOT',40.0,'MM','IAM_MF',F,0,999,'YM',

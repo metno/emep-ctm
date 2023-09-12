@@ -1,7 +1,7 @@
-! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <SubMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -36,6 +36,7 @@ module SubMet_mod
 !=============================================================================
 
 !F21 use BLPhysics_mod, only: MIN_USTAR_LAND
+use BiDir_module, only: BiDir
 use CheckStop_mod, only: StopAll, CheckStop
 use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES, PBL &
                       , Zmix_ref !height at which concentration above different landuse are considered equal 
@@ -212,6 +213,12 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
              Sub(iL)%z0 =  min( 0.07 * Sub(iL)%hveg, 1.0 )
              z_1m   = (Sub(iL)%hveg + 1.0) - Sub(iL)%d
              z_3m   = max(3.0,Sub(iL)%hveg)
+!BIDIR TMP FIXME to solve thin layer issues:
+! Assuming grid centre is relative to forest's displacement ht.
+            if ( BiDir%skipForestDisp) then
+                Sub(iL)%d  =  0.0
+            end if
+!END BIDIR TMP FIXME
         else
              Sub(iL)%d  =  0.7 * Sub(iL)%hveg
              Sub(iL)%z0 = max( 0.1 * Sub(iL)%hveg, 0.001) !  Fix for deserts, 
@@ -357,6 +364,10 @@ end if
         Sub(iL)%Ra_ref = AerRes(Sub(iL)%z0,Sub(iL)%z_refd,Sub(iL)%ustar,&
             Sub(iL)%invL,KARMAN)
         Zmix_refd = max(Zmix_ref-Sub(iL)%d,Sub(iL)%z_refd)
+        !BIDIR FIXME Zmix_refd = max(Zmix_ref-Sub(iL)%d,Sub(iL)%z_refd)
+        if ( BIDIR%skipForestDisp) then
+          Zmix_refd = Zmix_ref-Sub(iL)%d
+        end if 
         Sub(iL)%Ra_X = AerRes(Sub(iL)%z0,Zmix_refd,Sub(iL)%ustar,&
             Sub(iL)%invL,KARMAN)
         Sub(iL)%Ra_3m  = AerRes(Sub(iL)%z0,z_3md,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)

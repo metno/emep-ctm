@@ -1,7 +1,7 @@
-! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -73,11 +73,11 @@ use Config_module,only: &
 use Debug_module,       only: DEBUG  !  => DEBUG%AQUEOUS, DEBUG%MY_WETDEP, DEBUG%pH
 use DerivedFields_mod,  only: f_2d, d_2d     ! Contains Wet deposition fields
 use GasParticleCoeffs_mod, only: WetCoeffs, WDspec, WDmapping, nwdep
-use GridValues_mod,     only: gridwidth_m,xm2,dA,dB,i_fdom,j_fdom
+use GridValues_mod,     only: gridwidth_m,xm2,dA,dB,i_fdom,j_fdom,A_mid,B_mid
 use Io_mod,             only: IO_DEBUG, datewrite
 use LocalFractions_mod, only: lf_wetdep, wetdep_lf
 use MassBudget_mod,     only : wdeploss,totwdep
-use MetFields_mod,       only: pr, roa, z_bnd, cc3d, lwc
+use MetFields_mod,       only: pr, roa, z_bnd, cc3d, cw_met
 use MetFields_mod,       only: ps
 use OrganicAerosol_mod,  only: ORGANIC_AEROSOLS
 use Par_mod,             only: limax,ljmax, me,li0,li1,lj0,lj1
@@ -117,7 +117,7 @@ integer, private, save  :: ksubcloud   ! k-level just below cloud
 
 real, private, parameter :: & ! Define limits for "cloud"
   PR_LIMIT = 1.0e-7,  &      ! for accumulated precipitation
-  CW_LIMIT = 1.0e-10, &      ! for cloud water, kg(H2O)/kg(air)
+  CW_LIMIT = 1.0e-7, &      ! for cloud water, kg(H2O)/kg(air)
   B_LIMIT  = 1.0e-3         ! for cloud cover (fraction)
 
 !hf  real, private, save :: &      ! Set in init below
@@ -299,7 +299,7 @@ subroutine Setup_Clouds(i,j,debug_flag)
 
   real, dimension(KUPPER:KMAX_MID) :: &
     b,           &  ! Cloud-area (fraction)
-    cloudwater,  &  ! Cloud-water (volume mixing ratio)
+    cloudwater,  &  ! Cloud-water (volume mixing ratio, H2O/air)
                     ! cloudwater = 1.e-6 same as 1.g m^-3
     pres            ! Pressure (Pa)
   integer :: k, SO4
@@ -317,6 +317,7 @@ subroutine Setup_Clouds(i,j,debug_flag)
 !now pr is already defined correctly (>=0)
   do k= KUPPER, KMAX_MID
     pr_acc(k) = pr(i,j,k)
+    pres(k)=A_mid(k)+B_mid(k)*ps(i,j,1)
   end do
 
   prclouds_present=(pr_acc(KMAX_MID)>PR_LIMIT) ! --> precipitation at the surface
@@ -324,15 +325,16 @@ subroutine Setup_Clouds(i,j,debug_flag)
 ! initialise with .false. and 0:
   incloud(:)  = .false.
   cloudwater(:) = 0.
-  pres(:)=0.0
 !  aqrck(:,:)=0.0 !set in setup_aqurates
 !  aqrck(ICLOHSO2,:) = 1.0 !set in setup_aqurates
 
+  !cc3d is in fraction units (values 0 to 1)
+  !cw_met is in kg/kg units
 
 ! Loop starting at surface finding the cloud base:
   ksubcloud = KMAX_MID+1       ! k-coordinate of sub-cloud limit
   do k = KMAX_MID, KUPPER, -1
-    if(lwc(i,j,k)>CW_LIMIT) exit
+    if(cc3d(i,j,k,1) > B_LIMIT .and. cw_met(i,j,k,1) > CW_LIMIT) exit
     ksubcloud = k
   end do
   if(ksubcloud /= KUPPER)then 
@@ -342,30 +344,31 @@ subroutine Setup_Clouds(i,j,debug_flag)
      ! and cloud fractions are above limit values
      kcloudtop = -1               ! k-level of cloud top
      do k = KUPPER, ksubcloud-1
-        b(k) = cc3d(i,j,k)
+        b(k) = cc3d(i,j,k,1)
         ! Units: kg(w)/kg(air) * kg(air(m^3) / density of water 10^3 kg/m^3
-        ! ==> cloudwater (volume mixing ratio of water to air in cloud
-        ! (when devided by cloud fraction b )
-        ! cloudwater(k) = 1.0e-3 * cw(i,j,k,1) * roa(i,j,k,1) / b(k)
-        if(lwc(i,j,k)>CW_LIMIT) then
-           cloudwater(k) = lwc(i,j,k) / b(k) ! value of cloudwater in the
-           ! cloud fraction of the grid
-           
-           !hf : alternative if cloudwater exists (and can be used) from met model
-           !        cloudwater(k) = 1.0e-3 * cw(i,j,k,1) * roa(i,j,k,1) / b(k)
-           !        cloudwater min 0.03 g/m3 (0.03e-6 mix ratio)
-           !        cloudwater(k) = max(0.3e-7, (1.0e-3 * cw(i,j,k,1) * roa(i,j,k,1) ))
-           !        cloudwater(k) =         cloudwater(k)/ b(k)
+        ! ==> cloudwater (volume mixing ratio of water to air *in cloud*)
+        ! (it is divided by cloud fraction b )
+
+        if(b(k) > B_LIMIT .and. cw_met(i,j,k,1) > CW_LIMIT ) then
+           ! value of cloudwater in the cloud fraction of the grid in units
+           ! vol(water)/vol(air)
+           ! if  FIXED_CLW > 0, this value is used for clouds. Otherwise
+           ! calculated from NWP values. (In future NWP will be used by default,
+           ! but we are invesigating some pH calculation issues. 
+           ! For safety, use FIXED_CLW
+           if ( USES%FIXED_CLW > 0.0  ) then
+             cloudwater(k) = USES%FIXED_CLW
+           else ! calculate from NWP data
+             cloudwater(k) = 1.0e-3 * roa(i,j,k,1) * cw_met(i,j,k,1) / b(k)
+           end if 
            incloud(k) = .true.
-           !hf
-           pres(k)=ps(i,j,1)
            if(kcloudtop<0) kcloudtop = k
         end if
      end do
      if(kcloudtop == -1) then
         if(prclouds_present.and.DEBUG%AQUEOUS) &
              write(*,"(a20,2i5,3es12.4)") "ERROR prclouds sum_cw", &
-             i,j, maxval(lwc(i,j,KUPPER:KMAX_MID),1), maxval(pr(i,j,:)), pr_acc(KMAX_MID)
+             i,j, maxval(cw_met(i,j,KUPPER:KMAX_MID,1),1), maxval(pr(i,j,:)), pr_acc(KMAX_MID)
         kcloudtop = KUPPER ! for safety
      end if
   else
@@ -536,6 +539,7 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
   HNO3 = HNO3_ix
   call CheckStop( HNO3_ix<1, "Aqueous: HNO3 not defined" )
 
+  !pw note: some frac_aq are recalculated (overwritten) after get_frac
   call get_frac(cloudwater,incloud) ! => frac_aq
 
 ! initialize:
@@ -555,14 +559,17 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
   aqrck(ICLOHSO2,:) = 1.0
 
   do k = KUPPER,KMAX_MID
-    if(.not.incloud(k)) cycle ! Vf > 1.0e-10) ! lwc > CW_limit
+     if(.not.incloud(k)) cycle ! Vf > 1.0e-10)
+     !pwjoj (Jan 2023):
+     !we dissolve only the part which is inside the cloud,
+     !So the concentrations on the lhs are concentrations within the cloud (0 otherwise) 
 !For pH calculations:
 !Assume total uptake of so4,no3,hno3,nh4+
 !For pH below 5, all NH3 will be dissolved, at pH=6 around 50%
 !Effectively all dissolved NH3 will ionize to NH4+ (Seinfeldt)
     so4_aq(k)= (xn_2d(SO4,k)*1000./AVOG)/cloudwater(k) !xn_2d=molec cm-3
                                                 !cloudwater volume mix. ratio
-                                                !so4_aq= mol/l
+                                                !so4_aq= mol/l 
     no3_aq(k)= ( (xn_2d(NO3_F,k)+xn_2d(HNO3,k))*1000./AVOG)/cloudwater(k)
     if (NH4_F>0) then
        nh4_aq(k) =  ( xn_2d(NH4_F,k) *1000./AVOG )/cloudwater(k)!only nh4+ now

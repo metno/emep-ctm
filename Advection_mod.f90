@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -97,9 +97,10 @@
            ,neighbor,WEST,EAST,SOUTH,NORTH,NOPROC            &
            ,MSG_NORTH2,MSG_EAST2,MSG_SOUTH2,MSG_WEST2
   use PhysicalConstants_mod, only: GRAV,ATWAIR ! gravity
-  use LocalFractions_mod, only: lf_adv_x, lf_adv_y, lf_adv_k, lf_diff, LF_SRC_TOTSIZE, lf_Nvert,&
-                                lf, loc_frac_src, loc_frac_src_1d
-  use VerticalDiffusion_mod, only: vertdiffn  !DSKZ
+  use LocalFractions_mod, only: lf_adv_x, lf_adv_y, lf_adv_k, lf_adv_k_2nd, lf_diff, lf_conv, LF_SRC_TOTSIZE&
+                                , lf_Nvert, lf, loc_frac_src, loc_frac_src_1d
+  use VerticalDiffusion_mod, only: vertdiffn
+  use ZchemData_mod,    only: xn_2d ! buffer for vertical column concentrations
 
   implicit none
   private
@@ -261,7 +262,6 @@
     real dpdeta(LIMAX,LJMAX,KMAX_MID),psi
     real psw(3),pse(3)
     real psn(3),pss(3)
-    !DSKz real ds3(2:KMAX_MID),ds4(2:KMAX_MID)
     real xcmax(KMAX_MID,GJMAX),ycmax(KMAX_MID,GIMAX),scmax,sdcmax
     real dt_smax,dt_s
     real dt_x(LJMAX,KMAX_MID),dt_y(LIMAX,KMAX_MID)
@@ -304,8 +304,9 @@
        if(.not.allocated(loc_frac_src_1d))allocate(loc_frac_src_1d(0,1))!to avoid error messages
        if(ZERO_ORDER_ADVEC)then
           hor_adv0th = .true.
-          vert_adv0th = .true.
+          !vert_adv0th = .true.
           if(me==0)call PrintLog("USING ZERO ORDER ADVECTION")
+          if(me==0)call PrintLog("WARNING Still using second order for vertical advection")
       endif
     end if
 
@@ -546,13 +547,17 @@
                       call adv_vert_zero(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
                    else
                       !                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
-                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
+                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk,i,j)
                    endif
 
                    if(USES%LocalFractions)then
-                      call lf_adv_k(fluxk,i,j)
+                      if(vert_adv0th)then
+                         call lf_adv_k(fluxk,i,j)
+                      else
+                         call lf_adv_k_2nd(fluxk,i,j,Etadot(i,j,1,1),dt_s,alfnew,alfbegnew,alfendnew)
+                      end if
                    end if
- 
+
                    if(iters<niters .or. iterxys < niterxys)then
                       do k=1,KMAX_MID
                          dpdeta0=(dA(k)+dB(k)*ps(i,j,1))*dEta_i(k)
@@ -661,11 +666,15 @@
                       call adv_vert_zero(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
                    else
                    !                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
-                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
+                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk,i,j)
                    endif
 
                    if(USES%LocalFractions)then
-                      call lf_adv_k(fluxk,i,j)
+                      if(vert_adv0th)then
+                         call lf_adv_k(fluxk,i,j)
+                      else
+                         call lf_adv_k_2nd(fluxk,i,j,Etadot(i,j,1,1),dt_s,alfnew,alfbegnew,alfendnew)
+                      end if
                    end if
 
                    if(iters<niters .or. iterxys < niterxys)then
@@ -694,9 +703,13 @@
     if(USES%CONVECTION)then
 
        call CheckStop(ADVEC_TYPE/=1, "ADVEC_TYPE no longer supported")
-
-!convection uses mixing ratio units
-       call convection_Eta(dt_advec)
+       do j = lj0,lj1
+          do i = li0,li1
+             !convection uses mixing ratio units
+             if(USES%LocalFractions)call lf_conv(i,j,dt_advec)
+             call convection_Eta(i,j,dt_advec)
+          end do
+       end do
 
     end if
 
@@ -754,11 +767,6 @@
 
     !________ vertical diffusion ______
     ndiff = 1 !number of vertical diffusion iterations (the larger the better)
-    !DSKz also done in VerticalDiffusion. Keep for lf_diff for now
-    !DSKz  do k = 2,KMAX_MID
-    !DSKz     ds3(k) = dt_advec*dhs1i(k)*dhs2i(k)
-    !DSKz    ds4(k) = dt_advec*dhs1i(k+1)*dhs2i(k)
-    !DSKz  end do
 
     ! sum is conserved under vertical diffusion
     !   sum = 0.
@@ -769,10 +777,8 @@
 
     do j = lj0,lj1
        do i = li0,li1
-          !DSKz if(USES%LocalFractions)call lf_diff(i,j,ds3,ds4,ndiff)
+
           if(USES%LocalFractions)call lf_diff(i,j,dt_advec,ndiff)
-          
-          !DSKz call vertdiffn(xn_adv(1,i,j,1),NSPEC_ADV,LIMAX*LJMAX,1,EtaKz(i,j,1,1),ds3,ds4,dt_advec,ndiff)
           call vertdiffn(xn_adv(1,i,j,1),NSPEC_ADV,LIMAX*LJMAX,1,EtaKz(i,j,1,1),dt_advec,ndiff)
 
        end do
@@ -1101,7 +1107,7 @@
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-  subroutine advvk(xn_adv,ps3d,sdot,dt_s,fluxk)
+  subroutine advvk(xn_adv,ps3d,sdot,dt_s,fluxk,i,j)
 
 !     executes advection with a. bott's integreated flux-form
 !     using 2'nd order polynomial in the vertical.
@@ -1118,10 +1124,20 @@
     real fluxps(KMAX_MID),fc(KMAX_MID)
 
 !    local
-    integer  k, n1k,k1
+    integer  n, k, n1k,k1,i,j
     integer klimlow,klimhig
     real zzfl1,zzfl2,zzfl3,totk(NSPEC_ADV),totps
     real fc1,fc2,fc3
+
+    if (USES%LocalFractions) then
+       !save xn values before vertical advection
+       !TODO: integrate to other loops?
+       do k = max(KMAX_MID-lf_Nvert-1,KCHEMTOP),KMAX_MID
+          do n = 1, NSPEC_ADV !NB: no shl included, (not same as in Setup_1d)
+             xn_2d(n,k)=xn_adv(n,(k-1)*LIMAX*LJMAX)
+          end do
+       end do
+    end if
 
     do k = 1,KMAX_MID-1
       fc(k) = sdot(k*LIMAX*LJMAX)*dt_s
@@ -1132,8 +1148,8 @@
 
     klimlow = 1
     if(fc(1).ge.0.)klimlow=2
-      klimhig = KMAX_MID-1
-      if(fc(KMAX_MID-1).lt.0.)klimhig = KMAX_MID-2
+    klimhig = KMAX_MID-1
+    if(fc(KMAX_MID-1).lt.0.)klimhig = KMAX_MID-2
 
         fluxk(:,1) = 0.
         fluxps(1) = 0.
@@ -1182,9 +1198,8 @@
         zzfl3 = alfnew(7,k+1,n1k)*fc1         &
               + alfnew(8,k+1,n1k)*fc2         &
               + alfnew(9,k+1,n1k)*fc3
-
+!zzfl2 always >=0 (n1k is the switch between fc>0 and fc<0)
         k1 = k-1+n1k
-
         fluxk(:,k+1) = max(0.,                            &
                xn_adv(:,(k1-1)*LIMAX*LJMAX)*zzfl1   &
               +xn_adv(:, k1   *LIMAX*LJMAX)*zzfl2   &
@@ -1193,8 +1208,8 @@
                ps3d((k1-1)*LIMAX*LJMAX)*zzfl1       &
               +ps3d( k1   *LIMAX*LJMAX)*zzfl2       &
               +ps3d((k1+1)*LIMAX*LJMAX)*zzfl3)
-
-    end do
+        !note that here fluxk is always >=0 (signs and consistency taken care of below)
+   end do
       if(fc(KMAX_MID-1).lt.0.)then
 
         fc1 = fc(KMAX_MID-1)
@@ -1213,17 +1228,17 @@
         fluxps(KMAX_MID) =                                           &
             max(0.,ps3d((KMAX_MID-2)*LIMAX*LJMAX)*zzfl1        &
                   +ps3d((KMAX_MID-1)*LIMAX*LJMAX)*zzfl2)
-
     end if
-
     k=1
     do while(k.lt.KMAX_MID)
       if(fc(k).lt.0.) then
         if(fc(k+1).ge.0.) then
           totk(:) = min(xn_adv(:,k*LIMAX*LJMAX)*dhs1(k+2)       &
-                      /(fluxk(:,k+1) + fluxk(:,k+2)+ EPSIL),1.)
+               /(fluxk(:,k+1) + fluxk(:,k+2)+ EPSIL),1.)
+          !Normally totk = 1, except when this would completely empty the cell
           fluxk(:,k+1) = -fluxk(:,k+1)*totk(:)
           fluxk(:,k+2) =  fluxk(:,k+2)*totk(:)
+
           xn_adv(:,(k-1)*LIMAX*LJMAX) =                         &
                  max(0.,xn_adv(:,(k-1)*LIMAX*LJMAX)             &
                       -(fluxk(:,k+1) - fluxk(:,k))*dhs1i(k+1))
@@ -1233,7 +1248,7 @@
 
           totps = min(ps3d(k*LIMAX*LJMAX)*dhs1(k+2)             &
                     /(fluxps(k+1) + fluxps(k+2)+ EPSIL),1.)
-          fluxps(k+1) = -fluxps(k+1)*totps
+           fluxps(k+1) = -fluxps(k+1)*totps
           fluxps(k+2) =  fluxps(k+2)*totps
           ps3d((k-1)*LIMAX*LJMAX) =                             &
                max(0.,ps3d((k-1)*LIMAX*LJMAX)                   &
@@ -2776,7 +2791,7 @@ end if
     real,dimension((NSPEC_ADV+1)*3+LF_SRC_TOTSIZE) :: send_buf_w, rcv_buf_w, send_buf_e, rcv_buf_e
 
     integer :: LF_SRC_TOTSIZE_eff=0 !used to avoid copying when k>KMAX_MID-lf_Nvert
-    
+
     LF_SRC_TOTSIZE_eff=0
     if(LF_SRC_TOTSIZE>0 .and. k>KMAX_MID-lf_Nvert)then
        LF_SRC_TOTSIZE_eff=LF_SRC_TOTSIZE
@@ -3485,7 +3500,17 @@ end if
     real ,intent(inout)::fluxk(NSPEC_ADV,KMAX_MID)
 
     real :: fluxps(KMAX_MID),fc(KMAX_MID)
-    integer :: k
+    integer :: k,n
+
+    if (USES%LocalFractions) then
+       !save xn values before vertical advection
+       !TODO: integrate to other loops?
+       do k = max(KMAX_MID-lf_Nvert-1,KCHEMTOP),KMAX_MID
+          do n = 1, NSPEC_ADV !NB: no shl included, (not same as in Setup_1d)
+             xn_2d(n,k)=xn_adv(n,(k-1)*LIMAX*LJMAX)
+          end do
+       end do
+    end if
 
     do k = 1,KMAX_MID-1
       fc(k) = sdot(k*LIMAX*LJMAX)*dt_s
@@ -3528,7 +3553,6 @@ end if
     ps3d(k*LIMAX*LJMAX)=max(0.0,ps3d(k*LIMAX*LJMAX)+(fluxps(k+1))*dhs1i(k+2))
 
   end subroutine adv_vert_zero
-
 
   subroutine adv_vert_fourth(xn_adv,ps3d,sdot,dt_s)
  !"4th order Bott" advection for vertical
@@ -3943,84 +3967,3 @@ end if
 
   end subroutine adv_vert_fourth
 end module Advection_mod
-
-!DSKZ!=================================================================================
-!DSKZ! NOT IN MODULE
-!DSKZ!=================================================================================
-!DSKZ  subroutine vertdiffn(xn_adv,NSPEC,Nij,KMIN_in,SigmaKz,ds3,ds4,ndiff)
-!DSKZ
-!DSKZ!     executes vertical diffusion ndiff times
-!DSKZ
-!DSKZ! SigmaKz(k) mixes xn_adv(k) and xn_adv(k-1)
-!DSKZ!
-!DSKZ! adif(k) -> mixing of layers k and k+1:
-!DSKZ!            SigmaKz(k+1)*ds3(k+1)= SigmaKz(k+1)*dt_advec*dhs1i(k+1)*dhs2i(k+1)
-!DSKZ!            = SigmaKz(k+1)*dt_advec/(sigma_bnd(k+1)-sigma_bnd(k))/(sigma_mid(k+1)-sigma_mid(k))
-!DSKZ!
-!DSKZ! bdif(k) -> mixing of layers k and k-1:
-!DSKZ!            SigmaKz(k)*ds4(k)= SigmaKz(k)*dt_advec*dhs1i(k+1)*dhs2i(k)
-!DSKZ!            = SigmaKz(k+1)*dt_advec/(sigma_bnd(k+1)-sigma_bnd(k))/(sigma_mid(k)-sigma_mid(k-1))
-!DSKZ!
-!DSKZ! KMIN is the minimum value of k to include for diffusion (1 is top)
-!DSKZ
-!DSKZuse Config_module,only: KMAX_MID, KMAX_BND
-!DSKZuse Par_mod,           only: me,LIMAX,LJMAX
-!DSKZ!    input
-!DSKZ    real,intent(in)::  SigmaKz(0:LIMAX*LJMAX*KMAX_BND-1)
-!DSKZ    real,intent(in)::  ds3(KMAX_MID-1),ds4(KMAX_MID-1)
-!DSKZ    integer,intent(in)::  NSPEC,ndiff,Nij
-!DSKZ    integer,intent(in):: KMIN_in
-!DSKZ
-!DSKZ!    output
-!DSKZ    real ,intent(inout):: xn_adv(NSPEC,0:Nij*(KMAX_MID-1))
-!DSKZ
-!DSKZ!    local
-!DSKZ
-!DSKZ    integer  k,n,KMIN
-!DSKZ
-!DSKZ    real, dimension(0:KMAX_MID-1) :: adif,bdif,cdif,e1
-!DSKZ
-!DSKZ    real ndiffi
-!DSKZ
-!DSKZ    if(KMIN_in==KMAX_MID)return!no diffusion from one cell to itself
-!DSKZ    KMIN = KMIN_in-1
-!DSKZ    KMIN = max(1,KMIN)
-!DSKZ
-!DSKZ    ndiffi=1./ndiff
-!DSKZ
-!DSKZ    do k = KMIN,KMAX_MID-1
-!DSKZ      adif(k-1) = SigmaKz(k*LIMAX*LJMAX)*ds3(k)*ndiffi
-!DSKZ      bdif(k) = SigmaKz(k*LIMAX*LJMAX)*ds4(k)*ndiffi
-!DSKZ    end do
-!DSKZ
-!DSKZ    cdif(KMAX_MID-1) = 1./(1. + bdif(KMAX_MID-1))
-!DSKZ    e1(KMAX_MID-1) = bdif(KMAX_MID-1)*cdif(KMAX_MID-1)
-!DSKZ
-!DSKZ    do k = KMAX_MID-2,KMIN,-1
-!DSKZ      cdif(k) = 1./(1. + bdif(k) + adif(k) - adif(k)*e1(k+1))
-!DSKZ      e1(k) = bdif(k)*cdif(k)
-!DSKZ    end do
-!DSKZ
-!DSKZ    cdif(KMIN-1) = 1./(1. + adif(KMIN-1) - adif(KMIN-1)*e1(KMIN))
-!DSKZ
-!DSKZ    do n=1,ndiff
-!DSKZ
-!DSKZ      xn_adv(:,Nij*(KMAX_MID-1)) = &
-!DSKZ         xn_adv(:,Nij*(KMAX_MID-1))*cdif(KMAX_MID-1)
-!DSKZ
-!DSKZ      do k = KMAX_MID-2,KMIN-1,-1
-!DSKZ         xn_adv(:,Nij*k) =         &
-!DSKZ           (xn_adv(:,Nij*k)        &
-!DSKZ           +adif(k)*xn_adv(:,Nij*(k+1)))*cdif(k)
-!DSKZ      end do
-!DSKZ
-!DSKZ      do k = KMIN,KMAX_MID-1
-!DSKZ         xn_adv(:,Nij*k) =            &
-!DSKZ            e1(k)*xn_adv(:,Nij*(k-1)) &
-!DSKZ           +xn_adv(:,Nij*k)
-!DSKZ      end do
-!DSKZ
-!DSKZ    end do ! ndiff
-!DSKZ
-!DSKZ  end subroutine vertdiffn
-

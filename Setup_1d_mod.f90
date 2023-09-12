@@ -1,7 +1,7 @@
-! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -61,8 +61,8 @@ use Config_module,    only:  &
 use Debug_module,     only: DebugCell, DEBUG_MASS, DEBUG !->DEBUG%SETUP_1DCHEM
 use DerivedFields_mod,only: d_2d, f_2d
 use EmisDef_mod,      only: gridrcemis, gridrcroadd, KEMISTOP,Emis_4D,N_Emis_4D,Found_Emis_4D&
-                                , O_NH3, O_DMS, SplitEmisOut, EmisOut&
-                                , NEmis_sources, Emis_source, Emis_source_2D
+                            , O_NH3, O_DMS, SplitEmisOut, EmisOut&
+                            , NEmis_source_ij, Emis_source, Emis_source_ij_ix, Emis_source_ij
 use EmisGet_mod,      only:  nrcemis, iqrc2itot, emis_nsplit, emis_masscorr
 use ForestFire_mod,   only: Fire_rcemis, burning
 use Functions_mod,    only:  Tpot_2_T
@@ -73,11 +73,12 @@ use GridValues_mod,   only:  xmd, GridArea_m2, &
                              i_fdom, j_fdom
 use Io_Progs_mod,     only: datewrite !MASS
 use Landuse_mod,      only: water_fraction, ice_landcover
-use LocalVariables_mod,   only: Grid
+use LocalVariables_mod, only: Grid
+use LocalFractions_mod, only: lf_fullchem
 use MassBudget_mod,   only: totem    ! sum of emissions
 use MetFields_mod,    only: ps,sst
 use MetFields_mod,    only: roa, th, q, t2_nwp, cc3dmax, zen, z_bnd,ws_10m
-use Par_mod,          only: me,gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG
+use Par_mod,          only: me,gi0,gi1,gj0,gj1,IRUNBEG,JRUNBEG,limax
 use PhysicalConstants_mod,only: ATWAIR, AVOG, PI, GRAV, T0
 use Radiation_mod,    only: PARfrac, Wm2_uE
 use SmallUtils_mod,   only: find_index
@@ -90,12 +91,13 @@ use ZchemData_mod,    only: &
   ,rcemis, deltaZcm     &  ! emission terms and lowest layer thickness
   ,rct, rcphot          &  ! chemical reaction rates
   ,rh, temp, tinv, itemp,pp      &  !
-  ,M, o2, n2, h2o     &  ! Air concentrations
+  ,M, o2, n2, h2o, methane, hydrogen     &  ! Air concentrations
   ,cN2O5, cHO2, cO3, cHNO3 &  ! mol speeds, m/s
   ,cNO2, cNO3              &  ! mol speeds, m/s, kHetero tests
   ,gamN2O5                 &  ! kHetero test - for printout
   ,DpgNw, S_m2m3           &  ! for wet diameter and surf area
   ,aero_fom, aero_fbc, aero_fss, aero_fdust
+use BoundaryConditions_mod, only: METHBGN
  
 
 implicit none
@@ -309,6 +311,16 @@ contains
              ispec = PM10_GROUP(ipm)
 
              ugtmp  = xn_2d(ispec,k)*species(ispec)%molwt*1.0e12/AVOG
+             if (lf_fullchem) then
+                !For LF remove all O3-active species             
+                if (  species(ispec)%name == 'SO4' ) then
+                   ugtmp = 0
+                else if ( index( species(ispec)%name, 'NO3_f' )>0) then
+                   ugtmp = 0
+                else if ( index( species(ispec)%name, 'NO3_c' )>0) then
+                   ugtmp = 0
+                end if
+             end if
              is_finepm = is_finepm_a(ipm)
              is_ssalt  = is_ssalt_a(ipm)
              is_dust   = is_dust_a(ipm)
@@ -473,6 +485,8 @@ contains
    n2(:) = M(:) - o2(:)
 !   o2(:) = 0.2095 *M(:) ! more exact, but prefer o3+n2 to add to 100%
 !   n2(:) = 0.7808 *M(:)
+   methane(:) = METHBGN * PPB * M(:) 
+   hydrogen(:) = 500.0 * PPB * M(:)
    tinv(:) = 1./temp(:)
 
 
@@ -582,7 +596,7 @@ subroutine setup_rcemis(i,j)
   integer, intent(in) ::  i,j     ! coordinates of column
 
   !  local
-  integer :: iqrc, k, itot, iem ,f
+  integer :: iqrc, k, itot, iem ,f, ij, is
   real    :: Kw,fac, eland   ! for Pb210  - emissions from land
 
   integer :: i_Emis_4D,n
@@ -611,21 +625,22 @@ subroutine setup_rcemis(i,j)
 
   forall(k=KEMISTOP:KMAX_MID,iqrc=1:NRCEMIS) &
     rcemis(iqrc2itot(iqrc),k) = gridrcemis(iqrc,k,i,j)&
-                                  *roa(i,j,k,1)/(dA(k)+dB(k)*ps(i,j,1))
-
+    *roa(i,j,k,1)/(dA(k)+dB(k)*ps(i,j,1))
 
    ! add emissions from new format which are "pure", i.e. not defined as one of
    ! the splitted or sector species
-    do n = 1, NEmis_sources      
-       itot = Emis_source(n)%species_ix
-       if(itot>0 .and. Emis_source(n)%sector<=0)then
-          k = Emis_source(n)%injection_k
-          rcemis(itot,k) = rcemis(itot,k)   &
-               + Emis_source_2D(i,j,n)*ehlpcom0    &
-               /species(itot)%molwt&
-               *roa(i,j,k,1)/(dA(k)+dB(k)*ps(i,j,1))
-       endif
-    enddo
+   ij = i+limax*(j-1)
+   do is = 1, NEmis_source_ij(ij)
+      n = Emis_source_ij_ix(ij,is)
+      itot = Emis_source(n)%species_ix
+      if(itot>0 .and. Emis_source(n)%sector<=0)then
+         k = Emis_source(n)%injection_k
+         rcemis(itot,k) = rcemis(itot,k)   &
+              + Emis_source_ij(ij,is)*ehlpcom0    &
+              /species(itot)%molwt&
+              *roa(i,j,k,1)/(dA(k)+dB(k)*ps(i,j,1))
+      endif
+   enddo
 
   ! Volcanic emissions (SO2 and ASH),
   ! and Contribution from Emergeny scenarios

@@ -1,7 +1,7 @@
-! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -67,7 +67,7 @@ integer, public, save :: MMC_RH, MMC_CANO3, MMC_VPD, MMC_FST, &
 
 ! Mosaic-specific outputs, e.g. VG_CF_HNO3 or Rns_GR_NH3
 integer, public, save :: nMosaic = 0
-integer, public, parameter :: MAX_MOSAIC_OUTPUTS=150
+integer, public, parameter :: MAX_MOSAIC_OUTPUTS=1000
 logical, private, parameter :: T=.true., F=.false.
 
 type(Deriv), public, &
@@ -169,7 +169,7 @@ subroutine Add_NewMosaics(Mc,nMc)
     lctxt = Mc(n)%txt4                                  ! Grid, SNL,..
     name = trims( 'MSC_' // typ//"_"//poll//"_"//lctxt ) ! VG_O3_GRID?
 
-    iadv = find_index(poll,species_adv(:)%name )
+    iadv = find_index(poll,species_adv(:)%name,any_case=.true. )
     if(iadv<1) then
       if(MasterProc) write(*,*) "MOSSPEC not found ", iadv, trim(name)
       cycle MC_LOOP
@@ -277,7 +277,7 @@ subroutine Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
     do n=1,size(DDEP_ECOS)
 
       if(dbg0) write(*,"(a,i4,a6,2a12)") dtxt//"DDEP_WANTED,b:", n, &
-        DDEP_ECOS(n)%ind, trim(DDEP_ECOS(n)%name), trim(xtyp)
+        DDEP_ECOS(n)%ind, trim(DDEP_ECOS(n)%name), trim(xtyp)   ! ind = e.g. 'YM'
       if(all(SCAN(DDEP_ECOS(n)%ind,IOU_KEY)==0)) exit
       nDD = nDD + 1
       nMosaic = nMosaic + 1
@@ -292,14 +292,14 @@ subroutine Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
           xxname = xname(5:)
           if(dbg0) print *, "STO_ ", trims(xname // "=>"// xxname)
         end if
-        iadv = find_index(xxname,species_adv(:)%name)         ! Index in ix_adv arrays
+        iadv = find_index(xxname,species_adv(:)%name,any_case=.true.)         ! Index in ix_adv arrays
         if(iadv<1) print *, "OOPADVNOW", iadv, trims(xname // name)
         call CheckStop(iadv<1,dtxt//"Unknown in DDEP_WANTED SPEC: "//trim(xname))
         call Units_Scale(DDEP_WANTED(i)%txt3,iadv,unitscale,units)
         if(dbg0) print *, "ADVNO ",n,iadv,trim(xname), unitscale
 
       case("GROUP")
-        igrp = find_index(xname,chemgroups(:)%name) ! array of members: chemgroups%specs
+        igrp = find_index(xname,chemgroups(:)%name,any_case=.true.) ! array of members: chemgroups%specs
         if(igrp<1) print *, "OOPNOW", igrp, trims(xname // name)
         call CheckStop(igrp<1,dtxt//"Unknown in DDEP_WANTED GROUP: "//trim(xname))
         call Units_Scale(DDEP_WANTED(i)%txt3,-1,unitscale,units)
@@ -375,11 +375,12 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
   !  Query - crops, outisde g.s. ????
   if(first_call) then  ! need to find indices
 
-    idepO3 = find_index('O3',DDspec(:)%name)
+    idepO3 = find_index('O3',DDspec(:)%name,any_case=.true.)
     if(MasterProc) write(*,*) dtxt//'idepO3 = ', idepO3 ! was CDDEP_O3
 
     do imc = 1, nMosaic
-      MosaicOutput(imc)%f2d  = find_index(MosaicOutput(imc)%name,f_2d(:)%name)
+      MosaicOutput(imc)%f2d  = find_index(MosaicOutput(imc)%name,&
+          f_2d(:)%name,any_case=.true.)
       if(DEBUG%MOSAICS .and. MasterProc) then
          write(*,*) dtxt//" f2D", imc, &
            trim(MosaicOutput(imc)%name), MosaicOutput(imc)%f2d

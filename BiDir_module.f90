@@ -1,7 +1,7 @@
-! <BiDir_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <BiDir_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,5 +26,29 @@
 !*****************************************************************************!
 module BiDir_module
   ! DUMMY 
+  implicit none
+  private
+
   character(len=*), parameter :: BiDir_module_status='TOBEDONE'
+
+  ! Main:
+  !public  :: BiDirXconcs
+  !public  :: BiDirFluxes
+
+  !public  :: BiDirResistances
+  !public :: BiDirXwaterEuro
+  !public :: BiDirXwaterOrig
+
+  type, public :: BiDir_t
+
+    logical :: EuroXwater = .false.
+    logical :: OrigXwater = .false.
+    logical :: skipForestDisp   = .false. 
+    character(len=20) :: Method = 'NOTSET'
+    ! allow for long file names
+    character(len=500):: InputFile = 'NOTSET'
+    character(len=500) :: InputDir  = 'NOTSET'
+  end type BiDir_t
+  type(BiDir_t), public, save :: BiDir= BiDir_t()
+
 end module BiDir_module

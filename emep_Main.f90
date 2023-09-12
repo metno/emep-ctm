@@ -1,7 +1,7 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,7 +42,6 @@ program emep_Main
   use Advection_mod,     only: vgrid_Eta, assign_nmax, assign_dtadvec
   use Aqueous_mod,       only: init_aqueous, Init_WetDep   !  Initialises & tabulates
   use AirEmis_mod,       only: lightning
-  use BiDir_emep,        only : Init_BiDir  !  FUTURE
   use Biogenics_mod,     only: Init_BVOC, SetDailyBVOC
   use BoundaryConditions_mod, only: BoundaryConditions
   use CheckStop_mod,     only: CheckStop
@@ -129,6 +128,8 @@ program emep_Main
   logical :: End_of_Run=.false.
   real :: tim_before0 !private
   character(len=*), parameter :: dtxt='eMain:'
+!NB: the value of giversion may be overwritten later by the cpp. Keep lower cases
+  character(len=200) :: gitversion='git version not set ' 
 
   associate ( yyyy => current_date%year, mm => current_date%month, &
        dd => current_date%day,  hh => current_date%hour)
@@ -153,6 +154,8 @@ program emep_Main
   call assign_startandenddate()
  
   if(MasterProc)then
+    !Jan 2023: GITVERSION is set by Makefile on compile. Otherwise gitversion from above is default.
+     call PrintLog(trim(GITVERSION)) !NB: the value may be set by the cpp. Keep upper cases
      call PrintLog(trim(runlabel1))
      call PrintLog(trim(runlabel2))
      call PrintLog(date2string("startdate = YYYYMMDDhh",startdate(1:4)))
@@ -222,7 +225,7 @@ program emep_Main
   call Init_emissions !new format
   call Emissions(yyyy)! should be set for the enddate year, not start?
 
-  call Add_2timing(3,tim_after,tim_before,"Yearly emissions read in")
+  call Add_2timing(3,tim_after,tim_before,"Emissions read in")
 
   if(USES%LocalFractions) call lf_init
   
@@ -235,8 +238,6 @@ program emep_Main
   call Init_Derived()        ! Derived field defs.
 
   call Init_BVOC()
-
-  call Init_BiDir()           ! BIDIR FUTURE 
 
   call tabulate()             ! sets up tab_esat, etc.
 
@@ -353,8 +354,10 @@ program emep_Main
     call Add_2timing(9,tim_after,tim_before,"Meteoread")
 
     call SetDailyBVOC() !daily
+    call Add_2timing(10,tim_after,tim_before,"Fires+BVOC")
 
     call EmisUpdate
+    call Add_2timing(3,tim_after,tim_before,"Emissions read in")
 
     if(USES%FOREST_FIRES) call Fire_Emis(daynumber)
 

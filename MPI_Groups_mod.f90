@@ -1,7 +1,7 @@
-! <MPI_Groups_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <MPI_Groups_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

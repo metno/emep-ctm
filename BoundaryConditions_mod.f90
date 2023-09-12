@@ -1,7 +1,7 @@
-! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -196,6 +196,7 @@ integer, public, parameter :: &
   IBC_CH4 = NGLOB_BC + 2,     &
   NTOT_BC  = NGLOB_BC + NMISC_BC
 
+real, public, save :: METHBGN ! for use in Setup_1d_mod
 ! misc_bc specifies concentrations of these species:
 real, public, allocatable,save, dimension(:,:) :: misc_bc
 
@@ -822,26 +823,33 @@ subroutine My_bcmap(iyr_trend)
       top_misc_bc(IBC_CH4) = 1780.0 + (iyr_trend-1990)*0.1*(1820-1780.0)
     else
       top_misc_bc(IBC_CH4) = 1780.0 * exp(-0.01*0.91*(1990-iyr_trend)) ! Zander,1975-1990
-                                 !exp(-0.01*0.6633*(1975-iyr_trend)) ! Zander,1951-1975
+                                   !exp(-0.01*0.6633*(1975-iyr_trend)) ! Zander,1951-1975
     end if
-
-  else if ( fileName_CH4_ibcs /= 'NOTSET'  ) then ! use RCP26, 45 or 85, set in config_emep
-
-    call open_file(IO_TMP,'r',fileName_CH4_ibcs,needed=.true.)
-    call CheckStop(ios,dtxt//"CH4_ibcs error in "//trim(fileName_CH4_ibcs) )
-    do i=1, 9999  ! has 750 records while(.true.)
-       read(IO_TMP,'(a80)') txt
-       if ( txt(1:1) == '#' ) cycle
-       read(txt, *) yr_rcp, ch4_rcp
-       if ( yr_rcp == iyr_trend) exit
-    end do
-    close(IO_TMP)
-    top_misc_bc(IBC_CH4) =  ch4_rcp
-    if ( MasterProc ) write(*,*) dtxt//'CH4 SET from RCPs for CH4:', &
-      trim(fileName_CH4_ibcs), iyr_trend, ch4_rcp
   end if
 
-  ! Reset with namelist values if set
+  if ( fileName_CH4_ibcs /= 'NOTSET'  ) then ! CH4 input file overrides BGND_CH4 == -1, if found
+
+    call open_file(IO_TMP,'r',fileName_CH4_ibcs,needed=.true.)
+    ! call CheckStop(ios,dtxt//"CH4_ibcs error in "//trim(fileName_CH4_ibcs) )
+    if (ios /= 0) then
+      if (MasterProc) write(*,*) dtxt//'CH4 input file not found.'
+    else
+      if (MasterProc) write(*,*) dtxt//'CH4 input file found.'
+      call CheckStop(iyr_trend<1960 .or. iyr_trend > 2050,dtxt//"yr outside CH4 range"//trim(fileName_CH4_ibcs) )
+      do i=1, 9999 
+        read(IO_TMP,'(a80)') txt
+        if ( txt(1:1) == '#' ) cycle
+        read(txt, *) yr_rcp, ch4_rcp
+        if ( yr_rcp == iyr_trend) exit
+      end do
+      close(IO_TMP)
+      top_misc_bc(IBC_CH4) =  ch4_rcp
+      if ( MasterProc ) write(*,*) dtxt//'CH4 SET from RCPs for CH4:', &
+        trim(fileName_CH4_ibcs), iyr_trend, ch4_rcp
+    end if ! ios
+  end if ! filename
+
+  ! Reset with namelist value if set; this overrides all previous values
   if ( BGND_CH4 > 0 ) then
     if ( MasterProc ) write(*,*) dtxt//'CH4 OVERRIDE for CH4:', BGND_CH4
      top_misc_bc(IBC_CH4) = BGND_CH4
@@ -855,6 +863,7 @@ subroutine My_bcmap(iyr_trend)
      call PrintLog(txt)
   end if
 
+  METHBGN = top_misc_bc(IBC_CH4) ! for use in Setup_1d_mod fixed CH4 
   top_misc_bc(IBC_CH4) =  top_misc_bc(IBC_CH4) * PPB
   top_misc_bc(IBC_H2)  =  600.0 * PPB
 
@@ -1061,7 +1070,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   !---------------------------------------------------------------------------
   ! Mace Head ozone concentrations for backgroudn sectors
   ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
-  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2019
+  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2021
   real, dimension(12,MH_YEAR1:MH_YEAR2), parameter :: macehead_year=reshape(&
    [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
     36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
@@ -1104,7 +1113,9 @@ real :: trend_o3=1.0, trend_co, trend_voc
     40.4,42.5,43.7,43.6,42.4,29.7,27.5,28.6,32.0,37.7,40.5,42.5,& !2016
     41.1,45.2,46.1,45.5,40.2,33.2,28.7,32.6,34.1,39.4,41.2,39.5,& !2017
     42.1,43.6,44.8,46.9,42.8,33.8,28.0,28.9,34.3,38.9,41.5,37.8,& !2018
-    40.6,43.4,44.9,44.0,37.7,35.6,28.4,32.5,31.3,37.2,38.8,38.2]& !2019
+    40.6,43.4,44.9,44.0,37.7,35.6,28.4,32.5,31.3,37.2,38.8,38.2,& !2019
+    41.5,42.4,43.6,45.5,39.2,32.1,23.4,28.7,30.8,36.9,39.7,38.4,& !2020
+    37.2,42.1,42.4,45.2,42.0,30.4,25.7,31.2,36.0,37.1,40.6,40.6]& !2021 
     ,[12,MH_YEAR2-MH_YEAR1+1])
   real, dimension(12), parameter :: macehead_default=&
   ! Defaults from 1998-2010 average

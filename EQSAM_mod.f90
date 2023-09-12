@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -73,6 +73,7 @@ module EQSAM4clim_ml
 !  CHARACTER(LEN=*),PARAMETER :: modstr  = 'EQSAM4clim'    ! name of module
 !  CHARACTER(LEN=*),PARAMETER :: modver  = 'v10'           ! module version
 !  CHARACTER(LEN=*),PARAMETER :: moddat  = '15Jan2018'     ! last modification date
+!            ST (1 March 2023):  manual update from v10 to v11
 !____________________________________________________________________________________________
 ! ' Hydrogen |   H2O           H2SO4          HNO3            HCl            NH3    '
 ! '    H+    |    1              2             3               4              5     '
@@ -102,9 +103,14 @@ module EQSAM4clim_ml
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! Start modification for EMEP
 !>-------------------------------------------------------------------------------<
-subroutine EQSAM4clim (SO4in, HNO3in,NO3in,NH3in,NH4in,NAin,CLin, relh,temp,   &
-                       aSO4out, aNO3out, aNH4out, aNaout, aClout,              &
-                       gSO4out, gNH3out, gNO3out, gClout, aH2Oout, KCHEMTOP, KMAX_MID) 
+!subroutine EQSAM4clim (SO4in, HNO3in,NO3in,NH3in,NH4in,NAin,CLin, relh,temp,   &
+!                       aSO4out, aNO3out, aNH4out, aNaout, aClout,              &
+!                       gSO4out, gNH3out, gNO3out, gClout, aH2Oout, apH, KCHEMTOP, KMAX_MID) 
+
+subroutine EQSAM4clim (so4in,hno3in,no3in,nh3in,nh4in,NAin,CLin,CAin,MGin,Kin,relh,temp, &
+                       aSO4out,aNO3out,aNH4out,aCLout, gSO4out,gNH3out,gNO3out,gClout,     &
+                       aH2Oout, apH, KCHEMTOP,KMAX_MID)
+                       !aNAout, aCLout, aCAout, aMGout,aKout 
 !>-------------------------------------------------------------------------------<
 
 !  use Config_module,  only :  KMAX_MID, KCHEMTOP
@@ -119,6 +125,9 @@ implicit none
              NH4in(KCHEMTOP:KMAX_MID),  &
              NAin (KCHEMTOP:KMAX_MID),  &
              CLin (KCHEMTOP:KMAX_MID),  &
+             CAin (KCHEMTOP:KMAX_MID),  &
+             MGin (KCHEMTOP:KMAX_MID),  &
+             Kin  (KCHEMTOP:KMAX_MID),  &
              HNO3in(KCHEMTOP:KMAX_MID), &
              NH3in(KCHEMTOP:KMAX_MID)
 
@@ -126,13 +135,14 @@ implicit none
              aSO4out(KCHEMTOP:KMAX_MID), &
              aNO3out(KCHEMTOP:KMAX_MID), &
              aNH4out(KCHEMTOP:KMAX_MID), &
-             aNAout (KCHEMTOP:KMAX_MID), &
+!             aNAout (KCHEMTOP:KMAX_MID), &
              aCLout (KCHEMTOP:KMAX_MID), &
              gSO4out(KCHEMTOP:KMAX_MID), &
              gNH3out(KCHEMTOP:KMAX_MID), &
              gNO3out(KCHEMTOP:KMAX_MID), &
              gCLout (KCHEMTOP:KMAX_MID), &
-             aH2Oout(KCHEMTOP:KMAX_MID)
+             aH2Oout(KCHEMTOP:KMAX_MID), &
+             apH    (KCHEMTOP:KMAX_MID)
 
 !... Swen's comments ....
 ! neq = inner loop and should go over your number of grid boxes (e.g., vector loop), 
@@ -154,13 +164,15 @@ implicit none
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !
 !______________________________________________
-INTEGER,PARAMETER                             :: dp = SELECTED_REAL_KIND(12,307)
+INTEGER,PARAMETER                            :: dp = SELECTED_REAL_KIND(6,37)  ! SP   !ST
+!INTEGER,PARAMETER                             :: dp = SELECTED_REAL_KIND(12,307)! DP
 !______________________________________________
 REAL(dp),PARAMETER                            :: REALZERO=tiny(0._dp),ZERO=0._dp,ONE=1._dp
 REAL(dp),PARAMETER                            :: TINYX=1.e-15_dp,eqT0=298.15_dp ![K]
 REAL(dp),PARAMETER                            :: R=8.314409_dp            ![J/mol/K]
 REAL(dp),PARAMETER                            :: eqR=R/101325._dp   ![atm*m^3/mol/K]
 REAL(dp),PARAMETER                            :: sigma=0.0761_dp    ![J/m^2]
+REAL(dp),PARAMETER                            :: RHMAX=0.98_dp            ![-] !ST
 !______________________________________________
  LOGICAL,PARAMETER                            :: lke         =.FALSE.
  LOGICAL,PARAMETER                            :: lvola       =.TRUE.
@@ -211,6 +223,7 @@ INTEGER,           DIMENSION(KCHEMTOP:KMAX_MID,nleq) :: imask
 !_______________________________________________
 LOGICAL,           DIMENSION(0:jSOL)   :: leqsolute
 !_______________________________________________
+!INTEGER                                :: i,II,IJ,Ip,Im,Is !ST ,neq,neq1,neq2 - declared above
 INTEGER                                :: i,n,m,II,IJ,IK,Jp,Jm,Ip,Im,Is
 !INTEGER                               :: neq,neq1,neq2,nleq,nleq1,nleq2,jmeq ! modified for EMEP
 !______________________________________________
@@ -221,7 +234,7 @@ REAL(dp),DIMENSION(0:manio)  :: eqxmz,eqxmm
 REAL(dp),DIMENSION(0:jSOL)   :: eqxyZ,eqxyA,eqxyB,eqxyC
 REAL(dp),DIMENSION(8,0:jSOL) :: eqxy
 !______________________________________________
-LOGICAL :: leqskip_all,lhelp
+LOGICAL :: leqskip_all
 !______________________________________________
 LOGICAL, DIMENSION(KCHEMTOP:KMAX_MID) :: leqskip
 !______________________________________________
@@ -445,10 +458,14 @@ DATA eqxy(jRHDc,0:jSOL)/  ZERO, &
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! Start INPUT for EMEP:
    DO i=neq1,neq2     ! i = vertikal levels
-      eqWH2O(i)=xWH2O(i,n) ! aerosol water (from previous time step)
       eqTT  (i)=temp (i)   ! T [K]
-      eqAW  (i)=relh (i)   ! water activity [0-1]
-      eqRH  (i)=eqAW (i)   ! equilibrium assumption (aw=RH)
+! Aerosol water   mass   [ug/m3(air)]
+      eqWH2O(i)=xWH2O(i,n)*1.E-9_dp ! [ kg/m3(air)]
+!ST      eqWH2O(i)=xWH2O(i,n) ! aerosol water (from previous time step)
+! Relative humidity      [0-1]
+      eqRH  (i)=MAX(REALZERO,MIN(relh(i),RHMAX)) 
+!ST      eqAW  (i)=relh (i)   ! water activity [0-1]
+!ST      eqRH  (i)=eqAW (i)   ! equilibrium assumption (aw=RH)
       xYPa(i,n,mciam) = (NH3in(i)+NH4in(i))*1.E-6_dp    ! NH3  (g) + NH4+  (p)   [mol/m^3]
       xYPa(i,n,mciso) =  NAin(i)*1.E-6_dp               ! Na+  (ss + xsod) (p)   [mol/m^3]
       xYMa(i,n,maisu) =  SO4in(i)*1.E-6_dp              ! H2SO4(g) + SO4- + HSO4-- (p) [mol/m^3]
@@ -474,11 +491,11 @@ DATA eqxy(jRHDc,0:jSOL)/  ZERO, &
     leqskip_all=.TRUE.
    DO i=neq1,neq2
       IF(eqXPi(i)+eqXMi(i) > TINYX) leqskip(i)=.FALSE.
-      IF(imask (i,n) == 0) leqskip(i) =.TRUE.
+!ST      IF(imask (i,n) == 0) leqskip(i) =.TRUE.
       IF(.NOT.leqskip(i))  leqskip_all=.FALSE.
    END DO
 !______________________________________
-   IF(leqskip_all) GOTO 1000
+   IF(leqskip_all) RETURN   !ST GOTO 1000
 !______________________________________
 ! DOMAINS
    DO i=neq1,neq2
@@ -937,31 +954,47 @@ DATA eqxy(jRHDc,0:jSOL)/  ZERO, &
       IF(eqWH2O(i) > 1.e-12_dp) THEN
          T0T=eqT0/eqTT(i)
          COEF=ONE+LOG(T0T)-T0T
-         ! AUTODISSOCIATION CONSTANT (KW) OF WATER
-         X1   = 1.010E-14_dp
-         KEQ  = X1*EXP(-22.52_dp*(T0T-ONE) + 26.920_dp*COEF)
-         ! H2O <==> H+ + OH- WITH KW [MOL^2/KG^2]
-         AKW  = KEQ*eqRH(i)*eqWH2O(i)*eqWH2O(i)
+!ST         ! AUTODISSOCIATION CONSTANT (KW[-]) OF WATER
+!ST         X1   = 1.010E-14_dp
+!ST         KEQ  = X1*EXP(-22.52_dp*(T0T-ONE) + 26.920_dp*COEF)
+!ST         ! H2O <==> H+ + OH- WITH KW [MOL^2/KG^2]
+!ST         AKW  = KEQ*eqRH(i)*eqWH2O(i)*eqWH2O(i)
+!ST         ! [OH-] = [H+] [MOL]
+!ST         AKW  = AKW**0.5_dp
+!ST         ! H+ PARAMETERIZATION
+!ST         XZ=eqXMi(i)-eqXPi(i)
+!ST         IF(IDeq(i) > 2) THEN
+!ST            eqHPLUS(i)=XZ+eqyg(i,3)-eqyg(i,1)
+!ST            XZ=(eqHPLUS(i)/eqWH2O(i)+AKW)*Dw*1.e-3_dp
+!ST         ELSE IF(IDeq(i) < 3) THEN
+!ST             eqHPLUS(i)=XZ+eqyg(i,3)
+!ST             XZ=(eqHPLUS(i)/eqWH2O(i)+AKW)*Dw*1.e-6_dp
+!ST         END IF
+!ST         ! AEROSOL PH
+!ST         IF (XZ > REALZERO) THEN
+!ST            ! HYDROGEN CONCENTRATION [MOL/L(H2O)]
+!ST            eqPH(i) = -LOG10(XZ)
+!ST         ELSE IF (XZ < REALZERO) THEN
+!ST            ! HYDROXY ION CONCENTRATION [MOL/L(H2O)]
+!ST            eqPH(i) = 14._dp + LOG10(-XZ)
+!ST            eqHPLUS(i)=ZERO
+!ST         END IF
+         ! AUTODISSOCIATION CONSTANT (KW[-]) OF WATER 
+         ! relative to 1 [mol(H+)/kg(H2O)] and [mol(OH-)/kg(H2O)] at STD
+         KEQ  = 1.010E-14_dp*EXP(-22.52_dp*(T0T-ONE) + 26.920_dp*COEF) 
          ! [OH-] = [H+] [MOL]
-         AKW  = AKW**0.5_dp
-         ! H+ PARAMETERIZATION
-         XZ=eqXMi(i)-eqXPi(i)
-         IF(IDeq(i) > 2) THEN
-            eqHPLUS(i)=XZ+eqyg(i,3)-eqyg(i,1)
-            XZ=(eqHPLUS(i)/eqWH2O(i)+AKW)*Dw*1.e-3_dp
-         ELSE IF(IDeq(i) < 3) THEN
-             eqHPLUS(i)=XZ+eqyg(i,3)
-             XZ=(eqHPLUS(i)/eqWH2O(i)+AKW)*Dw*1.e-6_dp
-         END IF
-         ! AEROSOL PH
-         IF (XZ > REALZERO) THEN
-            ! HYDROGEN CONCENTRATION [MOL/L(H2O)]
-            eqPH(i) = -LOG10(XZ)
-         ELSE IF (XZ < REALZERO) THEN
-            ! HYDROXY ION CONCENTRATION [MOL/L(H2O)]
-            eqPH(i) = 14._dp + LOG10(-XZ)
-            eqHPLUS(i)=ZERO
-         END IF
+         AKW  = KEQ**0.5_dp      ! [mol(H+)/kg(H2O)]
+         !     [mol(H+)/kg(H2O)] * [kg(H2O)/m^3(air)]
+         eqHPLUS(i) = AKW * eqWH2O(i)  ! [mol(H+)/m^3(air)]
+         ! difference of totals of cations and anions
+         XZ   = (eqXPi(i)-eqXMi(i))    ! [mol(H+)/m^3(air)]
+         ! assuming  H+ = OH-    ! [mol(H+)/m^3(air)]
+         IF (XZ < ZERO) XZ = -XZ
+         eqHPLUS(i) = eqHPLUS(i) +  XZ/1000._dp
+         ! AEROSOL PH [-]
+         !  eqHPLUS   [mol(H+)/m^3(air)]
+         !  tWH2O     [kg(H2O)/m^3(air)]
+         eqPH(i) = -LOG10(eqHPLUS(i)/eqWH2O(i))
          ! Growth Factor [-]
          eqGF(i) =(eqRHO(i)/Dw*eqWH2O(i)/eqPMt(i)+ONE)**(1._dp/3._dp)
       END IF
@@ -1026,7 +1059,7 @@ DATA eqxy(jRHDc,0:jSOL)/  ZERO, &
       aNO3out(i) = (eqym(i,maino,jAP)+eqym(i,maino,jDP))*1.E6_dp   ! particulate nitrate  (p=a+s)
       aClout (i) = (eqym(i,maicl,jAP)+eqym(i,maicl,jDP))*1.E6_dp   ! particulate chloride (p=a+s)
       aNH4out(i) = (eqyp(i,mciam,jAP)+eqyp(i,mciam,jDP))*1.E6_dp   ! particulate ammonium (p=a+s)
-      aNAout (i) = (eqyp(i,mciso,jAP)+eqyp(i,mciso,jDP))*1.E6_dp   ! particulate sodium   (p=a+s)
+!      aNAout (i) = (eqyp(i,mciso,jAP)+eqyp(i,mciso,jDP))*1.E6_dp   ! particulate sodium   (p=a+s)
 !//.. gases [umol/m^3]
       gNO3out(i) = eqyg(i,1)*1.E6_dp       ! residual HNO3  (g)
       gCLout (i) = eqyg(i,2)*1.E6_dp       ! residual HCl   (g)
@@ -1034,11 +1067,15 @@ DATA eqxy(jRHDc,0:jSOL)/  ZERO, &
       gSO4out(i) = eqyg(i,4)*1.E6_dp       ! residual H2SO4 (g)
 !//.. aerosol water [ug/m^3]
       aH2Oout(i) = eqWH2O(i)               ! aerosol Water  (aq)
+!//.. H+ concentration 
+!      apH(i) = eqHPLUS(i)               ! 
+!//.. Aerosol pH 
+      apH(i) = eqPH(i) 
    END DO
 !  END OUTPUT for EMEP
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++
 !______________________________________
-1000 CONTINUE  ! leqskip_all = .TRUE.
+!ST  1000 CONTINUE  ! leqskip_all = .TRUE.
 !______________________________________
 END DO ! nleq1,nleq2
 !____________________________________________________________________________________________

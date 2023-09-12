@@ -1,7 +1,7 @@
-! <BiDir_emep.f90 - A component of the EMEP MSC-W Chemical transport Model, version rv4.45>
+! <BiDir_emep.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2022 met.no
+!*  Copyright (C) 2007-2023 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -28,20 +28,37 @@ module BiDir_emep
   ! DUMMY
   ! Will act as interface between emep-ctm and BiDir_module
 
-  use Config_module, only : USES, MasterProc
   implicit none
   private
 
-  character(len=*), parameter, public :: BiDir_emep_Status='TOBEDONE'
-
-  public :: Init_BiDir  ! FUTURE
+  public :: BiDir_ijInit
+  public :: BiDir_ijRGs
+  public :: BiDir_ijFluxes
+  public :: BiDir_ijFinish 
+  public :: BiDir_Derived
 
 contains
-  subroutine Init_BiDir()
-     logical, save :: first_call = .true.
-     character(len=*), parameter :: dtxt='IniBD:'
-     if ( USES%BIDIR .and. MasterProc .and.  first_call) then
-        write(*,*) dtxt//' FUTURE INIT'
-     end if
-  end subroutine Init_BiDir
+ subroutine BiDir_ijInit(i,j,NH3_ix)
+     integer, intent(in) :: i,j,NH3_ix
+ end subroutine BiDir_ijInit
+ subroutine BiDir_ijRGs(ncall,iL,Rsur,Gsto)
+     integer, intent(in):: ncall, iL
+     real, intent(inout) :: Rsur
+     real, intent(in)  :: Gsto
+ end subroutine BiDir_ijRGs
+ subroutine BiDir_ijFluxes(i,j,iL,Vg_ref,Vg_eff,Rb,Rsur,Gsto)
+     integer, intent(in) :: i,j,iL
+     real, intent(in) :: Vg_ref,Vg_eff,Rb,Rsur,Gsto
+ end subroutine BiDir_ijFluxes
+ subroutine BiDir_ijFinish(i,j,gradfac,sumLand,DepLoss)
+    integer, intent(in) :: i,j
+    real, intent(inout) :: gradfac
+    real, intent(in)    :: sumLand, DepLoss
+ end subroutine BiDir_ijFinish
+ subroutine BiDir_Derived(txt,n,limax,ljmax,nerr)
+    character(len=*), intent(in) :: txt
+    integer, intent(in) :: n,limax,ljmax
+    integer, intent(inout) :: nerr
+ end subroutine BiDir_Derived
+
 end module BiDir_emep
