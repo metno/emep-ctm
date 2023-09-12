@@ -209,7 +209,8 @@ The reports can be found under the following links:
   title        = {Open Source EMEP/MSC-W model rv4.45 (202203)},
   month        = mar,
   year         = 2022,
-  url          = {http://github.com/metno/emep-ctm/releases/tag/rv4_45}
+  doi          = {10.5281/zenodo.8337953},
+  url          = {https://doi.org/10.5281/zenodo.8337953}
 }
 
 @misc{emep-ctm_rv4.36,
