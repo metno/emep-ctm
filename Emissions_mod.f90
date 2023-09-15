@@ -608,403 +608,418 @@ contains
 
   end subroutine Init_masks
 !***********************************************************************
-  subroutine EmisUpdate
-    !Update emission arrays, and read new sets as required
-    integer :: n, i, j, ij, f, ix, is, is0, date_limit(5), iem, ic, icc, iqrc
-    integer :: itot,isec,iland, i_femis_lonlat, ncFileID, maxfound
-    type(date) :: coming_date
-    real :: fac, gridyear, ccsum,emsum(NEMIS_FILE)
-    character(len=TXTLEN_NAME) :: fmt
-    TYPE(timestamp)   :: ts1,ts2
-    logical, save ::first_call = .true.
-    real, allocatable, dimension(:,:) :: sumemis ! Sum of emissions per country
-    real, allocatable, dimension(:,:,:) :: sumemis_sec ! Sum of emissions per country and sector
-    real, save, allocatable, dimension(:,:) :: xsumemis ! DS testing for EMTBL output. Seems to work for Ncalls = 1, BUT BE CAREFUL
-    real, allocatable, dimension(:,:,:) :: cdfemis !to send to  Emis_GetCdf
-    logical :: writeoutsums
-    logical :: writeout !if something to show and writeoutsums=T
-    integer, save :: ncalls = 0
+subroutine EmisUpdate
+   !Update emission arrays, and read new sets as required
+   integer :: n, i, j, ij, f, ix, is, is0, date_limit(5), iem, ic, icc, iqrc
+   integer :: itot,isec,iland, i_femis_lonlat, ncFileID, maxfound
+   type(date) :: coming_date
+   real :: fac, gridyear, ccsum
+   character(len=TXTLEN_NAME) :: fmt
+   TYPE(timestamp)   :: ts1,ts2
+   logical, save ::first_call = .true.
+   real, allocatable, dimension(:) :: emsum ! Sum of emissions per file
+   real, allocatable, dimension(:,:) :: sumemis ! Sum of emissions per country
+   real, allocatable, dimension(:,:,:) :: sumemis_sec ! Sum of emissions per country and sector
+   real, save, allocatable, dimension(:,:) :: xsumemis ! DS testing for EMTBL output. Seems to work for Ncalls = 1, BUT BE CAREFUL
+   real, allocatable, dimension(:,:,:) :: cdfemis !to send to  Emis_GetCdf
+   logical :: writeoutsums
+   logical :: writeout !if something to show and writeoutsums=T
+   logical :: read_new_emissions
+   integer, save :: ncalls = 0
 
-    writeoutsums = first_call .or. step_main<10 .or. DEBUG%EMISSIONS
-    writeout = .false. !init
-    ncalls = ncalls + 1
+   writeoutsums = first_call .or. step_main<10 .or. DEBUG%EMISSIONS
+   writeout = .false. !init
+   ncalls = ncalls + 1
 
-    ts1=make_timestamp(current_date)
-    coming_date = current_date
-    coming_date%seconds = coming_date%seconds + 1800!NB: end_of_validity_date is at end of period, for example 1-1-2018 for December 2017
-    gridyear = GRIDWIDTH_M * GRIDWIDTH_M * 3600*24*nydays*1.0E-6!kg/m2/s -> kt/year
+   ts1=make_timestamp(current_date)
+   coming_date = current_date
+   coming_date%seconds = coming_date%seconds + 1800!NB: end_of_validity_date is at end of period, for example 1-1-2018 for December 2017
+   gridyear = GRIDWIDTH_M * GRIDWIDTH_M * 3600*24*nydays*1.0E-6!kg/m2/s -> kt/year
 
-    if ( ncalls == 1 .and. NEmisFile_sources > 0 ) then
-      allocate(xsumemis(NLAND,NEMIS_FILE))
-      xsumemis = 0.0
-   end if
+   read_new_emissions = .false.
    do n = 1, NEmisFile_sources
-       if(writeoutsums .or. EmisFiles(n)%periodicity=='monthly')then
-          writeoutsums = .true.
-          ! sum emissions per countries
-          allocate(sumemis(NLAND,NEMIS_FILE))
-          if(SecEmisTotalsWanted)allocate(sumemis_sec(NLAND,NSECTORS,NEMIS_FILE))
-          if(SecEmisTotalsWanted)sumemis_sec = 0.0
-          sumemis = 0.0
-          emsum = 0.0
-          exit
-       end if
-    end do
-    maxfound=0
-    is0=0
-    NEmis_source_ij=0
-    !loop over all sources and see which one need to be reread from files
-    do n = 1, NEmisFile_sources
-       if(date_is_reached(to_idate(EmisFiles(n)%end_of_validity_date,5 )))then
-          if(me==0 .and. writeoutsums)&
-               write(*,*)'Emis: current date has reached past update date ',&
-               EmisFiles(n)%end_of_validity_date,EmisFiles(n)%periodicity
-          if(writeoutsums) writeout = .true. ! at least something to write
-          if(writeoutsums .and. .not.allocated(sumemis))then
-             allocate(sumemis(NLAND,NEMIS_FILE))
-             if(SecEmisTotalsWanted)allocate(sumemis_sec(NLAND,NSECTORS,NEMIS_FILE))
-             emsum = 0.0
-          endif
-          !values are no more valid, fetch new one
-          if(writeoutsums)sumemis=0.0
-          if(writeoutsums .and. SecEmisTotalsWanted)sumemis_sec=0.0
-          allocate(cdfemis(EmisFiles(n)%nsectors,LIMAX,LJMAX))  !NB: sector is first coordinate
-          do is = EmisFiles(n)%source_start,EmisFiles(n)%source_end
-             if(Emis_source(is)%is3D)then
-                ix = ix3Dmap(is)
-                Emis_source_3D(1:,1:,1:,ix)=0.0
-                call Emis_GetCdf(EmisFiles(n),Emis_source(is),Emis_source_3D(1,1,1,ix),coming_date)
-             else
-                if (mod(is-EmisFiles(n)%source_start, EmisFiles(n)%nsectors) == 0) then
-                  is0=is-1 !shift to get at start of cdfemis array
-                  !we read EmisFiles(n)%nsectors at once
-                  !if only one sector per variable, EmisFiles(n)%nsectors=1 and, we only rewrite one 2D field
-                  cdfemis=0.0
-                  call Emis_GetCdf(EmisFiles(n),Emis_source(is),cdfemis,coming_date)
+      if(EmisFiles(n)%periodicity=='monthly') &
+         writeoutsums = .true.
 
-                 if(me==0 .and. DEBUG%EMISSIONS)write(*,*)is,&
-                     ' getemis '//trim(Emis_source(is)%units)//' '//trim(Emis_source(is)%varname)//' read as '//trim(Emis_source(is)%species)
+      if (.not. date_is_reached(to_idate(EmisFiles(n)%end_of_validity_date, 5))) &
+         cycle
 
+      if (MasterProc .and. writeoutsums) &
+         write(*,'(5(A,:,X))') sub,'current date has reached past update date',&
+            date2string("YYYY-MM-DD hh:mm:ss", EmisFiles(n)%end_of_validity_date),&
+            trim(EmisFiles(n)%periodicity)
+      read_new_emissions = .true.
+   end do
+   if (.not. read_new_emissions) then
+      if (MasterProc .and. writeoutsums) &
+         write(*,*) sub // " no new emissions to read"
+      return
+    end if
+    if (MasterProc .and. writeoutsums) &
+       write(*,*) sub // " read new and old emissions"
+
+   if (writeoutsums) then
+      writeout = .true. ! at least something to write
+
+      allocate(emsum(NEMIS_FILE))
+      emsum = 0.0
+
+      allocate(sumemis(NLAND,NEMIS_FILE))
+      sumemis = 0.0
+
+      if(.not. allocated(xsumemis)) then
+         allocate(xsumemis(NLAND,NEMIS_FILE))
+         xsumemis = 0.0
+      end if
+
+      if(SecEmisTotalsWanted) then
+         allocate(sumemis_sec(NLAND,NSECTORS,NEMIS_FILE))
+         sumemis_sec = 0.0
+      end if
+   endif
+   maxfound=0
+   is0=0
+   NEmis_source_ij=0
+
+   !loop over all sources and see which one need to be reread from files
+   do n = 1, NEmisFile_sources
+      allocate(cdfemis(EmisFiles(n)%nsectors,LIMAX,LJMAX))  !NB: sector is first coordinate
+      do is = EmisFiles(n)%source_start,EmisFiles(n)%source_end
+         if(Emis_source(is)%is3D)then
+            ix = ix3Dmap(is)
+            Emis_source_3D(1:,1:,1:,ix)=0.0
+            call Emis_GetCdf(EmisFiles(n),Emis_source(is),Emis_source_3D(1,1,1,ix),coming_date)
+         else
+            if (mod(is-EmisFiles(n)%source_start, EmisFiles(n)%nsectors) == 0) then
+               is0=is-1 !shift to get at start of cdfemis array
+               !we read EmisFiles(n)%nsectors at once
+               !if only one sector per variable, EmisFiles(n)%nsectors=1 and, we only rewrite one 2D field
+               cdfemis=0.0
+               call Emis_GetCdf(EmisFiles(n),Emis_source(is),cdfemis,coming_date)
+
+               if(me==0 .and. DEBUG%EMISSIONS)write(*,*)is,&
+                  ' getemis '//trim(Emis_source(is)%units)//' '//trim(Emis_source(is)%varname)//' read as '//trim(Emis_source(is)%species)
+
+            end if
+         end if
+         !reduction factors
+         fac = EmisFiles(n)%factor
+         fac = fac* Emis_source(is)%factor
+
+         !unit and factor conversions
+         !convert into kg/m2/s
+         select case(Emis_source(is)%units)
+         case ('kg/s', 'kg/m2/s', 'kg m-2 s-1')
+            fac = fac
+         case ('g/s', 'g/m2/s', 'g m-2 s-1')
+            fac = fac /(1000.0)
+         case ('mg/s', 'mg/m2/s', 'mg m-2 s-1')
+            fac = fac /(1000*1000.0)
+         case default
+            !if not /s units, depends on periodicity:
+            if(EmisFiles(n)%periodicity == 'yearly')then
+               select case(Emis_source(is)%units)
+               case ('kt/m2', 'kt/m2/year', 'kt', 'kt/year','kt m-2', 'kt m-2 year-1', 'kt year-1')
+                     fac = fac * 1000 *1000/(3600*24*nydays)
+               case ('tonnes/m2', 'tonnes/m2/year', 'tonnes', 'tonnes/year','tonnes m-2', 'tonnes m-2 year-1', 'tonnes year-1', 'Mg' )
+                  fac = fac * 1000/(3600*24*nydays)
+               case ('kg/m2', 'kg m-2', 'kg/m2/year', 'kg m-2 year-1', 'kg', 'kg/year', 'kg year-1')
+                  fac = fac /(3600*24*nydays)
+               case ('g/m2', 'g/m2/year', 'g', 'g/year', 'g m-2', 'g m-2 year-1', 'g year-1')
+                  fac = fac /(1000.0*3600*24*nydays)
+               case ('mg/m2', 'mg/m2/year', 'mg', 'mg/year', 'mg m-2', 'mg m-2 year-1', 'mg year-1')
+                  fac = fac /(1.0e6*3600*24*nydays)
+               case default
+                  call StopAll("Unit for yearly emissions not recognized: "//trim(Emis_source(is)%units))
+               end select
+            else if(EmisFiles(n)%periodicity == 'monthly')then
+               select case(Emis_source(is)%units)
+               case ('kt/m2','kt/m2/month', 'kt', 'kt/month','kt m-2','kt m-2 month-1', 'kt month-1')
+                  fac = fac *1000*1000/(3600*24*nmdays(coming_date%month))
+               case ('tonnes/m2', 'tonnes/m2/month', 'tonnes', 'tonnes/month','tonnes m-2', 'tonnes m-2 month-1', 'tonnes month-1')
+                  fac = fac *1000/(3600*24*nmdays(coming_date%month))
+               case ('kg/m2', 'kg/m2/month', 'kg', 'kg/month','kg m-2', 'kg m-2 month-1', 'kg month-1')
+                  fac = fac /(3600*24*nmdays(coming_date%month))
+               case ('g/m2', 'g/m2/month', 'g', 'g/month','g m-2', 'g m-2 month-1', 'g month-1')
+                  fac = fac /(1000*3600*24*nmdays(coming_date%month))
+               case ('mg/m2', 'mg/m2/month', 'mg', 'mg/month','mg m-2', 'mg m-2 month-1', 'mg month-1')
+                  fac = fac /(1.0e6*3600*24*nmdays(coming_date%month))
+               case default
+                  call StopAll("Unit for montly emissions not recognized: "//trim(Emis_source(is)%units))
+               end select
+            else
+               !assume hourly
+               select case(Emis_source(is)%units)
+               case ('mg/m2', 'mg/m2/h', 'mg m-2', 'mg m-2 h-1')
+                  !convert into kg/m2/s
+                  fac = fac /(1.0e6*3600.0)
+               case ('g/m2', 'g/m2/h','g m-2', 'g m-2 h-1')
+                  fac = fac /(1000.0*3600.0)
+                  if(EmisFiles(n)%periodicity /= 'hourly' .and. Emis_source(is)%units == 'g/m2')then
+                     call StopAll("Emis_source unit g/m2 only implemented for hourly, monthly or yearly. Found "//trim(EmisFiles(n)%periodicity))
+                  endif
+               case ('g/s','g s-1')
+                  fac = fac /(1000.0)
+               case ('kg/s','kg s-1')
+                  fac = fac
+               case ('tonnes/s', 'tonnes s-1')
+                  fac = fac * 1000.0
+               case default
+                  call StopAll("Emis_source unit not implemented. Found "//trim(Emis_source(is)%units)//' '//trim(EmisFiles(n)%periodicity))
+               end select
+               !Note: easy to implement more unit choices. Just add appropriate cases here
+            endif
+         end select
+
+         ! units that are "per gridcell" must be dvided by gridcell areas
+         select case(Emis_source(is)%units)
+         case ('kt', 'Mg', 'kt/s', 'kt/month', 'kt/year', 'tonnes', 'tonnes/s', 'tonnes/month' &
+            , 'tonnes/year', 'kg', 'kg/s', 'kg/month', 'kg/year', 'g', 'g/s', 'g/month' &
+            , 'g/year', 'mg', 'mg/s', 'mg/month', 'mg/year', 'g/h', 'mg/h'&
+            , 'kt s-1', 'kt month-1', 'kt year-1', 'tonnes s-1', 'tonnes month-1' &
+            , 'tonnes year-1', 'kg s-1', 'kg month-1', 'kg year-1', 'g s-1', 'g month-1' &
+            , 'g year-1', 'mg s-1', 'mg month-1', 'mg year-1', 'g h-1', 'mg h-1')
+            !divide by gridarea
+            fac = fac / (GRIDWIDTH_M * GRIDWIDTH_M)
+            do j = 1,ljmax
+               do i = 1,limax
+                  cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * xm2(i,j)
+               end do
+            end do
+         end select
+
+         do j = 1,ljmax
+            do i = 1,limax
+               cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * fac
+            end do
+         end do
+
+         !now cdfemis should be in kg/m2/s
+         !apply masks
+         !could easily be better CPU optimized if necessary by putting all factors in same i,j loop
+         if(Emis_source(is)%mask_ix>0)then
+            do j = 1,ljmax
+               do i = 1,limax
+                  cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * EmisMaskValues(i,j,Emis_source(is)%mask_ix)
+               end do
+            end do
+         end if
+         if(Emis_source(is)%mask_reverse_ix>0)then
+            do j = 1,ljmax
+               do i = 1,limax
+                  if (abs(EmisMaskValues(i,j,Emis_source(is)%mask_ix)-1.0)>1.0E-10) then
+                     !mutiply by fac in the not covered region
+                     cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * EmisMaskValues(i,j,Emis_source(is)%mask_ix)
+                  else
+                     !keep unchanged otherwise
+                  end if
+               end do
+            end do
+         end if
+         if(Emis_source(is)%apply_femis)then
+            !apply femis_lonlat
+            isec = Emis_source(is)%sector
+            if(Emis_source(is)%sector>0 .and. Emis_source(is)%sector<=NSECTORS)then
+               iland = Emis_source(is)%country_ix
+               if(iland<0)iland=IC_DUMMY
+               isec = Emis_source(is)%sector
+               iem = find_index(Emis_source(is)%species,EMIS_FILE(:))
+               if(iem >0 )then
+                  if(N_femis_lonlat>0 .and. isec>0) then
+                     do i_femis_lonlat=1,N_femis_lonlat
+                        if(femis_lonlat_ic(i_femis_lonlat)==0 .or. &
+                           femis_lonlat_ic(i_femis_lonlat)==Country(Emis_source(is)%country_ix)%icode)then
+                           do j=1,ljmax
+                              do i=1,limax
+                                 if(glat(i,j)>femis_latmin(i_femis_lonlat).and.&
+                                    glat(i,j)<femis_latmax(i_femis_lonlat).and.&
+                                    glon(i,j)>femis_lonmin(i_femis_lonlat).and.&
+                                    glon(i,j)<femis_lonmax(i_femis_lonlat))then
+                                    cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * e_fact_lonlat(isec,i_femis_lonlat,iem)
+                                 endif
+                              end do
+                           end do
+                        end if
+                     end do
+                  end if
+               else
+                  !see if the species belongs to any of the splitted species
+                  iqrc = 0
+                  do iem = 1,NEMIS_FILE
+                     do f = 1,emis_nsplit(iem)
+                        iqrc = iqrc + 1
+                        itot = iqrc2itot(iqrc)
+                        if(trim(species(itot)%name)==trim(Emis_source(is)%species))then
+                           !lonlat format
+                           if(N_femis_lonlat>0 .and. isec>0) then
+                              do i_femis_lonlat=1,N_femis_lonlat
+                                 if(femis_lonlat_ic(i_femis_lonlat)==0 .or. &
+                                    femis_lonlat_ic(i_femis_lonlat)==Country(Emis_source(is)%country_ix)%icode)then
+                                    do j=1,ljmax
+                                       do i=1,limax
+                                          if(glat(i,j)>femis_latmin(i_femis_lonlat).and.&
+                                             glat(i,j)<femis_latmax(i_femis_lonlat).and.&
+                                             glon(i,j)>femis_lonmin(i_femis_lonlat).and.&
+                                             glon(i,j)<femis_lonmax(i_femis_lonlat))then
+                                             cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * e_fact_lonlat(isec,i_femis_lonlat,iem)
+                                       endif
+                                       end do
+                                    end do
+                                 end if
+                              end do
+                           end if
+                           go to 888
+                        end if
+                     end do
+                  end do ! iem
+888               continue
+               end if
+            end if
+         end if
+
+         if(writeout)then
+            ! sum emissions per countries (in ktonnes?)
+            itot = Emis_source(is)%species_ix
+            isec = Emis_source(is)%sector
+            iland = Emis_source(is)%country_ix
+            if(itot>0)then
+               iqrc = itot2iqrc(itot)
+               if(isec>0 .and. iqrc>0)then
+                  iem = iqrc2iem(iqrc)
+               else
+                  iem=-1
                endif
-             end if
-             !reduction factors
-             fac = EmisFiles(n)%factor
-             fac = fac* Emis_source(is)%factor
+            else
+               iem=find_index(Emis_source(is)%species,EMIS_FILE(:))
+            end if
+            if(iem>0)then
+               do j = 1,ljmax
+                  do i = 1,limax
+                     sumemis(iland,iem) = sumemis(iland,iem) + cdfemis(is-is0,i,j) * gridyear * xmd(i,j) !now in kt/year
+                     xsumemis(iland,iem) = xsumemis(iland,iem) + cdfemis(is-is0,i,j) * gridyear * xmd(i,j) !now in kt/year
+                     if(SecEmisTotalsWanted)&
+                        sumemis_sec(iland,is,iem) = sumemis_sec(iland,is,iem)&
+                        + cdfemis(is-is0,i,j) * gridyear * xmd(i,j)
+                  end do
+               end do
+            end if
+         end if
+         if (is-is0 == EmisFiles(n)%nsectors) then
+            ! now we store the emission fields in a more memory effective form,
+            ! since most country emissions are zero outside of the country.
+            !note that we store only once all the EmisFiles(n)%nsectors are
+            ij = 0
+            do j=1,ljmax
+               do i=1,limax
+                  ij=ij+1
+                  do isec=1,EmisFiles(n)%nsectors
+                     if (cdfemis(isec,i,j)>1e-20) then
+                        if(NEmis_source_ij(ij)>NEmis_source_ijMAX)write(*,*)me,i,j,NEmis_source_ij(ij)
+                        call CheckStop(NEmis_source_ij(ij)>NEmis_source_ijMAX,'NEmis_source_ijMAX too small. Please increase it')
+                        NEmis_source_ij(ij)=NEmis_source_ij(ij)+1
+                        maxfound= max(maxfound,NEmis_source_ij(ij))
+                        Emis_source_ij_ix(ij,NEmis_source_ij(ij))=is0+isec
+                        Emis_source_ij(ij,NEmis_source_ij(ij)) =cdfemis(isec,i,j)
+                     end if
+                  end do
+               end do
+            end do
+         end if
+      end do
+      deallocate(cdfemis)
 
-             !unit and factor conversions
-             !convert into kg/m2/s
-             select case(Emis_source(is)%units)
-             case ('kg/s', 'kg/m2/s', 'kg m-2 s-1')
-                fac = fac
-             case ('g/s', 'g/m2/s', 'g m-2 s-1')
-                fac = fac /(1000.0)
-             case ('mg/s', 'mg/m2/s', 'mg m-2 s-1')
-                fac = fac /(1000*1000.0)
-             case default
-                !if not /s units, depends on periodicity:
-                if(EmisFiles(n)%periodicity == 'yearly')then
-                   select case(Emis_source(is)%units)
-                   case ('kt/m2', 'kt/m2/year', 'kt', 'kt/year','kt m-2', 'kt m-2 year-1', 'kt year-1')
-                         fac = fac * 1000 *1000/(3600*24*nydays)
-                   case ('tonnes/m2', 'tonnes/m2/year', 'tonnes', 'tonnes/year','tonnes m-2', 'tonnes m-2 year-1', 'tonnes year-1', 'Mg' )
-                      fac = fac * 1000/(3600*24*nydays)
-                   case ('kg/m2', 'kg m-2', 'kg/m2/year', 'kg m-2 year-1', 'kg', 'kg/year', 'kg year-1')
-                      fac = fac /(3600*24*nydays)
-                   case ('g/m2', 'g/m2/year', 'g', 'g/year', 'g m-2', 'g m-2 year-1', 'g year-1')
-                      fac = fac /(1000.0*3600*24*nydays)
-                   case ('mg/m2', 'mg/m2/year', 'mg', 'mg/year', 'mg m-2', 'mg m-2 year-1', 'mg year-1')
-                      fac = fac /(1.0e6*3600*24*nydays)
-                   case default
-                      call StopAll("Unit for yearly emissions not recognized: "//trim(Emis_source(is)%units))
-                   end select
-                else if(EmisFiles(n)%periodicity == 'monthly')then
-                   select case(Emis_source(is)%units)
-                   case ('kt/m2','kt/m2/month', 'kt', 'kt/month','kt m-2','kt m-2 month-1', 'kt month-1')
-                      fac = fac *1000*1000/(3600*24*nmdays(coming_date%month))
-                   case ('tonnes/m2', 'tonnes/m2/month', 'tonnes', 'tonnes/month','tonnes m-2', 'tonnes m-2 month-1', 'tonnes month-1')
-                      fac = fac *1000/(3600*24*nmdays(coming_date%month))
-                   case ('kg/m2', 'kg/m2/month', 'kg', 'kg/month','kg m-2', 'kg m-2 month-1', 'kg month-1')
-                      fac = fac /(3600*24*nmdays(coming_date%month))
-                   case ('g/m2', 'g/m2/month', 'g', 'g/month','g m-2', 'g m-2 month-1', 'g month-1')
-                      fac = fac /(1000*3600*24*nmdays(coming_date%month))
-                   case ('mg/m2', 'mg/m2/month', 'mg', 'mg/month','mg m-2', 'mg m-2 month-1', 'mg month-1')
-                      fac = fac /(1.0e6*3600*24*nmdays(coming_date%month))
-                   case default
-                      call StopAll("Unit for montly emissions not recognized: "//trim(Emis_source(is)%units))
-                   end select
-                else
-                   !assume hourly
-                   select case(Emis_source(is)%units)
-                   case ('mg/m2', 'mg/m2/h', 'mg m-2', 'mg m-2 h-1')
-                      !convert into kg/m2/s
-                      fac = fac /(1.0e6*3600.0)
-                   case ('g/m2', 'g/m2/h','g m-2', 'g m-2 h-1')
-                      fac = fac /(1000.0*3600.0)
-                      if(EmisFiles(n)%periodicity /= 'hourly' .and. Emis_source(is)%units == 'g/m2')then
-                         call StopAll("Emis_source unit g/m2 only implemented for hourly, monthly or yearly. Found "//trim(EmisFiles(n)%periodicity))
-                      endif
-                   case ('g/s','g s-1')
-                      fac = fac /(1000.0)
-                   case ('kg/s','kg s-1')
-                      fac = fac
-                   case ('tonnes/s', 'tonnes s-1')
-                      fac = fac * 1000.0
-                   case default
-                      call StopAll("Emis_source unit not implemented. Found "//trim(Emis_source(is)%units)//' '//trim(EmisFiles(n)%periodicity))
-                   end select
-                   !Note: easy to implement more unit choices. Just add appropriate cases here
-                endif
-             end select
+      !update date of valitdity
+      if(EmisFiles(n)%periodicity == 'yearly')then
+         !assumes only one record to read
+         EmisFiles(n)%end_of_validity_date = date(current_date%year,1,1,0,0)
+         EmisFiles(n)%end_of_validity_date%year = EmisFiles(n)%end_of_validity_date%year + 1
+      else if(EmisFiles(n)%periodicity == 'monthly')then
+         !assumes 12 records, one for each month
+         EmisFiles(n)%end_of_validity_date = date(current_date%year,1,1,0,0)
+         EmisFiles(n)%end_of_validity_date%month = current_date%month + 1
+         if(EmisFiles(n)%end_of_validity_date%month>12)then
+            EmisFiles(n)%end_of_validity_date = date(current_date%year+1,1,1,0,0)
+         end if
+      else
+         !the correct times must be written in the file and updated in Emis_GetCdf
+      end if
+      if(EmisFiles(n)%ncFileID >= 0) then
+         call check(nf90_close(EmisFiles(n)%ncFileID))
+         EmisFiles(n)%ncFileID = -1 !mark as closed
+      end if
 
-             ! units that are "per gridcell" must be dvided by gridcell areas
-             select case(Emis_source(is)%units)
-             case ('kt', 'Mg', 'kt/s', 'kt/month', 'kt/year', 'tonnes', 'tonnes/s', 'tonnes/month' &
-                  , 'tonnes/year', 'kg', 'kg/s', 'kg/month', 'kg/year', 'g', 'g/s', 'g/month' &
-                  , 'g/year', 'mg', 'mg/s', 'mg/month', 'mg/year', 'g/h', 'mg/h'&
-                  , 'kt s-1', 'kt month-1', 'kt year-1', 'tonnes s-1', 'tonnes month-1' &
-                  , 'tonnes year-1', 'kg s-1', 'kg month-1', 'kg year-1', 'g s-1', 'g month-1' &
-                  , 'g year-1', 'mg s-1', 'mg month-1', 'mg year-1', 'g h-1', 'mg h-1')
-                !divide by gridarea
-                fac = fac / (GRIDWIDTH_M * GRIDWIDTH_M)
-                do j = 1,ljmax
-                   do i = 1,limax
-                      cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * xm2(i,j)
-                   enddo
-                enddo
-             end select
+      if(writeout)then
+         CALL MPI_ALLREDUCE(MPI_IN_PLACE,sumemis,&
+            NLAND*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
+         if(SecEmisTotalsWanted)CALL MPI_ALLREDUCE(MPI_IN_PLACE,sumemis_sec,&
+            NLAND*NSECTORS*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
+         if(me==0)then
+            !EMTABDS write(*,*)"Emissions per country for "//trim(EmisFiles(n)%filename)//' (Gg/year) '
+            call PrintLog("#EMTBL Total emissions by countries for "//trim(EmisFiles(n)%filename)//' (Gg/year) ')
+            write(*     ,"(a14,a5,3x,30(a12,:))")"EMTBL CC Land ","    ",EMIS_FILE(:)
+            write(IO_LOG,"(a14,a5,3x,30(a12,:))")"EMTBL CC Land ","    ",EMIS_FILE(:)
+            fmt="(a5,i4,1x,a9,3x,30(f12.2,:))"
+            do ic = 1, NLAND
+               ccsum = sum( sumemis(ic,:) )
+               icc=Country(ic)%icode
+               if ( ccsum > 0.0 )then
+                  write(*,     fmt) 'EMTBL', icc, Country(ic)%code, sumemis(ic,:)
+                  write(IO_LOG,fmt) 'EMTBL', icc, Country(ic)%code, sumemis(ic,:)
+               end if
+            end do
+            if(SecEmisTotalsWanted)then
+               write(*     ,"(a19,2x,30(a12,:))")"  CC Land    Sector",EMIS_FILE(:)
+               fmt="(i4,1x,a9,i4,3x,30(f12.2,:))"
+               do ic = 1, NLAND
+                  do is = 1, NSECTORS
+                     ccsum = sum( sumemis_sec(ic,is,:) )
+                     icc=Country(ic)%icode
+                     if ( ccsum > 0.0 )then
+                        write(*, fmt) icc, Country(ic)%code, is, sumemis_sec(ic,is,:)
+                     end if
+                  end do
+               end do
+            end if
+         end if
 
-             do j = 1,ljmax
-                do i = 1,limax
-                   cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * fac
-                enddo
-             enddo
+         !total of emissions from all countries and files into emsum
+         do iem = 1, NEMIS_FILE
+            emsum(iem)= emsum(iem)+sum(sumemis(:,iem))
+         end do
+      endif
+   enddo
+   if(writeout)then
+      CALL MPI_ALLREDUCE(MPI_IN_PLACE,maxfound,1,MPI_INTEGER,MPI_MAX,MPI_COMM_CALC,IERROR)
+      if(me==0)write(*,*)'max sources found in single gridcell ',maxfound
+      CALL MPI_ALLREDUCE(MPI_IN_PLACE,xsumemis,&
+            NLAND*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
+      fmt="(a5,i4,1x,a9,3x,30(f12.2,:))" ! reset
+      if(me==0 .and. NEmisFile_sources>0) then
+         call PrintLog('#EMTBL Total emissions by countries, all Emis_source files (Gg/year) ')
+         write(*     ,"(a23,a5,3x,30(a12,:))")"EMTBL    NCalls CC Land","    ",EMIS_FILE(:)
+         write(IO_LOG,"(a23,a5,3x,30(a12,:))")"EMTBL    NCalls CC Land ","    ",EMIS_FILE(:)
+         fmt="(a5,i9,i4,1x,a9,3x,30(g12.2,:))"
+         do ic = 1, NLAND
+            ccsum = sum( xsumemis(ic,:) )
+            icc=Country(ic)%icode
+            if ( ccsum > 0.0 )then
+               write(*,     fmt) 'EMTBL', ncalls, icc, Country(ic)%code, xsumemis(ic,:)
+               write(IO_LOG,fmt) 'EMTBL', ncalls, icc, Country(ic)%code, xsumemis(ic,:)
+            end if
+         end do
+         write(*     ,fmt)'EMTBL',  ncalls,999,'TOTAL    ',emsum(:)
+         write(IO_LOG,fmt)'EMTBL',  ncalls,999,'TOTAL    ',emsum(:)
+      end if
+      fmt="(a5,i4,1x,a9,3x,30(f12.2,:))" ! reset
+      CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)!so that print out comes out nicely
+   endif
+   if (allocated(emsum)) deallocate(emsum)
+   if (allocated(sumemis)) deallocate(sumemis)
+   if (allocated(sumemis_sec)) deallocate(sumemis_sec)
 
-             !now cdfemis should be in kg/m2/s
+   first_call=.false.
 
-             !apply masks
-             !could easily be better CPU optimized if necessary by putting all factors in same i,j loop
-             if(Emis_source(is)%mask_ix>0)then
-                do j = 1,ljmax
-                   do i = 1,limax
-                      cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * EmisMaskValues(i,j,Emis_source(is)%mask_ix)
-                   enddo
-                enddo
-             endif
-             if(Emis_source(is)%mask_reverse_ix>0)then
-                do j = 1,ljmax
-                   do i = 1,limax
-                      if (abs(EmisMaskValues(i,j,Emis_source(is)%mask_ix)-1.0)>1.0E-10) then
-                         !mutiply by fac in the not covered region
-                         cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * EmisMaskValues(i,j,Emis_source(is)%mask_ix)
-                      else
-                         !keep unchanged otherwise
-                      end if
-                   enddo
-                enddo
-             endif
-             if(Emis_source(is)%apply_femis)then
-                !apply femis_lonlat
-                isec = Emis_source(is)%sector
-                if(Emis_source(is)%sector>0 .and. Emis_source(is)%sector<=NSECTORS)then
-                   iland = Emis_source(is)%country_ix
-                   if(iland<0)iland=IC_DUMMY
-                   isec = Emis_source(is)%sector
-                   iem = find_index(Emis_source(is)%species,EMIS_FILE(:))
-                   if(iem >0 )then
-                      if(N_femis_lonlat>0 .and. isec>0) then
-                         do i_femis_lonlat=1,N_femis_lonlat
-                            if(femis_lonlat_ic(i_femis_lonlat)==0 .or. &
-                                 femis_lonlat_ic(i_femis_lonlat)==Country(Emis_source(is)%country_ix)%icode)then
-                               do j=1,ljmax
-                                  do i=1,limax
-                                     if(glat(i,j)>femis_latmin(i_femis_lonlat).and.&
-                                          glat(i,j)<femis_latmax(i_femis_lonlat).and.&
-                                          glon(i,j)>femis_lonmin(i_femis_lonlat).and.&
-                                          glon(i,j)<femis_lonmax(i_femis_lonlat))then
-                                        cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * e_fact_lonlat(isec,i_femis_lonlat,iem)
-                                     endif
-                                  end do
-                               end do
-                            end if
-                         end do
-                      end if
-                   else
-                      !see if the species belongs to any of the splitted species
-                      iqrc = 0
-                      do iem = 1,NEMIS_FILE
-                         do f = 1,emis_nsplit(iem)
-                            iqrc = iqrc + 1
-                            itot = iqrc2itot(iqrc)
-                            if(trim(species(itot)%name)==trim(Emis_source(is)%species))then
-                               !lonlat format
-                               if(N_femis_lonlat>0 .and. isec>0) then
-                                  do i_femis_lonlat=1,N_femis_lonlat
-                                     if(femis_lonlat_ic(i_femis_lonlat)==0 .or. &
-                                          femis_lonlat_ic(i_femis_lonlat)==Country(Emis_source(is)%country_ix)%icode)then
-                                        do j=1,ljmax
-                                           do i=1,limax
-                                              if(glat(i,j)>femis_latmin(i_femis_lonlat).and.&
-                                                   glat(i,j)<femis_latmax(i_femis_lonlat).and.&
-                                                   glon(i,j)>femis_lonmin(i_femis_lonlat).and.&
-                                                   glon(i,j)<femis_lonmax(i_femis_lonlat))then
-                                                 cdfemis(is-is0,i,j) = cdfemis(is-is0,i,j) * e_fact_lonlat(isec,i_femis_lonlat,iem)
-                                             endif
-                                           end do
-                                        end do
-                                     end if
-                                  end do
-                               end if
-                               go to 888
-                            endif
-                         enddo
-                      enddo ! iem
-888                   continue
-                   endif
-                endif
-             endif
-
-             if(writeout)then
-                ! sum emissions per countries (in ktonnes?)
-                itot = Emis_source(is)%species_ix
-                isec = Emis_source(is)%sector
-                iland = Emis_source(is)%country_ix
-                if(itot>0)then
-                   iqrc = itot2iqrc(itot)
-                   if(isec>0 .and. iqrc>0)then
-                      iem = iqrc2iem(iqrc)
-                   else
-                      iem=-1
-                   endif
-                else
-                   iem=find_index(Emis_source(is)%species,EMIS_FILE(:))
-                endif
-                if(iem>0)then
-                   do j = 1,ljmax
-                      do i = 1,limax
-                         sumemis(iland,iem) = sumemis(iland,iem) + cdfemis(is-is0,i,j) * gridyear * xmd(i,j) !now in kt/year
-                         xsumemis(iland,iem) = xsumemis(iland,iem) + cdfemis(is-is0,i,j) * gridyear * xmd(i,j) !now in kt/year
-                         if(SecEmisTotalsWanted)&
-                              sumemis_sec(iland,is,iem) = sumemis_sec(iland,is,iem)&
-                              + cdfemis(is-is0,i,j) * gridyear * xmd(i,j)
-                      enddo
-                   enddo
-                endif
-             endif
-             if (is-is0 == EmisFiles(n)%nsectors) then
-                ! now we store the emission fields in a more memory effective form,
-                ! since most country emissions are zero outside of the country.
-                !note that we store only once all the EmisFiles(n)%nsectors are
-                ij = 0
-                do j=1,ljmax
-                   do i=1,limax
-                      ij=ij+1
-                      do isec=1,EmisFiles(n)%nsectors
-                         if (cdfemis(isec,i,j)>1e-20) then
-                            if(NEmis_source_ij(ij)>NEmis_source_ijMAX)write(*,*)me,i,j,NEmis_source_ij(ij)
-                            call CheckStop(NEmis_source_ij(ij)>NEmis_source_ijMAX,'NEmis_source_ijMAX too small. Please increase it')
-                            NEmis_source_ij(ij)=NEmis_source_ij(ij)+1
-                            maxfound= max(maxfound,NEmis_source_ij(ij))
-                            Emis_source_ij_ix(ij,NEmis_source_ij(ij))=is0+isec
-                            Emis_source_ij(ij,NEmis_source_ij(ij)) =cdfemis(isec,i,j)
-                         end if
-                      end do
-                   end do
-                end do
-             end if
-          enddo
-
-          !update date of valitdity
-          if(EmisFiles(n)%periodicity == 'yearly')then
-             !assumes only one record to read
-             EmisFiles(n)%end_of_validity_date = date(current_date%year,1,1,0,0)
-             EmisFiles(n)%end_of_validity_date%year = EmisFiles(n)%end_of_validity_date%year + 1
-          else if(EmisFiles(n)%periodicity == 'monthly')then
-             !assumes 12 records, one for each month
-             EmisFiles(n)%end_of_validity_date = date(current_date%year,1,1,0,0)
-             EmisFiles(n)%end_of_validity_date%month = current_date%month + 1
-             if(EmisFiles(n)%end_of_validity_date%month>12)then
-                EmisFiles(n)%end_of_validity_date = date(current_date%year+1,1,1,0,0)
-             endif
-          else
-             !the correct times must be written in the file and updated in Emis_GetCdf
-          endif
-          if(EmisFiles(n)%ncFileID >= 0) then
-             call check(nf90_close(EmisFiles(n)%ncFileID))
-             EmisFiles(n)%ncFileID = -1 !mark as closed
-          end if
-          deallocate(cdfemis)
-       endif
-       if(writeout)then
-          CALL MPI_ALLREDUCE(MPI_IN_PLACE,sumemis,&
-               NLAND*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
-          if(SecEmisTotalsWanted)CALL MPI_ALLREDUCE(MPI_IN_PLACE,sumemis_sec,&
-               NLAND*NSECTORS*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
-          if(me==0)then
-             !EMTABDS write(*,*)"Emissions per country for "//trim(EmisFiles(n)%filename)//' (Gg/year) '
-             call PrintLog("#EMTBL Total emissions by countries for "//trim(EmisFiles(n)%filename)//' (Gg/year) ')
-             write(*     ,"(a14,a5,3x,30(a12,:))")"EMTBL CC Land ","    ",EMIS_FILE(:)
-             write(IO_LOG,"(a14,a5,3x,30(a12,:))")"EMTBL CC Land ","    ",EMIS_FILE(:)
-             fmt="(a5,i4,1x,a9,3x,30(f12.2,:))"
-             do ic = 1, NLAND
-                ccsum = sum( sumemis(ic,:) )
-                icc=Country(ic)%icode
-                if ( ccsum > 0.0 )then
-                   write(*,     fmt) 'EMTBL', icc, Country(ic)%code, sumemis(ic,:)
-                   write(IO_LOG,fmt) 'EMTBL', icc, Country(ic)%code, sumemis(ic,:)
-                end if
-             end do
-             if(SecEmisTotalsWanted)then
-                write(*     ,"(a19,2x,30(a12,:))")"  CC Land    Sector",EMIS_FILE(:)
-                fmt="(i4,1x,a9,i4,3x,30(f12.2,:))"
-                do ic = 1, NLAND
-                   do is = 1, NSECTORS
-                      ccsum = sum( sumemis_sec(ic,is,:) )
-                      icc=Country(ic)%icode
-                      if ( ccsum > 0.0 )then
-                         write(*, fmt) icc, Country(ic)%code, is, sumemis_sec(ic,is,:)
-                      end if
-                   end do
-                end do
-             end if
-          end if
-
-          !total of emissions from all countries and files into emsum
-          do iem = 1, NEMIS_FILE
-             emsum(iem)= emsum(iem)+sum(sumemis(:,iem))
-          end do
-        endif
-    enddo
-    if(writeout)then
-       CALL MPI_ALLREDUCE(MPI_IN_PLACE,maxfound,1,MPI_INTEGER,MPI_MAX,MPI_COMM_CALC,IERROR)
-       if(me==0)write(*,*)'max sources found in single gridcell ',maxfound
-       CALL MPI_ALLREDUCE(MPI_IN_PLACE,xsumemis,&
-               NLAND*NEMIS_FILE,MPI_REAL8,MPI_SUM,MPI_COMM_CALC,IERROR)
-       fmt="(a5,i4,1x,a9,3x,30(f12.2,:))" ! reset
-       if(me==0 .and. NEmisFile_sources>0) then
-          call PrintLog('#EMTBL Total emissions by countries, all Emis_source files (Gg/year) ')
-          write(*     ,"(a23,a5,3x,30(a12,:))")"EMTBL    NCalls CC Land","    ",EMIS_FILE(:)
-          write(IO_LOG,"(a23,a5,3x,30(a12,:))")"EMTBL    NCalls CC Land ","    ",EMIS_FILE(:)
-          fmt="(a5,i9,i4,1x,a9,3x,30(g12.2,:))"
-          do ic = 1, NLAND
-             ccsum = sum( xsumemis(ic,:) )
-             icc=Country(ic)%icode
-             if ( ccsum > 0.0 )then
-                write(*,     fmt) 'EMTBL', ncalls, icc, Country(ic)%code, xsumemis(ic,:)
-                write(IO_LOG,fmt) 'EMTBL', ncalls, icc, Country(ic)%code, xsumemis(ic,:)
-             end if
-          end do
-          write(*     ,fmt)'EMTBL',  ncalls,999,'TOTAL    ',emsum(:)
-          write(IO_LOG,fmt)'EMTBL',  ncalls,999,'TOTAL    ',emsum(:)
-       end if
-       fmt="(a5,i4,1x,a9,3x,30(f12.2,:))" ! reset
-       CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)!so that print out comes out nicely
-    endif
-    if (allocated(sumemis)) deallocate(sumemis)
-    if (allocated(sumemis_sec)) deallocate(sumemis_sec)
-
-    first_call=.false.
-
-  end subroutine EmisUpdate
+end subroutine EmisUpdate
 
 !***********************************************************************
   subroutine Emissions(year)
