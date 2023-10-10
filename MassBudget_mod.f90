@@ -39,7 +39,7 @@ use Config_module,    only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d field
                               PT,               & ! Pressure at top
                               USES, DMS,&
                               EXTENDEDMASSBUDGET
-use Debug_module,     only: DEBUG_MASS
+use Debug_module,     only: DEBUG ! %MASS
 use EmisDef_mod,      only: O_NH3, O_DMS
 use GridValues_mod,   only: xmd, &  
                               gridwidth_m,dA,dB,debug_proc,debug_li,debug_lj
@@ -139,7 +139,7 @@ subroutine emis_massbudget_1d(i,j)
 
   do k = KCHEMTOP,KMAX_MID
     scaling_k = scaling * (dA(k) + dB(k)*ps(i,j,1))/M(k)
-    if(all((/DEBUG_MASS,debug_proc,i==debug_li,j==debug_lj/)))&
+    if(all((/DEBUG%MASS,debug_proc,i==debug_li,j==debug_lj/)))&
       call datewrite("MASSRC ",k,(/dB(k)*ps(i,j,1),xmd(i,j),&
           ps(i,j,1),scaling_k/))
 
@@ -207,7 +207,7 @@ subroutine massbudget()
         xmin(:) = amin1(xmin(:),xn_adv(:,i,j,k))
         sumk(:,k) = sumk(:,k) + xn_adv(:,i,j,k)*helsum
 
-        if(all((/DEBUG_MASS,debug_proc,i==debug_li,j==debug_lj/)))&
+        if(all((/DEBUG%MASS,debug_proc,i==debug_li,j==debug_lj/)))&
           call datewrite("MASSBUD",k,(/(dA(k)*dB(k)*ps(i,j,1))*xmd(i,j)/&
           GRAV*GRIDWIDTH_M*GRIDWIDTH_M,ps(i,j,1),PT,xmd(i,j)/))
       end do

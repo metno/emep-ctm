@@ -34,7 +34,7 @@ use ChemDims_mod,           only: NSPEC_ADV
 use ChemSpecs_mod,          only: species_adv
 use Config_module,          only: MasterProc, BC_DAYS,&
      USE_EXTERNAL_BIC,EXTERNAL_BIC_NAME,EXTERNAL_BIC_VERSION,TOP_BC,filename_eta
-use Debug_module,           only: DEBUG=>DEBUG_NEST_ICBC
+use Debug_module,           only: DEBUG !=>DEBUG%NEST_ICBC
 use Io_mod,                 only: IO_NML
 use Io_RunLog_mod,          only: PrintLog
 use OwnDataTypes_mod,       only: TXTLEN_SHORT
@@ -146,10 +146,10 @@ subroutine set_extbic_id(idate)
   rewind(IO_NML)
   READ_NML: do
     read(IO_NML,NML=ExternalBICs_bc,iostat=ios)
-    if(DEBUG.and.MasterProc.and.ios/=0) &
+    if(DEBUG%NEST_ICBC.and.MasterProc.and.ios/=0) &
       write(*,*) "failed ExternalBICs_bc read with iostat=",ios
     if(ios/=0) exit READ_NML
-    if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic","read_nml bc",&
+    if(DEBUG%NEST_ICBC.and.MasterProc) write(*,DEBUG_FMT) "set_extbic","read_nml bc",&
       trim(description%name)//"/"//trim(description%version)
     EXTERNAL_BIC_SET=&
       EXTERNAL_BIC_NAME==description%name.and.&
@@ -164,7 +164,7 @@ subroutine set_extbic_id(idate)
   if(.not.EXTERNAL_BIC_SET) &
     call CheckStop(MasterProc,"No external BICs found")
   
-  if(DEBUG.and.MasterProc) write(*,DEBUG_FMT) "set_extbic", &
+  if(DEBUG%NEST_ICBC.and.MasterProc) write(*,DEBUG_FMT) "set_extbic", &
     date2string("BCs for YYYY-MM-DD hh type",idate),&
     trim(EXTERNAL_BIC_NAME)//"/"//trim(EXTERNAL_BIC_VERSION)
 

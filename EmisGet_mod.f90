@@ -24,7 +24,7 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-	module EmisGet_mod
+module EmisGet_mod
 
 use CheckStop_mod,     only: CheckStop, StopAll, check=>CheckNC
 use ChemDims_mod,      only: NSPEC_ADV, NSPEC_TOT, NEMIS_File, NEMIS_Specs
@@ -1887,49 +1887,44 @@ subroutine make_iland_for_time(debug_tfac, indate, i, j, iland, wday,&
   iland_timefac_hour = find_index(Country(iland)%timefac_index_hourly,Country(:)%icode)
 
   ! iland_timefacs are country codes for time factors.
-  if (debug_tfac) write(*,'(a,3i6)') dtxt//'TZLAND', iland, &
-     iland_timefac, iland_timefac_hour
+  !if (debug_tfac) write(*,'(a,3i6)')dtxt//'TZLAND'//trim(Country(iland)%code),&
+  !     iland,  iland_timefac, iland_timefac_hour
 
 !if (Country(iland)%icode ==223)then
 ! write(*,*) 'TIMEZONE NZ', i_fdom(i),j_fdom(j),debug_tfac
 !nd if
 
-  itz = -999 ! if not set with USES%TIMEZONEMAP
+  ! Sep2023 - TIMEZONEMAP always in use.
+  ! itz = -999 ! if not set with USES%TIMEZONEMAP
+  !if ( USES%TIMEZONEMAP ) then
 
-  if ( USES%TIMEZONEMAP ) then
-     itJan = timezones%Jan(i,j)   ! Values -12 to +12
-     itz   = timezones%map(i,j)
-     if(debug_tfac)then
-      write(*,"(a,i3,f7.1,3i5)")dtxt//"TIMEZONE:"//trim(Country(iland)%code),&
-         indate%month,  glon(i,j),timezones%map(i,j), itJan, itz
-     end if
-  end if ! USES%TIMEZONEMAP
+  itJan = timezones%Jan(i,j)   ! Values -12 to +12 ? not used?
+  itz   = timezones%map(i,j)
 
   if(Country(iland)%timezone==-100)then
-    if ( USES%TIMEZONEMAP ) then  ! can use tz directly
+    !if ( USES%TIMEZONEMAP ) then  ! can use tz directly
       hour_iland = indate%hour + itz
-    else ! approximate local time from longitude:
-      lon = modulo(360+nint(glon(i,j)),360)
-      if(lon>180.0)lon=lon-360.0
-      hour_iland= mod(nint(indate%hour+24*(lon/360.0)),24)
-      if(debug_tfac) write(*,"(a,i3,f7.1,3i5)")dtxt//"TIME-100:"//trim(Country(iland)%code),&
-        indate%month,  glon(i,j),hour_iland
-    end if
+    !else ! approximate local time from longitude:
+    !  lon = modulo(360+nint(glon(i,j)),360)
+    !  if(lon>180.0)lon=lon-360.0
+    !  hour_iland= mod(nint(indate%hour+24*(lon/360.0)),24)
+    !end if
 
   else ! we use the country-specified time-zones, but add summer-time from grid
 
      hour_iland = indate%hour + Country(iland)%timezone
-     if ( USES%TIMEZONEMAP ) then ! we can add summertime :-)
-       hour_iland = hour_iland + timezones%inc(i,j)
-       if(debug_tfac) write(*,"(a,3i6)") dtxt//"TIMEDST:",&
-          Country(iland)%timezone, hour_iland, timezones%inc(i,j)
-     end if
+     !if ( USES%TIMEZONEMAP ) then ! we can add summertime :-)
+     hour_iland = hour_iland + timezones%inc(i,j)
+     !end if
   end if
 
   hour_iland = hour_iland + 1 !add 1 to get 1..24
 
-  if(debug_tfac) write(*,"(a,L2,5i7)") dtxt//"TIMECALC:", USES%TIMEZONEMAP, &
-      Country(iland)%timezone,indate%hour, hour_iland, itz+1
+  if(debug_tfac) write(*,"(a,3i4,f7.1,9i6)") dtxt//"TIMECALC:"//&
+   trim(Country(iland)%code), iland,  iland_timefac, iland_timefac_hour, &
+     glon(i,j), timezones%map(i,j), Country(iland)%timezone,&
+     indate%hour, hour_iland, itJan, itz !why: +1
+
   wday_loc=wday
   if(hour_iland>24) then
      hour_iland = hour_iland - 24
@@ -1945,12 +1940,12 @@ subroutine make_iland_for_time(debug_tfac, indate, i, j, iland, wday,&
   end if
 
   if(debug_tfac .or. hour_iland < -24) then
-     write(*,"(a,2i3,i5,3x,5i5,i4)") dtxt//"DAYS times ", &
-          wday, wday_loc, iland,&
-          hour_iland, Country(iland)%timezone, i,j, itz
-     call datewrite(dtxt//"DAY 24x7:", &
-          (/ iland, wday, wday_loc, hour_iland /), &
-          (/ fac_ehh24x7(1,TFAC_IDX_TRAF,hour_iland,wday_loc,iland_timefac_hour) /) )
+    !write(*,"(a,2i3,i5,3x,5i5,i4)") dtxt//"DAYS times ", &
+    !     wday, wday_loc, iland,&
+    !     hour_iland, Country(iland)%timezone, i,j, itz
+    call datewrite(dtxt//"DAY 24x7:", &
+      [ iland, wday, wday_loc, hour_iland ], &
+      [ fac_ehh24x7(1,TFAC_IDX_TRAF, hour_iland,wday_loc,iland_timefac_hour) ])
   end if
 
 end subroutine make_iland_for_time

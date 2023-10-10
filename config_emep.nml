@@ -22,7 +22,8 @@
   SondesFile            = 'DataDir/sondes.dat',
   Vertical_levelsFile   = 'DataDir/Vertical_levels20_EC.txt'
   AircraftEmis_FLFile   = 'DataDir/AircraftEmis_FL.nc',
-  soilnox_emission_File = 'DataDir/cams81_monthly_SoilEmissions_v2.4a_GLOBAL05_Clim2000_2020.nc',
+ !from ECCAD:
+  soilnox_emission_File = 'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc',
 !------------------------------
   ZCMDIR                     = 'DataDir/ZCM_EmChem19r',
   SplitDefaultFile           = 'ZCMDIR/emissplit_defaults_POLL.csv',
@@ -83,12 +84,9 @@
   ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
   BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
   SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
-!--- 'fake' vegetation for ozone POD calculations
-!    Note - these are only applicable to European EMEP domain. For
-!    global-scale POD calculations, contact d.simpson@met.no
-  FLUX_VEGS = 'IAM_DF','IAM_DF_MED', ! do not need all array elements
-              'IAM_WH','IAM_WH_MED','IAM_WH_Irrig','IAM_WH_MED_Irrig',
-              'IAM_SNL','IAM_SNL_MED',
+!------------------------------
+! In v5.0, we do not give FLUX_VEGS as before. Set from OutputVegO3 landcovers.
+! Still need to ignore some classes:
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE',  ! Ignore these for FLUX calcs.
 !-------- volcanic emissions from passive degassing and historical eruptions
   flocdef='DataDir/columnsource_location.csv_2023',
@@ -205,8 +203,8 @@ OutputVegO3=
   'MMAOT40_TC'     ,'AOT',40.0,'MM','TC    ',F,0,999,'YM',
   'MMAOT40_IAM_DF' ,'AOT',40.0,'MM','IAM_DF',F,0,999,'YM',
   'MMAOT40_IAM_MF' ,'AOT',40.0,'MM','IAM_MF',F,0,999,'YM',
-  'MMAOT40_IAM_CR' ,'AOT',40.0,'MM','IAM_CR',F,0,999,'YM',
-  'EUAOT40_Crops'  ,'AOT',40.0,'EU','IAM_CR',F,0,999,'YM',
+  'MMAOT40_IAM_WH' ,'AOT',40.0,'MM','IAM_WH',F,0,999,'YM',
+  'EUAOT40_Crops'  ,'AOT',40.0,'EU','IAM_WH',F,0,999,'YM',
   'EUAOT40_Forests','AOT',40.0,'EU','IAM_DF',F,0,999,'YM',
   'MMAOT40_IAM_WH' ,'AOT',40.0,'MM','IAM_WH',F,0,999,'YM',
 

@@ -33,7 +33,7 @@ module Config_module
 !----------------------------------------------------------------------------
 use AeroConstants_mod,     only: AERO
 use BiDir_module,          only: BiDir
-use CheckStop_mod,         only: CheckStop
+use CheckStop_mod,         only: CheckStop, StopAll
 use ChemDims_mod,          only: NSPEC_ADV, NSPEC_SHL
 use ChemSpecs_mod,         only: species, CM_schemes_ChemSpecs
 use ChemGroups_mod,        only: chemgroups
@@ -177,7 +177,6 @@ type, public :: emep_useconfig
     ,EMIS             = .false. &! Uses ESX
     ,GRIDDED_EMIS_MONTHLY_FACTOR = .false. & ! .true. triggers ECLIPSE monthly factors
     ,DEGREEDAY_FACTORS = .true. &! will not be used if not found or global grid
-    ,DAYOFYEARTIMEFAC  = .false. &! Replace monthly and Daily by day of year timefactor
     ,EMISSTACKS       = .false. &!
     ,BVOC             = .true.  &!triggers isoprene and terpene emissions
 !    ,RH_RHO_CORR      = .false. &! EXPERIMENTAL, for settling velocity
@@ -214,7 +213,7 @@ type, public :: emep_useconfig
     ,CLOUDJVERBOSE    = .false. & ! set to true to get initialization print output from CloudJ
     ,AMINEAQ          = .false. & ! MKPS
 !    ,ESX              = .false. &! Uses ESX
-    ,PFT_MAPS         = .false. &! Set true for GLOBAL runs, false for EMEP/European
+    ,PFT_MAPS         = .false. &! Set true for GLOBAL runs, false for EMEP/European. Also sets GLOBAL_Settings (tmp)
     ,uEMEP            = .false. &! make local fraction of pollutants
     ,LocalFractions   = .false. &! make local fraction of pollutants
     ! meteo related
@@ -225,7 +224,6 @@ type, public :: emep_useconfig
     ,RH_FROM_NWP      = .true.  &! Use rh2m, not LE in Submet
     ,TLEAF_FROM_HD    = .false.  &! TESTING Tleaf. Cannot use both _HD and _Rn
     ,TLEAF_FROM_RN    = .false.  &! TESTING Tleaf 
-    ,TIMEZONEMAP      = .true. & ! Uses new monthly_timezones_GLOBAL05 map
     ,EFFECTIVE_RESISTANCE = .true. ! Drydep method designed for shallow layer
 !  real :: SURF_AREA_RHLIMITS  = -1  ! Max RH (%) in Gerber eqns. -1 => 100%
   real :: SEASALT_fFrac = 0.5       ! 0 = "< rv4_39", 0.3 = new suggestion
@@ -520,6 +518,8 @@ type(typ_s5ind), public, save, dimension(MAX_NUM_DERIV2D) :: &
 
 integer, parameter, private :: MAXNVO3  = 60
 type(O3cl_t), public, save, dimension(MAXNVO3) :: OutputVegO3 = O3cl_t()
+! will be set in Landuse_mod:
+integer, save, public :: nOutputVegO3 = 0
 
 ! Depositions
 type(typ_s1ind), public, save, dimension(MAX_NUM_DDEP_ECOS) :: &
@@ -683,13 +683,9 @@ real, public :: Zmix_ref = 50.0 !height at which concentration above different l
 !! We will put the filename, and params (SGS, EGS, etc) in
 !! the _Params array.
 character(len=TXTLEN_SHORT), public, save, dimension(20) ::  &
-   FLUX_VEGS=""    & ! e.g. WinterWheat
-  ,FLUX_IGNORE=""  & ! e.g. Water, desert..
+  FLUX_IGNORE=""  & ! e.g. Water, desert..
   ,VEG_2dGS=""
-character(len=TXTLEN_SHORT), private, dimension(size(FLUX_VEGS)) ::  &
-   FLUX_VEGS_COPY =""     !  work array
 character(len=99), public, save, dimension(10) :: VEG_2dGS_Params=""
-integer, public, save :: nFluxVegs = 0 ! reset in Landuse_mod
 
 ! To use external maps of plant functional types we need to
 ! map between EMEP codes and netcdf file codes
@@ -798,7 +794,10 @@ character(len=TXTLEN_FILE), target, save, public :: AircraftEmis_FLFile = 'DataD
 !character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = 'DataDir/nox_emission_1996-2005.nc'
 !CAMS81:
 !rv4.50+: use this climatological file for all years, since year-to-year variation is small and uncertain
-character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = 'DataDir/cams81_monthly_SoilEmissions_v2.4a_GLOBAL05_Clim2000_2020.nc'
+!character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = 'DataDir/cams81_monthly_SoilEmissions_v2.4a_GLOBAL05_Clim2000_2020.nc'
+!ECCAD format:
+character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = &
+   'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc'
 !
 !2021: added ECLIPSE6b-based factors for non-European areas
 !MAY 2021: CAREFUL - set MonthlyFacFile consistent with MonthlyFacBasis
@@ -806,9 +805,12 @@ character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = 'Dat
 ! (though code will crudely check)
 !2023 rv4.50 update - revert defaults to xJune2012 and GENEMIS. Need to re-check this!
 character(len=TXTLEN_FILE), target, save, public :: MonthlyFacFile = 'DataDir/Timefactors/MonthlyFacs_eclipse_V6b_snap_xJun2012/MonthlyFacs.POLL'
-!character(len=TXTLEN_FILE), save, public :: MonthlyFacBasis = 'NOTSET'  ! ECLIPSE  => No summer/witer  corr
-character(len=TXTLEN_FILE), save, public :: MonthlyFacBasis = 'GENEMIS'  ! => Uses summer/witer  corr
-character(len=TXTLEN_FILE), save, public :: TimeFacBasis = 'MIXED'  ! => mixed sources for Monthly, Daily, etc
+!character(len=TXTLEN_SHORT), save, public :: MonthlyFacBasis = 'NOTSET'  ! ECLIPSE  => No summer/witer  corr
+character(len=TXTLEN_SHORT), save, public :: MonthlyFacBasis = 'GENEMIS'  ! => Uses summer/witer  corr
+character(len=TXTLEN_SHORT), save, public :: TimeFacBasis = &
+   'MIXED'  ! => mixed sources for Monthly, Daily, etc
+    ! or CAMS_CLIM_TEMPO    ! Uses climatological month/day/hour CAMS-TEMPO data
+    ! or DAY_OF_YEAR        ! Replace monthly and Daily by day of year timefactor
 !POLL replaced by name of pollutant in Timefactors_mod
 character(len=TXTLEN_FILE), target, save, public :: DayofYearFacFile = './DayofYearFac.POLL'
 character(len=TXTLEN_FILE), target, save, public :: DailyFacFile = 'DataDir/inputs_emepdefaults_Jun2012/DailyFac.POLL'
@@ -861,7 +863,7 @@ contains
 subroutine Config_Constants(iolog)
   integer, intent(in) :: iolog ! for Log file
 
-  integer :: i, j, ispec, iostat
+  integer :: i, j, nj, ispec, iostat
   logical,save :: first_call = .true.
   character(len=len(meteo)) ::  MetDir='./' ! path from meteo
   character(len=*), parameter ::  dtxt='Config_MC:'
@@ -900,7 +902,6 @@ subroutine Config_Constants(iolog)
    ,SecEmisTotalsWanted    & ! give total per sectors and countries
    ,HourlyEmisOut         & ! to output emissions hourly
    ,DailyEmisOut         & ! to output emissions daily
-   ,FLUX_VEGS             & ! Allows user to add veg categories for eg IAM ouput
    ,FLUX_IGNORE           & ! Specify which landcovers don't need FLUX
    ,VEG_2dGS              & ! Allows 2d maps of growing seasons
    ,VEG_2dGS_Params       & ! Allows 2d maps of growing seasons
@@ -1016,7 +1017,9 @@ subroutine Config_Constants(iolog)
         do j=1,i-1
           write(*,*)trim(DataPath(j))
         end do
-        stop
+        !stop
+        !Hmmm... maybe above write statements are not flushed in time. Re-consider another day
+        call StopAll(dtxt//'WARNING: Could not find valid DataDir.')
       end if
       exit
     end if
@@ -1068,6 +1071,13 @@ subroutine Config_Constants(iolog)
   if(MasterProc)then
     write(*,*)dtxt//'Defined DegreeDayFactorsFile as:'
     write(*,*)trim(DegreeDayFactorsFile)
+  end if
+
+  ! Sep 2023 temporary solution. We set PFT_MAPS in most configs, but here we 
+  ! assume: (will reverse logic one day)
+  if ( USES%PFT_MAPS ) then
+     GLOBAL_settings = "YES"
+     European_settings = "NO"
   end if
 
  ! LandCoverInputs
@@ -1171,24 +1181,6 @@ subroutine Config_Constants(iolog)
 
   call define_chemicals_indices() ! sets up species indices if they exist
   
-  ! For global runs we shout not allow IAM_ in FLUX_VEGS, because the
-  ! growing season and other characteristics are not really available.
-  ! For advice on how to trigger e.g. global wheat calculations, contact
-  ! d.simpson@met.no
-  
-  if ( USES%PFT_MAPS ) then
-    j=0
-    do i = 1, size(FLUX_VEGS)
-      if ( index(FLUX_VEGS(i),'IAM_') > 0 ) cycle
-      if ( FLUX_VEGS(i) == '' ) cycle
-      j = j + 1
-      FLUX_VEGS_COPY(j) = FLUX_VEGS(i)
-      if(masterProc) write(*,*) 'FLUX_VEGij',i,j, trim(FLUX_VEGS(i)), index(FLUX_VEGS(i),'IAM_')
-    end do
-    FLUX_VEGS = FLUX_VEGS_COPY
-    if(MasterProc) write(*,*) 'FLUX_VEGS', FLUX_VEGS
-  end if
-
 end subroutine Config_Constants
 
 ! PRELIM. Just writes out USES so far.
@@ -1201,11 +1193,11 @@ subroutine WriteConfig_to_RunLog(iolog)
     write(iolog,'(a)') 'soilnox_emission_File: '//trim(soilnox_emission_File)
     write(iolog,'(a)') 'SplitDefaultFile:      '//trim(SplitDefaultFile)
     write(iolog,'(a)') 'SplitSpecialsFile:     '//trim(SplitSpecialsFile)
+    write(iolog,*)     'TimeFacBasis:          '//trim(TimeFacBasis)
+    write(iolog,*)     'MonthlyFacBasis:       '//trim(MonthlyFacBasis)
     write(iolog,'(a)') 'MonthlyFacFile:        '//trim(MonthlyFacFile)
     write(iolog,'(a)') 'DailyFacFile:          '//trim(DailyFacFile)
     write(iolog,'(a)') 'HourlyFacFile:         '//trim(HourlyFacFile)
-    write(iolog,*)     'TimeFacBasis:          '//trim(TimeFacBasis)
-    write(iolog,*)     'MonthlyFacBasis:       '//trim(MonthlyFacBasis)
     write(iolog,'(a)') 'HourlyFacSpecialsFile: '//trim(HourlyFacSpecialsFile)
   endif
 end subroutine WriteConfig_to_RunLog

@@ -39,12 +39,14 @@
 !
 ! 2023 updates
 !  New options
-!   CAMS_TEMPO - can erad day-of-year variations
+!  TimeFacBasis can be:
+!   CAMS_TEMPO - can read day-of-year variations
 !   CAMS_TEMPO_CLIM - reads climatological monthly, day-of-week, and hour-of-day files
 !    from CAMS-TEMPO system.
-!   IMPORTANT CAMS_TEMPO_CLIM needs ADD_SECTORS lines in config_emep.nml to
-!   reset time-factor indices to 1-19, instead of SNAP's 1-11.
-!   *** Check if CAMS_TEMP day-of-year method should have done this.
+!   DAY_OF_YEAR
+!  IMPORTANT CAMS_TEMPO_CLIM needs ADD_SECTORS lines in config_emep.nml to
+!  reset time-factor indices to 1-19, instead of SNAP's 1-11.
+!  *** Check if CAMS_TEMPO day-of-year method should have done this.
 !
 ! Older:
 !  Reads monthly and daily (GENEMIS) factors for all emissions from files
@@ -78,7 +80,7 @@
   use Config_module, only: INERIS_SNAP1, INERIS_SNAP2, DegreeDayFactorsFile,&
                             Monthly_patternsFile,DailyFacFile,MonthlyFacFile,&
                             DayofYearFacFile,&
-                            TimeFacBasis, & ! MIXED or CAMS_TEMPO_CLIM - tmp solution
+                            TimeFacBasis, & ! MIXED, CAMS_TEMPO_CLIM, or DAY_OF_YEAR
                             MonthlyFacBasis, & ! ECLIPSE or other
                             monthly_timezoneFile, &
                             HourlyFacFile,HourlyFacSpecialsFile,&
@@ -224,7 +226,8 @@ contains
 
    if(N_TFAC==0)return
    
-   if(.not. USES%GRIDDED_EMIS_MONTHLY_FACTOR .and. .not.USES%DAYOFYEARTIMEFAC)then      
+   if(.not. USES%GRIDDED_EMIS_MONTHLY_FACTOR .and.&
+           .not. TimeFacBasis == 'DAY_OF_YEAR' )then      
 
 !  #################################
 !  1) Read in Monthly factors, and determine min value (for baseload)
@@ -242,28 +245,28 @@ contains
    if(TimeFacBasis == 'CAMS_TEMPO_CLIM' ) then
       MonthlyFacBasis = 'CAMS_TEMPO_CLIM'
    else ! TMP - until users get uses to new TimefacBasis
-      call CheckStop(MonthlyFacBasis=='CAMS_TEMP_CLIM','CLIMCHECK')
+      call CheckStop(MonthlyFacBasis=='CAMS_TEMPO_CLIM','CLIMCHECK')
    end if
       
 
    if(MasterProc) then
      write(*,*) dtxt//"TimeFacBasis:"//trim(TimeFacBasis)
      write(*,*) dtxt//"MonthlyFacBasis:"//trim(MonthlyFacBasis)
-     write(*,*) dtxt//"USES%DAOPFYEARTIMEFAC:", USES%DAYOFYEARTIMEFAC
+     !write(*,*) dtxt//"USES%DAOPFYEARTIMEFAC:", USES%DAYOFYEARTIMEFAC
    end if
 
    select case(MonthlyFacBasis)
    case("ECLIPSE")
       call CheckStop(index(MonthlyFacFile,'may2021')<1, & !CRUDE and TMP!
-         dtxt//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
+         dtxt//'Incostistent:'//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
 
    case("CAMS_TEMPO", "CAMS_TEMPO_CLIM")
       call CheckStop(index(MonthlyFacFile,'cams_tempo')<1, &
-         dtxt//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
+         dtxt//'Incostistent:'//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
          
    case("GENEMIS") ! check eclipse not in FacFile
-     call CheckStop(index(MonthlyFacFile,'xJun2012')<1, &
-         dtxt//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
+     call CheckStop(index(MonthlyFacFile,'xJun2012')<1, & !CRUDE and TMP!
+         dtxt//'Incostistent:'//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
      
      fracchange=0.005*(iyr_trend -1990)
      fracchange=max(0.0,fracchange) !do not change before 1990
@@ -278,14 +281,14 @@ contains
      do mm=1,12
       !Assume max change for august and february
       fac_cemm(mm)  = 1.0 + fracchange * cos ( 2 * PI * (mm - 8)/ 12.0 )
-      write(unit=6,fmt="(a,i3,f8.3,a,f8.3)") dtxt//"Change in fac_cemm ", mm,fac_cemm(mm)
+      write(unit=6,fmt="(a,i3,f8.3,a,f8.3)") dtxt//"S-W change in fac_cemm ", mm,fac_cemm(mm)
      end do
    case default
       call StopAll(dtxt//'ERROR MonthlyFac:'//trim(MonthlyFacBasis)//' vs '//MonthlyFacFile)
    end select ! MonthlyFacBasis
    write(*,"(a,f8.4)") dtxt//"Mean fac_cemm ", sum( fac_cemm(:) )/12.0
    
-   if( INERIS_SNAP1 ) fac_cemm(:) = 1.0
+   if( INERIS_SNAP1 ) fac_cemm(:) = 1.0   ! Hardly ever used.
 
    do iemis = 1, NEMIS_FILE
 
@@ -366,15 +369,15 @@ contains
                " MONTH records from ", trim(fname2) 
    end do  ! iemis
 
-   else if (USES%DAYOFYEARTIMEFAC) then
+   else if (TimeFacBasis == 'DAY_OF_YEAR' ) then
       !set monthly and daily timefactore to 1.0 and use day of the year timefactor instead
-      write(*,*)'Using Day of year timefactors. Setting standard Monthly and Daily factors to 1' 
-   end if ! .not. USES%GRIDDED_EMIS_MONTHLY_FACTOR/USES%DAYOFYEARTIMEFAC
+      write(*,*)'Using Day of year timefactors. Keeping standard Monthly and Daily factors to 1' 
+   end if ! .not. USES%GRIDDED_EMIS_MONTHLY_FACTOR/'DAY_OF_YEAR'
 
 ! #################################
 ! 2) Read in Daily factors
 
-   if ( USES%DAYOFYEARTIMEFAC ) then !read directly day of the year timefactors
+   if ( TimeFacBasis == 'DAY_OF_YEAR' ) then !read directly day of the year timefactors
        fac_dayofyear = 1.0
        do iemis = 1, NEMIS_FILE
           fname2 = key2str(DayofYearFacFile,'POLL',trim ( EMIS_FILE(iemis) ))
@@ -418,7 +421,7 @@ contains
           
        end do  ! NEMIS_FILE
 
-   else ! Uses Monthly, Daily facs
+   else ! NOT DAY_OF_YEAR. Uses Monthly, Daily facs
 
      do iemis = 1, NEMIS_FILE
        fname2 = key2str(DailyFacFile,'POLL',trim ( EMIS_FILE(iemis) ))
@@ -465,7 +468,7 @@ contains
 
      end do  ! NEMIS_FILE
 
-   endif ! testing USES%DAYOFYEARTIMEFAC
+   endif ! testing DAY_OF_YEAR
 
 !  #################################
 !  3) Read in hourly (24x7) factors, options set in run script.
@@ -477,6 +480,7 @@ contains
    CLIMTEMPO: if ( MonthlyFacBasis == "CAMS_TEMPO_CLIM") then
 
    ! ===== START New June 2023 ===========================
+   ! Will read country dependent hourly facs
 
      HourlyFacSpecialsFile = HourlyFacFile  ! Will handle in Specials below.
      found_HourlyFacFile=.false.
@@ -581,8 +585,7 @@ contains
              cycle
           else
             ! ===== START New June 2023 ===========================
-            !BUGFIX if ( TimeFacBasis == "CAMS_TEMPO_CLIM" ) then
-            !CRUDE hard-code for name cams_tempo for now:
+            !CRUDE hard-code also for name cams_tempo for now:
             if ( TimeFacBasis == "CAMS_TEMPO_CLIM".or. & 
                index( HourlyFacSpecialsFile,'cams_tempo') > 0 ) then
               read(inputline,fmt=*,iostat=ios) code,secname, idd, &
@@ -674,8 +677,9 @@ contains
 !    Here we execute the same interpolations which are later done
 !    in "NewDayFactors", and scale efac_mm if necessary.
 
-       write(unit=6,fmt="(a,I6,a,I5)")dtxt//" Time factors normalisation: ",nydays,' days in ',year
-       if (.not. USES%DAYOFYEARTIMEFAC) call yearly_normalize(year)
+       write(unit=6,fmt="(a,I6,a,I5)")dtxt//" Time factors normalisation: ",&
+                                        nydays,' days in ',year
+       if ( TimeFacBasis /= 'DAY_OF_YEAR') call yearly_normalize(year)
 
 !#########################################################################
 !
@@ -687,7 +691,8 @@ contains
            !fac_ehh24x7(iemis,insec,ihh,idd2,:)
        ic=27; insec=3;  iemis=1
        write( *,*) dtxt//" test of time factors, UK: "//trim(EMIS_FILE(iemis))
-       if(.not. USES%DAYOFYEARTIMEFAC)then
+       !if(.not. USES%DAYOFYEARTIMEFAC)then
+       if (TimeFacBasis /= 'DAY_OF_YEAR') then
           do mm = 1, 12
              write(*, "(i2,i6,f8.3,9f8.4)") mm, nydays, sumfac,  &
               fac_emm(ic,mm,insec,iemis), &

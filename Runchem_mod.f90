@@ -52,8 +52,8 @@ module RunChem_mod
                               KMAX_MID, END_OF_EMEPDAY, step_main,  &
                               USES, AOD_WANTED, dt_advec &
                               , OH_ix,NH3_ix,SO2_ix,SO4_ix, NO_ix, C5H8_ix
-  use Debug_module,      only: DebugCell, DEBUG  & ! -> DEBUG%RUNCHEM
-                              ,DEBUG_EMISSTACKS ! MKPS
+  use Debug_module,      only: DebugCell, DEBUG  ! -> DEBUG%RUNCHEM
+                                                 !  ,DEBUG%EMISSTACKS ! MKPS
   ! use DefPhotolysis_mod, only: setup_phot
   use DerivedFields_mod, only: f_2d
   use DryDep_mod,        only: drydep
@@ -165,7 +165,7 @@ subroutine runchem()
           call WindDust(i,j,DEBUG%DUST.and.DebugCell)     ! sets rcemis(DUST...)
 
       if ( USES%EMISSTACKS ) then
-         if ( pointsources(i,j) ) call get_pointsources(i,j,DEBUG_EMISSTACKS)
+         if ( pointsources(i,j) ) call get_pointsources(i,j,DEBUG%EMISSTACKS)
       end if
     
       if(USES%POLLEN) &

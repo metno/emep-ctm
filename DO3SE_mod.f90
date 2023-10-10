@@ -137,9 +137,7 @@ contains
     do
        read(unit=io_num,fmt="(a200)",iostat=ios) inputline
 
-       if ( ios /= 0 ) then !! End of File, hopefully
-           exit
-       end if
+       if ( ios /= 0 ) EXIT !! End of File, hopefully
 
        if( inputline(1:1) == "#" ) CYCLE ! Is a  comment
 
@@ -159,9 +157,9 @@ contains
          call CheckStop(nSumVPD>MAXnSumVPD, dtxt//"ERROR nSumVPD>MAXnSumVPD")
          SumVPD_LC(nSumVPD) = iLC
        end if
-       if ( DEBUG%DO3SE>0 .and. MasterProc ) then
-         write(*,'(a,i5,2(2x,a),f8.2,i6)') dtxt//" iLC", iLC,  &
-           do3se(iLC)%code, wanted_codes(iLC),do3se(iLC)%VPDcrit, nSumVPD
+       if ( MasterProc ) then
+         write(*,'(a,i5,2x,a20,3x,a20,f16.2,i6)') dtxt//" iLC", iLC,  &
+           adjustl(do3se(iLC)%code), adjustl(wanted_codes(iLC)),do3se(iLC)%VPDcrit, nSumVPD
        end if
 
        nLC = nLC + 1
@@ -189,7 +187,6 @@ contains
     logical, intent(in) :: debug_flag
     character(len=20) :: txtdate
     character(len=*), parameter:: dtxt='gsDO3SE:'
-    logical, parameter :: OLDBUG = .false.
 
 ! Outputs:
 !    L%g_sto, L%g_sun       ! stomatal conductance for canopy and sun-leaves
@@ -216,13 +213,8 @@ contains
 !    al. (1998), eqns. 31-35, based upon sun/shade method of  
 !    Norman (1979,1982)
 
-  if ( OLDBUG) then
-    L%f_sun   = (1.0 - exp (-do3se(iLC)%f_light*L%PARsun  ) ) 
-    L%f_shade = (1.0 - exp (-do3se(iLC)%f_light*L%PARshade) ) 
-  else
     L%f_sun   = (1.0 - exp (-do3se(iLC)%f_light*L%PARsun*Wm2_uE  ) ) 
     L%f_shade = (1.0 - exp (-do3se(iLC)%f_light*L%PARshade*Wm2_uE) ) 
-  end if
 
     L%f_light = L%LAIsunfrac * L%f_sun + (1.0 - L%LAIsunfrac) * L%f_shade
 
@@ -297,7 +289,7 @@ contains
            L%fSW, L%g_sto * L%f_sun/L%f_light, L%g_sun 
    end if
 
-    if ( DEBUG%DO3SE>0 ) then
+   if ( DEBUG%DO3SE>0 ) then
       needed = (/ L%t2C,L%t2,L%vpd ,L%SWP ,&
                     L%PARsun ,L%PARshade ,L%LAIsunfrac /)
       if ( any( needed(:) < -998.0 )) then
@@ -316,7 +308,7 @@ contains
          write(*,"(a,2i3,2f7.2,2f8.3,9f9.2)") dtxt//"-M ", daynumber, iLC, &
            L%LAI, L%t2C, L%vpd, L%fSW, L%PARsun ,L%PARshade ,L%LAIsunfrac
       end if
-    end if
+   end if
          
 
   end subroutine g_stomatal

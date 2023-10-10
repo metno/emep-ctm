@@ -36,6 +36,7 @@ module Debug_module
  type, public :: emep_debug
   logical :: &
      AOT             = .false. &
+    ,ADV             = .false. & ! 
     ,AEROSOL         = .false. & ! ...needed for intended debugs are to work
     ,AQUEOUS         = .false. &
     ,BCS             = .false. & ! BoundaryConditions
@@ -50,6 +51,7 @@ module Debug_module
     ,DUST            = .false. & ! Skips fast chemistry to save some CPU
     ,ECOSYSTEMS      = .false. &
     ,EMISSIONS       = .false. & ! 
+    ,EMISSTACKS      = .false. & ! 
     ,EMISTIMEFACS    = .false. &
     ,EQUIB           = .false. &   !MARS, EQSAM etc.
     ,FORESTFIRE      = .false. &
@@ -60,10 +62,17 @@ module Debug_module
     ,IOPROG          = .false. &
     ,Kz              = .false. &
     ,LANDDEFS        = .false. &
+    ,LANDIFY         = .false. &
     ,MAINCODE        = .false. & !< debugs main code (emepctm) driver
+    ,MASS            = .false. &
     ,MET             = .false. &
     ,MOSAICS         = .false. &
     ,MY_DERIVED      = .false. &
+    ,NEST            = .false. &
+    ,NEST_ICBC       = .false. & ! IFS-MOZART/C-IFS BC
+    ,NETCDF          = .false. &
+    ,NETCDF_RF       = .false. & ! ReadField_CDF in NetCDF_mod
+    ,OUTPUTCHEM      = .false. & ! Output of netcdf results
     ,pH              = .false. &
     ,PHYCHEM         = .false. &
     ,POLLEN          = .false. &
@@ -98,24 +107,5 @@ module Debug_module
 end type emep_debug
 type(emep_debug), public, save :: DEBUG
 
-! Older style, awaiting conversion
-logical, public, parameter ::    &
-   DEBUG_ADV            = .false. &
-  ,DEBUG_DERIVED        = .false. &
-  ,DEBUG_EMISSTACKS     = .false. &
-  !!,DEBUG_DRYDEP         = .false. &
-    ,DEBUG_MY_DRYDEP    = .false. &
-    ,DEBUG_CLOVER       = .false. &
-  ,DEBUG_LANDIFY        = .false. &
-  ,DEBUG_MASS           = .false. &
-  ,DEBUG_NEST           = .false. &
-  ,DEBUG_NEST_ICBC      = .false. & ! IFS-MOZART/C-IFS BC
-  ,DEBUG_NETCDF         = .false. &
-  ,DEBUG_NETCDF_RF      = .false. & ! ReadField_CDF in NetCDF_mod
-  ,DEBUG_NH3            = .false. & ! NH3Emis experimental
-  ,DEBUG_OUTPUTCHEM     = .false. & ! Output of netcdf results
-  ,DEBUG_OUT_HOUR       = .false. & ! Debug Output_hourly.f90
-    ,DEBUG_WETDEP       = .false. &
-  ,DEBUG_RB             = .false.
 
 end module Debug_module

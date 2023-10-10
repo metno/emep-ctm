@@ -27,7 +27,6 @@
 !*****************************************************************************! 
 module Rb_mod
 
-use Debug_module,          only: DEBUG_RB
 use GasParticleCoeffs_mod, only: nddep, DDspec
 use PhysicalConstants_mod, only: KARMAN
                     
@@ -88,10 +87,6 @@ contains
 
   end do GASLOOP
 
-   if ( DEBUG_RB ) then
-!      print *,   "RB DRYDEP_GAS", size(DRYDEP_GAS), DRYDEP_GAS(1)
-      print *,   "RB water",  water, "Rb(1) ", Rb(1)
-   end if
  end subroutine Rb_gas
 
 !--------------------------------------------------------------------

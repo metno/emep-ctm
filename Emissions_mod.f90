@@ -42,6 +42,7 @@ use Config_module,only: &
     KMAX_MID, KMAX_BND, PT ,dt_advec, step_main, &
     KCHEMTOP, &
     NSECTORS_ADD_MAX, SECTORS_ADD, &
+    TimeFacBasis, &
     emis_inputlist, &
     EmisDir,      &    ! template for emission path
     DataDir,      &    ! template for path
@@ -443,7 +444,8 @@ contains
                       NSECTORS = NSECTORS + 1
                       call CheckStop(NSECTORS > NSECTORS_MAX, "NSECTORS_MAX too small, please increase value in EmisDef_mod.f90")
                       SECTORS(NSECTORS) = SECTORS_ADD(isec_idx)
-                      if(MasterProc) write(*,*)'adding sector  ',trim(SECTORS_ADD(isec_idx)%longname),', total ',NSECTORS
+                      if(MasterProc) write(*,*) dtxt//'adding sector1st  ',&
+                         trim(SECTORS_ADD(isec_idx)%longname),', total ',NSECTORS
                       found = 1
                    end if
                 end do
@@ -651,7 +653,7 @@ subroutine EmisUpdate
       read_new_emissions = .true.
    end do
    if (.not. read_new_emissions) then
-      if (MasterProc .and. writeoutsums) &
+      if (MasterProc .and. writeoutsums .and. DEBUG%EMISSIONS) &
          write(*,*) sub // " no new emissions to read"
       return
     end if
@@ -1169,8 +1171,10 @@ end subroutine EmisUpdate
           do i = 1, NSECTORS_ADD_MAX
              if(SECTORS_ADD(i)%name ==  trim(emis_inputlist(iemislist)%sector)) then
                 NSECTORS = NSECTORS + 1
-                if(MasterProc) write(*,*)'adding sector  ',trim(SECTORS_ADD(i)%longname)
-                call CheckStop(NSECTORS > NSECTORS_MAX, "NSECTORS_MAX too small, please increase value in EmisDef_mod.f90")
+                if(MasterProc) write(*,*) dtxt//'adding sector2nd  ',&
+                         trim(SECTORS_ADD(i)%longname), i
+                call CheckStop(NSECTORS > NSECTORS_MAX, &
+                    "NSECTORS_MAX too small, please increase value in EmisDef_mod.f90")
                 SECTORS(NSECTORS) = SECTORS_ADD(i)
                 found = 1
              end if
@@ -1263,11 +1267,14 @@ end subroutine EmisUpdate
     N_TFAC = 0
     N_HFAC = 0
     largestsplit = 0
-    if (MasterProc) write(*,*)NSECTORS,' sectors defined in total'
+    if (MasterProc) write(*,*)dtxt, NSECTORS,' sectors defined in total'
        if (MasterProc) write(*,*)"   name,   longname, cdfname, timefac,height,split, description"
     do isec = 1, NSECTORS
        91 format(A10,A10,A10,3I7,A)
-       if (MasterProc) write(*,91)trim(SECTORS(isec)%name),trim(SECTORS(isec)%longname),trim(SECTORS(isec)%cdfname),SECTORS(isec)%timefac,SECTORS(isec)%height,SECTORS(isec)%split,' '//trim(SECTORS(isec)%description)
+       if (MasterProc) write(*,91)trim(SECTORS(isec)%name), &
+          trim(SECTORS(isec)%longname),trim(SECTORS(isec)%cdfname),&
+          SECTORS(isec)%timefac,SECTORS(isec)%height,SECTORS(isec)%split,&
+          ' '//trim(SECTORS(isec)%description)
     end do
     ! find indices for special sectors
     do isec = NSECTORS, 1, -1 !reverse order so that TFAC_IDX get value from the lowest (= most "fundamental")
@@ -1382,7 +1389,7 @@ end subroutine EmisUpdate
     if(.not.allocated(fac_emm))allocate(fac_emm(NLAND,12,N_TFAC,NEMIS_FILE))
     if(.not.allocated(fac_min))allocate(fac_min(NLAND,N_TFAC,NEMIS_FILE))
     if(.not.allocated(fac_edd))allocate(fac_edd(NLAND, 7,N_TFAC,NEMIS_FILE))
-    if(USES%DAYOFYEARTIMEFAC .and. .not.allocated(fac_dayofyear)) &
+    if(TimeFacBasis =='DAY_OF_YEAR' .and. .not.allocated(fac_dayofyear)) &
          allocate(fac_dayofyear(NSECTORS,NLAND,NEMIS_FILE,366))
 
     allocate(isec2SecOutWanted(0:NSECTORS))
@@ -1445,7 +1452,8 @@ end subroutine EmisUpdate
     CALL MPI_BCAST(fac_emm,8*NLAND*12*N_TFAC*NEMIS_FILE,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     CALL MPI_BCAST(fac_edd,8*NLAND*7*N_TFAC*NEMIS_FILE,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     CALL MPI_BCAST(fac_ehh24x7,8*NEMIS_FILE*N_TFAC*24*7*NLAND,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
-    if (USES%DAYOFYEARTIMEFAC) CALL MPI_BCAST(fac_dayofyear,8*NEMIS_FILE*NSECTORS*366*NLAND,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
+    if(TimeFacBasis =='DAY_OF_YEAR' ) CALL MPI_BCAST(fac_dayofyear,&
+            8*NEMIS_FILE*NSECTORS*366*NLAND,MPI_BYTE,0,MPI_COMM_CALC,IERROR)
     !define fac_min for all processors
     forall(iemis=1:NEMIS_FILE,insec=1:N_TFAC,inland=1:NLAND) &
          fac_min(inland,insec,iemis) = minval(fac_emm(inland,:,insec,iemis))
@@ -2064,7 +2072,8 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
     do j = 1,ljmax
       do i = 1,limax
         ncc = nlandcode(i,j)            ! No. of countries in grid
-        debug_tfac=(DEBUG%EMISTIMEFACS.and.debug_proc.and.i==DEBUG_li.and.j==DEBUG_lj)
+        debug_tfac=(DEBUG%EMISTIMEFACS.and.debug_proc &
+                     .and.i==DEBUG_li.and.j==DEBUG_lj)
         ! find the approximate local time:
         lon = modulo(360+nint(glon(i,j)),360)
         if(lon>180.0)lon=lon-360.0
@@ -2099,21 +2108,20 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                emish_idx = SECTORS(isec)%height
                split_idx = SECTORS(isec)%split
 
-               if (.not. USES%DAYOFYEARTIMEFAC) then
-                  tfac = timefac(iland_timefac,tfac_idx,iem) &
+               if(TimeFacBasis =='DAY_OF_YEAR' ) then
+                  tfac = fac_dayofyear(isec, iland_timefac, iem, daynumber)& ! NB: use isec, not tfac_idx
                        * fac_ehh24x7(iem,tfac_idx,hour_iland,wday_loc,iland_timefac_hour)
                else
-                  tfac = fac_dayofyear(isec, iland_timefac, iem, daynumber)& ! NB: use isec, not tfac_idx
+                  tfac = timefac(iland_timefac,tfac_idx,iem) &
                        * fac_ehh24x7(iem,tfac_idx,hour_iland,wday_loc,iland_timefac_hour)
                endif
 
-               !if (debug_tfac.and.iem==1) then
                dbgPoll = (debug_tfac.and. EMIS_FILE(iem)=='nh3')
                if (dbgPoll) then
                 !if (isec==1) write(*,"(a,2i4,2f8.2,i6)")dtxt//"DAY TFAC loc:",&
-                write(*,"(a,2i4,2f8.2,i6)")dtxt//"tfacs DAY TFAC loc:",&
+                write(*,"(a,2i4,2f8.2,i6)")dtxt//"efacs DAY TFAC loc:",&
                      iland,isec, glon(i,j), glat(i,j), Country(iland)%timezone
-                write(*,"(a,3i4,f8.3)")dtxt//"tfacs DAY TFAC:",isec,tfac_idx,hour_iland,tfac
+                write(*,"(a,3i4,f8.3)")dtxt//"efacs DAY TFAC:",isec,tfac_idx,hour_iland,tfac
               end if
 
               !it is best to multiply only if USES%GRIDDED_EMIS_MONTHLY_FACTOR
@@ -2138,7 +2146,8 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
 
               if (allocated(Emisfac2D)) then
                  if (Emisfac2D(1,1,iem)>-0.5) then
-                    if(me==NPROC/2 .and. i==2 .and. j==2 .and. icc == 1 .and. isec==1) write(*,*)'Warning: reseting all timefactors, and using only gridded hourly factors for '//trim(EMIS_FILE(iem))
+                    if(me==NPROC/2 .and. i==2 .and. j==2 .and. icc == 1 &
+                        .and. isec==1) write(*,*)'Warning: reseting all timefactors, and using only gridded hourly factors for '//trim(EMIS_FILE(iem))
                     !the hourly factors are defined for this pollutant
                     tfac = Emisfac2D(i,j,iem)
                  end if
@@ -2196,37 +2205,15 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
             ! -> Need to know day_of_week
             !    Relatively weak variation with day of week so use a simplified approach
 
-            ! if( DEBUG%ROADDUST .and. debug_proc .and. i==DEBUG_li .and. j==DEBUG_lj )THEN
-            !    write(*,*)"DEBUG ROADDUST! Dry! ncc=", road_nlandcode(i,j)
-            ! end if
-
             ncc = road_nlandcode(i,j) ! number of countries in grid point
             do icc = 1, ncc
               !iland = road_landcode(i,j,icc)
               iland = find_index(road_landcode(i,j,icc),Country(:)%icode)
               iland_timefac_hour = find_index(Country(iland)%timefac_index_hourly,Country(:)%icode)
-!print *, 'ROAD ', icc, ncc, iland, hour_iland
+             !print *, 'ROAD ', icc, ncc, iland, hour_iland
              ! Needed here since can be called without hour change
-          call make_iland_for_time(debug_tfac, indate, i, j, iland, wday,&
+              call make_iland_for_time(debug_tfac, indate, i, j, iland, wday,&
                  iland_timefac,hour_iland,wday_loc,iland_timefac_hour)
-              !if ( USES%TIMEZONEMAP ) then
-              !  hour_iland =
-              !end if
-              !DS belpw not needed. We have calld make_iland_for_time which gives wday_loc
-              !DS and iland_hour already.
-              !if(Country(iland)%timezone==-100)then
-              !  hour_iland=mod(nint(indate%hour+24*(lon/360.0)),24) + 1
-              !else
-              !  hour_iland=indate%hour + Country(iland)%timezone + 1! add 1 to get 1..24
-              !end if
-
-              !wday_loc = wday ! DS added here also, for fac_ehh24x7
-              !if( hour_iland > 24 ) then
-              !  hour_iland = 1
-              !  if(wday_loc==0)wday_loc=7 ! Sunday -> 7
-              !  if(wday_loc>7 )wday_loc=1
-              !end if
-              !DS END commented out
 
               roadfac = 1.0
               if(ANY(iland==(/IC_FI,IC_NO,IC_SE/)).and. & ! Nordic countries
@@ -2234,11 +2221,13 @@ subroutine EmisSet(indate)   !  emission re-set every time-step/hour
                  roadfac=2.0
               end if
 
-if ( hour_iland<1) then
-    print *, dtxt//'HOURCHANGE', hourchange
-    print *, dtxt//'TZWRONGB', iland, hour_iland
-    print '(a,9i5)', 'ROAD TFAC :', iland, iem, Country(iland)%timezone, hour_iland
-end if
+              if ( hour_iland<1) then
+                  print *, dtxt//'HOURCHANGE', hourchange
+                  print *, dtxt//'TZWRONGB', iland, hour_iland
+                  print '(a,9i5)', 'ROAD TFAC :', iland, iem, Country(iland)%timezone, hour_iland
+                  call StopAll(dtxt//'ROADDUST')
+              end if
+              
               do iem = 1, NROAD_FILES
                  tfac = fac_ehh24x7(iem, TFAC_IDX_TRAF,hour_iland,wday_loc,iland_timefac_hour)
                  s = tfac * roadfac * roaddust_emis_pot(i,j,icc,iem)
@@ -2284,6 +2273,10 @@ end if
     do ij = 1,limax*ljmax
        i=mod(ij-1,limax)+1
        j=(ij-1)/limax+1
+
+       debug_tfac=(DEBUG%EMISTIMEFACS.and.debug_proc&
+                    .and.i==DEBUG_li.and.j==DEBUG_lj)
+
        do is = 1,NEmis_source_ij(ij)
           n = Emis_source_ij_ix(ij,is)
 
@@ -2296,6 +2289,10 @@ end if
           split_idx = SECTORS(isec_idx)%split
 
           iland = Emis_source(n)%country_ix
+          if(debug_tfac) write(*,'(a,9i5)') dtxt//'NewFormStart'// &
+            ':'//trim(Emis_source(n)%periodicity), &
+              is, iland, itot,isec,isec_idx,me
+
           if(itot>0)then
              !the species is directly defined (no splits)
              iqrc = itot2iqrc(itot)
@@ -2303,6 +2300,10 @@ end if
                 call CheckStop(iqrc<=0,dtxt// &
                      "emitted sector species must be one of the splitted species")
                 iem = iqrc2iem(iqrc)
+
+                if(debug_tfac) write(*,'(a,9i5)') dtxt//'NewForm-itot'// &
+                  trim(EMIS_FILE(iem))//':'//trim(Emis_source(n)%periodicity), &
+                    is, iland, itot,isec,isec_idx
 
                 if(Emis_source(n)%periodicity == 'monthly')then
                    !make normalization factor for daily fac
@@ -2320,28 +2321,31 @@ end if
 
                 if(Emis_source(n)%periodicity == 'yearly' .or. Emis_source(n)%periodicity == 'monthly')then
                    !we need to apply hourly factors
-                   debug_tfac=(DEBUG%EMISTIMEFACS.and.debug_proc.and.i==DEBUG_li.and.j==DEBUG_lj)
                    dbgPoll = (debug_tfac.and. EMIS_FILE(iem)=='nh3')
 
                    call make_iland_for_time(debug_tfac, indate, i, j, iland,&
                            wday, iland_timefac,hour_iland,wday_loc,iland_timefac_hour)
                    tfac = fac_ehh24x7(iem,tfac_idx,hour_iland,wday_loc,iland_timefac_hour)
+                   if(debug_tfac) write(*,'(a,4i5,es12.3)') dtxt//'NH3tfacLand', &
+                           is, iland,  iland_timefac, tfac
 
-                   if (USES%DAYOFYEARTIMEFAC) then
+                   if(TimeFacBasis =='DAY_OF_YEAR' ) then
                       tfac = tfac * fac_dayofyear(isec_idx, iland_timefac, iem, daynumber)
-                      if(dbgPoll) write(*,*) dtxt//'tfacs HERE-DOY', tfac, iland_timefac, daynumber
+                      if(dbgPoll) write(*,*) dtxt//'efacs HERE-DOY', tfac, iland_timefac, daynumber
                    else if(Emis_source(n)%periodicity == 'yearly')then
                       !apply monthly and daily factor on top of hourly factors
                       tfac = tfac * timefac(iland_timefac,tfac_idx,iem)
-                      if(dbgPoll) write(*,*) dtxt//'tfacs HERE-MD', tfac, iland_timefac, daynumber
+                      if(dbgPoll) write(*,*) dtxt//'efacs HERE-MD', tfac, iland_timefac, daynumber
                    else if(Emis_source(n)%periodicity == 'monthly')then
                       !apply daily factors, with renormalization to conserve monthly sums
                       tfac = tfac * fac_edd(iland_timefac,wday,tfac_idx,iem) * daynorm
-                      if(dbgPoll) write(*,*) dtxt//'tfacs HERE-MM', tfac, iland_timefac, daynumber
+                      if(dbgPoll) write(*,*) dtxt//'efacs HERE-MM', tfac, iland_timefac, daynumber
                    endif
                 else
                    !not monthly or yearly emissions, timefactors must be included in emission values
                    tfac = 1.0
+                   if(debug_tfac) write(*,'(a,9i5)') dtxt//'NewFormSet1.0',&
+                           is, iland,itot,isec,isec_idx
                 endif
 
                 s = Emis_source_ij(ij,is) * tfac
@@ -2371,12 +2375,16 @@ end if
           else
              !the species is defined as a sector emission
              iem=find_index(Emis_source(n)%species,EMIS_FILE(:))
+
+             if(debug_tfac) write(*,'(a,9i5)'), dtxt//'SecEmis'//trim(EMIS_FILE(iem))//':'//&
+              trim(Emis_source(n)%species)//trim(Emis_source(n)%periodicity ), &
+               is, iland, iem
              call CheckStop(iem<0, dtxt//"did not recognize species "//trim(Emis_source(n)%species))
              call CheckStop(Emis_source(n)%sector<=0,dtxt//" sector must be defined for "//trim(Emis_source(n)%varname))
 
+             iland_timefac = find_index(Country(iland)%timefac_index,Country(:)%icode)
              if(Emis_source(n)%periodicity == 'monthly')then
                 !make normalization factor for daily fac
-                iland_timefac = find_index(Country(iland)%timefac_index,Country(:)%icode)
                 iwday = mod(wday-indate%day+35, 7) + 1
                 daynorm = 0.0
                 do id = 1, nmdays(indate%month)
@@ -2393,6 +2401,11 @@ end if
                 iqrc = itot2iqrc(itot)
 
                 debug_tfac=(DEBUG%EMISTIMEFACS.and.debug_proc.and.i==DEBUG_li.and.j==DEBUG_lj)
+
+                if(debug_tfac) write(*,*) dtxt//'NewFormsplit'// trim(EMIS_FILE(iem))//':'//&
+                   trim(Emis_source(n)%species)//trim(Emis_source(n)%periodicity ), &
+                    n, iem, iland
+
                 dbgPoll = (debug_tfac.and. EMIS_FILE(iem)=='nh3' .and. iland_timefac==IC_HU )
 
                 if(Emis_source(n)%periodicity == 'yearly' .or. Emis_source(n)%periodicity == 'monthly')then
@@ -2401,16 +2414,16 @@ end if
                            wday, iland_timefac,hour_iland,wday_loc,iland_timefac_hour)
                    tfac = fac_ehh24x7(iem,tfac_idx,hour_iland,wday_loc,iland_timefac_hour)
 
-                   if (USES%DAYOFYEARTIMEFAC) then
+                   if(TimeFacBasis =='DAY_OF_YEAR' ) then
                       tfac = tfac * fac_dayofyear(isec_idx, iland_timefac, iem, daynumber)
                       if(dbgPoll) write(*,'(a,3i4,f12.4)') &
-                         dtxt//'tfacs HERE-DOYhu', tfac_idx, isec_idx, &
+                         dtxt//'efacs HERE-DOYhu', tfac_idx, isec_idx, &
                             daynumber, tfac
                    else if(Emis_source(n)%periodicity == 'yearly')then
                       !apply monthly and daily factor on top of hourly factors
                       tfac = tfac * timefac(iland_timefac,tfac_idx,iem)
                       if(dbgPoll) write(*,'(a,3i4,f12.4)') dtxt//&
-                         'tfacs HERE-CLIMhu', tfac_idx, isec_idx, daynumber, tfac
+                         'efacs HERE-CLIMhu', tfac_idx, isec_idx, daynumber, tfac
                    else if(Emis_source(n)%periodicity == 'monthly')then
                       !apply daily factors, with renormalization to conserve monthly sums
                       tfac = tfac * fac_edd(iland_timefac,wday,tfac_idx,iem) * daynorm
@@ -2418,7 +2431,7 @@ end if
                 else
                    !not monthly or yearly emissions, timefactors must be included in emission values
                    tfac = 1.0
-                   if ( dbgPoll ) write(*,'(a,4i4,f12.4)') dtxt//'tfacsUnset HERE', IC_HU, &
+                   if ( dbgPoll ) write(*,'(a,4i4,f12.4)') dtxt//'efacsUnset HERE', IC_HU, &
                           tfac_idx, isec_idx, daynumber, tfac
                 endif
 
@@ -2429,7 +2442,7 @@ end if
                      IS_DOM(isec_idx) .and. Gridded_SNAP2_Factors .and. &
                      (Emis_source(n)%periodicity == 'yearly' .or. &
                       Emis_source(n)%periodicity == 'monthly')) then
-                   if(dbgPoll) write(*,*) dtxt//'tfacs HERE-PreHDD', tfac,& 
+                   if(dbgPoll) write(*,*) dtxt//'efacs HERE-PreHDD', tfac,& 
                            isec,daynumber
                    oldtfac = tfac
                    ! If INERIS_SNAP2  set, the fac_min will be zero, otherwise
@@ -2443,10 +2456,10 @@ end if
                         isec, tfac_idx,iland, daynumber, indate%hour, &
                         timefac(iland_timefac,tfac_idx,iem), t2_nwp(i,j,2)-273.15, &
                         fac_min(iland_timefac,tfac_idx,iem),  gridfac_HDD(i,j), tfac
-                   if(dbgPoll) write(*,*) dtxt//'tfacs HERE-HDD', tfac, isec,daynumber
+                   if(dbgPoll) write(*,*) dtxt//'efacs HERE-HDD', tfac, isec,daynumber
                 end if ! =============== HDD
 
-                if(dbgPoll) write(*,*) dtxt//'tfacs HERE-PosHDD', tfac, isec,daynumber
+                if(dbgPoll) write(*,*) dtxt//'efacs HERE-PosHDD', tfac, isec,daynumber
 
                 s = Emis_source_ij(ij,is) * emisfrac(iqrc,split_idx,iland) * tfac
 
@@ -2538,9 +2551,9 @@ subroutine newmonth
   if(USES%GRIDDED_EMIS_MONTHLY_FACTOR)&
     call Read_monthly_emis_grid_fac(current_date%month)
 
-  if(USES%TIMEZONEMAP)then
-     call Read_monthly_timezones(current_date%month)
-  end if
+  !Sep2023 always:  if(USES%TIMEZONEMAP)then
+  call Read_monthly_timezones(current_date%month)
+  !end if
 
   if(USES%AIRCRAFT_EMIS)then
     airn = 0.0
@@ -2649,7 +2662,8 @@ subroutine newmonth
     if ( USES%SOILNOX_METHOD == 'Total' .or. USES%SOILNOX_METHOD =='NoFert' ) then
 
 
-   if ( index(soilnox_emission_File,'v2.4a_GLOBAL05_Clim2000') > 0) then
+   if (  index(soilnox_emission_File,'v2.4a_GLOBAL05_Clim2000') > 0 .or. & ! EMEP-style
+         index(soilnox_emission_File,'v2.4clim') > 0) then                 ! ECCAD-style
      ! New format: tsteps in 4D array. No year info, just month.
 
       nstart=current_date%month
@@ -2660,7 +2674,7 @@ subroutine newmonth
            'TotalSoilEmis',buffer3D,&
            nstart=current_date%month, kstart=1, kend=8,& !same variation every year
            interpol='conservative',known_projection="lon lat",&
-           needed=.true.,debug_flag=.false.,UnDef=0.0)
+           needed=.true.,debug_flag=DEBUG%SOILNOX,UnDef=0.0)
       do n=1,8 ! hour= 1.5, 4.5, 7.5 ... 22.5
           SoilNOx3D(:,:,n)=buffer3D(n,:,:)
       end do

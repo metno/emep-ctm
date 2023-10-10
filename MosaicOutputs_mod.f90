@@ -27,18 +27,18 @@
 ! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************!
 module MosaicOutputs_mod
-use AOTx_mod,          only: Calc_AOTx, Calc_POD, VEGO3_OUTPUTS,&
-                                nOutputVegO3
+use AOTx_mod,          only: Calc_AOTx, Calc_POD, VEGO3_OUTPUTS
 use CheckStop_mod,     only: CheckStop
 use ChemDims_mod,      only: NSPEC_ADV,NSPEC_SHL
 use ChemGroups_mod,    only: chemgroups
 use ChemSpecs_mod,     only: species_adv
-use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY,OutputVegO3
+use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY,OutputVegO3,nOutputVegO3
 use Debug_module,      only: DEBUG   ! -> DEBUG%MOSAICS
 use DerivedFields_mod, only: f_2d, d_2d
 use EcoSystem_mod,     only: NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS, EcoSystemFrac, &
                             FULL_ECOGRID, FULL_LCGRID, Is_EcoSystem
 use GasParticleCoeffs_mod,  only:  DDspec
+use GridValues_mod,    only: debug_proc
 use Io_Progs_mod,      only: datewrite
 use LandDefs_mod,      only: LandDefs, LandType, Check_LandCoverPresent ! e.g. "CF"
 use Landuse_mod,       only: LandCover ! for POD
@@ -76,7 +76,7 @@ type(Deriv), public, &
 type(group_umap), private, target, &
   dimension( MAX_MOSAIC_OUTPUTS ), save :: dryGroupUnits
 
-logical, private, save :: dbg0  !if DEBUG and MasterProc
+logical, private, save :: mydbg=.false.  !if DEBUG and MasterProc or debug_proc
 
 contains
 
@@ -86,7 +86,13 @@ subroutine Init_MosaicMMC(MOSAIC_METCONCS)
 ! not found, but that's okay I hope...
   character(len=*), dimension(:), intent(in) :: MOSAIC_METCONCS
 
-  dbg0 = (DEBUG%MOSAICS .and. MasterProc)
+  
+  ! MasterProc and debug_proc output at different times, so we merge
+  if (DEBUG%MOSAICS .and. debug_proc) then
+    mydbg = .true.
+  else if (MasterProc ) then
+    mydbg = .true.
+  end if
 
   MMC_RH    = find_index("RH"      ,MOSAIC_METCONCS)
   MMC_CANO3 = find_index("CanopyO3",MOSAIC_METCONCS)
@@ -143,7 +149,7 @@ subroutine Add_MosaicMetConcs(MOSAIC_METCONCS,MET_LCS,iotyp, nMET)
           MosaicOutput(nMosaic)%dt_scale  =  .true.
       end select
 
-      if(dbg0) call print_deriv_type(MosaicOutput(nMosaic))
+      if(mydbg) call print_deriv_type(MosaicOutput(nMosaic))
     end do MET_LC !n
   end do ! ilab
 end subroutine Add_MosaicMetConcs
@@ -193,7 +199,7 @@ subroutine Add_NewMosaics(Mc,nMc)
         iadv, -99, F , 1.0,  T, Mc(n)%ind ) ! ind gives iotype
     end select
 
-    if(dbg0) write(*,*) "DEBUG nMc ", &
+    if(mydbg) write(*,*) "DEBUG nMc ", &
       trims(name//":"//Mc(n)%txt2//":"//Mc(n)%txt3), iadv, iLC
   end do MC_LOOP
 end subroutine Add_NewMosaics
@@ -213,11 +219,17 @@ subroutine Add_MosaicVegO3(nVEGO3)
   nVEGO3 = 0
   dt_scale = .false. ! for POD and AOT we need to reset this.
 
+  ! Looking for POD problems we can use another DEBUG:
+  if (DEBUG%STOFLUX .and. debug_proc) mydbg = .true.
+
   VEGO3_LC: do n = 1, nOutputVegO3
 
     veg = OutputVegO3(n)
     name = veg%name
 
+    if(mydbg) write(*,"(a,i4,a,f7.1,2a)") dtxt//trim(name)//' class:'//trim(veg%class), &
+            n, ' Y=', veg%Threshold, ' defn:'//trim(veg%defn), ' txtLC:'// trim(veg%txtLC) 
+    !if(mydbg) write(*,*) dtxt//'veg:', veg
     select case(veg%class)
     case("POD")
       units = "mmole/m2"
@@ -237,12 +249,11 @@ subroutine Add_MosaicVegO3(nVEGO3)
     if(iLC>0) LandType(iLC)%flux_wanted  = .true.
     !-------------End of Check if LC present in this array ------!
     nVEGO3 = nVEGO3 + 1
-    name = veg%name
 
     nMosaic = nMosaic + 1
     call CheckStop(NMosaic>=MAX_MOSAIC_OUTPUTS,dtxt//"too many nMos..EGO3")
-    if(dbg0)&
-      write(*,*) "Moscaics", nMosaic, trims(name// "->" //veg%TXTLC)
+    !S30 if(mydbg)&
+    !S30   write(*,"(a,i4,a30)") dtxt, nMosaic, trims(name// "->" //veg%TXTLC)
 
     ! Deriv(name, class,    subc,  txt,           unit
     ! Deriv index, f2d,LC, scale dt_scale avg? Inst Yr Mn Day
@@ -272,11 +283,11 @@ subroutine Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
     xname  = DDEP_WANTED(i)%txt1
     xtyp   = DDEP_WANTED(i)%txt2
     if(xname=='-') exit
-    if(dbg0) write(*,*) dtxt//"DDEP_WANTED,a:"//trim(xname), i, xtyp
+    if(mydbg) write(*,*) dtxt//"DDEP_WANTED,a:"//trim(xname), i, xtyp
 
     do n=1,size(DDEP_ECOS)
 
-      if(dbg0) write(*,"(a,i4,a6,2a12)") dtxt//"DDEP_WANTED,b:", n, &
+      if(mydbg) write(*,"(a,i4,a6,2a12)") dtxt//"DDEP_WANTED,b:", n, &
         DDEP_ECOS(n)%ind, trim(DDEP_ECOS(n)%name), trim(xtyp)   ! ind = e.g. 'YM'
       if(all(SCAN(DDEP_ECOS(n)%ind,IOU_KEY)==0)) exit
       nDD = nDD + 1
@@ -290,13 +301,13 @@ subroutine Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
         xxname = xname
         if(xname(1:4)=="STO_") then
           xxname = xname(5:)
-          if(dbg0) print *, "STO_ ", trims(xname // "=>"// xxname)
+          if(mydbg) print *, "STO_ ", trims(xname // "=>"// xxname)
         end if
         iadv = find_index(xxname,species_adv(:)%name,any_case=.true.)         ! Index in ix_adv arrays
         if(iadv<1) print *, "OOPADVNOW", iadv, trims(xname // name)
         call CheckStop(iadv<1,dtxt//"Unknown in DDEP_WANTED SPEC: "//trim(xname))
         call Units_Scale(DDEP_WANTED(i)%txt3,iadv,unitscale,units)
-        if(dbg0) print *, "ADVNO ",n,iadv,trim(xname), unitscale
+        if(mydbg) print *, "ADVNO ",n,iadv,trim(xname), unitscale
 
       case("GROUP")
         igrp = find_index(xname,chemgroups(:)%name,any_case=.true.) ! array of members: chemgroups%specs
@@ -307,7 +318,7 @@ subroutine Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
                       ! Add_MosaicOutput gets the unit conversion factor from Group_Scale
         iadv = -igrp  ! use negative values for groups (e.g. DDEP_SOX)
         dryGroupUnits(nMosaic) = &
-          Group_Scale(igrp,DDEP_WANTED(i)%txt3,debug=dbg0)
+          Group_Scale(igrp,DDEP_WANTED(i)%txt3,debug=mydbg)
       case default
         call CheckStop(DEBUG%MOSAICS,&
           dtxt//" unknown MosaicDDEP type "//trim(DDEP_WANTED(i)%txt2))
@@ -321,7 +332,7 @@ subroutine Add_MosaicDDEP(DDEP_ECOS,DDEP_WANTED,nDD)
         name, "Mosaic", "DDEP", DDEP_ECOS(n)%name, units, &
         iadv,-99, F, unitscale, F, DDEP_ECOS(n)%ind )
 
-      if(dbg0) then
+      if(mydbg) then
         write(*,*) "DDEP setups", n, nMosaic
         call print_deriv_type(MosaicOutput(nMosaic))
       end if
@@ -475,7 +486,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
       n =  MosaicOutput(imc)%Index !Index in VEGO3_OUPUTS
       call Calc_POD( n, iLC, output, debug_flag)
       if(dbg) &
-        write(*,"(2a,g12.4)") dtxt//"MYPOD ", trim(txtdate), output
+        write(*,"(2a,2g12.4)") dtxt//"MYPOD ", trim(txtdate), output, Sub(iLC)%FstO3
 
 
     case("AOT")         ! AOTX

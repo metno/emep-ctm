@@ -31,13 +31,13 @@ module AOTx_mod
   use CheckStop_mod,  only : checkStop, StopAll
   use Chemfields_mod, only : xn_adv, cfac
   use ChemSpecs_mod,  only : IXADV_O3
-  use Config_module, only : dt_advec, KMAX_MID & 
-                            ,PPBINV& ! 1.0e9, for conversion from mixing ratio to ppb
-                            ,OutputVegO3
+  use Config_module, only : dt_advec, KMAX_MID, &
+          PPBINV& ! 1.0e9, for conversion from mixing ratio to ppb
+         ,OutputVegO3, nOutputVegO3, step_main
   use Debug_module,   only:  DEBUG   ! -> DEBUG%AOT
   use DO3SE_mod
   use GridValues_mod, only : debug_li, debug_lj, debug_proc, i_fdom, j_fdom
-  use Io_Progs_mod,   only : datewrite
+  use Io_Progs_mod,   only : datewrite, print_date
   use LandDefs_mod,   only : LandType, LandDefs
   use LocalVariables_mod, only : Grid, L
   use MetFields_mod, only: zen
@@ -68,8 +68,6 @@ module AOTx_mod
           ! possibilities are EU (8-20daytime) or UN (May-July for
           ! crops)
    !================== 
-
-   integer, save, public :: nOutputVegO3 = 0
 
     type(O3cl_t), public, allocatable, dimension(:) :: &
      VEGO3_OUTPUTS
@@ -239,6 +237,7 @@ contains
     real, intent(out)   :: pod
     character(len=*),parameter :: dtxt='CalcPOD:'
     character(len=10):: txt
+    character(len=20) :: txtdate
 
     real    :: o3, o3_3m
     integer :: i,j, spod, epod
@@ -246,12 +245,15 @@ contains
     real :: Y
 
     pod = 0.0
-    dbg = ( DEBUG%AOT .and. debug_flag )
+    dbg = ( DEBUG%STOFLUX .and. debug_flag )
 
-    if ( Grid%izen >= AOT_HORIZON ) then  !UN or MM use daylight
-        if ( dbg ) write(*,"(2a,5i5)") dtxt//"Zen ",&
-           trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, Grid%izen, L%SGS, L%EGS
-        return
+    if ( L%FstO3 < 1.0e-6 ) then ! Grid%izen >= AOT_HORIZON ) then
+        if ( dbg ) write(*,"(a45,5i5,9es12.3)") adjustl(dtxt//"Dark "//&
+          trim(txtdate)//VEGO3_OUTPUTS(iO3cl)%name ), &
+           iO3cl, jday, Grid%izen, L%SGS, L%EGS, L%f_env, L%FstO3
+
+       RETURN
+
     end if
 
     ! Start and end of POD accumulation period:
@@ -265,9 +267,9 @@ contains
       spod = L%SGS
       epod = L%EGS
     end if
-    if ( dbg ) write(*,'(2a,5i5)') dtxt//"uZen ",&
-     trim(VEGO3_OUTPUTS(iO3cl)%name)//'def:'//trim(VEGO3_OUTPUTS(iO3cl)%defn),&
-      iO3cl, jday, Grid%izen, spod, epod
+    if ( dbg ) write(*,'(a45,5i4,2es12.3)') adjustl(dtxt//"Day  "// trim(txtdate)// &
+      VEGO3_OUTPUTS(iO3cl)%name ), &
+        iO3cl, jday, Grid%izen, spod, epod, L%f_env, L%FstO3
     if ( jday < spod .or. jday > epod ) then
        if ( dbg ) write(*,*) dtxt//"Jday RETURN "
        return
@@ -282,21 +284,21 @@ contains
 
    ! Add fluxes if Y exceeded:
 
-     !D21 pod  = max(L%FstO3 - Y,0.0)
      pod  = max(L%FstO3 - Y,0.0) * do3se(iLC)%PODscale
 
     if ( dbg ) then
-       write(txt,"(a,L1)") "Rel", VEGO3_OUTPUTS(iO3cl)%RelSGS
+       !write(txt,"(a,L1)") "Rel", VEGO3_OUTPUTS(iO3cl)%RelSGS
        !txt= "Rel"
-       call datewrite(dtxt//"YYY:" // trim(txt) //  &
-         trim(VEGO3_OUTPUTS(iO3cl)%defn), (/ iLC,   &
-              VEGO3_OUTPUTS(iO3cl)%SAccPeriod,&
-              VEGO3_OUTPUTS(iO3cl)%EAccPeriod, jday, Grid%izen /), &
-           (/ Y,  o3, L%FstO3, pod /) )
-       if(current_date%hour > 10 .and. pod > 0.1 ) then
-       end if
+       txt= "FFF"
+       write(*,'(a60,5i4,5es12.3)') adjustl( dtxt//"OUT:" // trim(txtdate)// &
+          trim(VEGO3_OUTPUTS(iO3cl)%name) // txt ),  iLC,   &
+            VEGO3_OUTPUTS(iO3cl)%SAccPeriod, VEGO3_OUTPUTS(iO3cl)%EAccPeriod,&
+              jday, Grid%izen,  Y,  o3, L%f_env, L%FstO3, pod
     end if
-!if(debug_flag) write(*,"(2a,4i5,2g12.3)") "PODO3 ", trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, spod, epod, L%FstO3,L%cano3_ppb
+
+!afmt="a34,TXTDATE,5i5,4f8.2,20es14.5")  possible
+!if(debug_flag) write(*,"(a45,4i5,2g12.3)") "PODO3 "// &
+!  trim(VEGO3_OUTPUTS(iO3cl)%name), iO3cl, jday, spod, epod, L%FstO3,L%cano3_ppb
 
   end subroutine Calc_POD 
 

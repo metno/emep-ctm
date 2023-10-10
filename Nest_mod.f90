@@ -88,7 +88,7 @@ use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
      NEST_MET_inner,NEST_RUNDOMAIN_inner,&
      NEST_WRITE_SPC,NEST_WRITE_GRP,NEST_OUTDATE_NDUMP,NEST_outdate,OUTDATE_NDUMP_MAX,&
      EXTERNAL_BIC_NAME, TOP_BC, filename_eta
-use Debug_module,           only: DEBUG_NEST,DEBUG_ICBC=>DEBUG_NEST_ICBC
+use Debug_module,           only: DEBUG ! %NEST,DEBUG_ICBC=>DEBUG_NEST_ICBC
 use MPI_Groups_mod  
 use netcdf,                 only: nf90_open,nf90_write,nf90_close,nf90_inq_dimid,&
                                   nf90_inquire,nf90_inquire_dimension,nf90_inq_varid,&
@@ -170,7 +170,7 @@ subroutine Config_Nest()
 ! Ensure out-domain is not larger than rundomain (or rundomain by default)
   call RestrictDomain(NEST_out_DOMAIN)
 
-  mydebug = DEBUG_NEST.and.MasterProc
+  mydebug = DEBUG%NEST.and.MasterProc
 
   NEST_WRITE_SPC = ""  ! If these variables remain ""
   NEST_WRITE_GRP = ""  ! all advected species will be written out.
@@ -251,7 +251,7 @@ subroutine readxn(indate)
   end select
   ! never comes to this point if NEST_MODE=100, 11 or 12
 
-  if(DEBUG_NEST.and.MasterProc) write(*,*) 'Nest: kt', kt, first_call
+  if(DEBUG%NEST.and.MasterProc) write(*,*) 'Nest: kt', kt, first_call
 
 ! Update filenames according to date following templates defined in config nml
   filename_read_3D=date2string(NEST_template_read_3D,ndate,&
@@ -302,7 +302,7 @@ subroutine readxn(indate)
       W1=1.0-W2               ! interpolate
     end if
   end if
-  if(DEBUG_NEST.and.MasterProc) then
+  if(DEBUG%NEST.and.MasterProc) then
     write(*,*) 'Nesting BC 2D: time weights : ',W1,W2
     write(*,*) 'Nesting BC 2D: time stamps : ',rtime_saved(1),rtime_saved(2)
   end if
@@ -310,7 +310,7 @@ subroutine readxn(indate)
   do bc=1,size(adv_bc)
     if(.not.(adv_bc(bc)%wanted.and.adv_bc(bc)%found))cycle
     n=adv_bc(bc)%ixadv
-    if(DEBUG_ICBC.and.MasterProc) write(*,"(2(A,1X),I0,'-->',I0)") &
+    if(DEBUG%NEST_ICBC.and.MasterProc) write(*,"(2(A,1X),I0,'-->',I0)") &
       'NestICBC: Nesting component',trim(adv_bc(bc)%varname),bc,n
     forall (i=iw:iw, k=1:KMAX_BC, j=1:ljmax, i>=1) &
       xn_adv(n,i,j,k)=W1*xn_adv_bndw(n,j,k,1)+W2*xn_adv_bndw(n,j,k,2)
@@ -415,7 +415,7 @@ subroutine wrtxn(indate, End_of_run)
         i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
         if(i>0)then
           adv_ic(i)%wanted=.true.
-        elseif((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
+        elseif((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)then
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
            "Warning (wrtxn)", &
            "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
@@ -428,7 +428,7 @@ subroutine wrtxn(indate, End_of_run)
       if(i>0)then
         where(chemgroups(i)%specs>NSPEC_SHL) &
           adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.false.
-        if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
            "Warning (wrtxn)", &
            "Group","POLLEN","is written to pollen restart/dump file", &
@@ -437,7 +437,7 @@ subroutine wrtxn(indate, End_of_run)
     end if
     do n=1,NSPEC_ADV
       if(.not.adv_ic(n)%wanted)then
-        if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
             "Nest(wrtxn) DEBUG_ICBC",&
             "Variable",trim(species_adv(n)%name),"is not wanted as IC",&
@@ -448,7 +448,7 @@ subroutine wrtxn(indate, End_of_run)
                            MPI_COMM_CALC,IERROR)
         adv_ic(n)%wanted=wanted_out
         if(.not.adv_ic(n)%wanted.and.&
-          (DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+          (DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
             "Nest(wrtxn) DEBUG_ICBC",&
             "Variable",trim(species_adv(n)%name),"was found constant=0.0",&
@@ -567,7 +567,7 @@ subroutine Dump(indate)
         i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
         if(i>0)then
           adv_ic(i)%wanted=.true.
-        elseif((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
+        elseif((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)then
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
            "Warning (wrtxn)", &
            "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
@@ -580,7 +580,7 @@ subroutine Dump(indate)
       if(i>0)then
         where(chemgroups(i)%specs>NSPEC_SHL) &
           adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.false.
-        if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
            "Warning (wrtxn)", &
            "Group","POLLEN","is written to pollen restart/dump file", &
@@ -589,7 +589,7 @@ subroutine Dump(indate)
     end if
     do n=1,NSPEC_ADV
       if(.not.adv_ic(n)%wanted)then
-        if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
             "Nest(wrtxn) DEBUG_ICBC",&
             "Variable",trim(species_adv(n)%name),"is not wanted as IC",&
@@ -600,7 +600,7 @@ subroutine Dump(indate)
                            MPI_COMM_CALC,IERROR)
         adv_ic(n)%wanted=wanted_out
         if(.not.adv_ic(n)%wanted.and.&
-          (DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)&
+          (DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
           write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
             "Nest(wrtxn) DEBUG_ICBC",&
             "Variable",trim(species_adv(n)%name),"was found constant=0.0",&
@@ -701,7 +701,7 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
       if(.not.adv_ic(n)%found)then
         if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
              call PrintLog("WARNING: IC variable '"//trim(adv_ic(n)%varname)//"' not found")
-      elseif(DEBUG_NEST.or.DEBUG_ICBC)then
+      elseif(DEBUG%NEST.or.DEBUG%NEST_ICBC)then
         write(*,*) "init_icbc filled adv_ic "//trim(adv_ic(n)%varname)
       end if
     end do
@@ -709,13 +709,13 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
       if(.not.adv_bc(n)%found)then
         if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
         call PrintLog("WARNING: BC variable '"//trim(adv_bc(n)%varname)//"' not found")
-      elseif(DEBUG_NEST.or.DEBUG_ICBC)then
+      elseif(DEBUG%NEST.or.DEBUG%NEST_ICBC)then
         write(*,*) "init_icbc filled adv_bc "//trim(adv_bc(n)%varname)
       end if
     end do
   end if
 
-  if((DEBUG_NEST.or.DEBUG_ICBC).and.MasterProc)then
+  if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)then
     write(*,"(a)") "Nest: DEBUG_ICBC Variables:",&
       trim(filename_read_3D),trim(filename_read_BC)
     write(*,"((1X,A,I3,'->',"//ICBC_FMT//"))") &
@@ -1473,7 +1473,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
       allocate(xn_adv_bndn(NSPEC_ADV,LIMAX,KMAX_MID,2)) ! North
     if(kt>=1    .and..not.allocated(xn_adv_bndt)) &
       allocate(xn_adv_bndt(NSPEC_ADV,LIMAX,LJMAX,2)) ! Top
-    if(DEBUG_ICBC)then
+    if(DEBUG%NEST_ICBC)then
       CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
       if(MasterProc) write(*, "(A)") "Nest: DEBUG_ICBC Boundaries:"
       write(*,"(1X,'me=',i3,5(1X,A,I0,'=',L1))")&
@@ -1574,7 +1574,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
     if(.not.(adv_bc(bc)%wanted.and.adv_bc(bc)%found))cycle DO_BC
     n=adv_bc(bc)%ixadv
     if(MasterProc)then
-      if(DEBUG_NEST.or.DEBUG_ICBC) write(*,"(2(A,1X),I0,'-->',I0)")&
+      if(DEBUG%NEST.or.DEBUG%NEST_ICBC) write(*,"(2(A,1X),I0,'-->',I0)")&
         'Nest: DO_BC',trim(adv_bc(bc)%varname),bc,n
       ! Could fetch one level at a time if sizes becomes too big
       call check(nf90_inq_varid(ncFileID,trim(adv_bc(bc)%varname),varID))
@@ -1591,13 +1591,13 @@ subroutine read_newdata_LATERAL(ndays_indate)
         if(index(adv_bc(bc)%varname,"mmr")>0)units="mmr"
       end if
       if(status==nf90_noerr) then
-        if(DEBUG_NEST.or.DEBUG_ICBC) write(*,*)&
+        if(DEBUG%NEST.or.DEBUG%NEST_ICBC) write(*,*)&
           'Nest: variable '//trim(adv_bc(bc)%varname)//' has unit '//trim(units)
         call Units_Scale(units,n,unitscale,needroa=divbyroa,&
                          debug_msg="read_newdata_LATERAL")
         unitscale=adv_bc(bc)%frac/unitscale
       else
-        if(DEBUG_NEST.or.DEBUG_ICBC) write(*,*)&
+        if(DEBUG%NEST.or.DEBUG%NEST_ICBC) write(*,*)&
           'Nest: variable '//trim(adv_bc(bc)%varname//' has no unit attribute')
         unitscale=adv_bc(bc)%frac
       end if
@@ -1768,7 +1768,7 @@ subroutine reset_3D(ndays_indate)
      DO_SPEC: do n= 1, NSPEC_ADV
         if(.not.(adv_ic(n)%wanted.and.adv_ic(n)%found)) cycle DO_SPEC
         if(MasterProc)then
-           if(DEBUG_NEST) print *,'Nest: 3D component ',trim(adv_ic(n)%varname)
+           if(DEBUG%NEST) print *,'Nest: 3D component ',trim(adv_ic(n)%varname)
            ! Could fetch one level at a time if sizes becomes too big
            call check(nf90_inq_varid(ncFileID,trim(adv_ic(n)%varname),varID))
            call check(nf90_get_var(ncFileID, varID, data &
@@ -1783,13 +1783,13 @@ subroutine reset_3D(ndays_indate)
               if(index(adv_ic(n)%varname,"mmr")>0)units="mmr"
            end if
            if(status==nf90_noerr) then
-              if(DEBUG_NEST) write(*,*)&
+              if(DEBUG%NEST) write(*,*)&
                    'Nest: variable '//trim(adv_ic(n)%varname)//' has unit '//trim(units)
               call Units_Scale(units,n,unitscale,needroa=divbyroa,&
                    debug_msg="reset_3D")
               unitscale=adv_ic(n)%frac/unitscale
            else
-              if(DEBUG_NEST) write(*,*)&
+              if(DEBUG%NEST) write(*,*)&
                    'Nest: variable '//trim(adv_ic(n)%varname//' has no unit attribute')
               unitscale=adv_ic(n)%frac
            end if

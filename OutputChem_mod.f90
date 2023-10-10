@@ -33,7 +33,7 @@ use Config_module,     only: num_lev3d, MasterProc, runlabel1,&
                              IOU_HOUR_INST, IOU_MAX_MAX, HOURLYFILE_ending, &
                              startdate, enddate, out_startdate, USES&
                              ,SITE_XTRA_D2D
-use Debug_module,       only: DEBUG => DEBUG_OUTPUTCHEM
+use Debug_module,       only: DEBUG  ! => DEBUG%OUTPUTCHEM
 use Derived_mod,        only: LENOUT2D, nav_2d, num_deriv2d  &
                             ,LENOUT3D, nav_3d, num_deriv3d  &
                             ,wanted_iou, ResetDerived
@@ -92,6 +92,7 @@ subroutine Wrtchem(ONLY_HOUR)
   integer, save :: daynumber_old=-999
   character(len=TXTLEN_FILE) :: newname
   TYPE(timestamp)   :: ts1,ts2
+  logical :: dbg   
 
 !---------------------------------------------------------------------
 
@@ -115,16 +116,17 @@ subroutine Wrtchem(ONLY_HOUR)
   End_of_Run =  date_is_reached(enddate)
 
   if((current_date%seconds /= 0 ).and. .not. End_of_Run)return
-  if(MasterProc .and. DEBUG) write(6,"(a12,i5,5i4)") "DAILY DD_OUT ",   &
-       nmonth, mm_out, nday, dd_out, nhour
+  dbg = MasterProc .and. DEBUG%OUTPUTCHEM
+  if(dbg) write(6,"(a12,i5,5i4)") "DAILY DD_OUT ", nmonth, mm_out, &
+             nday, dd_out, nhour
 
   !. END_OF_EMEPDAY = 6am - end of EMEP daily sampling period
   !. Daily outputs are dated with the start of sampling period
   if ( END_OF_EMEPDAY  <= 7 ) then
     dd_out = nday - 1     ! only used for daily outputs
 
-    if( MasterProc .and. DEBUG) write(6,"(a12,i5,5i4)")&
-      "DAILY SET ",  nmonth, mm_out, nday, dd_out, nhour
+    if( dbg ) write(6,"(a12,i5,5i4)") "DAILY SET ",  nmonth, mm_out, &
+             nday, dd_out, nhour
 
     if(dd_out == 0) then
       mm_out = nmonth - 1
@@ -133,7 +135,7 @@ subroutine Wrtchem(ONLY_HOUR)
 
       dd_out = max_day(mm_out, nyear)  !  Last day of month
 
-      if( MasterProc .and. DEBUG) write(6,"(a12,i5,4i4)") "DAILY FIX ", &
+      if( dbg ) write(6,"(a12,i5,4i4)") "DAILY FIX ", &
                        nmonth, mm_out, nday, dd_out
     end if
   end if      ! for END_OF_EMEPDAY <= 7
@@ -207,16 +209,18 @@ subroutine Output_fields(iotyp)
   logical, dimension(IOU_MAX_MAX),save       :: myfirstcall = .true.
   logical :: Init_Only
   integer :: i
+  logical :: dbg   
+  dbg =   MasterProc .and. DEBUG%OUTPUTCHEM
   if(myfirstcall(iotyp))then
      !only predefine the fields. For increased performance 
      Init_Only = .true.
      if(num_deriv2d > 0) call Output_f2d(iotyp,num_deriv2d,nav_2d,f_2d,d_2d,Init_Only)
      if(num_deriv3d > 0) call Output_f3d(iotyp,num_deriv3d,nav_3d,f_3d,d_3d,Init_Only)
      myfirstcall(iotyp) = .false.
-     IF(DEBUG.and.MasterProc)write(*,*)'2d and 3D OUTPUT INITIALIZED',iotyp
+     IF( dbg ) write(*,*)'2d and 3D OUTPUT INITIALIZED',iotyp
   end if
   Init_Only = .false.
-  IF(DEBUG.and.MasterProc)write(*,*)'2d and 3D OUTPUT WRITING',iotyp
+  IF( dbg ) write(*,*)'2d and 3D OUTPUT WRITING',iotyp
   !*** 2D fields, e.g. surface SO2, SO4, NO2, NO3 etc.; AOT, fluxes
   !--------------------
 
@@ -255,8 +259,10 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
 
   integer :: my_iotyp,icmp ! output type,component index
   real    :: scale      ! Scaling factor
+  logical :: dbg   
 !---------------------------------------------------------------------
 
+  dbg =   MasterProc .and. DEBUG%OUTPUTCHEM
   do icmp = 1, dim
     if ( wanted_iou(iotyp,def(icmp)%iotype) ) then
       my_iotyp=iotyp
@@ -265,7 +271,7 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
       if(my_iotyp/=IOU_INST) scale = scale / max(1,nav(icmp,my_iotyp))
 
       !if ( MasterProc .and. DEBUG ) then
-      if ( DEBUG .and. debug_proc ) then
+      if ( dbg ) then
           write(*,*) "DEBUG Output_f2d ", icmp, iotyp, trim(def(icmp)%name)
           write(*,"(a,i6,2es10.3)") "Output_f2d n,Scales:"// &
             trim(def(icmp)%name), nav(icmp,my_iotyp), def(icmp)%scale, scale

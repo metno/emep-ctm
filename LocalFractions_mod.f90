@@ -1238,16 +1238,16 @@ subroutine lf_av(dt,End_of_Day)
                  xtot=0.0
                  do iix=1,lf_src(isrc)%Nsplit
                     ix = lf_src(isrc)%ix(iix)
-                    if(lf_src(isrc)%type=='country')then
+                     if(lf_src(isrc)%type=='country')then
                        !3m height cfac correction
                        xtot=xtot+(xn_adv(ix,i,j,k)*lf_src(isrc)%mw(iix))/ATWAIR&
                          *roa(i,j,k,1)*1.E9* cfac(ix,i,j) !for ug/m3
                        !                   *(dA(k)+dB(k)*ps(i,j,1))/GRAV*1.E6 !for mg/m2
-                    else
-                        xtot=xtot+(xn_adv(ix,i,j,k)*lf_src(isrc)%mw(iix))/ATWAIR&
-                             *roa(i,j,k,1)*1.E9 !for ug/m3
-                       !                   *(dA(k)+dB(k)*ps(i,j,1))/GRAV*1.E6 !for mg/m2
-                    endif
+                     else
+                         xtot=xtot+(xn_adv(ix,i,j,k)*lf_src(isrc)%mw(iix))/ATWAIR&
+                              *roa(i,j,k,1)*1.E9 !for ug/m3
+                        !                   *(dA(k)+dB(k)*ps(i,j,1))/GRAV*1.E6 !for mg/m2
+                     endif
                  end do
                  if(.not. pollwritten(ipoll))then !one pollutant may be used for several sources
                     if (iou_ix == iou_ix_inst) then
@@ -1292,23 +1292,16 @@ subroutine lf_av(dt,End_of_Day)
                           !                   *(dA(k)+dB(k)*ps(i,j,1))/GRAV*1.E6 !for mg/m2
                        endif
                     end do
-                    if (iou_ix == iou_ix_inst) then
-                       !not accumulated
-                       lf_src_tot(i,j,k,ipoll,iou_ix) = xtot
-                       n_new = lf_src(isrc_pm25_new)%start
-                       do n=lf_src(isrc)%start, lf_src(isrc)%end !NB: loop over isrc for pm25, not new
-                          lf_src_acc(n,i,j,k,iou_ix)=xtot*lf(n_new,i,j,k)
-                          n_new = n_new + 1
-                       end do
-                   else
+                    if(.not. pollwritten(ipoll))then !one pollutant may be used for several sources
+                       !It is added to the _old (= not new) component, also in the inst case
                        lf_src_tot(i,j,k,ipoll,iou_ix) = lf_src_tot(i,j,k,ipoll,iou_ix) + xtot
-                       n_new = lf_src(isrc_pm25_new)%start
-                       do n=lf_src(isrc)%start, lf_src(isrc)%end !NB: loop over isrc for pm25, not new
-                          lf_src_acc(n,i,j,k,iou_ix)=lf_src_acc(n,i,j,k,iou_ix)+xtot*lf(n_new,i,j,k)
-                          n_new = n_new + 1
-                       end do
                     end if
-                 enddo
+                    n_new = lf_src(isrc_pm25_new)%start
+                    do n=lf_src(isrc)%start, lf_src(isrc)%end !NB: loop over isrc for pm25, not new
+                       lf_src_acc(n,i,j,k,iou_ix)=lf_src_acc(n,i,j,k,iou_ix) + xtot*lf(n_new,i,j,k)
+                       n_new = n_new + 1
+                    end do
+                 end do
               enddo
            enddo
         end if

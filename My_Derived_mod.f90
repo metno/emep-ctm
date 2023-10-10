@@ -52,7 +52,7 @@ module My_Derived_mod
 !  moving most definitions to the config namelist system.
 !---------------------------------------------------------------------------
 
-use AOTx_mod,          only: VEGO3_OUTPUTS, nOutputVegO3
+use AOTx_mod,          only: VEGO3_OUTPUTS
 use CheckStop_mod,     only: CheckStop
 use Chemfields_mod,    only: xn_adv, xn_shl, cfac
 use ChemDims_mod          ! Use IXADV_ indices...
@@ -73,7 +73,7 @@ use Config_module,     only: MasterProc, SOURCE_RECEPTOR, & !
                             fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,&
                             hour_DOMAIN, &
                             lev3d_from_surface,&
-                            MAX_NUM_DERIV2D,OutputVegO3
+                            MAX_NUM_DERIV2D,OutputVegO3, nOutputVegO3
 use Debug_module,      only: DEBUG ! => DEBUG_MY_DERIVED
 use EmisDef_mod,       only: NSECTORS, SECTORS, EMIS_FILE
 use EmisGet_mod,       only: nrcemis, iqrc2itot
@@ -204,8 +204,8 @@ subroutine Init_My_Deriv()
     tag_name    ! Needed to concatanate some text in AddArray calls
                 ! - older (gcc 4.1?) gfortran's had bug
   character(len=TXTLEN_SHORT) :: outname, outunit, outdim, outtyp, outclass
-  logical :: Is3D,debug0   !  if(DEBUG%MY_DERIVED.and.MasterProc )
-  character(len=12), save :: sub='InitMyDeriv:'
+  logical :: Is3D,dbg0   !  if(DEBUG%MY_DERIVED.and.MasterProc )
+  character(len=12), save :: dtxt='InitMyDeriv:'
   character(len=2)::  isec_char
   character(len=3)::  neigh_char
 
@@ -219,7 +219,7 @@ subroutine Init_My_Deriv()
      if(lev3d(k)==0)lev3d(k)=k
   enddo
 
-  debug0 = DEBUG%MY_DERIVED.and.MasterProc
+  dbg0 = DEBUG%MY_DERIVED.and.MasterProc
 
   if(out_startdate(1)<0)then
      ! notset values are not set in config
@@ -250,13 +250,15 @@ subroutine Init_My_Deriv()
   !! Find number of wanted OutoutConcs
   nOutputMisc  = find_index("-", OutputMisc(:)%name, first_only=.true. ) -1
   nOutputConcs = find_index("-", OutputConcs(:)%txt1, first_only=.true. ) -1
-  nOutputVegO3 = find_index("-", OutputVegO3(:)%name, first_only=.true. ) -1
+  !nOutputVegO3 now calculated in Landuse_mod.
+  !IAMVEG: nOutputVegO3 = find_index("-", OutputVegO3(:)%name, first_only=.true. ) -1
   nOutputWdep  = find_index("-", WDEP_WANTED(:)%txt1, first_only=.true. ) -1
   nOutputMosMet = find_index("-", MOSAIC_METCONCS(:), first_only=.true. ) -1
   nOutputMosLC  = find_index("-", MET_LCS(:), first_only=.true. ) -1
   nOutputNewMos = find_index("-", NewMosaic(:)%txt1, first_only=.true. ) -1
        
-  if(MasterProc) write(*,"(a,i3)") "NMLOUT nOUTMISC ", nOutputMisc
+  if(MasterProc) write(*,"(a,i3)") dtxt//"NMLOUT nOUTMISC ", nOutputMisc
+  if(MasterProc) write(*,"(a,i3)") dtxt//"NMLOUT nOutputVegO3 ", nOutputVegO3
   found_3D_hourly = .false.
   found_3D_hourly_inst = .false.
   found_hourly_PS = .false.
@@ -384,10 +386,10 @@ subroutine Init_My_Deriv()
 
   do n = 1, nOutputVegO3
     VEGO3_OUTPUTS(n) = OutputVegO3(n)
-    if(debug0)  write(*,*) "VEGO3 NUMS ", n, trim(OutputVegO3(n)%name) 
+    !if(dbg0)  write(*,*) "VEGO3 NUMS ", n, trim(OutputVegO3(n)%name) 
   end do
-  if(MasterProc) call WriteArray(VEGO3_OUTPUTS(:)%name,nOutputVegO3,&
-                                   " VEGO3 OUTPUTS:")
+  if(dbg0) call WriteArray(VEGO3_OUTPUTS(:)%name,nOutputVegO3,&
+                                   dtxt//" VEGO3 OUTPUTS:")
   ! nVEGO3 is output, excluding missing LC types:
   call Add_MosaicVEGO3(nOutVEGO3) 
 
@@ -395,7 +397,7 @@ subroutine Init_My_Deriv()
   if( .not.SOURCE_RECEPTOR)then
     !------------- Deposition velocities ---------------------
     call Add_NewMosaics(NewMosaic, nMc)
-    if(debug0)  write(*,*) 'NewMos Nums ', nOutputNewMos, nMC
+    if(dbg0)  write(*,*) 'NewMos Nums ', nOutputNewMos, nMC
 
     !------------- Met data for d_2d -------------------------
     ! We find the various combinations of met and ecosystem,
@@ -406,7 +408,7 @@ subroutine Init_My_Deriv()
            MET_LCS(1:nOutputMosLC),Mosaic_timefmt, nMET)
     nOutMET = nMET !not needed?
 
-    if(debug0) then
+    if(dbg0) then
       write(*,*) "NEWMOSAIC   NUM ", nMc
       write(*,*) "VEGO3 FINAL NUM ", nVEGO3
       write(*,*) "nOutputMosMet FINAL NUM ", nOutputMosMet
@@ -418,10 +420,10 @@ subroutine Init_My_Deriv()
   end if ! SOURCE_RECEPTOR
 
 !------------- end LCC data for d_2d -------------------------
-  call CheckStop( NMosaic >= MAX_MOSAIC_OUTPUTS, sub//"too many nMosaics" )
+  call CheckStop( NMosaic >= MAX_MOSAIC_OUTPUTS, dtxt//"too many nMosaics" )
   call AddArray( MosaicOutput(1:nMosaic)%name, &
                     wanted_deriv2d, NOT_SET_STRING, errmsg)
-  call CheckStop( errmsg, sub//errmsg // "MosaicOutput too long" )
+  call CheckStop( errmsg, dtxt//errmsg // "MosaicOutput too long" )
 
   mynum_deriv2d  = LenArray( wanted_deriv2d, NOT_SET_STRING )
 
@@ -480,7 +482,7 @@ subroutine Init_My_Deriv()
       end select
 
       if(n1<1) then
-        if( debug0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
+        if( dbg0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
         call PrintLog("WARNING: Requested My_Derived OutputField not found: "&
             //trim(outclass)//":"//trim(outname), MasterProc)
         cycle
@@ -512,7 +514,7 @@ subroutine Init_My_Deriv()
           OutputFields(nOutputFields) = OutputConcs(n)
           Is3D=.true.
       case default
-        if( debug0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
+        if( dbg0 ) write(*,*) "Xd-2d-SKIP ", n, trim(outname)
         call PrintLog("WARNING: Unsupported My_Derived OutputField%outdim: "&
             //trim(outclass)//":"//trim(outname)//":"//trim(outdim), MasterProc)
         cycle
@@ -526,7 +528,7 @@ subroutine Init_My_Deriv()
     if(tag_name(1)=="PS" .and. scan(OutputConcs(n)%ind,'H')>0)found_hourly_PS = .true.
     if(tag_name(1)=="PS" .and. scan(OutputConcs(n)%ind,'I')>0)found_hourly_inst_PS = .true.
 
-    if(debug0)write(*,*)"OutputFields-tags ",n,trim(outname),"->",tag_name(1)
+    if(dbg0)write(*,*)"OutputFields-tags ",n,trim(outname),"->",tag_name(1)
  end do
 
   ! ditto wanted_deriv3d....

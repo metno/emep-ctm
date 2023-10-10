@@ -83,7 +83,7 @@ use Config_module,    only: PASCAL, PT, Pref, METSTEP  &
      ,LANDIFY_MET,MANUAL_GRID  &
      ,CW_THRESHOLD,RH_THRESHOLD, CW2CC, JUMPOVER29FEB, meteo, startdate&
      ,SoilTypesFile, Soil_TegenFile, TopoFile, SurfacePressureFile
-use Debug_module,       only: DEBUG, DEBUG_LANDIFY 
+use Debug_module,       only: DEBUG
 use Functions_mod,      only: Exner_tab, Exner_nd
 use Functions_mod,      only: T_2_Tpot, StandardAtmos_kPa_2_km 
 use GridValues_mod,     only: glat, xm_i, xm_j, xm2         &
@@ -1572,7 +1572,6 @@ subroutine met_derived(nt)
   implicit none
   integer, intent(in) :: nt  ! set to 1 from metint or nr from matvar
   integer ::i,j, k
-  logical :: DEBUG_DERIV = .false.
 
   do k = 1, KMAX_MID
     do j = 1,ljmax
@@ -1638,10 +1637,10 @@ subroutine met_derived(nt)
   end where
 
 
-  if ( DEBUG_DERIV .and. debug_proc ) then
+  if ( DEBUG%MET .and. debug_proc ) then  ! was DEBUG_DERIV
     i = debug_iloc
     j = debug_jloc
-    write(*,*) "MET_DERIV DONE ", me, nt, ustar_nwp(i,j), rho_surf(i,j), &
+    write(*,*) "MET DERIV DONE ", me, nt, ustar_nwp(i,j), rho_surf(i,j), &
         fh(i,j,nt), invL_nwp(i,j)
   end if
 end subroutine met_derived
@@ -2241,7 +2240,7 @@ subroutine landify(x,intxt,xmin,xmax,wfmin,xmask)
   xxmax = 1.0e30   ! Default max value x
   if ( present(xmax) )  xxmax = xmax
 
-  if(DEBUG_LANDIFY.and.MasterProc) then
+  if(DEBUG%LANDIFY.and.MasterProc) then
       write(*,*) trim(txt) , water_frac_set
       write(*,"(a,2g12.4)") 'Data Limits ', xxmin, xxmax
       write(*,"(a,g12.4)")  'Water Limit ', xwfmin
@@ -2261,7 +2260,7 @@ subroutine landify(x,intxt,xmin,xmax,wfmin,xmask)
     masktxt = "Coastal mask"
   end if
 
-   if ( DEBUG_LANDIFY.and. debug_proc ) then
+   if ( DEBUG%LANDIFY.and. debug_proc ) then
       write(*,"(a,6i4,L2,1x,a)") "DLandify start ", &
        debug_li, debug_lj, 1, limax, 1, ljmax,  xwf_done, trim(masktxt)
    end if
@@ -2277,7 +2276,7 @@ subroutine landify(x,intxt,xmin,xmax,wfmin,xmask)
 
   call extendarea( x(:,:), xx(:,:), debug_flag )
 
-  if ( DEBUG_LANDIFY .and. debug_proc) write(*,*) "Landify now ", &
+  if ( DEBUG%LANDIFY .and. debug_proc) write(*,*) "Landify now ", &
      xwf_done , likely_coastal(debug_li,debug_lj), mask(debug_li,debug_lj)
 
   oldx = 0.0
@@ -2291,7 +2290,7 @@ subroutine landify(x,intxt,xmin,xmax,wfmin,xmask)
 
       sumland  = 0.0
       sumx     = 0.0
-      debug_flag = ( DEBUG_LANDIFY .and. debug_proc .and. &
+      debug_flag = ( DEBUG%LANDIFY .and. debug_proc .and. &
              i==debug_li .and. j==debug_lj )
 
       if( mask(i,j) ) then ! likely coastal or water_frac <0.0 for SW
@@ -2328,7 +2327,7 @@ subroutine landify(x,intxt,xmin,xmax,wfmin,xmask)
      end do ! i
   end do ! j
 
-  if ( DEBUG_LANDIFY .and. debug_proc ) then
+  if ( DEBUG%LANDIFY .and. debug_proc ) then
     call datewrite("LandifyDONE: "//trim(intxt), (/ oldx, x(debug_li,debug_lj) /) )
   end if
 

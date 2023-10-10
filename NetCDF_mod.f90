@@ -55,7 +55,7 @@ use Config_module,       only: KMAX_MID,KMAX_BND, runlabel1, runlabel2&
                              , num_lev3d,lev3d&      ! 3D levels on 3D output
                              , startdate, step_main
 use Country_mod,        only : NLAND, Country
-use Debug_module,       only : DEBUG_NETCDF, DEBUG_NETCDF_RF
+use Debug_module,       only : DEBUG ! old:_NETCDF, DEBUG_NETCDF_RF
 use Functions_mod,       only: StandardAtmos_km_2_kPa
 use GridValues_mod,     only : GRIDWIDTH_M,fi,xp,yp,xp_EMEP_official&
                              ,debug_proc, debug_li, debug_lj &
@@ -140,15 +140,16 @@ private :: createnewvariable
 contains
 !_______________________________________________________________________
 
-subroutine Out_CDF_sondes(fileName,SpecName,NSpec,Values,NLevels,g_ps,debug)
+subroutine Out_CDF_sondes(fileName,SpecName,NSpec,Values,NLevels,g_ps,debug_flag)
   !writes out a given variable with attributes in 1D (vertical coordinates) + station dimension (and time).
   !Note: defining a different variable for each station/component pair, would be very slow (almost double cpu time of run)
   !Note: writing only one variable at a time would be extremely slow
+  !DS - changed debug to debug_Flag to avoid confusion with DEBUG
 
   character(len=*),  intent(in)  :: fileName,SpecName(NSpec)
   integer, intent(in)  :: NLevels,NSpec
   real,intent(in)  :: Values(Nlevels,NSpec,*),g_ps(*)
-  logical, intent(in), optional  :: debug
+  logical, intent(in), optional  :: debug_flag
   logical  :: debug_1D
   integer :: ncFileID
   integer :: varID,dimID
@@ -159,8 +160,9 @@ subroutine Out_CDF_sondes(fileName,SpecName,NSpec,Values,NLevels,g_ps,debug)
   real,save,allocatable :: buff(:,:)
 
 
-  debug_1D=DEBUG_NETCDF
-  if(present(debug))debug_1D = debug .or. debug_1D
+  debug_1D=DEBUG%NETCDF
+  
+  if(present(debug_flag))debug_1D = debug_flag .or. debug_1D
 
   if(MasterProc)then
     if(debug_1D)write(*,*)'writing in ',trim(fileName)
@@ -215,14 +217,14 @@ subroutine Out_CDF_sondes(fileName,SpecName,NSpec,Values,NLevels,g_ps,debug)
 end subroutine Out_CDF_sondes
 
 subroutine Create_CDF_sondes(fileName,NSpec,NSpec_Att,SpecDef,&
-        NStations,NMetaData,MetaData,KMAXcdf,CDFtype,debug)
+        NStations,NMetaData,MetaData,KMAXcdf,CDFtype,debug_flag)
 ! Create a NetCDF file with given attributes.
 ! if Nvalues>1 define vertical coordinates.
   integer, intent(in)  :: KMAXcdf,NSpec,NStations,NSpec_Att,NMetaData
   character(len=*),  intent(in) :: fileName, &
     SpecDef(NSpec,0:NSpec_Att),MetaData(0:NStations,NMetaData)
   integer, intent(in), optional :: CDFtype
-  logical, intent(in), optional :: debug
+  logical, intent(in), optional :: debug_flag
   logical  :: debug_1D
   integer :: OUTtype,ncFileID,levDimID,ilevDimID,timeDimID
   integer :: varID,StationDimID,StringDimID
@@ -238,8 +240,8 @@ subroutine Create_CDF_sondes(fileName,NSpec,NSpec_Att,SpecDef,&
   integer :: auxI(NStations),ierr
   real :: auxR(NStations)
 
-  debug_1D=DEBUG_NETCDF
-  if(present(debug))debug_1D = debug .or. debug_1D
+  debug_1D=DEBUG%NETCDF
+  if(present(debug_flag))debug_1D = debug_flag .or. debug_1D
 
   if(MasterProc)then
     !Create file if it does not yet exist
@@ -526,7 +528,7 @@ integer :: i1,i2,j1,j2
 call CloseNetCDF !must be called by all procs, to syncronize outCDFtag
 
 !if(MasterProc)then
-if(MasterProc.and.DEBUG_NETCDF )&
+if(MasterProc.and.DEBUG%NETCDF )&
   write(*,*)'Init_new_netCDF ',trim(fileName),iotyp
 
 !NB IBEGcdf and JBEGcdf are here defined relative to fulldomain
@@ -571,12 +573,12 @@ case default
   period_type = 'unknown'
 end select
 
-if(MasterProc.and.DEBUG_NETCDF)&
+if(MasterProc.and.DEBUG%NETCDF)&
   write(*,*) "Creating ", trim(fileName),' ',trim(period_type)
 call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
                       num_lev3d,KLEVcdf=lev3d,KLEVcdf_from_top=.true.)
 
-if(MasterProc.and.DEBUG_NETCDF)&
+if(MasterProc.and.DEBUG%NETCDF)&
   write(*,*) "Finished Init_new_netCDF", trim(fileName),' ',trim(period_type)
 !end if
 end subroutine Init_new_netCDF
@@ -630,15 +632,15 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
   end if
 
   if(MasterProc)write(*,*)'creating ',trim(fileName)
-  if(MasterProc.and.DEBUG_NETCDF)write(*,*)'UsedProjection ',trim(UsedProjection)
-  if(MasterProc.and.DEBUG_NETCDF)write(*,fmt='(A,8I7)')'with sizes (IMAX,JMAX,IBEG,JBEG,KMAX) ',&
+  if(MasterProc.and.DEBUG%NETCDF)write(*,*)'UsedProjection ',trim(UsedProjection)
+  if(MasterProc.and.DEBUG%NETCDF)write(*,fmt='(A,8I7)')'with sizes (IMAX,JMAX,IBEG,JBEG,KMAX) ',&
        GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,KMAXcdf
 
   if(MasterProc)then
     if(NETCDF_DEFLATE_LEVEL >= 0)then
-      if(MasterProc.and.DEBUG_NETCDF)write(*,*)'nf90_create'
+      if(MasterProc.and.DEBUG%NETCDF)write(*,*)'nf90_create'
       call check(nf90_create(fileName,nf90_hdf5,ncFileID),"create:"//trim(fileName))
-      if(MasterProc.and.DEBUG_NETCDF)write(*,*)'nf90_created'
+      if(MasterProc.and.DEBUG%NETCDF)write(*,*)'nf90_created'
     else
       call check(nf90_create(fileName,nf90_clobber,ncFileID),"create:"//trim(fileName))
     end if
@@ -701,7 +703,7 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
       longVarID =define_var("lon"   ,nf90_float,[iDimID,jDimID])
     end select
 
-    if(MasterProc.and.DEBUG_NETCDF)write(*,*)'lon lat dims defined'
+    if(MasterProc.and.DEBUG%NETCDF)write(*,*)'lon lat dims defined'
     call check(nf90_def_dim(ncFileID, "lev",KMAXcdf  , levDimID))
     call check(nf90_def_dim(ncFileID,"ilev",KMAXcdf+1,ilevDimID))
     call check(nf90_put_att(ncFileID, nf90_global,"vert_coord",vert_coord))
@@ -709,7 +711,7 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
     call check(nf90_def_dim(ncFileID,"time",nf90_unlimited,timeDimID))
 
     call Date_And_Time(date=created_date,time=created_hour)
-    if(DEBUG_NETCDF)write(*,"(2A)")&
+    if(DEBUG%NETCDF)write(*,"(2A)")&
       'created_date: ',created_date,'created_hour: ',created_hour
 
     ! Write global attributes
@@ -855,7 +857,7 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
       call write_klev(KMAXcdf,[(k,k=1,KMAXcdf)],levels_from_top)
     end if
 
-    if(DEBUG_NETCDF) write(*,*) "end serial part "
+    if(DEBUG%NETCDF) write(*,*) "end serial part "
   end if! MasterProc
 
   !NB: this part is run by all processors
@@ -917,7 +919,7 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
                start=[istart,jstart],count=[icount,jcount]))
         end if
       end do
-      if(DEBUG_NETCDF) write(*,*) "NetCDF: lon lat written"
+      if(DEBUG%NETCDF) write(*,*) "NetCDF: lon lat written"
     else
       CALL MPI_SEND(Buff2D,2*8*MAXLIMAX*MAXLJMAX,MPI_BYTE,0,&
                     me,MPI_COMM_CALC,IERROR)
@@ -927,7 +929,7 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
 
   if(MasterProc)then
      call check(nf90_close(ncFileID))
-     if(DEBUG_NETCDF)write(*,*)'NetCDF: file created, end of CreatenetCDFfile ',ncFileID
+     if(DEBUG%NETCDF)write(*,*)'NetCDF: file created, end of CreatenetCDFfile ',ncFileID
   end if
 contains
 function define_var(vname,xtype,dimIDs) result(varID)
@@ -1087,7 +1089,7 @@ subroutine write_klev(kmax,klev,from_top)
         Bm(k)=B_mid(klev(k))
         Ai(k)=A_bnd(klev(k))
         Bi(k)=B_bnd(klev(k))
-        if(DEBUG_NETCDF) write(*,*) "TESTHH netcdf KLEVcdf ",k,klev(k),Am(k)
+        if(DEBUG%NETCDF) write(*,*) "TESTHH netcdf KLEVcdf ",k,klev(k),Am(k)
       end if
     end do
     Ai(kmax+1)=A_bnd(klev(kmax)+1)        ! top boundary
@@ -1104,7 +1106,7 @@ subroutine write_klev(kmax,klev,from_top)
         Bm(k)=B_mid(KMAX_MID-klev(k)+1)
         Ai(k)=A_bnd(KMAX_BND-klev(k)+1)
         Bi(k)=B_bnd(KMAX_BND-klev(k)+1)
-        if(DEBUG_NETCDF) write(*,*) "TESTHH netcdf KLEVcdf ",k,klev(k),Am(k)
+        if(DEBUG%NETCDF) write(*,*) "TESTHH netcdf KLEVcdf ",k,klev(k),Am(k)
       end if
     end do
     Ai(kmax+1)=A_bnd(KMAX_BND-klev(kmax)) ! top boundary
@@ -1206,7 +1208,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
 
  !make variable name
   write(varname,fmt='(A)')trim(def1%name)
-  if(DEBUG_NETCDF.and.MasterProc) write(*,*)'Out_NetCDF: START ',trim(varname)
+  if(DEBUG%NETCDF.and.MasterProc) write(*,*)'Out_NetCDF: START ',trim(varname)
 
   !to shorten the output we can save only the components explicitely named here
   !if(varname.ne.'D2_NO2'.and.varname.ne.'D2_O3' &
@@ -1223,29 +1225,29 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
     if(present(overwrite))overwrite_local=overwrite
     if(MasterProc)then
        if(overwrite_local)then
-         if(DEBUG_NETCDF) &
+         if(DEBUG%NETCDF) &
            write(*,*)'Out_NetCDF: overwrite file (if exists) ',trim(fileName_given)
          ! do not try to open the file
          status=nf90_noerr
        elseif(present(ncFileID_given))then
-         if(DEBUG_NETCDF) &
+         if(DEBUG%NETCDF) &
            write(*,*)'Out_NetCDF: ncFileID_given ',ncFileID_given
          if(ncFileID_given<0)then
            status=nf90_open(trim(fileName_given),nf90_share+nf90_write,ncFileID)
            ncFileID_given=ncFileID
-           if(DEBUG_NETCDF) &
+           if(DEBUG%NETCDF) &
              write(*,*)'Out_NetCDF: opened a file ',ncFileID_given
          else
            !the file must already be open
            ncFileID=ncFileID_given
            status=nf90_noerr
-           if(DEBUG_NETCDF) &
+           if(DEBUG%NETCDF) &
              write(*,*)'Out_NetCDF: assuming file already open ',trim(fileName_given)
          end if
        else
          status=nf90_open(trim(fileName_given),nf90_write,ncFileID)
        end if
-       if(DEBUG_NETCDF) write(*,*)'Out_NetCDF: fileName_given ' ,&
+       if(DEBUG%NETCDF) write(*,*)'Out_NetCDF: fileName_given ' ,&
             trim(fileName_given),overwrite_local,status==nf90_noerr,ncfileID,&
             trim(nf90_strerror(status))
        createfile=overwrite_local.or.(status/=nf90_noerr)
@@ -1275,7 +1277,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
       end if
    elseif(MasterProc)then
       !test if the defined dimensions are compatible
-        if(DEBUG_NETCDF)then
+        if(DEBUG%NETCDF)then
            write(6,*) 'checking dims file: ',trim(fileName_given),ncFileID
             ! find main properties
             call check(nf90_Inquire(ncFileID,n,i,j))
@@ -1325,7 +1327,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
     ncFileID_new=ncFileID
   end if
 
-  if(DEBUG_NETCDF.and.MasterProc)then
+  if(DEBUG%NETCDF.and.MasterProc)then
     if(iotyp_new==IOU_GIVEN)then
       write(*,*)' Out_NetCDF: cases new file ', trim(fileName_given), iotyp
     else
@@ -1346,7 +1348,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
 
   if(present(ncFileID_given))ncFileID_given=ncFileID!use rather stored ncFileID_XXX
 
-  if(DEBUG_NETCDF.and.MasterProc) &
+  if(DEBUG%NETCDF.and.MasterProc) &
     write(*,*)'Out_NetCDF, filename ', trim(fileName), iotyp,ncFileID
 
   if(.not. present(dimSizes))then
@@ -1375,10 +1377,9 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
     !test first if the variable is already defined:
     status=nf90_inq_varid(ncFileID,varname,VarID)
     if(status==nf90_noerr)then
-!     print *, 'variable exists: ',varname
-      if(DEBUG_NETCDF) write(*,*) 'Out_NetCDF: variable exists: ',varname
+      if(DEBUG%NETCDF) write(*,*) 'Out_NetCDF: variable exists: ',varname
     else
-      if(DEBUG_NETCDF) write(*,*) 'Out_NetCDF: creating variable: ',varname
+      if(DEBUG%NETCDF) write(*,*) 'Out_NetCDF: creating variable: ',varname
       if(create_var_only_local) &
            call check(nf90_set_fill(ncFileID,NF90_NOFILL,ijk),"nofill:"//trim(varname))
       if(.not.present(dimSizes).and.present(chunksizes))&
@@ -1394,13 +1395,13 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
     ! For performance: need to create all variables before writing data
     if(MasterProc.and.iotyp_new==IOU_GIVEN)then
       if(present(ncFileID_given))then
-        if(DEBUG_NETCDF)write(*,*)'keep open ',trim(fileName),ncFileID
+        if(DEBUG%NETCDF)write(*,*)'keep open ',trim(fileName),ncFileID
         ncFileID_given=ncFileID
       else
         call check(nf90_close(ncFileID),"close:"//trim(fileName))
       end if
     end if
-    if(DEBUG_NETCDF.and.MasterProc)write(*,*)'variable ONLY created. Finished'
+    if(DEBUG%NETCDF.and.MasterProc)write(*,*)'variable ONLY created. Finished'
     CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)!wait until the file creation is finished
    return
   end if ! create var only
@@ -1446,7 +1447,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      call check(nf90_inq_varid(ncFileID,varname,VarID))
      ! find the number of records already written
      call check(nf90_get_att(ncFileID,VarID,"numberofrecords",nrecords))
-     if(DEBUG_NETCDF) print *,'number of dataset saved: ',nrecords
+     if(DEBUG%NETCDF) print *,'number of dataset saved: ',nrecords
      
      ! test if new record is needed
      if(present(ik).and.nrecords>0)then
@@ -1462,7 +1463,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
         ! increase nrecords, to define position of new data
         nrecords=nrecords+1
      end if
-     if(DEBUG_NETCDF) print *,'writing on dataset: ',nrecords
+     if(DEBUG%NETCDF) print *,'writing on dataset: ',nrecords
      startvec(ndim+1) = nrecords
      countvec(ndim+1) = 1
      
@@ -1688,7 +1689,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
         end select !type
      end if
      if (size5D > 0) deallocate(R4data5D, stat=alloc_err)
-     if (DEBUG_NETCDF .and. ndim == 5) write(*,*)'TIME mpi ',tmpi,' time IO ',tio,trim(varname)
+     if (DEBUG%NETCDF .and. ndim == 5) write(*,*)'TIME mpi ',tmpi,' time IO ',tio,trim(varname)
           
      call check(nf90_get_att(ncFileID,nf90_global,"lastmodified_hour",lastmodified_hour0 ))
      call check(nf90_get_att(ncFileID,nf90_global,"created_hour",created_hour))
@@ -1739,7 +1740,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      !close file if present(fileName_given)
      if(iotyp_new==IOU_GIVEN)then
         if(present(ncFileID_given))then
-           if(DEBUG_NETCDF)write(*,*)'keep open ',trim(fileName),ncFileID
+           if(DEBUG%NETCDF)write(*,*)'keep open ',trim(fileName),ncFileID
            ncFileID_given=ncFileID
         else
            call check(nf90_close(ncFileID))
@@ -1747,7 +1748,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      end if
   end if !MasterProc
 
-  if(DEBUG_NETCDF.and.MasterProc) write(*,*)'Out_NetCDF: FINISHED '
+  if(DEBUG%NETCDF.and.MasterProc) write(*,*)'Out_NetCDF: FINISHED '
 end subroutine Out_netCDF
 !_______________________________________________________________________
 subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype,chunksizes,dimSizes,dimNames)
@@ -1954,8 +1955,11 @@ subroutine GetCDF(varname,fileName,Rvar,varGIMAX,varGJMAX,varKMAX,nstart,nfetch,
   character*100::name
   real :: scale,offset,scalefactors(2)
   integer, allocatable:: Ivalues(:)
+  character(len=*), parameter :: dtxt='GerCDF'
+  logical :: dbg0  ! for MasterProc
 
-  if(MasterProc.and.DEBUG_NETCDF)print *,'GetCDF  reading ',trim(fileName), ' nstart ', nstart
+  dbg0 = MasterProc.and.DEBUG%NETCDF
+  if(dbg0)print *,dtxt//' reading ',trim(fileName), ' nstart ', nstart
   !open an existing netcdf dataset
   fileneeded=.true.!default
   if(present(needed)) fileneeded=needed
@@ -1965,7 +1969,7 @@ subroutine GetCDF(varname,fileName,Rvar,varGIMAX,varGJMAX,varKMAX,nstart,nfetch,
   else
     status=nf90_open(path = trim(fileName), mode = nf90_nowrite, ncid = ncFileID)
     if(status/= nf90_noerr)then
-      write(*,*)trim(fileName),' not found (but not needed)'
+      write(*,*)dtxt//trim(fileName),' not found (but not needed)'
       nfetch=0
       return
     end if
@@ -1981,11 +1985,12 @@ subroutine GetCDF(varname,fileName,Rvar,varGIMAX,varGJMAX,varKMAX,nstart,nfetch,
   status = nf90_inq_varid(ncid = ncFileID, name = varname, varID = VarID)
 
   if(status == nf90_noerr) then
-    if(DEBUG_NETCDF)write(*,*) 'variable exists: ',trim(varname)
+    !if(DEBUG%NETCDF)write(*,*) 'variable exists: ',trim(varname)
+    if(dbg0)write(*,*) dtxt//'variable exists: ',trim(varname)
   else
-    print *, 'variable does not exist: ',trim(varname)
+    if(MasterProc) print *, dtxt//'variable does not exist: ',trim(varname)
     nfetch=0
-    call CheckStop(fileneeded, "NetCDF_mod : variable needed but not found")
+    call CheckStop(fileneeded, dtxt//"NetCDF_mod : variable needed but not found")
     return
   end if
 
@@ -1999,26 +2004,26 @@ subroutine GetCDF(varname,fileName,Rvar,varGIMAX,varGJMAX,varKMAX,nstart,nfetch,
   ! write(*,*)'size variable ',i,dims(i)
   end do
 
-  if(MasterProc.and.DEBUG_NETCDF)write(*,*)'dimensions ',(dims(i),i=1,ndims)
+  if(dbg0) write(*,*) dtxt//'dimensions ',(dims(i),i=1,ndims)
   if(dims(1)>varGIMAX.or.dims(2)>varGJMAX)then
-    write(*,*)'buffer too small',dims(1),varGIMAX,dims(2),varGJMAX
-    Call StopAll('GetCDF buffer too small')
+    write(*,*) dtxt//'buffer too small',dims(1),varGIMAX,dims(2),varGJMAX
+    Call StopAll(dtxt//' buffer too small')
   end if
 
   if(ndims>3.and.dims(3)>varKMAX)then
-    if(MasterProc.and.DEBUG_NETCDF)write(*,*)'Warning: not reading all levels ',dims(3),varKMAX,trim(varname)
+    if(dbg0)write(*,*)dtxt//'Warning: not reading all levels ',dims(3),varKMAX,trim(varname)
   end if
 
   if(nstart+nfetch-1>dims(ndims))then
-    write(*,*)'WARNING: did not find all data'
+    write(*,*)'dtxt//WARNING: did not find all data'
     nfetch=dims(ndims)-nstart+1
-    if(nfetch<=0)Call StopAll('GetCDF  nfetch<0')
+    if(nfetch<=0)Call StopAll(dtxt//' nfetch<0')
   end if
 
   startvec=1
   startvec(ndims)=nstart
   totsize=totsize/dims(ndims)
-  if(nfetch<dims(ndims).and.DEBUG_NETCDF)&
+  if(nfetch<dims(ndims).and.DEBUG%NETCDF)&
     write(*,*)'fetching only',totsize*nfetch,'of ',totsize*dims(ndims),'elements'
   dims(ndims)=nfetch
   totsize=totsize*dims(ndims)
@@ -2042,11 +2047,11 @@ subroutine GetCDF(varname,fileName,Rvar,varGIMAX,varGJMAX,varKMAX,nstart,nfetch,
     deallocate(Ivalues)
   case(NF90_FLOAT,NF90_DOUBLE)
     call check(nf90_get_var(ncFileID, VarID, Rvar,start=startvec,count=dims))
-    if(DEBUG_NETCDF) &
-      write(*,*)'datatype real, read', me, maxval(Rvar), minval(Rvar)
+    if(DEBUG%NETCDF) &
+      write(*,*)dtxt//'datatype real, read', me, maxval(Rvar), minval(Rvar)
   case default
-    write(*,*)'datatype not yet supported'!Char
-    Call StopAll('GetCDF  datatype not yet supported')
+    write(*,*)dtxt//'datatype not yet supported'!Char
+    Call StopAll(dtxt//'  datatype not yet supported')
   end select
 
   call check(nf90_close(ncFileID))
@@ -2106,7 +2111,7 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   endif
   call CheckStop(i0>imax, "NetCDF_mod i: subdomain not compatible. cannot handle this")
   call CheckStop(j0>jmax, "NetCDF_mod j: subdomain not compatible. cannot handle this")
-  if(MasterProc.and.DEBUG_NETCDF)&
+  if(MasterProc.and.DEBUG%NETCDF)&
     print *,'GetCDF_modelgrid  reading ',trim(fileName), ' nstart ', nstart
 
   !open an existing netcdf dataset
@@ -2128,10 +2133,10 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   !test if the variable is defined and get varID:
   status=nf90_inq_varid(ncFileID,varname,VarID)
   if(status==nf90_noerr) then
-    if(DEBUG_NETCDF)write(*,*) 'variable exists: ',trim(varname)
+    if(DEBUG%NETCDF)write(*,*) 'variable exists: ',trim(varname)
     if(present(found))found=.true.
   else
-    if(MasterProc .and. DEBUG_NETCDF) &
+    if(MasterProc .and. DEBUG%NETCDF) &
       write(*,*)'variable does not exist: ',trim(varname)
     call CheckStop(fileneeded, "NetCDF_mod : variable needed but not found "&
          //trim(varname)//' '//trim(fileName))
@@ -2147,7 +2152,7 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
     call check(nf90_inquire_dimension(ncFileID,dimids(i),len=dims(i)),"len:dimN")
   end do
 
-  if(DEBUG_NETCDF)write(*,*)'dimensions ',(dims(i),i=1,ndims)
+  if(DEBUG%NETCDF)write(*,*)'dimensions ',(dims(i),i=1,ndims)
   if(any(dims(1:2)/=[IIFULLDOM,JJFULLDOM]))then
     if(MasterProc.and..not.present(i_start))&
       write(*,"(3A,2I5,A,2I5)")'WARNING : grid ',trim(fileName),&
@@ -2193,7 +2198,7 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   end if
   dims(ndims)=nfetch!NB: for 2D ndims=3 and we overwrite it!
   83 format(I4,A,3I5,A,15I5)
-  if(DEBUG_NETCDF) &
+  if(DEBUG%NETCDF) &
     write(*,83)me,' Reading from ',startvec(1),startvec(2),startvec(3),' to ',&
        startvec(1)+dims(1)-1,startvec(2)+dims(2)-1,startvec(3)+dims(3)-1
 
@@ -2222,7 +2227,7 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   case(NF90_FLOAT,NF90_DOUBLE)
     allocate(Rvalues(totsize), stat=alloc_err)
     call check(nf90_get_var(ncFileID, VarID, Rvalues,start=startvec,count=dims))
-!   if(DEBUG_NETCDF) &
+!   if(DEBUG%NETCDF) &
 !     write(*,*)'datatype real, read', me, maxval(Rvalues), minval(Rvalues)
   case default
     write(*,*)'datatype not yet supported'!Char
@@ -2281,7 +2286,7 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
 
   deallocate(Rvalues)
   call check(nf90_close(ncFileID))
-  if(DEBUG_NETCDF)write(*,*)'finished GetCDF_modelgrid', me
+  if(DEBUG%NETCDF)write(*,*)'finished GetCDF_modelgrid', me
 end subroutine GetCDF_modelgrid
 
 subroutine WriteCDF(varname,vardate,filename_given,newfile)
@@ -2518,7 +2523,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   real, allocatable:: xUTM(:), yUTM(:)
   integer, allocatable:: Mask_values(:)
   real ::lat,lon,maxlon,minlon,maxlat,minlat,maxlon_var,minlon_var,maxlat_var,minlat_var
-  logical ::fileneeded, debug,data3D
+  logical ::fileneeded, mydebug,data3D
   character(len = TXTLEN_NAME) :: interpol_used, data_projection=""
   real :: Grid_resolution_lon,Grid_resolution
   type(Deriv) :: def1 ! definition of fields
@@ -2553,18 +2558,18 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
   fileneeded=.true.!default
 
-  debug = .false.
+  mydebug = .false.
   dtxt_msg = dtxt//trim(fileName)//':'//trim(varname)//':' ! Message for errors
   if(present(debug_flag))then
-     debug = (debug_flag .or. DEBUG_NETCDF_RF) .and. me==0
-     if ( debug ) write(*,*) 'ReadCDF start: ',trim(filename),':', trim(varname)
+     mydebug = (debug_flag .or. DEBUG%NETCDF_RF) .and. me==0
+     if ( mydebug ) write(*,*) 'ReadCDF start: ',trim(filename),':', trim(varname)
   end if
 
-  debug1 = ( (MasterProc .and. step_main == 1) .or. debug )
+  debug1 = ( (MasterProc .and. step_main == 1) .or. mydebug )
 
   UnDef_local=0.0
   if(present(UnDef))UnDef_local=UnDef
-  if ( debug ) write(*,*) 'ReadCDF UnDef defined as: ',UnDef_local
+  if ( mydebug ) write(*,*) 'ReadCDF UnDef defined as: ',UnDef_local
 
   data3D=.false.
   kstart_loc=0
@@ -2587,7 +2592,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      status=nf90_open(path = trim(fileName), mode = nf90_nowrite, ncid = ncFileID)
 
      if(status == nf90_noerr) then
-        if ( debug ) write(*,*) 'ReadCDF reading ',trim(filename), ' nstart ', nstart
+        if ( mydebug ) write(*,*) 'ReadCDF reading ',trim(filename), ' nstart ', nstart
      else
         if(fileneeded)then
            print *, 'file does not exist: ',trim(fileName),nf90_strerror(status)
@@ -2619,7 +2624,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   !test if the variable is defined and get varID:
   status = nf90_inq_varid(ncid = ncFileID, name = trim(varname), varID = VarID)
   if(status == nf90_noerr) then
-    if(debug) write(*,*) 'ReadCDF variable exists: ',trim(varname)
+    if(mydebug) write(*,*) 'ReadCDF variable exists: ',trim(varname)
   else
     !     nfetch=0
     if(fileneeded)then
@@ -2682,7 +2687,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   status = nf90_get_att(ncFileID, VarID, "minlat", minlat_var  )
   if(status == nf90_noerr)then
      !found minlat, therfore the other (maxlat,minlon,maxlat) expected too
-     if ( debug ) write(*,*) 'minlat attribute found: ',minlat_var
+     if ( mydebug ) write(*,*) 'minlat attribute found: ',minlat_var
      call CheckStop(fractions, &
           "ReadField_CDF: minlat not implemented for fractions")
      call CheckStop(kstart_loc>0, &
@@ -2693,46 +2698,46 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      if(minlat_var>maxlat)then
         !the data is outside range. put zero or Undef.
         Rvar(1:ijk)=UnDef_local
-        if ( debug ) write(*,*) 'data out of maxlat range ',maxlat
+        if ( mydebug ) write(*,*) 'data out of maxlat range ',maxlat
         if(.not. present(ncFileID_given))call check(nf90_close(ncFileID))
         return
      end if
      status = nf90_get_att(ncFileID, VarID, "maxlat", maxlat_var  )
      if(status == nf90_noerr)then
-        if ( debug ) write(*,*) 'maxlat attribute found: ',maxlat_var
+        if ( mydebug ) write(*,*) 'maxlat attribute found: ',maxlat_var
         if(maxlat_var<minlat)then
            !the data is outside range. put zero or Undef.
            Rvar(1:ijk)=UnDef_local
-           if ( debug ) write(*,*) 'data out of minlat range ',minlat
+           if ( mydebug ) write(*,*) 'data out of minlat range ',minlat
            if(.not. present(ncFileID_given))call check(nf90_close(ncFileID))
            return
         end if
      end if
      status = nf90_get_att(ncFileID, VarID, "minlon", minlon_var  )
      if(status == nf90_noerr)then
-        if ( debug ) write(*,*) 'minlon attribute found: ',minlon_var
+        if ( mydebug ) write(*,*) 'minlon attribute found: ',minlon_var
         if(minlon_var>maxlon)then
            !the data is outside range. put zero or Undef.
            Rvar(1:ijk)=UnDef_local
-           if ( debug ) write(*,*) 'data out of minlon range ',minlon
+           if ( mydebug ) write(*,*) 'data out of minlon range ',minlon
            if(.not. present(ncFileID_given))call check(nf90_close(ncFileID))
            return
         end if
      end if
      status = nf90_get_att(ncFileID, VarID, "maxlon", maxlon_var  )
      if(status == nf90_noerr)then
-        if ( debug ) write(*,*) 'maxlon attribute found: ',maxlon_var
+        if ( mydebug ) write(*,*) 'maxlon attribute found: ',maxlon_var
         if(maxlon_var<minlon)then
            !the data is outside range. put zero or Undef.
            Rvar(1:ijk)=UnDef_local
-           if ( debug ) write(*,*) 'data out of maxlon range ',maxlon
+           if ( mydebug ) write(*,*) 'data out of maxlon range ',maxlon
            if(.not. present(ncFileID_given))call check(nf90_close(ncFileID))
            return
         end if
      end if
   else
      !dont expect to find maxlat,minlon or maxlat, therfore don't check
-     if ( debug ) write(*,*) 'minlat attribute not found for ',trim(varname)
+     if ( mydebug ) write(*,*) 'minlat attribute not found for ',trim(varname)
   end if
 
   !get dimensions id
@@ -2747,13 +2752,13 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   OnlyDefinedValues=.not.present(UnDef)
   if(status == nf90_noerr)then
     OnlyDefinedValues=.false.
-    if( debug ) write(*,*)' FillValue (not counted)',FillValue
+    if( mydebug ) write(*,*)' FillValue (not counted)',FillValue
   else ! ds Jun 2010
     FillValue = -1.0e35  ! Should not arise in normal data
     status=nf90_get_att(ncFileID, VarID, "missing_value", FillValue)
     if(status == nf90_noerr)then
       OnlyDefinedValues=.false.
-      if ( debug ) write(*,*)' FillValue found from missing_value (not counted)',FillValue
+      if ( mydebug ) write(*,*)' FillValue found from missing_value (not counted)',FillValue
     else
       select case(xtype)
         case(NF90_BYTE  );FillValue=NF90_FILL_BYTE
@@ -2762,7 +2767,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
       ! case(NF90_REAL  );FillValue=NF90_FILL_REAL ! same as FLOAT
         case(NF90_DOUBLE);FillValue=NF90_FILL_DOUBLE
       end select
-      if( debug ) write(*,*) 'FillValue not found, using ',FillValue
+      if( mydebug ) write(*,*) 'FillValue not found, using ',FillValue
     end if
   end if
 
@@ -2772,7 +2777,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   do i=1,ndims
      call check(nf90_inquire_dimension(ncid=ncFileID, dimID=dimids(i), &
           len=dims(i)),"GetDims")
-     if ( debug ) write(*,*) 'ReadCDF size variable ',i,dims(i)
+     if ( mydebug ) write(*,*) 'ReadCDF size variable ',i,dims(i)
   end do
 
   xtype_lon=NF90_FLOAT !default
@@ -2783,15 +2788,15 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   if( data_projection /= 'Unknown' ) then
      data_projection = trim(known_projection)
      if(trim(known_projection)=="longitude latitude")data_projection = "lon lat"
-     if ( debug ) write(*,*) 'data known_projection ',trim(data_projection)
+     if ( mydebug ) write(*,*) 'data known_projection ',trim(data_projection)
   else
      status = nf90_get_att(ncFileID, nf90_global, &
                            "projection", data_projection )
-     if ( debug ) write(*,*) 'data projection from file ',trim(data_projection)
+     if ( mydebug ) write(*,*) 'data projection from file ',trim(data_projection)
      if(status == nf90_noerr)then
     !remove invisible char(0)!!
         if(trim(data_projection(1:7))=="lon lat")data_projection="lon lat"!remove invisible char(0)!!
-        if ( debug ) write(*,*) 'data projection from file ',trim(data_projection)
+        if ( mydebug ) write(*,*) 'data projection from file ',trim(data_projection)
      else
         status=nf90_inq_varid(ncid = ncFileID, name='lon', varID = lonVarID)
         if(status /= nf90_noerr) then
@@ -2820,20 +2825,20 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      ! here we have simple 1-D lat, lon
      allocate(Rlon(dims(1)), stat=alloc_err)
      allocate(Rlat(dims(2)), stat=alloc_err)
-     if ( debug ) write(*,"(a,a,i5,i5,a,i5)") 'alloc_flag lon lat ',&
+     if ( mydebug ) write(*,"(a,a,i5,i5,a,i5)") 'alloc_flag lon lat ',&
           trim(data_projection), alloc_err, dims(1), "x", dims(2)
   else
      allocate(Rlon(dims(1)*dims(2)), stat=alloc_err)
      allocate(Rlat(dims(1)*dims(2)), stat=alloc_err)
-     if ( debug ) write(*,*) 'data allocElse ',trim(data_projection), alloc_err, trim(fileName)
+     if ( mydebug ) write(*,*) 'data allocElse ',trim(data_projection), alloc_err, trim(fileName)
   end if
 
   if (trim(data_projection)/="transverse_mercator") then
      call check_lon_lat(ncFileID, used_lon_name, used_lat_name, n, lonVarID, latVarID)
      if(present(use_lat_name)) used_lat_name=trim(use_lat_name)
      if(present(use_lon_name)) used_lon_name=trim(use_lon_name)
-     if ( debug ) write(*,*) 'ReadCDF using lon name',trim(used_lon_name)
-     if ( debug ) write(*,*) 'ReadCDF using lat name',trim(used_lat_name)
+     if ( mydebug ) write(*,*) 'ReadCDF using lon name',trim(used_lon_name)
+     if ( mydebug ) write(*,*) 'ReadCDF using lat name',trim(used_lat_name)
      
      if(trim(data_projection)=="lon lat")then
         call check(nf90_get_var(ncFileID, lonVarID, Rlon), 'Getting Rlon')
@@ -2942,15 +2947,15 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      if(Rlon(ij)<-180)Rlon(ij)=Rlon(ij)+360.0
   end do
 
-  if ( debug ) write(*,*) 'ReadCDF lon bounds',minval(Rlon),maxval(Rlon)
-  if ( debug ) write(*,*) 'ReadCDF lat bounds',minval(Rlat),maxval(Rlat)
+  if ( mydebug ) write(*,*) 'ReadCDF lon bounds',minval(Rlon),maxval(Rlon)
+  if ( mydebug ) write(*,*) 'ReadCDF lat bounds',minval(Rlat),maxval(Rlat)
 
   call CheckStop(fractions.and.trim(data_projection)/="lon lat", &
        "ReadField_CDF: only implemented lon lat projection for fractions")
 
   !if Mask_filename is given, open that file
   if(present(Mask_fileName))then
-     if ( debug ) write(*,*) 'ReadCDF reading also ',trim(Mask_fileName)
+     if ( mydebug ) write(*,*) 'ReadCDF reading also ',trim(Mask_fileName)
      N=1
      if(present(NMask_Code))N=NMask_Code
      if(N>0)then!otherwise no need to do anything!
@@ -2975,7 +2980,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         call StopAll("ReadField_CDF: only 2 dimensional mask implemented")
      end if
      else
-        if (debug)write(*,*) 'ReadCDF MASK: no need to reduce anything for ', trim(varname)
+        if (mydebug)write(*,*) 'ReadCDF MASK: no need to reduce anything for ', trim(varname)
      end if
   end if
 
@@ -3020,9 +3025,9 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      if(.not.present(interpol).and.Grid_resolution/GRIDWIDTH_M>4)then
         interpol_used='zero_order'!usually good enough, and keeps gradients
      end if
-     if ( debug ) write(*,*) 'interpol_used: ',interpol_used
+     if ( mydebug ) write(*,*) 'interpol_used: ',interpol_used
 
-     if(debug) then
+     if(mydebug) then
         write(*,*) "SET Grid resolution:" // trim(fileName), Grid_resolution
         write(*,"(a,6f8.2,2x,4f8.2)") 'ReadCDF LL values ',&
              Rlon(2),Rlon(1),dRloni, Rlat(2),Rlat(1), dRlati, &
@@ -3030,10 +3035,10 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      end if
 
      if(mod(nint(100.*(Rlon(dims(1))+(Rlon(2)-Rlon(1))-Rlon(1))),36000)/=0)then
-           if(MasterProc.and.debug)write(*,*)'Grid does not cover 360 degrees ', Rlon(1),Rlon(dims(1))
+           if(MasterProc.and.mydebug)write(*,*)'Grid does not cover 360 degrees ', Rlon(1),Rlon(dims(1))
         !the grid does not cover 360 degrees
         if(Rlon(1)>Rlon(dims(1)))then
-           if(MasterProc.and.debug)write(*,*)'Longitudes not monotonic ', Rlon(1),Rlon(dims(1))
+           if(MasterProc.and.mydebug)write(*,*)'Longitudes not monotonic ', Rlon(1),Rlon(dims(1))
            imin=1!cover everything available
            imax=dims(1)!cover everything available
         else
@@ -3084,7 +3089,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         imax=dims(1)
      end if
 
-     if ( debug ) write(*,"(a,4f8.2,6i8)") 'ReadCDF minmax values ',&
+     if ( mydebug ) write(*,"(a,4f8.2,6i8)") 'ReadCDF minmax values ',&
           minlon,maxlon,minlat,maxlat,imin,imax,jmin,jmax
 
      startvec(1)=imin
@@ -3115,7 +3120,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      end do
 
      allocate(Rvalues(totsize), stat=alloc_err)
-     if ( debug ) then
+     if ( mydebug ) then
         do i=1, ndims ! NF90_MAX_VAR_DIMS would be 1024
            write(*,"(a,6i8)") 'ReadCDF reading chunk ',i ,startvec(i), dims(i)
         end do
@@ -3136,9 +3141,9 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         status=nf90_get_var(ncFileID_Mask, dimids_Mask(2), lat_mask)
         if(status==nf90_noerr.and.(lat_mask(2)-lat_mask(1))*(Rlat(2)-Rlat(1))<0)then
            Reverse_lat_direction_Mask=.true.
-           if(debug) write(*,*)'ReadCDF mask: reverting latitude direction'
+           if(mydebug) write(*,*)'ReadCDF mask: reverting latitude direction'
         else
-           if(debug) write(*,*)'ReadCDF mask: not reverting latitude direction',&
+           if(mydebug) write(*,*)'ReadCDF mask: not reverting latitude direction',&
              (lat_mask(2)-lat_mask(1))*(Rlat(2)-Rlat(1)),status==nf90_noerr
         end if
         lon_shift_Mask=0
@@ -3160,7 +3165,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
          factor=0.0
          if(present(Mask_ReducFactor))factor=Mask_ReducFactor
          92 format(A,F5.2,A,500I4)
-         if(debug.and.N>0)write(*,92)'multiplying values by ',factor,'where mask has one of values: ',Mask_Code(1:N)
+         if(mydebug.and.N>0)write(*,92)'multiplying values by ',factor,'where mask has one of values: ',Mask_Code(1:N)
          j=0
            do i=1,totsize
               im=mod(i-1,dims(1))+1
@@ -3172,11 +3177,11 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                  j=j+1
               end if
            end do
-          if ( debug )write(*,*)'reduced ',j,' values by ',factor
+          if ( mydebug )write(*,*)'reduced ',j,' values by ',factor
        else
            factor=1.0
            if(present(Mask_ReducFactor))factor=Mask_ReducFactor
-           if ( debug ) write(*,*)'multiplying values by ',factor,'and Mask '
+           if ( mydebug ) write(*,*)'multiplying values by ',factor,'and Mask '
            do i=1,totsize
               Rvalues(i)=Rvalues(i)*Mask_values(i)*factor
            end do
@@ -3190,7 +3195,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      !test if this is "fractions" type data
      fractions=.false.
      if(present(fractions_out).or.present(CC_out).or.present(Ncc_out))then
-        if ( debug ) write(*,*) 'ReadField_CDF, fraction arrays  '
+        if ( mydebug ) write(*,*) 'ReadField_CDF, fraction arrays  '
         if(.not.(present(fractions_out).and.present(CC_out).and.present(Ncc_out)))then
            write(*,*) 'Fraction interpolation missing some arrays of arrays fractions_out CC_out Ncc_out',&
                 present(fractions_out),present(CC_out),present(Ncc_out)
@@ -3198,7 +3203,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         fractions=.true.
      end if
      if(fractions)then
-        if ( debug ) write(*,*) 'fractions method. Reading data '
+        if ( mydebug ) write(*,*) 'fractions method. Reading data '
         Nstartvec=startvec!set 2 first dimensions
         Nstartvec(3)=1
         NCdims=dims!set 2 first dimensions
@@ -3227,7 +3232,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         call check(nf90_get_var(ncFileID, VarIDfrac,fraction_in ,start=Nstartvec,count=NCdims),&
              errmsg="fractions")
 
-!        if( debug )then
+!        if( mydebug )then
 !           write(*,*)'More than 2 countries:'
 !           do i=1,dims(1)*dims(2)
 !              if(NCC(i)>2)write(*,77)me,i,NCC(i),CC(i,1),fraction_in(i,1),CC(i,NCC(i)),fraction_in(i,NCC(i))
@@ -3251,21 +3256,21 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         if(status == nf90_noerr) scalefactors(2) = offset
         Rvalues=Rvalues*scalefactors(1)+scalefactors(2)
         FillValue=FillValue*scalefactors(1)+scalefactors(2)
-        if ( debug ) then
+        if ( mydebug ) then
            write(*,*)' Start scaling mpixtype',xtype
            write(*,*)' FillValue scaled to',FillValue
            write(*,*)' Max(RValues)   ',maxval(RValues)
         end if
      else ! Real
-        if ( debug )write(*,*)' xtype real ',xtype
+        if ( mydebug )write(*,*)' xtype real ',xtype
      end if
 
      if(interpol_used=='conservative'.or.interpol_used=='mass_conservative')then
 
-        if ( debug )write(*,*)'interpol case ',interpol_used
+        if ( mydebug )write(*,*)'interpol case ',interpol_used
 
         if(projection=='lon lat')then
-         if ( debug )write(*,*)'interpol case ',trim(interpol_used),' projection lon lat'
+         if ( mydebug )write(*,*)'interpol case ',trim(interpol_used),' projection lon lat'
           !exact integrals assuming uniform emission over emitter gridcells
            if(.not.allocated(fracfirstlon))then
               allocate(fracfirstlon(dims(1)),fraclastlon(dims(1)),ifirst(dims(1)),ilast(dims(1)))
@@ -3549,7 +3554,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                  ij=i+(j-1)*LIMAX
                  ijk=k+(ij-1)*k2
 
-                 debug_ij = ( DEBUG_NETCDF_RF .and. debug_proc .and. &
+                 debug_ij = ( DEBUG%NETCDF_RF .and. debug_proc .and. &
                       i== debug_li .and. j== debug_lj )
                  if ( debug_ij ) write(*,"(a,9i5)") 'DEBUG  -- INValues!',&
                       Ivalues(ijk), Nvalues(ijk), me, i,j,k
@@ -3646,34 +3651,34 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         status=nf90_get_att(ncFileID, nf90_global, "Grid_resolution", Grid_resolution )
         if(status /= nf90_noerr)then
            Grid_resolution=GRIDWIDTH_M_EMEP
-           if ( debug )write(*,*)'Grid_resolution assumed =',Grid_resolution
+           if ( mydebug )write(*,*)'Grid_resolution assumed =',Grid_resolution
         end if
      endif
      !the method chosen depends on the relative resolutions
      if(interpol_used=='conservative'.and.Grid_resolution/GRIDWIDTH_M>2)then
         interpol_used='zero_order'!usually good enough, and keeps gradients
-        if ( MasterProc .and. debug) write(*,*) 'Asked for conservative interpolation, but redefined as ',interpol_used
+        if ( MasterProc .and. mydebug) write(*,*) 'Asked for conservative interpolation, but redefined as ',interpol_used
      end if
 
      status = nf90_get_att(ncFileID, nf90_global, "xcoordinate_NorthPole", xp_ext )
      if(status /= nf90_noerr)then
         xp_ext=xp_EMEP_old
-        if ( debug )write(*,*)'xcoordinate_NorthPole assumed =',xp_ext
+        if ( mydebug )write(*,*)'xcoordinate_NorthPole assumed =',xp_ext
      end if
      status=nf90_get_att(ncFileID, nf90_global, "ycoordinate_NorthPole", yp_ext )
      if(status /= nf90_noerr)then
         yp_ext=yp_EMEP_old
-        if ( debug )write(*,*)'ycoordinate_NorthPole assumed =',yp_ext
+        if ( mydebug )write(*,*)'ycoordinate_NorthPole assumed =',yp_ext
      end if
      status=nf90_get_att(ncFileID, nf90_global, "fi", fi_ext )
      if(status /= nf90_noerr)then
         fi_ext=fi_EMEP
-        if ( debug )write(*,*)'fi assumed =',fi_ext
+        if ( mydebug )write(*,*)'fi assumed =',fi_ext
      end if
      status=nf90_get_att(ncFileID, nf90_global, "ref_latitude", ref_lat_ext  )
      if(status /= nf90_noerr)then
         ref_lat_ext=ref_latitude_EMEP
-        if ( debug )write(*,*)'ref_latitude assumed =',ref_lat_ext
+        if ( mydebug )write(*,*)'ref_latitude assumed =',ref_lat_ext
      end if
      an_ext=EARTH_RADIUS*(1.0+sin(ref_lat_ext*PI/180.0))/Grid_resolution
 
@@ -3684,7 +3689,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      do i=1,ndims
         totsize=totsize*dims(i)
      end do
-     if ( debug )write(*,*)'totsize ',totsize,ndims
+     if ( mydebug )write(*,*)'totsize ',totsize,ndims
      allocate(Rvalues(totsize), stat=alloc_err)
      call check(nf90_get_var(ncFileID, VarID, Rvalues,start=startvec,count=dims),&
           errmsg="RRvaluesStereo")
@@ -3698,13 +3703,13 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         if(status == nf90_noerr) scalefactors(2) = offset
         Rvalues=Rvalues*scalefactors(1)+scalefactors(2)
         FillValue=FillValue*scalefactors(1)+scalefactors(2)
-        if ( debug ) then
+        if ( mydebug ) then
            write(*,*)' Start scaling mpixtype',xtype
            write(*,*)' FillValue scaled to',FillValue
            write(*,*)' Max(RValues)   ',maxval(RValues)
         end if
      else ! Real
-        if ( debug ) then
+        if ( mydebug ) then
            write(*,*)' xtype real ',xtype
            write(*,*)' FillValue still',FillValue
            write(*,*)' Max(RValues)   ',maxval(RValues)
@@ -3763,7 +3768,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
 
 !83                  format(2I4,31F9.2)
-                    !if ( debug .and.me==0) write(*,83)i,j,lon,lat,fi_ext,an_ext_div,xp_ext_div,yp_ext_div,fi,xp,yp,Rvalues(igjg)
+                    !if ( mydebug .and.me==0) write(*,83)i,j,lon,lat,fi_ext,an_ext_div,xp_ext_div,yp_ext_div,fi,xp,yp,Rvalues(igjg)
 
                     if(i>=1.and.i<=limax.and.j>=1.and.j<=ljmax)then
                        ij=i+(j-1)*LIMAX
@@ -3796,7 +3801,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                  ij=i+(j-1)*LIMAX
                  ijk=k+(ij-1)*k2
 
-                 debug_ij = ( DEBUG_NETCDF_RF .and. debug_proc .and. &
+                 debug_ij = ( DEBUG%NETCDF_RF .and. debug_proc .and. &
                       i== debug_li .and. j== debug_lj )
                  if ( debug_ij ) write(*,*) 'DEBUG  -- INValues!', &
                       Ivalues(ijk), Nvalues(ijk)
@@ -3843,7 +3848,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         xp_ext_div=(xp_ext-0.5)*Ndiv+0.5
         yp_ext_div=(yp_ext-0.5)*Ndiv+0.5
         an_ext_div=an_ext*Ndiv
-        if(MasterProc.and.debug)write(*,*)'zero_order interpolation ',an_ext_div,xp_ext_div,yp_ext_div,dims(1),dims(2)
+        if(MasterProc.and.mydebug)write(*,*)'zero_order interpolation ',an_ext_div,xp_ext_div,yp_ext_div,dims(1),dims(2)
 
         if(projection/='Stereographic'.and.projection/='lon lat'.and.projection/='Rotated_Spherical'.and.projection/='lambert')then
            !the method should be revised or used only occasionally
@@ -3885,7 +3890,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                     if(present(UnDef))then
                        Rvar(ijk)=UnDef!default value
                     else
-                       !                    if ( debug ) write(*,*)'WARNING: gridcell out of map. Set to ',FillValue
+                       !                    if ( mydebug ) write(*,*)'WARNING: gridcell out of map. Set to ',FillValue
                        call StopAll("ReadField_CDF: values outside grid required")
                     end if
                  end do
@@ -3991,13 +3996,13 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
            if(status == nf90_noerr) scalefactors(2) = offset
            Rvalues=Rvalues*scalefactors(1)+scalefactors(2)
            FillValue=FillValue*scalefactors(1)+scalefactors(2)
-           if ( debug ) then
+           if ( mydebug ) then
               write(*,*)' Start scaling mpixtype',xtype
               write(*,*)' FillValue scaled to',FillValue
               write(*,*)' Max(RValues)   ',maxval(RValues)
            end if
         else ! Real
-           if ( debug )write(*,*)' xtype real ',xtype
+           if ( mydebug )write(*,*)' xtype real ',xtype
         end if
 
 !not 100% robust: assumes i increases with longitude, j with latitude. and i almost parallel with longitudes
@@ -4103,7 +4108,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         deallocate(Ivalues)
      else
        call CheckStop(interpol_used=='mass_conservative', "ReadField_CDF: only linear interpolation implemented")
-       if(interpol_used=='zero_order'.and.MasterProc.and.debug)&
+       if(interpol_used=='zero_order'.and.MasterProc.and.mydebug)&
          write(*,*)'zero_order interpolation asked, but performing linear interpolation'
 
 !      call CheckStop(data3D, "ReadField_CDF : 3D not yet implemented for general projection")
@@ -4115,11 +4120,11 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
       !Make interpolation coefficients.
       !Coefficients could be saved and reused if called several times.
-      if(DEBUG_NETCDF_RF.and.debug_proc.and.i==debug_li.and.j==debug_lj)&
+      if(DEBUG%NETCDF_RF.and.debug_proc.and.i==debug_li.and.j==debug_lj)&
          write(*,"(a)") "DEBUG_RF G2G ", me, debug_proc
       call grid2grid_coeff(glon,glat,IIij,JJij,Weight,&
            Rlon,Rlat,dims(1),dims(2), LIMAX, LJMAX, limax, ljmax,&
-           (DEBUG_NETCDF_RF.and.debug_proc), debug_li, debug_lj )
+           (DEBUG%NETCDF_RF.and.debug_proc), debug_li, debug_lj )
 
       startvec(1)=minval(IIij(:,:limax,:ljmax))
       startvec(2)=minval(JJij(:,:limax,:ljmax))
@@ -4155,7 +4160,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
       end do
 
       allocate(Rvalues(totsize), stat=alloc_err)
-      if(debug) then
+      if(mydebug) then
         write(*,"(2a)") 'ReadCDF VarID ', trim(varname)
         do i=1, ndims
           write(*,"(a,6i8)") 'ReadCDF ',i, dims(i),startvec(i)
@@ -4219,7 +4224,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 !  if(interpolate_vertical)then
 !do the interpolation in the vertical direction only
 !filename is used only to define the vertical coordinates
-!     call vertical_interpolate(filename,Rvar,dims(3),debug)
+!     call vertical_interpolate(filename,Rvar,dims(3),mydebug)
 
 !  end if
 
@@ -4242,7 +4247,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
   !code below only used for testing purposes
 
   CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)
-  if(debug)write(*,*)'writing results in file. Variable: ',trim(varname)
+  if(mydebug)write(*,*)'writing results in file. Variable: ',trim(varname)
 
   !only for tests:
   def1%class='Readtest' !written
@@ -4314,7 +4319,7 @@ end subroutine ReadField_CDF
   integer, allocatable:: Nvalues(:)  !ds counts all values
   real, allocatable:: Rvalues(:),Rlon(:),Rlat(:)
   real ::lat,lon,maxlon,minlon,maxlat,minlat
-  logical ::fileneeded, debug,data3D
+  logical ::fileneeded, mydebug,data3D
   character(len = TXTLEN_NAME) :: interpol_used, data_projection="",name
   real :: Grid_resolution
   integer, parameter ::NFLmax=50 !number of flight level (could be read from file)
@@ -4331,10 +4336,10 @@ end subroutine ReadField_CDF
 
   fileneeded=.true.!default
 
-  debug = .false.
+  mydebug = .false.
   if(present(debug_flag))then
-     debug = debug_flag .and. MasterProc
-     if ( debug ) write(*,*) 'ReadCDF start: ',trim(filename),':', trim(varname)
+     mydebug = debug_flag .and. MasterProc
+     if ( mydebug ) write(*,*) 'ReadCDF start: ',trim(filename),':', trim(varname)
   end if
   if(present(needed))   fileneeded=needed
 
@@ -4342,7 +4347,7 @@ end subroutine ReadField_CDF
   status=nf90_open(path = trim(fileName), mode = nf90_nowrite, ncid = ncFileID)
 
   if(status == nf90_noerr) then
-     if ( debug ) write(*,*) 'ReadCDF reading ',trim(filename), ' nstart ', nstart
+     if ( mydebug ) write(*,*) 'ReadCDF reading ',trim(filename), ' nstart ', nstart
   else
      if(fileneeded)then
         print *, 'file does not exist: ',trim(fileName),nf90_strerror(status)
@@ -4363,7 +4368,7 @@ end subroutine ReadField_CDF
   !test if the variable is defined and get varID:
   status = nf90_inq_varid(ncid = ncFileID, name = trim(varname), varID = VarID)
   if(status == nf90_noerr) then
-     if(debug) write(*,*) 'ReadCDF variable exists: ',trim(varname)
+     if(mydebug) write(*,*) 'ReadCDF variable exists: ',trim(varname)
      is_CAMS=.false.
      if (trim(varname)=='avi') is_CAMS=.true.
   else     
@@ -4401,7 +4406,7 @@ end subroutine ReadField_CDF
   do i=1,ndims
      call check(nf90_inquire_dimension(ncid=ncFileID, dimID=dimids(i), &
           len=dimsin(i)),"GetDims")
-     if ( debug ) write(*,*) 'ReadCDF size variable ',i,dims(i)
+     if ( mydebug ) write(*,*) 'ReadCDF size variable ',i,dims(i)
   end do
 
   data_projection = "lon lat"
@@ -4504,7 +4509,7 @@ end subroutine ReadField_CDF
         imax=dims(1)
      end if
 
-     if ( debug ) write(*,"(a,4f8.2,6i8)") 'ReadCDF minmax values ',&
+     if ( mydebug ) write(*,"(a,4f8.2,6i8)") 'ReadCDF minmax values ',&
           minlon,maxlon,minlat,maxlat,imin,imax,jmin,jmax
 
      startvec(1)=imin
@@ -4525,7 +4530,7 @@ end subroutine ReadField_CDF
      end do
 
      allocate(Rvalues(totsize), stat=alloc_err)
-     if ( debug ) then
+     if ( mydebug ) then
         do i=1, ndims ! NF90_MAX_VAR_DIMS would be 1024
            write(*,"(a,6i8)") 'ReadCDF reading chunk ',i ,startvec(i), dims(i)
         end do
@@ -4708,9 +4713,15 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
   integer :: string_length
   integer :: yyyy,mo,dd,hh,mi,ss,julian,julian_1900,diff_1900,nwords,errcode,startrecord
   logical:: proleptic_gregorian, find_record
+  character(len=*), parameter :: dtxt = 'ReadTimeCDF:' ! debug text
+  logical :: dbg0
+
+
+  if(DEBUG%NETCDF) write(*,*) dtxt//'STARTS:'//trim(fileName)
+  dbg0 = (DEBUG%NETCDF.and.MasterProc)
 
   call check(nf90_open(path=fileName, mode=nf90_nowrite, ncid=ncFileID),&
-       errmsg="ReadTimeCDF, file not found: "//trim(fileName))
+       errmsg=dtxt//" file not found: "//trim(fileName))
 
   find_record = .false.
   if(present(time_wanted)) find_record = .true.!only find the record needed
@@ -4718,14 +4729,16 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
 
   varname='time'
   status=nf90_inq_varid(ncid=ncFileID, name=varname, varID=VarID)
+  if(DEBUG%NETCDF) write(*,*) dtxt//'HERE:'//trim(varname), NTime_Read, find_record, status
 
   if(status==nf90_noerr)then
-     if(DEBUG_NETCDF.and.MasterProc)write(*,*)'time variable exists: ',trim(varname)
+if(DEBUG%NETCDF) write(*,*) dtxt//'HEREB:'//trim(varname), NTime_Read, find_record, status
+     if(dbg0)write(*,*)dtxt//'time variable exists: ',trim(varname)
      call check(nf90_Inquire_Variable(ncFileID,VarID,name,xtype,ndims,dimids,nAtts))
-     if(ndims>1)write(*,*)'WARNING: time has more than 1 dimension!? ',ndims
+     if(ndims>1)write(*,*)dtxt//'WARNING: time has more than 1 dimension!? ',ndims
      call check(nf90_inquire_dimension(ncid=ncFileID,dimID=dimids(1),len=ntimes))
      if(NTime_Read<1)then
-        if(DEBUG_NETCDF.and.MasterProc)write(*,*)'reading all time records'
+        if(dbg0)write(*,*)dtxt//'reading all time records'
         NTime_Read=ntimes
      end if
      call CheckStop(ntimes<NTime_Read .and. .not.find_record, "to few records in "//trim(fileName))
@@ -4736,12 +4749,15 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
 
      do startrecord = 1,ntimes !in case find_record, loop over one record at a time
 
-     call check(nf90_get_var(ncFileID, VarID, times, start = (/startrecord/),count=(/NTime_Read/)))
+     call check(nf90_get_var(ncFileID, VarID, times, start = (/startrecord/),&
+       count=(/NTime_Read/)), errmsg=dtxt//" StartCheck: "//trim(fileName) ) 
 
-     call check(nf90_get_att(ncFileID, VarID, "units", timeunit  ))
+if(DEBUG%NETCDF) write(*,*) dtxt//'HEREtimeA:',VarID,trim(fileName)
+     call check(nf90_get_att(ncFileID, VarID, "units", timeunit  ),errmsg=dtxt//'TIMEUNIT'//timeunit)
+if(DEBUG%NETCDF) write(*,*) dtxt//'HEREtimeB:'//trim(timeunit), NTime_Read, find_record, status
 
      if(trim(timeunit(1:16))=='day as %Y%m%d.%f')then
-        if(DEBUG_NETCDF.and.MasterProc)write(*,*)'time unit ',trim(timeunit(1:16))
+        if(dbg0)write(*,*)'time unit ',trim(timeunit(1:16))
         do i=1,NTime_Read
            yyyy=int(times(i))/10000
            mo=int(times(i)-10000*yyyy)/100
@@ -4751,7 +4767,7 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
            julian_1900=julian_date(1900,1,1)
            diff_1900=julian-julian_1900
            TimesInDays(i)=diff_1900+hh/24.0
-           if(DEBUG_NETCDF.and.MasterProc)write(*,*)'time ',yyyy,mo,dd,hh
+           if(dbg0)write(*,*)'time ',yyyy,mo,dd,hh
         end do
      else if (trim(timeunit)=='month')then
         !used for files with only 12 monthly values, without year
@@ -4762,8 +4778,7 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
 
         !    read(timeunit,fmt="(a,a,a,a)")period,since,date,time
         call wordsplit(trim(timeunit),wordarraysize,wordarray,nwords,errcode,separator='-')
-        if(DEBUG_NETCDF.and.MasterProc)&
-             write(*,*)"time@units:",(" ",trim(wordarray(i)),i=1,8)
+        if(dbg0) write(*,*)"time@units:",(" ",trim(wordarray(i)),i=1,8)
         period=wordarray(1)
         since=wordarray(2)
         call CheckStop(since/='since',"since error "//trim(since))
@@ -4784,15 +4799,14 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
 
         status=nf90_get_att(ncFileID, VarID, "calendar", calendar )
         proleptic_gregorian=(status==nf90_noerr).and.(calendar=='proleptic_gregorian'.or.calendar=='gregorian')
-        if(proleptic_gregorian.and.DEBUG_NETCDF.and.MasterProc)&
-             write(*,*)'found proleptic_gregorian calendar'
+        if(proleptic_gregorian.and. dbg0) write(*,*) dtxt//&
+                 'found proleptic_gregorian calendar'
 
         if(yyyy/=0.or.proleptic_gregorian)then
            !read(date,fmt="(I4.4,a1,I2.2,a1,I2.2)")yyyy,s1,mo,s2,dd
            !read(time,fmt="(I2.2,a1,I2.2,a1,I2.2)")hh,s1,mi,s2,ss
 
-           if(DEBUG_NETCDF.and.MasterProc)&
-                write(*,"(A,I4.4,2('-',I2.2),A,I2.2,2(':',I2.2))")&
+           if(dbg0) write(*,"(A,I4.4,2('-',I2.2),A,I2.2,2(':',I2.2))")&
                 ' refdate ',yyyy,mo,dd,' time ',hh,mi,ss
            ss=ss+60*mi+3600*hh
            julian=julian_date(yyyy,mo,dd)
@@ -4821,13 +4835,14 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
               forall(i=1:NTime_Read) &
                    TimesInDays(i) = 30*(times(i)-1)+15
            case default
-              call StopAll("ReadTimeCDF, time unit not recognized: "//trim(period))
+              call StopAll(dtxt//" time unit not recognized: "//trim(period))
            end select
 
         else
-           if(DEBUG_NETCDF.and.MasterProc)&
+           if(dbg0)&
                 write(*,*)'assuming days since 0-01-01 00:00 and 365days'
-           call CheckStop(period/='days',"Error: only time in days implemented "//trim(period))
+  if(DEBUG%NETCDF) write(*,*) dtxt//'HEREB:'//trim(varname), NTime_Read, find_record, status
+           call CheckStop(period/='days',dtxt//"Error: only time in days implemented "//trim(period))
            !assume units = "days since 0-01-01 00:00"
            !and calendar = "365_day"
            yyyy=int(times(1)/365)
@@ -4849,7 +4864,7 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
               ! Keep this separately as this may be defined differently in different situations.
               ! This implementation works for the IFS-MOZART BC
               if(current_date%month==2.and.current_date%day==29)then
-                 write(*,*)'WARNING: assuming 29th of February for ',trim(filename)
+                 write(*,*)dtxt//'WARNING: assuming 29th of February for ',trim(filename)
                  forall(i=1:NTime_Read,int(times(i)-yyyy*365)==60) & ! move Mar 1st
                       TimesInDays(i)=TimesInDays(i)-1.0                 ! to Feb 29th
               end if
@@ -4866,23 +4881,23 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
      enddo
      deallocate(times)
 
-     call CheckStop(startrecord>ntimes.and.find_record, "did not find correct time in "//trim(fileName))
+     call CheckStop(startrecord>ntimes.and.find_record, dtxt//"did not find correct time in "//trim(fileName))
 
   else
 !     write(*,*)'ReadTimeCDF '//trim(varname)//" not found in "//trim(fileName)
      varname='Times'!wrf format
      status=nf90_inq_varid(ncid=ncFileID, name=varname, varID=VarID)
      if(status==nf90_noerr)then
-        call CheckStop(find_record,"find_record not implemented for time format in "//trim(fileName))
+        call CheckStop(find_record,dtxt//"find_record not implemented for time format in "//trim(fileName))
         call check(nf90_Inquire_Variable(ncFileID,VarID,name,xtype,ndims,dimids,nAtts))
-        if(ndims>2)write(*,*)'WARNING: Times has more than 2 dimension!? ',ndims
+        if(ndims>2)write(*,*)dtxt//'WARNING: Times has more than 2 dimension!? ',ndims
         call check(nf90_inquire_dimension(ncid=ncFileID,dimID=dimids(2),len=ntimes))
         if(NTime_Read<1)then
-           if(DEBUG_NETCDF)write(*,*)'reading all time records'
+           if(DEBUG%NETCDF)write(*,*)dtxt//'reading all time records'
            NTime_Read=ntimes
         end if
-        call CheckStop(ntimes<NTime_Read, "to few records in "//trim(fileName))
-        call CheckStop(SIZE(TimesInDays)<NTime_Read,"to many records in "//trim(fileName))
+        call CheckStop(ntimes<NTime_Read, dtxt//"too few records in "//trim(fileName))
+        call CheckStop(SIZE(TimesInDays)<NTime_Read,dtxt//"too many records in "//trim(fileName))
         call check(nf90_inquire_dimension(ncid=ncFileID,dimID=dimids(1),len=string_length))
 
         allocate(Times_string(string_length,ntimes))
@@ -4892,9 +4907,11 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
               name(j:j)=Times_string(j,i)
            end do
            call wordsplit(name,string_length,wordarray,nwords,errcode,'_')
-           if(DEBUG_NETCDF.and.MasterProc)write(*,*)'date ',trim(wordarray(1)),' hour ',trim(wordarray(2)),' minutes ',trim(wordarray(3))
+           if(dbg0) write(*,*)'date ',trim(wordarray(1)),' hour ',&
+                   trim(wordarray(2)),' minutes ',trim(wordarray(3))
            call wordsplit(wordarray(1),wordarraysize,wordarray2,nwords,errcode,'-')
-           if(DEBUG_NETCDF.and.MasterProc)write(*,*)'year ',trim(wordarray2(1)),' month ',trim(wordarray2(2)),' day ',trim(wordarray2(3))
+           if(dbg0) write(*,*)'year ',trim(wordarray2(1)),&
+                   ' month ',trim(wordarray2(2)),' day ',trim(wordarray2(3))
            read(wordarray2(1),*)yyyy
            read(wordarray2(2),*)mo
            read(wordarray2(3),*)dd
@@ -4910,14 +4927,14 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
         status=nf90_inq_varid(ncid=ncFileID, name=varname, varID=VarID)
         if(status==nf90_noerr)then
            call check(nf90_Inquire_Variable(ncFileID,VarID,name,xtype,ndims,dimids,nAtts))
-           if(ndims/=3)write(*,*)'WARNING: TSTEP does not have 3 dimensions!? ',ndims
+           if(ndims/=3)write(*,*)dtxt//'WARNING: TSTEP does not have 3 dimensions!? ',ndims
            call check(nf90_inquire_dimension(ncid=ncFileID,dimID=dimids(3),len=ntimes))
            if(NTime_Read<1)then
-              if(DEBUG_NETCDF)write(*,*)'reading all time records'
+              if(DEBUG%NETCDF)write(*,*)dtxt//'reading all time records'
               NTime_Read=ntimes
            end if
-           call CheckStop(ntimes<NTime_Read, "to few records in "//trim(fileName))
-           call CheckStop(SIZE(TimesInDays)<NTime_Read,"to many records in "//trim(fileName))
+           call CheckStop(ntimes<NTime_Read, dtxt//"too few records in "//trim(fileName))
+           call CheckStop(SIZE(TimesInDays)<NTime_Read,dtxt//"too many records in "//trim(fileName))
 
            allocate(int_times(2,1,NTime_Read))
            !NB: we assume all variables have same time stamp. Read only for first
@@ -4946,12 +4963,14 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
                     NTime_Read = startrecord
                     exit
                  endif
-                 if(startrecord == ntimes .and. me==0)write(*,*)'WARNING: did not find correct emis time. Last time found ',TimesInDays(1),' wanted ',time_wanted
+                 if(startrecord == ntimes .and. me==0) write(*,*)dtxt// &
+                  'WARNING: did not find correct emis time. Last time found ',&
+                   TimesInDays(1),' wanted ',time_wanted
               endif
            enddo
            deallocate(int_times)
         else
-           if(DEBUG_NETCDF)write(*,*)'time variable not found: ',trim(varname)
+           if(DEBUG%NETCDF)write(*,*)dtxt//'time variable not found: ',trim(varname)
            NTime_Read = 0
         endif
      endif
@@ -4961,18 +4980,20 @@ subroutine ReadTimeCDF(filename,TimesInDays,NTime_Read,time_wanted)
 
 end subroutine ReadTimeCDF
 
-subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
+subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug_flag)
   character(len = *),intent(in) ::fileName
   integer, intent(in)::KMAX_ext
   real,intent(in) :: Rvar(KMAX_ext,LIMAX,LJMAX)
   real,intent(out):: Rvar_emep(LIMAX,LJMAX,KMAX_MID)
-  logical, optional, intent(in) :: debug!output only masterproc
+  logical, optional, intent(in) :: debug_flag!output only masterproc
   real, allocatable,dimension(:)::hyam_ext,hybm_ext,P_ext,weight_k1
   integer, allocatable,dimension(:)::k1_ext,k2_ext
   integer :: ncFileID,varID,status,i,j,k,k_ext!,ij,ijk
   real :: P_emep,P0
   character(len=100) :: word
   logical ::reversed_k
+  logical, save :: dbg = .false.
+  if(present(debug_flag)) dbg = debug_flag
 
   allocate(k1_ext(KMAX_MID),k2_ext(KMAX_MID),weight_k1(KMAX_MID))
  !Read pressure for vertical levels
@@ -4986,7 +5007,7 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
 
   status=nf90_inq_varid(ncFileID,"hyam",varID)
   if(status==nf90_noerr) then
-    if(debug) write(*,*)'Found hyam type levels (values at level midpoints)'
+    if(dbg) write(*,*)'Found hyam type levels (values at level midpoints)'
     call check(nf90_get_var(ncFileID,varID,hyam_ext(1:KMAX_ext)))
     status=nf90_get_att(ncFileID,VarID,"units",word)
     if(status==nf90_noerr)then
@@ -5000,12 +5021,12 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
   else
    status=nf90_inq_varid(ncFileID,"hyai",varID)
    if(status==nf90_noerr) then
-      if(debug)write(*,*)'Found hyai type levels (values at level interfaces)'
+      if(dbg)write(*,*)'Found hyai type levels (values at level interfaces)'
       call check(nf90_get_var(ncFileID,varID,hyam_ext))
       status=nf90_get_att(ncFileID,VarID,"units",word)
       if(status==nf90_noerr)then
         if(word(1:3)=='hPa')then
-          if(debug)write(*,*)'Changing hyai from hPa to Pa'
+          if(dbg)write(*,*)'Changing hyai from hPa to Pa'
           hyam_ext=100*hyam_ext
         end if
       end if
@@ -5028,14 +5049,14 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
         status=nf90_get_att(ncFileID,VarID,"units",word)
         if(status==nf90_noerr)then
            if(word(1:3)=='hPa')then
-              if(debug)write(*,*)'Changing P0 from hPa to Pa'
+              if(dbg)write(*,*)'Changing P0 from hPa to Pa'
               P0=100*P0
            end if
         end if
-        if(debug)write(*,*)'Multiplying hyam with P0 ',P0
+        if(dbg)write(*,*)'Multiplying hyam with P0 ',P0
         hyam_ext=hyam_ext*P0
      else
-        if(debug)write(*,*)'did not find P0 ',status
+        if(dbg)write(*,*)'did not find P0 ',status
      end if
   end if
 
@@ -5046,7 +5067,7 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
   !   important as long as they are both terrain following.
   do k_ext=1,KMAX_EXT
     P_ext(k_ext)=hyam_ext(k_ext)+hybm_ext(k_ext)*Pref
-    if(debug) write(*,fmt="(A,I3,F10.2)")'vert_inter: P_ext',k_ext,P_ext(k_ext)
+    if(dbg) write(*,fmt="(A,I3,F10.2)")'vert_inter: P_ext',k_ext,P_ext(k_ext)
   end do
 
   reversed_k=(P_ext(1)>P_ext(2))
@@ -5055,7 +5076,7 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
   if(reversed_k)then
     do k=1,KMAX_MID
       P_emep=A_mid(k)+B_mid(k)*Pref !Pa
-      if(debug) write(*,fmt="(A,I3,F10.2)")'vert_inter: P_emep',k,P_emep
+      if(dbg) write(*,fmt="(A,I3,F10.2)")'vert_inter: P_emep',k,P_emep
       if(P_emep<P_ext(KMAX_EXT))then
          !we need levels above the highest level available.
          !we do not want to extrapolate. take the top level value
@@ -5084,7 +5105,7 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
          end do
          weight_k1(k)=(P_emep-P_ext(k2_ext(k)))/(P_ext(k1_ext(k))-P_ext(k2_ext(k)))
       end if
-      if(debug)&
+      if(dbg)&
         write(*,fmt="(A,I4,2(A,I4,A,F5.2))")'vert_inter: level',k,&
           ' is the sum of level ',k1_ext(k),' weight ',weight_k1(k),&
           ' and level ',k2_ext(k),' weight ',1-weight_k1(k)
@@ -5092,7 +5113,7 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
   else
     do k=1,KMAX_MID
       P_emep=A_mid(k)+B_mid(k)*Pref !Pa
-      if(debug) write(*,fmt="(A,I3,F10.2)")'vert_inter: P_emep',k,P_emep
+      if(dbg) write(*,fmt="(A,I3,F10.2)")'vert_inter: P_emep',k,P_emep
       if(P_emep<P_ext(1))then
          !we need levels above the highest level available.
          !we do not want to extrapolate. take the top level value
@@ -5121,7 +5142,7 @@ subroutine   vertical_interpolate(filename,Rvar,KMAX_ext,Rvar_emep,debug)
          end do
          weight_k1(k)=(P_emep-P_ext(k2_ext(k)))/(P_ext(k1_ext(k))-P_ext(k2_ext(k)))
       end if
-      if(debug) &
+      if(dbg) &
         write(*,fmt="(A,I4,2(A,I4,A,F5.2))")'vertical_interpolate: level',k,&
           ' is the sum of level ', k1_ext(k),' weight ',weight_k1(k),&
           ' and level ', k2_ext(k),' weight ',1.0-weight_k1(k)
@@ -5205,7 +5226,7 @@ end subroutine vertical_interpolate
       end if
       !update fractions
       total=val+Rvalues*fraction_in(igjgk,Ng)*factor*latlon_weight
-!      if(debug.and.fraction_in(igjgk,Ng)>1.001)then
+!      if(dbg.and.fraction_in(igjgk,Ng)>1.001)then
 !         write(*,*)'fractions_in TOO LARGE ',Ng,ig,jg,k,fraction_in(igjgk,Ng)
 !         stop
 !      end if
@@ -5462,7 +5483,7 @@ end subroutine vertical_interpolate
 
    ! the file does not exist yet or is overwritten
    if(MasterProc) then
-      if(DEBUG_NETCDF)write(*,*)'nf90_create '//trim(fileName)
+      if(DEBUG%NETCDF)write(*,*)'nf90_create '//trim(fileName)
       call check(nf90_create(trim(fileName),nf90_hdf5,ncFileID),"create:"//trim(fileName))
 
       ! define coordinate dimensions

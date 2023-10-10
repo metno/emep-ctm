@@ -1330,10 +1330,12 @@ real :: trend_o3=1.0, trend_co, trend_voc
  
      varname='O3'
      if(me==0)write(*,*)'reading IBC for O3 from ',trim(LoganO3File)
-     call  ReadField_CDF(LoganO3File,varname,O3_logan,nstart=month,kstart=1,kend=Nlevel_logan,interpol='zero_order', &
-          needed=.true.,debug_flag=.false.)
+     call  ReadField_CDF(LoganO3File,varname,O3_logan,nstart=month,&
+       kstart=1,kend=Nlevel_logan,interpol='zero_order', needed=.true., &
+       debug_flag=.false.)
      !interpolate vertically
-     call vertical_interpolate(LoganO3File,O3_logan,Nlevel_logan,O3_logan_emep,debug=.false.)
+     call vertical_interpolate(LoganO3File,O3_logan,Nlevel_logan,O3_logan_emep,&
+             debug_flag=.false.)
      do k = 1, KMAX_MID
         do j = 1, ljmax
            do i = 1, limax
@@ -1429,11 +1431,13 @@ real :: trend_o3=1.0, trend_co, trend_voc
          else
             call CheckStop('IBC dust case error')
          end if
-         call  ReadField_CDF(DustFile,varname,Dust_3D,nstart=month,kstart=1,kend=Nlevel_Dust,&
-              interpol='zero_order', needed=.true.,debug_flag=.false.)
+         call  ReadField_CDF(DustFile,varname,Dust_3D,nstart=month,&
+           kstart=1,kend=Nlevel_Dust, interpol='zero_order', needed=.true.,&
+           debug_flag=.false.)
 
          !interpolate vertically
-         call vertical_interpolate(DustFile,Dust_3D,Nlevel_Dust,Dust_3D_emep,debug=.false.)
+         call vertical_interpolate(DustFile,Dust_3D,Nlevel_Dust,Dust_3D_emep,&
+                 debug_flag=.false.)
 
         ! have to convert from ug/m3 into mixing ratio. NB: Dust in Netcdf file
         !  has molwt = 200 g/mol

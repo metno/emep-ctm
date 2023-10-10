@@ -1066,7 +1066,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
          call Create_CDF_sondes(fileName,&
               NSPEC,NSpec_Att+3,SpecDef(:,0:NSpec_Att+3),&
               NStations,NMetaData,MetaData(:,1:NMetaData),&
-              NLevels,debug=debug_1d)
+              NLevels,debug_flag=debug_1d)
          
          write(*,*)'Created ',trim(fileName)
       else
@@ -1146,7 +1146,7 @@ subroutine siteswrt_out(fname,io_num,nout,f,nglobal,nlocal, &
       SpecName(ispec)=trim(s_species(ispec))!name of the variable for one sites/sonde and species          
     end do ! n
     if(nglobal>0)then
-       call Out_CDF_sondes(fileName,SpecName,NSPEC,g_out,NLevels,g_ps,debug=debug_1d)
+       call Out_CDF_sondes(fileName,SpecName,NSPEC,g_out,NLevels,g_ps,debug_flag=debug_1d)
     end if
 
     deallocate(SpecName)

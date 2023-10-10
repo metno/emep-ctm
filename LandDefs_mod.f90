@@ -30,7 +30,6 @@
 module LandDefs_mod
  use CheckStop_mod, only : CheckStop, StopAll
  use Config_module, only : NLANDUSEMAX, MasterProc
- use Config_module, only :  FLUX_VEGS
  use Debug_module,  only:  DEBUG   ! -> DEBUG%LANDDEFS
  use Io_mod, only : IO_TMP, open_file, ios, Read_Headers, read_line
  use KeyValueTypes, only :  KeyVal
@@ -203,7 +202,6 @@ contains
        nn = 0     
        do
             call read_line(IO_TMP,txtinput,ios)
-!if(MasterProc) print *, "READ LINE ",me, nn,  trim(txtinput), ios
 
             if ( ios /= 0 ) exit   ! likely end of file
             if ( dbg ) write(*,*) nn,  dtxt//' READLINE: ------ '// trim(txtinput)
@@ -252,14 +250,11 @@ contains
 
             LandType(n)%is_water  =  LandInput%code == "W" 
             LandType(n)%is_ice    =  LandInput%code == "ICE" 
-            LandType(n)%is_iam    =  LandInput%code(1:4) == "IAM_" 
+            !is_iam is now set in Landuse_mod.
+            !LandType(n)%is_iam    =  LandInput%code(1:4) == "IAM_" &
+            !                  .or. LandInput%code(1:6) == "G-IAM_" 
             LandType(n)%is_clover =  LandInput%code(1:2) == "CV" 
             LandType(n)%flux_wanted = LandType(n)%is_iam  ! default
-           !Also:
-           if( find_index( LandInput%code, FLUX_VEGS(:) ) > 0 ) then
-             if(MasterProc) write(*,*) dtxt//"FLUX_VEG SET:", trim(LandInput%code)
-             LandType(n)%flux_wanted = .true.
-           end if
 
             LandType(n)%is_forest =  &
                 (  LandDefs(n)%hveg_max > 4.0 .and. &    !  Simpler definition 

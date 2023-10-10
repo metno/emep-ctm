@@ -58,7 +58,7 @@ use Config_module,    only:  &
   ,emis_inputlist               & ! Used in EEMEP
   ,KMAX_MID ,KMAX_BND, KCHEMTOP & ! Upper layer (k), upper level, and k for 1d fields
   ,EmisSplit_OUT
-use Debug_module,     only: DebugCell, DEBUG_MASS, DEBUG !->DEBUG%SETUP_1DCHEM
+use Debug_module,     only: DebugCell, DEBUG !->DEBUG%SETUP_1DCHEM
 use DerivedFields_mod,only: d_2d, f_2d
 use EmisDef_mod,      only: gridrcemis, gridrcroadd, KEMISTOP,Emis_4D,N_Emis_4D,Found_Emis_4D&
                             , O_NH3, O_DMS, SplitEmisOut, EmisOut&

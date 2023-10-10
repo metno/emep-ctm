@@ -74,7 +74,7 @@
                   dt_advec, dt_advec_inv,  PT,Pref, KCHEMTOP, &
                   NPROCX,NPROCY,NPROC, &
                   USES,ZERO_ORDER_ADVEC
-  use Debug_module,       only: DEBUG_ADV
+  use Debug_module,       only: DEBUG
   use Convection_mod,     only: convection_Eta
   use EmisDef_mod,        only: NSECTORS
   use GridValues_mod,     only: GRIDWIDTH_M,xm2,xmd,xm2ji,xmdji,xm_i, Pole_Singular, &
@@ -425,7 +425,7 @@
          MPI_MAX,MPI_COMM_CALC,IERROR)
     dt_smax = 1./scmax
 42  FORMAT(A,F10.2)
-    if(me==0.and. firstcall.and.DEBUG_ADV)write(*,42)'dt_smax',dt_smax
+    if(me==0.and. firstcall.and.DEBUG%ADV)write(*,42)'dt_smax',dt_smax
     niters = int(dt_advec/dt_smax)+1
     dt_s = dt_advec/real(niters)
 

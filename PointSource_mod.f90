@@ -53,7 +53,7 @@ module PointSource_mod
 use CheckStop_mod,       only: CheckStop
 use ChemSpecs_mod,       only: species
 use Config_module,  only: KMAX_MID, PT, Pref, MasterProc, USES
-use Debug_module,        only: DEBUG => DEBUG_EMISSTACKS
+use Debug_module,        only: DEBUG ! => DEBUG%EMISSTACKS
 use Functions_mod,       only: StandardAtmos_kPa_2_km, Tpot_2_T
 use GridValues_mod,      only: sigma_bnd, debug_proc &
                          , coord_in_processor, GridArea_m2
@@ -129,7 +129,7 @@ subroutine readstacks(io)
   logical :: first_header=.true., debug_flag=.false.
   character(len=20), dimension(MAX_POLLS+9) :: words
   integer :: errcode, ncol, emcol, nemis_cols, ispec, nn, nwords, iemis
-  debug_flag = DEBUG !! .and. MasterProc 
+  debug_flag = DEBUG%EMISSTACKS !! .and. MasterProc 
 
   ! The plume rise methodology is very approximate, so we calculate
   ! layer thickness once, for a standard atmosphere
@@ -310,7 +310,7 @@ subroutine get_pointsources(i,j, debug_flag)
       Mh = 1.36e-3 * stack(n)%flue * (stack(n)%Ts-283.15)
       dh = Plume_PreggerFriedrich( Mh, Grid%u_ref, stack(n)%Vs, stack(n)%d )
       he = stack(n)%hs + dh      
-      if(DEBUG .and. n==1) &
+      if(DEBUG%EMISSTACKS .and. n==1) &
         write(*,"(a,i3,f10.4,f10.4)") "Plume_PVDI: stack he dh",n,he,dh
 
     case default
