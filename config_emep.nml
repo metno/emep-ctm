@@ -205,7 +205,6 @@ OutputVegO3=
   'MMAOT40_IAM_WH' ,'AOT',40.0,'MM','IAM_WH',F,0,999,'YM',
   'EUAOT40_Crops'  ,'AOT',40.0,'EU','IAM_WH',F,0,999,'YM',
   'EUAOT40_Forests','AOT',40.0,'EU','IAM_DF',F,0,999,'YM',
-  'MMAOT40_IAM_WH' ,'AOT',40.0,'MM','IAM_WH',F,0,999,'YM',
 
 DDEP_ECOS =
   'Grid'     ,'YMD',
