@@ -15,7 +15,8 @@ which supports the development of air quality polices in the European Union.
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
 [guide]:    http://emep-ctm.readthedocs.io/en/latest
-[publ2021]: http://emep.int/publ/emep2021_publications.html
+[publ2023]: http://emep.int/publ/emep2023_publications.html
+[rel5.0]:   http://github.com/metno/emep-ctm/releases/tag/5.0
 [rel445]:   http://github.com/metno/emep-ctm/releases/tag/rv4_45
 [rel436]:   http://github.com/metno/emep-ctm/releases/tag/rv4_36
 [rel434]:   http://github.com/metno/emep-ctm/releases/tag/rv4_34
@@ -44,20 +45,21 @@ The Open Source releases are intended to:
 
 ## Releases
 
-The latest Open Source EMEP MSC-W model version ([rv4.45][rel445])
-is based on the version used on the [EMEP status reporting of the year 2021][publ2021].
+The latest Open Source EMEP MSC-W model version ([5.0][rel5.0])
+is based on the version used on the [EMEP status reporting of the year 2023][publ2023].
 The source code, together with a set of input data,
 an updated user guide and a full year model results for the year 2015,
 under [GPL license v3][GPLv3].
 
 You can download the source code and input data by following the instructions on the 
-[OpenSource rv4.45 (202203)][rel445] release page.
+[OpenSource v5.0 (202310)][rel5.0] release page.
 
 Information on use of the model can be found in the [EMEP MSC-W model User Guide][guide]
 
 #### Previous releases (YYYYMM - date of release)
 
-* [OpenSource rv4.36 (202011)][rel436]
+* [OpenSource rv4.45 (202203)][rel445].
+* [OpenSource rv4.36 (202011)][rel436].
 * [OpenSource rv4.34 (202001)][rel434].
 * [OpenSource rv4.33 (201906)][rel433].
 * [OpenSource rv4.32 (201904)][rel432].
