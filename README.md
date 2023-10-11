@@ -1,7 +1,6 @@
 # Open Source EMEP MSC-W model
 [![Documentation Status](https://readthedocs.org/projects/emep-ctm/badge/?version=latest)](http://emep-ctm.readthedocs.io/en/latest/?badge=latest)
-[![DOI](https://zenodo.org/badge/65725508.svg)](https://zenodo.org/badge/latestdoi/65725508)
-
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3265911.svg)](https://doi.org/10.5281/zenodo.3265911)
 
 The EMEP models have been instrumental to the development of
 air quality policies in Europe since the late 1970s,
@@ -190,7 +189,7 @@ The reports can be found under the following links:
 
 ## Citation
 
-```bibtex
+``` bibtex
 @article{emep-mscw_2012,
   author = {Simpson, D. and Benedictow, A. and Berge, H. and Bergstr\"om, R. and Emberson, L. D. and 
             Fagerli, H. and Flechard, C. R. and Hayman, G. D. and Gauss, M. and Jonson, J. E. and
@@ -204,6 +203,15 @@ The reports can be found under the following links:
   pages = {7825--7865},
   doi = {10.5194/acp-12-7825-2012},
   url = {https://www.atmos-chem-phys.net/12/7825/2012/}
+}
+
+@misc{emep-ctm_v5.0,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model v5.0 (202310)},
+  month        = oct,
+  year         = 2023,
+  doi          = {10.5281/zenodo.8431553},
+  url          = {https://doi.org/10.5281/zenodo.8431553}
 }
 
 @misc{emep-ctm_rv4.45,
