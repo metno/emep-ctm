@@ -98,11 +98,11 @@ Model code
 ----------
 
 
-The latest release Open Source of the EMEP/MSC-W model is `version rv4_45`__.
+The latest release Open Source of the EMEP/MSC-W model is `version 5.0`__.
 This and previous releases can be found on the `releases section`__
 of the EMEP/MSC-W Open Source `github page`__.
 
-.. __: https://github.com/metno/emep-ctm/releases/tag/rv4_45
+.. __: https://github.com/metno/emep-ctm/releases/tag/5.0
 .. __: https://github.com/metno/emep-ctm/releases
 .. __: https://github.com/metno/emep-ctm
 
@@ -120,8 +120,8 @@ the release page, the preferred retrieval method is via the `catalog tool`_ as f
     # make it executable and run it
     chmod +x catalog.py
 
-    # download the source code for rv4_45 release
-    catalog.py -R rv4_45 --source
+    # download the source code for 5.0 release
+    catalog.py -R 5.0 --source
 
 
 The model source code, makefiles, and a copy of the license file

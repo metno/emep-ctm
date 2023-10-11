@@ -2,5 +2,5 @@
 *.dvi
 *.log
 *.out
-build/
+*build/
 .vscode/
