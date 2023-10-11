@@ -1,5 +1,6 @@
 downloads
-emep-ctm-rv*
+emep-ctm-*
 docs
 meteo*
 EMEP_MSC-W_model*
+*.tar.*

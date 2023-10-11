@@ -16,7 +16,7 @@ from textwrap import dedent
 assert sys.version_info >= (3, 6), "This script requires python3.6 or better"
 
 _CONST = {
-    "VERSION": "0.2.1",  # script version
+    "VERSION": "0.3.0",  # script version
     "RELEASE": [  # released model versions
         "rv3",
         "v201106",
@@ -33,6 +33,7 @@ _CONST = {
         "rv4_34",
         "rv4_36",
         "rv4_45",
+        "5.0"
     ],
     "METYEAR": [  # released met-years
         2005,
