@@ -126,12 +126,24 @@ A history of the development of the EMEP model can be found at
 
 ### Model Description
 
+The main documentation is still the 2012 ACP paper:
+
 The EMEP MSC-W chemical transport model -- technical description
 D. Simpson, A. Benedictow, H. Berge, R. Bergstrõm, L. D. Emberson, H. Fagerli,
 C. R. Flechard, G. D. Hayman, M. Gauss, J. E. Jonson, M. E. Jenkin, A. Nyíri,
 C. Richter, V. S. Semeena, S. Tsyro, J.-P. Tuovinen, Á. Valdebenito, and P. Wind
 Atmos. Chem. Phys., 12, 7825-7865, 2012
 http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html
+
+... but many changes (some major) have been made since then. These changes are reported each year in the "updates" chapter of EMEP Status reports. The latest update concerns v5.0, and is:
+
+Simpson, D., van Caspel, W., Benedictow, A., Fagerli, H., Jonson, J. E., Tsyro, S., 
+Valdebento, A., and Wind, P.: Updates to the EMEP/MSC-W model, 2022–2023, 
+in: Transboundary particulate matter, photo-oxidants, acidifying and eutrophying components. 
+EMEP Status Report 1/2023, The Norwegian Meteorological Institute, Oslo, Norway, 159–179, 2023.
+https://emep.int/publ/reports/2023/EMEP_Status_Report_1_2023.pdf
+
+Please, when referring to the EMEP model, use the appropriate updates reference as well as the 2012 paper, e.g. Simpson et al., (2012, 2023, and references therein).
 
 ## Running the model
 
