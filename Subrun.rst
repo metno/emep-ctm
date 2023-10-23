@@ -921,6 +921,23 @@ Instead of defining countries in the emission files, one can define "source regi
     mask2name(2)='Eigersund',
     
 If a value is within the min and max range, but does not appear in the mask file, it will not be taken into account (meaning it is ok to specify a range that covers all the masks values, even if some values are not defined on the mask) 
+    
+ (under development): use mask file with fraction of emissions in each gridcell: 
+
+.. code-block:: Fortran
+    :caption: Local Fractions using mask with fractions of gridcells
+
+    EmisMask(1)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
+    EmisMask(1)%cdfname = 'TouHan',
+    EmisMask(1)%ID = 'CELL-FRACTION',
+
+    EmisMask(2)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
+    EmisMask(2)%cdfname = 'PorUtr',
+    EmisMask(2)%ID = 'CELL-FRACTION',
+
+    lf_country%cellmask_name(1) =  'PorUtr',
+
+In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PortUtr" is used as a "country" in the LF run.
 
 
 The full Ozone chemistry can be included. This option is under development, and only limited options are available. The cpu cost is high, approximatively 10 times the cost without this option (independently of the number of sources tracked). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``. Example of config settings:
@@ -941,26 +958,9 @@ The full Ozone chemistry can be included. This option is under development, and 
     lf_country%list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
-    
-    
- (under development): use mask file with fraction of emissions in each gridcell: 
 
-.. code-block:: Fortran
-    :caption: Local Fractions using mask with fractions of gridcells
 
-    EmisMask(1)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
-    EmisMask(1)%cdfname = 'TouHan',
-    EmisMask(1)%ID = 'CELL-FRACTION',
 
-    EmisMask(2)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
-    EmisMask(2)%cdfname = 'PorUtr',
-    EmisMask(2)%ID = 'CELL-FRACTION',
-
-    lf_country%cellmask_name(1) =  'PorUtr',
-
-In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PortUtr" is used as a "country" in the LF run.
-
-    
 Technical
 =========
 
