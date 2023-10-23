@@ -943,7 +943,23 @@ The full Ozone chemistry can be included. This option is under development, and 
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
     
     
- 
+ (under development): use mask file with fraction of emissions in each gridcell: 
+
+.. code-block:: Fortran
+    :caption: Local Fractions using mask with fractions of gridcells
+
+    EmisMask(1)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
+    EmisMask(1)%cdfname = 'TouHan',
+    EmisMask(1)%ID = 'CELL-FRACTION',
+
+    EmisMask(2)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
+    EmisMask(2)%cdfname = 'PorUtr',
+    EmisMask(2)%ID = 'CELL-FRACTION',
+
+    lf_country%cellmask_name(1) =  'PorUtr',
+
+In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PortUtr" is used as a "country" in the LF run.
+
     
 Technical
 =========
