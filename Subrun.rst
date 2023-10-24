@@ -929,15 +929,16 @@ If a value is within the min and max range, but does not appear in the mask file
 
     EmisMask(1)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
     EmisMask(1)%cdfname = 'TouHan',
-    EmisMask(1)%ID = 'CELL-FRACTION',
+    EmisMask(1)%type = 'CELL-FRACTION',
+    EmisMask(1)%ID = 'ToHa',
 
     EmisMask(2)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
     EmisMask(2)%cdfname = 'PorUtr',
-    EmisMask(2)%ID = 'CELL-FRACTION',
+    EmisMask(2)%type = 'PoUt',
 
-    lf_country%cellmask_name(1) =  'PorUtr',
+    lf_country%cellmask_name(1) =  'ToHa',
 
-In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PortUtr" is used as a "country" in the LF run.
+In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PoUt" is used as a "country" in the LF run.
 
 
 The full Ozone chemistry can be included. This option is under development, and only limited options are available. The cpu cost is high, approximatively 10 times the cost without this option (independently of the number of sources tracked). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``. Example of config settings:
