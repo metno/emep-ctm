@@ -934,7 +934,8 @@ If a value is within the min and max range, but does not appear in the mask file
 
     EmisMask(2)%filename = '/ec/res4/hpcperm/fan/Data/Masks/cameo_city_masks.nc',
     EmisMask(2)%cdfname = 'PorUtr',
-    EmisMask(2)%type = 'PoUt',
+    EmisMask(2)%type = 'CELL-FRACTION',
+    EmisMask(2)%ID = 'PoUt',
 
     lf_country%cellmask_name(1) =  'ToHa',
 
