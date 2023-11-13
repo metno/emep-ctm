@@ -696,10 +696,27 @@ To define which gridcells to include in your local region, you must find a suita
 A "mask" can be defined for instance with:
 
 .. code-block:: Fortran
-    :caption: Define a mask example
+    :caption: Define a cell-fraction mask, example. The mask value represents the fraction of the grid-cell area to be reduced.
 
     EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
+    EmisMask(1)%type     = 'CELL-FRACTION', ! the mask value is part of the reduction, default
+    EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
+    EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
+
+    ! define species to be read from the emission file separately, as if reading from different files
+    Emis_sourceFiles(1:7)%filename=7*'path/Emis_CAMS_v5_1_with_Ref2_0_1_GNFR_CAMS_01005deg_2018_CAMS2_40_U5.nc',
+    Emis_sourceFiles(1:7)%species='sox','nox','voc','nh3','co','pm25','pmco',
+    ! apply mask to pm25 and pmco emissions
+    Emis_sourceFiles(6:7)%mask_ID =2*'London_PM',
+
+
+.. code-block:: Fortran
+    :caption: Define a mask with lower and upper threshold, example
+
+    EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
+    EmisMask(1)%type     = 'THRESHOLD',
     EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
     EmisMask(1)%threshold = 1.0E-10, ! the mask is set at any point larger than the threshold
     EmisMask(1)%threshold_max = 100, ! ... and smaller than the threshold_max value (default 1E60)
@@ -719,7 +736,8 @@ To be used with the Local Fractions (see below), one can also define a set of re
     
     EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
-    EmisMask(1)%ID = 'NUMBER',
+    EmisMask(1)%type     = 'NUMBER',
+    EmisMask(1)%ID       = 'specific-mask-name',
 
 
 Other less used options
@@ -908,13 +926,15 @@ Instead of defining countries in the emission files, one can define "source regi
     :caption: Local Fractions mask regions source receptor example
 
     EmisMask(1)%filename='municip_mask/municip_mask_500m.nc',
-    EmisMask(1)%cdfname='region_id',
-    EmisMask(1)%ID='NUMBER',
+    EmisMask(1)%cdfname =region_id',
+    EmisMask(1)%type    ='NUMBER',
+    EmisMask(1)%ID      ='municip_mask',
 
     lf_country%mask_val(1:) = 2,5,8,12, 
     lf_country%mask_val_min = 100,
-    lf_country%mask_val_max= 357,
-    lf_country%sector_list(1:1)=0,
+    lf_country%mask_val_max = 357,
+    lf_country%sector_list(1:1)=0, ! sum of all sectors
+    lf_country%cellmask_name(1:1) = 'municip_mask',
     lf_src(1)%species="pm25",
     lf_src(1)%type='country',
     mask2name(1)='Oslo',     !map id numbers to names (for use in output)
