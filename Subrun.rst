@@ -961,8 +961,10 @@ If a value is within the min and max range, but does not appear in the mask file
 
 In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PoUt" is used as a "country" in the LF run.
 
+Local Fractions for Sensibilities with full chemistry
+-----------------------------------------------------
 
-The full Ozone chemistry can be included. This option is under development, and only limited options are available. The cpu cost is high, approximatively 10 times the cost without this option (independently of the number of sources tracked). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``. Example of config settings:
+The full chemistry can be included. This option is under development, and only limited options are available. The cpu cost is high, approximatively 20 times the cost without this option (independently of the number of sources tracked). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``. Example of config settings:
 
 .. code-block:: Fortran
     :caption: Local Fractions Country source receptor type example
@@ -972,8 +974,7 @@ The full Ozone chemistry can be included. This option is under development, and 
     lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
     
     !Local Fractions pollutants and sectors to include:
-    lf_src(1)%species="FULLCHEM", ! 
-    lf_src(1)%type='country',  ! Means make country style SR
+    lf_src(1)%species="FULLCHEM", ! to indicate that all species must be included
 
     ! Specify which countries and sectors
     lf_country%sector_list(1:)=0,1,8,
@@ -981,7 +982,18 @@ The full Ozone chemistry can be included. This option is under development, and 
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
 
+    ! Specify which species or group of species must be outputted
+    lf_spec_out(1)%name='O3', !single species
+    lf_spec_out(2)%name='NO', !single species
+    lf_spec_out(3)%name='NO2', !single species
+    lf_spec_out(4)%name='SIA',!group of species
+    lf_spec_out(4)%species(1:)='SO4','NO3_f','NO3_c','NH4_f', !species to include in the group
+    lf_spec_out(4)%species_fac(1:)=1.0, 1.0, 1.0, 1.0,        !weights (default 1.0)
+    lf_spec_out(5)%name='NOx',!group of species
+    lf_spec_out(5)%species(1:)='NO','NO2', !species to include in the group
 
+    lf_src(1)%MDA8 = T, !special: make MDA8. NB: requires that O3 is outputted too
+    
 
 Technical
 =========
