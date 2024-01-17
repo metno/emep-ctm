@@ -992,7 +992,7 @@ The full chemistry can be included. This option is under development, and only l
     lf_spec_out(5)%name='NOx',!group of species
     lf_spec_out(5)%species(1:)='NO','NO2', !species to include in the group
 
-    lf_src(1)%MDA8 = T, !special: make MDA8. NB: requires that O3 is outputted too
+    lf_src(1)%MDA8 = T, !special: make AvgMDA8_6month. NB: requires that O3 is outputted too
     
 
 Technical
