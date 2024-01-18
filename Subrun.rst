@@ -678,7 +678,29 @@ Note about species: These can be interpreted in one of three categories
   Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
   Emis_sourceFiles(1)%source(1)%units='kg',
 
+If two CV emission files are wished to be combined in a single simulation, for example so that different
+emission scenarios can be applied inside and outside of the EMEP region (UNECE excl. NA), one can use
+the Emis_sourceFiles(1)%country_ISO_excl(1:) and Emis_sourceFiles(1)%country_ISO_incl(1:) options. 
+The below dummy example applies a 2015 baseline scenario inside the EMEP region and 2050 MFR scenario in the rest of the world (ROW),
+based on 0.5 degree emission input data files.
 
+.. code-block:: text
+  :caption: Include or exclude countries from emission input files.
+
+  Emis_sourceFiles(1)%filename = '/path_to_global_0.5deg_2015_baseline.nc',
+  Emis_sourceFiles(2)%filename = '/path_to_global_0.5deg_2050_MFR.nc',
+
+  Emis_sourceFiles(1)%country_ISO_incl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
+                                               "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
+                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
+                                               "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
+                                               "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
+
+  Emis_sourceFiles(2)%country_ISO_excl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
+                                               "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
+                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
+                                               "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
+                                               "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
 .. code-block:: Fortran
     :caption: TEST.
     
