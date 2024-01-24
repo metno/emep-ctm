@@ -634,6 +634,9 @@ List of file attributes (default in parenthesis):
   - SECTORS_NAME or sectorsName ('GNFR_CAMS') . It must be set to one of the SECTORS%name defined ('GNFR_CAMS' for example).
   - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
   - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
+  - country_ISO_incl ('NOTSET') If used, only use emissions from the countries in the list (see example below)
+  - country_ISO_excl ('NOTSET') If used, do not take into account emissions from countries in the list (see example below)
+
 
 List of source attributes:
   - varname (‘NOTSET’) The name as used in the netcdf file
