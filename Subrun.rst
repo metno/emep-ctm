@@ -876,10 +876,11 @@ config_emep.nml settings:
 
     USES%LocalFractions = T, ! T for computing Local Fractions, F otherwise
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
-    !NB: Values from lf_src(1) are used for all sources
-    lf_src(1)%YEAR = T, !average value for full run in output 
+    lf_set%YEAR = T, !average value for full run in output
+    lf_set%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
+
+    !NB: for now lf_src(1)%dist will be used for all sources
     lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
-    lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
     
     !Local Fractions pollutants and sectors to include:
     lf_src(1)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
@@ -894,7 +895,7 @@ config_emep.nml settings:
     lf_src(4)%species="nox ",
     lf_src(4)%sector=8,
     
-    ! lf_src(1)%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
+    ! lf_set%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
 
 If one wants to include many species, sectors and res values, without writing one entry per source, one can use the following syntax:
@@ -924,9 +925,8 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
 
     USES%LocalFractions = T, ! T for computing Local Fractions
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
-    !NB: Values from lf_src(1) are used for all sources
-    lf_src(1)%YEAR = T, !average value for full run in output 
-    lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
+    lf_set%YEAR = T, !average value for full run in output 
+    lf_set%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
     
     !Local Fractions pollutants and sectors to include:
     lf_src(1)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
@@ -995,11 +995,10 @@ The full chemistry can be included. This option is under development, and only l
     :caption: Local Fractions Country source receptor type example
 
     USES%LocalFractions = T, ! T for computing Local Fractions
-    lf_src(1)%YEAR = T, !average value for full run in output 
-    lf_src(1)%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
-    
-    !Local Fractions pollutants and sectors to include:
-    lf_src(1)%species="FULLCHEM", ! to indicate that all species must be included
+    lf_set%YEAR = T, !average value for full run in output 
+    lf_set%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
+    lf_set%full_chem = T, ! to indicate that all species must be included
+    lf_set%EmisDer_all = T, ! reduce voc, sox, nox, nh3 together (separately if F)
 
     ! Specify which countries and sectors
     lf_country%sector_list(1:)=0,1,8,
@@ -1017,7 +1016,7 @@ The full chemistry can be included. This option is under development, and only l
     lf_spec_out(5)%name='NOx',!group of species
     lf_spec_out(5)%species(1:)='NO','NO2', !species to include in the group
 
-    lf_src(1)%MDA8 = T, !special: make AvgMDA8_6month. NB: requires that O3 is outputted too
+    lf_set%MDA8 = T, !special: make AvgMDA8_6month. NB: requires that O3 is outputted too
     
 
 Technical
