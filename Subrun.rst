@@ -915,6 +915,19 @@ The corresponding lf_src values will then be added to the already defined lf_src
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
 
+Local Fractions for tracing natural emissions (under development)
+---------------------------------------------
+Natural emissions are assumed emitted from surface (in current version). 
+So far only the DMS emissions can be tracked. 
+To include DMS outputs:
+
+.. code-block:: Fortran
+    :caption: Example for DMS output
+    lf_src(1)%name = 'DMS',
+    lf_src(1)%dist = 2, !will track over up to 2 gridcells in all directions
+    lf_src(1)%nhour = 1, ! will track separately emissions every 1 hour, and reset every 24 hours
+    lf_set%HOUR_INST = T, ! output instantaneous values every hour
+
 Local Fractions for Source Receptor style runs
 ----------------------------------------------
 
