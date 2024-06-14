@@ -1013,7 +1013,7 @@ The full chemistry can be included. This option is under development, and only l
     lf_set%YEAR = T, !average value for full run in output 
     lf_set%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
     lf_set%full_chem = T, ! to indicate that all species must be included
-    lf_set%EmisDer_all = T, ! reduce voc, sox, nox, nh3 together (separately if F)
+    lf_set%EmisDer_all = F, ! reduce voc, sox, nox, nh3 together if T (separately if F)
 
     ! Specify which countries and sectors
     lf_country%sector_list(1:)=0,1,8,
@@ -1030,8 +1030,20 @@ The full chemistry can be included. This option is under development, and only l
     lf_spec_out(4)%species_fac(1:)=1.0, 1.0, 1.0, 1.0,        !weights (default 1.0)
     lf_spec_out(5)%name='NOx',!group of species
     lf_spec_out(5)%species(1:)='NO','NO2', !species to include in the group
+    lf_spec_out(6)%name='PM25_rh50',
+    lf_spec_out(6)%species(1:)='NO3_c','PM_WATER','SO4','NO3_f','NH4_f','ASOC_ng1e2','ASOC_ug1', 'ASOC_ug10', 'ASOC_ug1e2', 'ASOC_ug1e3','non_C_ASOA_ng1e2', 'non_C_ASOA_ug1', 'non_C_ASOA_ug10','non_C_ASOA_ug1e2', 'non_C_ASOA_ug1e3',
+    lf_spec_out(6)%species_fac(1)=0.202764826447516,
+    lf_spec_out(7)%name='DDEP_OXN',
+    lf_spec_out(7)%species(1:)='NO2', 'N2O5', 'HONO', 'HNO3', 'HO2NO2', 'SC4H9NO3', 'NALD', 'ISON', 'PAN', 'MPAN', 'NO3_f', 'NO3_c', 'shipNOx'
+    lf_spec_out(8)%name='WDEP_SOX',
+    lf_spec_out(8)%species(1:)='SO2','SO4',
+    lf_spec_out(9)%name='POD1_IAM_DF',
+    lf_spec_out(9)%species(1:)='POD',
+    lf_spec_out(9)%DryDep=T,
+    lf_spec_out(10)%name='pm25',
+    lf_spec_out(11)%name='PM_WATER',
 
-    lf_set%MDA8 = T, !special: make AvgMDA8_6month. NB: requires that O3 is outputted too
+    lf_set%MDA8 = T, !special: make AvgMDA8_6month and SOMO35 NB: requires that O3 is outputted too
     
 
 Technical
