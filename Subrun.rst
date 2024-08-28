@@ -733,7 +733,7 @@ A "mask" can be defined for instance with:
     Emis_sourceFiles(1:7)%filename=7*'path/Emis_CAMS_v5_1_with_Ref2_0_1_GNFR_CAMS_01005deg_2018_CAMS2_40_U5.nc',
     Emis_sourceFiles(1:7)%species='sox','nox','voc','nh3','co','pm25','pmco',
     ! apply mask to pm25 and pmco emissions
-    Emis_sourceFiles(6:7)%mask_ID =2*'London_PM',
+    Emis_sourceFiles(6:7)%mask_ID =2*'LONDON',
 
 
 .. code-block:: Fortran
@@ -762,7 +762,7 @@ To be used with the Local Fractions (see below), one can also define a set of re
     EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
     EmisMask(1)%type     = 'NUMBER',
-    EmisMask(1)%ID       = 'specific-mask-name',
+    EmisMask(1)%ID       = 'specific-mask-name', 
 
 
 
