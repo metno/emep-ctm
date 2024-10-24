@@ -83,11 +83,6 @@ where ``LANDUSE`` can be either a specific landuse type or a cell average.
 For wet depositions, the names are ``WDEP_COMPONENT``.
 The units for dry and wet depositions are |mgm2|\ , |mgSm2| or |mgNm2|\.
 
-Surface concentrations, column integrated, wet and dry deposition outputs
-are defined by the user in the ``Model_config``namelist, in the configuration file ``config_emep.nml``.
-Surface concentrations and column integrated outputs specified in ``OutputConcs`` variable.
-Dry and wet deposition outputs specified in ``DDEP_ECOS``, ``DDEP_WANTED`` and ``WDEP_WANTED`` variables.
-
 ``VG_COMPONENT_LANDUSE`` are the dry deposition velocities on various
 landuse types, typically in :math:`cm/s`.
 
@@ -102,26 +97,25 @@ selected output parameters, see provided output NetCDF files, or
     :delim: &
 
     **Surface Concentrations**
-    ``SURF_ppb_O3``         & |O3|   [ppb]                        &
-    ``SURF_ugN_NO``         & NO     [|ugNm3|\ ]                  & Available also in ppb
-    ``SURF_ugN_NO2``        & |NO2|  [|ugNm3|\ ]                  & Available also in ppb
-    ``SURF_ugN_HNO3``       & |HNO3| [|ugNm3|\ ]                  & Available also in ppb
-    ``SURF_ugN_NH3``        & |NH3|  [|ugNm3|\ ]                  & Available also in ppb
-    ``SURF_ugS_SO2``        & |SO2|  [|ugSm3|\ ]                  & Available also in ppb
+    ``SURF_ppb_O3``         & |O3|   [ppb]                        & Also available in |ugm3|
+    ``SURF_ugN_NO``         & NO     [|ugNm3|\ ]                  & Also available in |ugm3| and ppb
+    ``SURF_ugN_NO2``        & |NO2|  [|ugNm3|\ ]                  & Also available in |ugm3| and ppb
+    ``SURF_ugN_HNO3``       & |HNO3| [|ugNm3|\ ]                  & Also available in |ugm3| and ppb
+    ``SURF_ugN_NH3``        & |NH3|  [|ugNm3|\ ]                  & Also available in |ugm3| and ppb
+    ``SURF_ugS_SO2``        & |SO2|  [|ugSm3|\ ]                  & Also available in |ugm3| and ppb
     ``SURF_ug_SO4``         & |SO4|  [|ugm3|\ ]                   &
     ``SURF_ug_NO3_F``       & |NO3|  fine aerosol   [|ugm3|\ ]    & As ammonium nitrate
     ``SURF_ug_NO3_C``       & |NO3|  coarse aerosol [|ugm3|\ ]    & Associated with sea salt and mineral dust
-    ``SURF_ug_TNO3``        & |NO3|  total          [|ugm3|\ ]    & Sum of fine and coarse nitrate
+    ``SURF_ug_PNO3``        & |NO3|  total          [|ugm3|\ ]    & Sum of fine and coarse nitrate
     ``SURF_ug_NH4_F``       & |NH4|  fine aerosol   [|ugm3|\ ]    & As ammonium sulphate and ammonium nitrate
     ``SURF_ug_SIA``         & SIA [|ugm3|\ ]                      & Secondary Inorganic Aerosol
-    ``SURF_ug_SIA``         & SIA       [|ugm3|\ ]                & Secondary Inorganic Aerosol
     ``SURF_ug_ECFINE``      & EC fine   [|ugm3|\ ]                & Elemental carbon
     ``SURF_ug_ECCOARSE``    & EC coarse [|ugm3|\ ]                & Elemental carbon
-    ``SURF_ug_PM_OM25``     & OM fine   [|ugm3|\ ]                & Organic Matter fine aerosol
-    ``SURF_ug_PM_OMCOARSE`` & OM coarse [|ugm3|\ ]                &  Organic Matter coarse aerosol
+    ``SURF_ug_PM_OM25``     & OM fine   [|ugm3|\ ]                & Organic Matter fine aerosol, also available in |ugCm3|
+    ``SURF_ug_PM_OMCOARSE`` & OM coarse [|ugm3|\ ]                & Organic Matter coarse aerosol, also available in |ugCm3|
     ``SURF_ug_SEASALT_F``   & Sea salt fine aerosol    [|ugm3|\ ] &
     ``SURF_ug_SEASALT_C``   & Sea salt coarse aerosol  [|ugm3|\ ] &
-    ``SURF_ug_SEASALT``     & Sea salt                 [|ugm3|\ ] & Sum of fine and coarse sea salt
+    ``SURF_ug_SS``          & Sea salt                 [|ugm3|\ ] & Sum of fine and coarse sea salt
     ``SURF_ug_DUST_ROAD_F`` & Road dust fine aerosol   [|ugm3|\ ] &
     ``SURF_ug_DUST_ROAD_C`` & Road dust coarse aerosol [|ugm3|\ ] &
     ``SURF_ug_DUST_WB_F``   & Windblown dust fine      [|ugm3|\ ] &
@@ -138,7 +132,7 @@ selected output parameters, see provided output NetCDF files, or
     ``SURF_ug_PM25X``       & |PM25| dry [|ugm3|\ ]               & Includes fine PM and 27% of coarse |NO3|\ , EC and OM
     ``SURF_ug_PM25X_rh50``  & |PM25|     [|ugm3|\ ]               & As ``PM25X`` + particle water at 50 %rh
     ``SURF_ug_PMFINE``      & Fine PM [|ugm3|\ ]                  & Sum of all fine aerosols
-    ``SURF_ug_PPM25``       & Primary P|PM25| [|ugm3|\ ]          & Anthropogenic emissions
+    ``SURF_ug_PPM25``       & Primary |PM25| [|ugm3|\ ]           & Anthropogenic emissions
     ``SURF_ug_PPM_C``       & Primary coarse PM [|ugm3|\ ]        & Anthropogenic emissions
     ``SURF_ug_PM25_FIRE``   & |PM25| from forest fires [|ugm3|\ ] & Sum of BC, OC and rest |PM25|
      **Dry Depositions**
@@ -257,3 +251,104 @@ The output files ``sites_2015.csv`` and ``sondes_2015.csv`` are comma
 separated files that can be read by excel, python or fortran tools.
 If you include the whole year, or the 31\ :sup:`st` December,
 ``sites_2016.csv`` and ``sondes_2016.csv`` are also included in the output.
+
+.. _`ch-output-config`:
+
+Output configuration
+====================
+
+Surface concentrations, column integrated, wet and dry deposition outputs
+are defined by the user in the ``Model_config``namelist, in the configuration file ``config_emep.nml``.
+Surface concentrations and column integrated outputs specified in ``OutputConcs`` variable
+as shown in :numref:`output-concs` and :numref:`output-concs-alt`.
+Dry and wet deposition outputs specified in ``DDEP_ECOS``, ``DDEP_WANTED`` and ``WDEP_WANTED`` variables
+as shown in :numref:`output-deps`.
+
+.. code-block:: Fortran
+  :name: output-concs
+  :caption: Output configuration exmple for surface concentrations correspondig to :numref:`tab-outpar`.
+  OutputConcs=
+    'O3'                  ,'ppb' ,'2d','AIR_CONCS','SPEC' ,'YMDI',
+    'NO'                  ,'ugN' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NO2'                 ,'ugN' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'HNO3'                ,'ugN' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NH3'                 ,'ugN' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SO2'                 ,'ugS' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SO4'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',    
+    'NO3_F'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NO3_C'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'PNO3'                ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',    
+    'NH4_F'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SIA'                 ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'ECFINE'              ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'ECCOARSE'            ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'OM25'               ,'ug_PM','2d','AIR_CONCS','GROUP','YMD',
+    'OMCOARSE'           ,'ug_PM','2d','AIR_CONCS','GROUP','YMD',
+    'SEASALT_F'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SEASALT_C'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SS'                  ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'DUST_ROAD_F'         ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'DUST_ROAD_C'         ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'DUST_WB_F'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'DUST_WB_C'           ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'DUST_SAH_F'          ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'DUST_SAH_C'          ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'DUST_NAT_F'          ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'DUST_NAT_C'          ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'DUST'                ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'SURF_PM25water'      ,'ug'  ,'2d','PM25water','MISC' ,'',
+    'PMFINE'              ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'SURF_ug_PM25'        ,'ug'  ,'2d','PM25'     ,'MISC' ,'YMD',
+    'SURF_ug_PM25X'       ,'ug'  ,'2d','PM25X'    ,'MISC' ,'YMD',
+    'SURF_ug_PM25X_rh50'  ,'ug'  ,'2d','PM25X_rh50','MISC','YMD',
+    'SURF_ug_PM25_rh50'   ,'ug'  ,'2d','PM25_rh50','MISC' ,'YMD',
+    'PMCO'                ,'ug'  ,'2d','AIR_CONCS','GROUP','',
+    'PM10'                ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'SURF_ug_PM10_rh50'   ,'ug'  ,'2d','PM10_rh50','MISC' ,'YMD',
+    'PPM25'               ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'PPM_C'               ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+    'PPM25_FIRE'          ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
+
+.. code-block:: Fortran
+  :name: output-concs-alt
+  :caption: Output configuration exmple for surface concentrations in alternative units.
+  OutputConcs=
+    'O3'                  ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMDI',
+    'NO'                  ,'ppb' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NO'                  ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NO2'                 ,'ppb' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NO2'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'HNO3'                ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'HNO3'                ,'ppb' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NH3'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'NH3'                 ,'ppb' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SO2'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'SO2'                 ,'ppb' ,'2d','AIR_CONCS','SPEC' ,'YMD',
+    'OM25'              ,'ugC_PM','2d','AIR_CONCS','GROUP','YMD',
+    'OMCOARSE'          ,'ugC_PM','2d','AIR_CONCS','GROUP','YMD',
+
+.. code-block:: Fortran
+  :name: output-deps
+  :caption: Output configuration correspondig to :numref:`tab-outpar` dry and wet depositions.
+  DDEP_ECOS =
+    'Grid'     ,'YMD',
+    'Conif'    ,'YM',
+    'Seminat'  ,'YM',
+    'Water_D'  ,'Y',
+    'Decid'    ,'Y',
+    'Crops'    ,'Y',
+
+  DDEP_WANTED =
+    'SOX'      ,'GROUP','mgS',
+    'OXN'      ,'GROUP','mgN',
+    'RDN'      ,'GROUP','mgN',
+
+  WDEP_WANTED =
+    'PREC'     ,'PREC' ,'mm' ,'YMD',
+    'SOX'      ,'GROUP','mgS','YMD',
+    'OXN'      ,'GROUP','mgN','YMD',
+    'RDN'      ,'GROUP','mgN','YMD',
+    'SO2'      ,'SPEC' ,'mgS','YMD',
+    'HNO3'     ,'SPEC' ,'mgN','YMD',
+
+
