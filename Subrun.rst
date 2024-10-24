@@ -51,7 +51,7 @@ the keywords, 'YYYY', 'MM', 'DD' and 'GRID' will be replaced on the fly by respe
 It is possible to run the model on a smaller domain than the full
 regional model domain, as defined by indexes :math:`x` and :math:`y`.
 For the 'EECCA' grid  :math:`x=1,\ldots,132; y=1,\ldots,159`\ .
-To set a smaller domain, use ``RUNDOMAIN`` variable in the ``ModelConstants_config``
+To set a smaller domain, use ``RUNDOMAIN`` variable in the ``Model_config``
 namelist to indicate the sub-domain indexes. In the config_emep extract above,
 ``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
 The indices refer always to the meteo grid (starting from 1).

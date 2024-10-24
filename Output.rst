@@ -84,11 +84,9 @@ For wet depositions, the names are ``WDEP_COMPONENT``.
 The units for dry and wet depositions are |mgm2|\ , |mgSm2| or |mgNm2|\.
 
 Surface concentrations, column integrated, wet and dry deposition outputs
-are defined by the user in ``config_emep.nml`` file.
-Surface concentrations and column integrated outputs
-are described in ``OutputConcs_config`` namelist,
-Dry and wet deposition outputs
-are described in ``OutputDep_config`` namelist.
+are defined by the user in the ``Model_config``namelist, in the configuration file ``config_emep.nml``.
+Surface concentrations and column integrated outputs specified in ``OutputConcs`` variable.
+Dry and wet deposition outputs specified in ``DDEP_ECOS``, ``DDEP_WANTED`` and ``WDEP_WANTED`` variables.
 
 ``VG_COMPONENT_LANDUSE`` are the dry deposition velocities on various
 landuse types, typically in :math:`cm/s`.
