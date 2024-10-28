@@ -276,9 +276,11 @@ Road Dust
 Road traffic produces dust. These emissions are handled in the
 EMEP/MSC-W model in the ``Emissions_mod.f90`` module. To include road
 dust, set ``USE_ROADDUST=.true.`` in ``config_emep.nml``. There are two
-files included in input data, ``RoadMap.nc`` and ``AVG_SMI_2005-2010.nc``.
-``RoadMap.nc`` include gridded roads and PM emissions over Europe,
-``AVG_SMI_2005-2010.nc`` are global.
+files included in input data, ``RoadMap.nc`` and ``AVG_SMI_2005_2010.nc``.
+``RoadMap.nc`` include gridded roads and PM emissions over Europe, while the
+Soil Moisture Index (SMI) file ``AVG_SMI_2005_2010.nc`` used to estimate
+emissions is global. Hence road dust emissions can currently only be calculated
+for the European domain. 
 
 .. _`emisair`:
 

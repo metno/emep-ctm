@@ -516,33 +516,50 @@ either convert them into one of the above mentioned units in pre-processing
 or add the respective conversion factor in the module ``Units_mod.f90``.
 
 
-config: Europe or Global?
+config: Europe or Generic/Global?
 -------------------------
 
 The EMEP model has traditionally been run on the EMEP grid covering
 Europe, and using meteorology from the ECMWF IFS model. In this environment,
 we typically set several configuration variables to make use of
 Euro-specific data. In other regions it is better to make use of the
-model's 'global' settings, which will ensure better handling of
+model's generic ('global') settings, which will ensure better handling of
 vegetation (eg LAI) changes, convection, and various emission
-settings.
+settings. For the EMEP grid, the relevant USES config flag settings are
 
 .. code-block:: text
   :caption: Typical European/EMEP settings.
 
   USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
   USES%PFT_MAPS = F,
-  USES%MonthlyNH3 = 'LOTOS', ! Better monthly profile, for Europe only!
   USES%CONVECTION = F, 
-  USES%SOILNOX_METHOD = 'NoFert',  ! If using ECLIPSEv6
+  USES%ROADDUST = T,
+  Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
+
+while for the generic domain settings these are
 
 .. code-block:: text
   :caption: Typical non-European/global settings.
 
   USES%DEGREEDAY_FACTORS = F
   USES%PFT_MAPS = T,    ! PFT LAI tests
-  USES%MonthlyNH3 = '-', ! Better monthly profile, for Europe only!
   USES%CONVECTION = T,
+  USES%ROADDUST = F,
+  Vertical_levelsFile = 'DataDir/Vertical_levels19_EC.txt',
+  timefacs%Monthly = 'GRIDDED',
+
+While the meaning of the above flags is described in more detail below, since EMEP model version 
+rv5.4 the sets of above flags are controlled by the USES%DOMAIN_SETUP_TYPE flag, and no longer included
+as separate USES flags in the config namelist. The DOMAIN_SETUP_TYPE flag currently
+has three options: 'EMEPDOMAIN', 'GenericDOMAIN', and 'Custom_Config'. The 'EMEPDOMAIN' and 'GenericDOMAIN' flags
+trigger their respective USES options described above, and overwrite any USES settings for these flags
+included in the config namelist (by default, these flags are therefore not included in the namelist). If a user wishes 
+to use custom domain settings, using the 'Custom_Config' domain setting re-activates the use of the above USES
+flags in the config namelist (i.e., these are not overwritten with what would be specified through the 'EMEPDOMAIN'
+and 'GenericDOMAIN' flags). Alternatively, one could for example use 'EMEPDOMAIN', while also specifying
+EMEP_DOMAIN_SETUP%PFT_MAPS = T in the config namelist, if the plan is to use PFT maps for European scale modelling.
+To avoid confusion as to which domain settings are applied, users are forced to choose either one of the three
+above domain settings. 
 
 The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
 controlling residential combustion (GNFR C/SNAP2) emissions. This requires pre-processed files of heating degree days.
@@ -557,19 +574,24 @@ controls deposition and biogenic VOC emission parameters. In Europe, a
 simpler latitude-dependent system is used (based upon DO3SE), and so
 ``PFT_MAPS`` should be set F.
 
-``MonthlyNH3='LOTOS'`` is also only relevant for European simulations; and
-indeed any non-European runs are better off with monthly emissions for
-that particular area. To disable the monthly NH3 profile from LOTOS-EUROS
-and instead use the monthly profile defined, for example, in the 
-``MonthlyFacFile``, set ``MonthlyNH3='-'`` explicitly. If not set explicitly,
-``MonthlyNH3='LOTOS'`` will be set automatically for European simulation runs.
-
 ``CONVECTION`` is difficult. In principle, all models runs should use the T
 setting, but for Europe we find it degrades the model results too much
 and we use F. The problem is likely that the sub-grid processes behind
 convection are so complex and the paramererisation is very uncertain.
 Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=0.33``,
 which may be changed to allow more or less influence of this variable.
+
+``ROADDUST`` includes dust produced by road traffic based on input files broadly
+covering the EMEP modelling domain.
+
+``Vertical_levelsFile`` controls the number of verticl levels, with the Generic domain 
+setting employing 19 vertical levels rather than 20 for the EMEP domain. For regions outside 
+of Europe high orography and tall trees can make it more scientifically sound to use a 
+thicker surface layer, with the bottom two layers of the 20-level file being combined
+into a single layer being approximately 90 m thick.
+
+``timefacs%Monthly`` Outside of Europe, it is also typical to use time-factors derived
+from the global CAMS-TEMPO data set.
 
 config: SOILNOX
 ---------------
