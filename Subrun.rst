@@ -603,12 +603,26 @@ config: SOILNOX
   USES%SOILNOX_METHOD = 'NoFert',  ! If using ECLIPSEv6 or EMEP European
   USES%SOILNOX_METHOD = 'Total',   ! If using ECLIPSEv5
 
-The model makes use of global 0.5 degree data from the CAMS81 project, but the user needs
+The model makes use of global 0.5 degree data from the CAMS2-61 project (cf Simpson et al., Ch.8 in
+Denier van der Gon, 2023, doi:10.24380/q2si-ti6i,
+https://atmosphere.copernicus.eu/node/1054), but the user needs
 to specify the data to be used from this system. 
 The choice, between ``Total``  and ``NoFert`` depends
-on the anthropogenic emission inventory in use. If this anthropogenic inventory
+on the anthropogenic emission inventory in use.
+
+*IMPORTANT*:
+
+If this anthropogenic inventory
 already includes fertlizer-induced soil NO emissions, then the  ``NoFert`` data from
-the soil-NO system is used. If not, choose ``Total``.
+the soil-NO system is used. This case applies to EMEP/CEIP emissions,  HTAPv3, EDGAR and
+CAMS-GLOB-ANT.
+The latest ECLIPSE inventories (v6+) also incude fertlizer-induced emssions
+
+If fertlizer-induced soil NO emissions are not included in the inventory,
+then choose ``Total``. This case applies to CAMS-REG-ANT and some earlier ECLIPSE (v5
+and earlier) inventories.
+
+
 
 
 Country Variable (CV) format
