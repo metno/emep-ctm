@@ -533,7 +533,7 @@ settings. For the EMEP grid, the relevant USES config flag settings are
   USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
   USES%PFT_MAPS = F,
   USES%CONVECTION = F, 
-  USES%ROADDUST = T,
+  USES%ROADDUST = F,
   Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
 
 while for the generic domain settings these are
@@ -582,7 +582,8 @@ Note also that in Config_module we have the default setting ``CONVECTION_FACTOR=
 which may be changed to allow more or less influence of this variable.
 
 ``ROADDUST`` includes dust produced by road traffic based on input files broadly
-covering the EMEP modelling domain.
+covering the EMEP modelling domain (see Input section). However, this input is now deprecated
+and both the Generic and EMEP domain setups set this flag to False.
 
 ``Vertical_levelsFile`` controls the number of verticl levels, with the Generic domain 
 setting employing 19 vertical levels rather than 20 for the EMEP domain. For regions outside 
