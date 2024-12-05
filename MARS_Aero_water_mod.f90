@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -182,7 +182,11 @@
             , mfsso4, mfsno3                         &
             , y, y0, y1, y15, y2, y3                 &
             , y40, y140, y1540, yc
-
+      real :: wh2o_high,wh2o_low,weight_high,weight_low &
+              ,x_high,x_low,d
+      logical :: do_high
+      integer :: iter
+      
 ! Check range of per cent relative humidity:
 ! aw - water activity = fractional relative humidity
       aw = relh
@@ -206,126 +210,176 @@
         if (tno3 > 0. .and. tnh4 > 0.) x = 10.
       end if
 
-! Begin screen on x for calculating wh2o:
-      if ( x < 1. ) then
-
-        mfs0 = poly4(C0,aw)
-        mfs1 = poly4(C1,aw)
-        y0 = ( 1. - mfs0 ) / mfs0
-        y1 = ( 1. - mfs1 ) / mfs1
-        y  = ( 1. - x ) * y0 + x * y1
-
-      else if ( x < 1.5) then
-
-        if ( aw >= 0.40 ) then
-
-          mfs1  = poly4(C1,aw)
-          mfs15 = poly4(C15,aw)
-          y1    = (1. - mfs1 ) / mfs1
-          y15   = (1. - mfs15) / mfs15
-          y     = 2. * ( y1 * (1.5 - x) + y15 *( x - 1.) )
-
-        else
-
-! Setup for crystalization:
-
-! Crystallization is done as follows:
-!
-!   for 1.5 <= x : crystallization is assumed to occur at rh = 0.4
-!   for x <= 1.0 : crystallization is assumed to occur at an rh < 0.01
-!
-!   and since the code does not allow rh < 0.01, crystallization is
-!   assumed not to occur in this range.
-!
-!   for 1.0 <= x <= 1.5 : the crystallization curve is a straight line
-!                         from a value of y15 at rh = 0.4 to a value of
-!                         zero at y1. From point b to point a in the
-!                         diagram the algorithm does a double inter-
-!                         polation to calculate the amount of water.
-!
-!               y1(0.40)               y15(0.40)
-!                +                     + point b
-!
-!
-!
-!                +---------------------+
-!                x=1                   x=1.5
-!              point a
-!
-
-          awc = 0.80 * (x - 1.0) ! rh along the crystallization curve.
-
-          y = 0.0
-          u=0.40
-
-          if ( aw >= awc ) then
-
-! Interpolate using crystalization curve:
-
-            mfs1  = poly4(C1,u)
-            mfs15 = poly4(C15,u)
-            y140  = (1.0 - mfs1 ) / mfs1
-            y1540 = (1.0 - mfs15) / mfs15
-            y40 = 2.0 * ( y140 * (1.5 - x) + y1540 *( x - 1.0) )
-            yc = 2.0 * y1540 * (x -1.0) ! y along crystallization curve
-            y = y40 - (y40 - yc) * (u - aw) / (u - awc)
-
-          end if ! end of "if ( aw >= awc ) then"
-
-        end if ! end of "if ( aw >= 0.40 ) then"
-
-      else if ( x < 1.9999) then
-
-         y= 0.0
-
-         if (aw >= 0.40) then
-           mfs15 = poly4(C15,aw)
-           mfs2  = poly4(C2,aw)
-           y15   = (1.0 - mfs15) / mfs15
-           y2    = (1.0 - mfs2) / mfs2
-           y     = 2.0 * (y15 * (2.0 - x) + y2 * (x - 1.5) )
-         end if ! end of check for crystallization
-
-      else
-
-! i.e. x >= 1.9999
-!
-! Regime where ammonium sulfate and ammonium nitrate are in solution!
-!
-! Following cf&s for both ammonium sulfate and ammonium nitrate
-! Check for crystallization here. Their data indicate a 40% value
-! is appropriate.
-
-        y2 = 0.0
-        y3 = 0.0
-
-        if (aw >= 0.40) then
-          mfsso4 = poly6(KSO4,aw)
-          mfsno3 = poly6(KNO3,aw)
-          y2     = (1.0 - mfsso4) / mfsso4
-          y3     = (1.0 - mfsno3) / mfsno3
-        end if
-
-      end if ! end of 'if ( x < 1. ) then'
-
-! Now set up output of wh2o
-!
-! wh2o units are micrograms(liquid water) / (cubic meter of air)
-
-      if ( x < 1.9999) then
-
-        wh2o =  y * (tso4 * MWSO4 + tnh4 * MWNH4 )
-
-      else
-
-! This is the case when all the sulfate is ammonium sulfate
-! and the excess ammonium forms ammonum nitrate
-
-        wh2o =   y2 * tso4 * MW2 + y3 * tno3 * MWANO3
-
+      !default
+      x_low = x
+      x_high = x
+      weight_low = 1.0 !we use "low" if we only do one calculation
+      weight_high= (1.0 - weight_low)
+      wh2o_high = 0.0
+      do_high = .false.
+      
+      !around x=1, x=1.5 and x=2, we do two calculations, with slightly different x, and interpolate between the two
+      d=0.05 !distance from limits where we do two calculations (arbitrarily chosen)
+      if( abs(x-1.)<d ) then
+         x_low = 1.0-d
+         x_high = 1.0+d
+         weight_high= (x-x_low)/(2*d) ! = 0 ix x=x_low, =1 if x=x_high
+         weight_low = (1.0 - weight_high)
+         do_high = .true.
+      else if ( abs(x-1.5)<d) then
+         x_low = 1.5-d
+         x_high = 1.5+d
+         weight_high= (x-x_low)/(2*d) ! = 0 ix x=x_low, =1 if x=x_high
+         weight_low = (1.0 - weight_high)
+         do_high = .true.         
+      else if ( abs(x-1.9999)<d) then
+         x_low = 1.9999-d
+         x_high = 1.9999+d
+         weight_high= (x-x_low)/(2*d) ! = 0 ix x=x_low, =1 if x=x_high
+         weight_low = (1.0 - weight_high)
+         do_high = .true.         
       end if
 
-
+      do iter = 1,2 !one calculation for x_low  and one for x_high (if necessary)
+         if(iter==1)then
+            x=x_low            
+         else
+            if(do_high)then
+               x=x_high
+            else
+               exit
+            end if
+         end if
+! Begin screen on x for calculating wh2o:
+         if ( x < 1. ) then
+            
+            mfs0 = poly4(C0,aw)
+            mfs1 = poly4(C1,aw)
+            y0 = ( 1. - mfs0 ) / mfs0
+            y1 = ( 1. - mfs1 ) / mfs1
+            y  = ( 1. - x ) * y0 + x * y1
+            
+         else if ( x < 1.5) then
+            
+            if ( aw >= 0.40 ) then
+               
+               mfs1  = poly4(C1,aw)
+               mfs15 = poly4(C15,aw)
+               y1    = (1. - mfs1 ) / mfs1
+               y15   = (1. - mfs15) / mfs15
+               y     = 2. * ( y1 * (1.5 - x) + y15 *( x - 1.) )
+               
+            else
+               
+               ! Setup for crystalization:
+               
+               ! Crystallization is done as follows:
+               !
+               !   for 1.5 <= x : crystallization is assumed to occur at rh = 0.4
+               !   for x <= 1.0 : crystallization is assumed to occur at an rh < 0.01
+               !
+               !   and since the code does not allow rh < 0.01, crystallization is
+               !   assumed not to occur in this range.
+               !
+               !   for 1.0 <= x <= 1.5 : the crystallization curve is a straight line
+               !                         from a value of y15 at rh = 0.4 to a value of
+               !                         zero at y1. From point b to point a in the
+               !                         diagram the algorithm does a double inter-
+               !                         polation to calculate the amount of water.
+               !
+               !               y1(0.40)               y15(0.40)
+               !                +                     + point b
+               !
+               !
+               !
+               !                +---------------------+
+               !                x=1                   x=1.5
+               !              point a
+               !
+               
+               awc = 0.80 * (x - 1.0) ! rh along the crystallization curve.
+               
+               y = 0.0
+               u=0.40
+               
+               if ( aw >= awc ) then
+                  
+                  ! Interpolate using crystalization curve:
+                  
+                  mfs1  = poly4(C1,u)
+                  mfs15 = poly4(C15,u)
+                  y140  = (1.0 - mfs1 ) / mfs1
+                  y1540 = (1.0 - mfs15) / mfs15
+                  y40 = 2.0 * ( y140 * (1.5 - x) + y1540 *( x - 1.0) )
+                  yc = 2.0 * y1540 * (x -1.0) ! y along crystallization curve
+                  y = y40 - (y40 - yc) * (u - aw) / (u - awc)
+                  
+               end if ! end of "if ( aw >= awc ) then"
+               
+            end if ! end of "if ( aw >= 0.40 ) then"
+            
+         else if ( x < 1.9999) then
+            
+            y= 0.0
+            
+            if (aw >= 0.40) then
+               mfs15 = poly4(C15,aw)
+               mfs2  = poly4(C2,aw)
+               y15   = (1.0 - mfs15) / mfs15
+               y2    = (1.0 - mfs2) / mfs2
+               y     = 2.0 * (y15 * (2.0 - x) + y2 * (x - 1.5) )
+            end if ! end of check for crystallization
+            
+         else
+            
+            ! i.e. x >= 1.9999
+            !
+            ! Regime where ammonium sulfate and ammonium nitrate are in solution!
+            !
+            ! Following cf&s for both ammonium sulfate and ammonium nitrate
+            ! Check for crystallization here. Their data indicate a 40% value
+            ! is appropriate.
+            
+            y2 = 0.0
+            y3 = 0.0
+            
+            if (aw >= 0.40) then
+               mfsso4 = poly6(KSO4,aw)
+               mfsno3 = poly6(KNO3,aw)
+               y2     = (1.0 - mfsso4) / mfsso4
+               y3     = (1.0 - mfsno3) / mfsno3
+            end if
+            
+         end if ! end of 'if ( x < 1. ) then'
+         
+         ! Now set up output of wh2o
+         !
+         ! wh2o units are micrograms(liquid water) / (cubic meter of air)
+         
+         if ( x < 1.9999) then
+            
+            wh2o =  y * (tso4 * MWSO4 + tnh4 * MWNH4 )
+            
+         else
+            
+            ! This is the case when all the sulfate is ammonium sulfate
+            ! and the excess ammonium forms ammonum nitrate
+            
+            wh2o =   y2 * tso4 * MW2 + y3 * tno3 * MWANO3
+            
+         end if
+         
+         if(iter==1)then
+            wh2o_low = wh2o        
+         else
+            wh2o_high = wh2o
+         end if
+  
+      end do
+      
+      !note that both weights are defined also when only one is computed
+      wh2o = wh2o_low * weight_low + wh2o_high * weight_high 
+      
       end subroutine Awater
 
 !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC

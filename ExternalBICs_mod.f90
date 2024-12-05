@@ -1,7 +1,7 @@
-! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -95,13 +95,16 @@ subroutine set_extbic_id(idate)
   logical, save     :: first_call=.true.
   integer           :: ydmh=0,ios=0,n=0
   type(icbc_desc) :: description
+  character(len=*), parameter :: dtxt='set_extbic_id:'
+  logical, save :: dbg
   NAMELIST /ExternalBICs_bc/description,map_bc
 
   if(.not.first_call) return
+  dbg = ( DEBUG%NEST_ICBC .and. MasterProc )
 
   if(.not.USE_EXTERNAL_BIC)then
     EXTERNAL_BIC_SET=.false.
-    call PrintLog("No external BICs set",MasterProc)
+    call PrintLog(dtxt//"No external BICs set",MasterProc)
     first_call = .false.
     return
   end if
@@ -146,10 +149,10 @@ subroutine set_extbic_id(idate)
   rewind(IO_NML)
   READ_NML: do
     read(IO_NML,NML=ExternalBICs_bc,iostat=ios)
-    if(DEBUG%NEST_ICBC.and.MasterProc.and.ios/=0) &
-      write(*,*) "failed ExternalBICs_bc read with iostat=",ios
+    if( dbg .and. ios/=0) &
+      write(*,*) dtxt//"failed ExternalBICs_bc read with iostat=",ios
     if(ios/=0) exit READ_NML
-    if(DEBUG%NEST_ICBC.and.MasterProc) write(*,DEBUG_FMT) "set_extbic","read_nml bc",&
+    if( dbg ) write(*,DEBUG_FMT) dtxt,"read_nml bc",&
       trim(description%name)//"/"//trim(description%version)
     EXTERNAL_BIC_SET=&
       EXTERNAL_BIC_NAME==description%name.and.&
@@ -162,23 +165,26 @@ subroutine set_extbic_id(idate)
   end do READ_NML
 
   if(.not.EXTERNAL_BIC_SET) &
-    call CheckStop(MasterProc,"No external BICs found")
+    call CheckStop(MasterProc,dtxt//"No external BICs found"//&
+      ":"//trim(EXTERNAL_BIC_NAME)//":"// & 
+      trim(description%name)//"/"//trim(description%version) )
   
-  if(DEBUG%NEST_ICBC.and.MasterProc) write(*,DEBUG_FMT) "set_extbic", &
-    date2string("BCs for YYYY-MM-DD hh type",idate),&
+  if( dbg ) write(*,DEBUG_FMT) dtxt, &
+    date2string(dtxt//"BCs for YYYY-MM-DD hh type",idate),&
     trim(EXTERNAL_BIC_NAME)//"/"//trim(EXTERNAL_BIC_VERSION)
 
   do n = 1,size(EXTERNAL_BC%ixadv)
     EXTERNAL_BC(n)%ixadv=find_index(EXTERNAL_BC(n)%spcname,species_adv(:)%name,any_case=.true.)
     if(EXTERNAL_BC(n)%ixadv<1)then
       EXTERNAL_BC(n)%wanted=.false.
-      if(MasterProc) write(*,DEBUG_FMT) "set_extbic","unknow variable",&
+      if(MasterProc) write(*,DEBUG_FMT) dtxt, "unknow variable",&
         trim(EXTERNAL_BC(n)%spcname)
     end if
+    if ( dbg ) write(*,*) dtxt//'Found', EXTERNAL_BC(n)%spcname, EXTERNAL_BC(n)%ixadv
   end do
 
   if(MasterProc) &
-    call PrintLog("External BICs set for "//EXTERNAL_BIC_NAME)
+    call PrintLog(dtxt//"External BICs set for "//EXTERNAL_BIC_NAME)
   EXTERNAL_BIC_SET = .true.
   first_call = .false.
 end subroutine set_extbic_id

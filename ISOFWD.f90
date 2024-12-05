@@ -2,9 +2,9 @@
 !
 ! *** ISORROPIA CODE
 ! *** SUBROUTINE ISRP1F
-! *** THIS SUBROUTINE IS THE DRIVER ROUTINE FOR THE FOREWARD PROBLEM OF 
-!     AN AMMONIUM-SULFATE AEROSOL SYSTEM. 
-!     THE COMPOSITION REGIME IS DETERMINED BY THE SULFATE RATIO AND BY 
+! *** THIS SUBROUTINE IS THE DRIVER ROUTINE FOR THE FOREWARD PROBLEM OF
+!     AN AMMONIUM-SULFATE AEROSOL SYSTEM.
+!     THE COMPOSITION REGIME IS DETERMINED BY THE SULFATE RATIO AND BY
 !     THE AMBIENT RELATIVE HUMIDITY.
 !
 ! *** COPYRIGHT 1996-2006, UNIVERSITY OF MIAMI, CARNEGIE MELLON UNIVERSITY,
@@ -28,9 +28,9 @@
   !
   ! *** FIND CALCULATION REGIME FROM (SULRAT,RH) **************************
   !
-  ! *** SULFATE POOR 
+  ! *** SULFATE POOR
   !
-        IF (2.0.LE.SULRAT) THEN 
+        IF (2.0.LE.SULRAT) THEN
         DC   = W(3) - 2.001D0*W(2)  ! For numerical stability
         W(3) = W(3) + MAX(-DC, ZERO)
   !
@@ -39,20 +39,20 @@
   !
   ! *** SULFATE RICH (NO ACID)
   !
-        ELSEIF (1.0.LE.SULRAT .AND. SULRAT.LT.2.0) THEN 
+        ELSEIF (1.0.LE.SULRAT .AND. SULRAT.LT.2.0) THEN
   !
            SCASE = 'B4'
            CALL CALCB4                 ! Only liquid (metastable)
-    
+
         CALL CALCNH3
   !
   ! *** SULFATE RICH (FREE ACID)
   !
-        ELSEIF (SULRAT.LT.1.0) THEN             
+        ELSEIF (SULRAT.LT.1.0) THEN
   !
            SCASE = 'C2'
            CALL CALCC2                 ! Only liquid (metastable)
-  
+
         CALL CALCNH3
         ENDIF
   !
@@ -67,8 +67,8 @@
   !
   ! *** ISORROPIA CODE
   ! *** SUBROUTINE ISRP2F
-  ! *** THIS SUBROUTINE IS THE DRIVER ROUTINE FOR THE FOREWARD PROBLEM OF 
-  !     AN AMMONIUM-SULFATE-NITRATE AEROSOL SYSTEM. 
+  ! *** THIS SUBROUTINE IS THE DRIVER ROUTINE FOR THE FOREWARD PROBLEM OF
+  !     AN AMMONIUM-SULFATE-NITRATE AEROSOL SYSTEM.
   !     THE COMPOSITION REGIME IS DETERMINED BY THE SULFATE RATIO AND BY
   !     THE AMBIENT RELATIVE HUMIDITY.
   !
@@ -93,21 +93,21 @@
   !
   ! *** FIND CALCULATION REGIME FROM (SULRAT,RH) **************************
   !
-  ! *** SULFATE POOR 
+  ! *** SULFATE POOR
   !
-        IF (2.0.LE.SULRAT) THEN                
+        IF (2.0.LE.SULRAT) THEN
   !
            SCASE = 'D3'
            CALL CALCD3                 ! Only liquid (metastable)
-     
+
   !
   ! *** SULFATE RICH (NO ACID)
-  !     FOR SOLVING THIS CASE, NITRIC ACID IS ASSUMED A MINOR SPECIES, 
+  !     FOR SOLVING THIS CASE, NITRIC ACID IS ASSUMED A MINOR SPECIES,
   !     THAT DOES NOT SIGNIFICANTLY PERTURB THE HSO4-SO4 EQUILIBRIUM.
   !     SUBROUTINES CALCB? ARE CALLED, AND THEN THE NITRIC ACID IS DISSOLVED
   !     FROM THE HNO3(G) -> (H+) + (NO3-) EQUILIBRIUM.
   !
-        ELSEIF (1.0.LE.SULRAT .AND. SULRAT.LT.2.0) THEN 
+        ELSEIF (1.0.LE.SULRAT .AND. SULRAT.LT.2.0) THEN
   !
            SCASE = 'B4'
            CALL CALCB4                 ! Only liquid (metastable)
@@ -116,12 +116,12 @@
         CALL CALCNA                 ! HNO3(g) DISSOLUTION
   !
   ! *** SULFATE RICH (FREE ACID)
-  !     FOR SOLVING THIS CASE, NITRIC ACID IS ASSUMED A MINOR SPECIES, 
+  !     FOR SOLVING THIS CASE, NITRIC ACID IS ASSUMED A MINOR SPECIES,
   !     THAT DOES NOT SIGNIFICANTLY PERTURB THE HSO4-SO4 EQUILIBRIUM
   !     SUBROUTINE CALCC? IS CALLED, AND THEN THE NITRIC ACID IS DISSOLVED
   !     FROM THE HNO3(G) -> (H+) + (NO3-) EQUILIBRIUM.
   !
-        ELSEIF (SULRAT.LT.1.0) THEN             
+        ELSEIF (SULRAT.LT.1.0) THEN
   !
            SCASE = 'C2'
            CALL CALCC2                 ! Only liquid (metastable)
@@ -142,8 +142,8 @@
   ! *** ISORROPIA CODE
   ! *** SUBROUTINE ISRP3F
   ! *** THIS SUBROUTINE IS THE DRIVER ROUTINE FOR THE FORWARD PROBLEM OF
-  !     AN AMMONIUM-SULFATE-NITRATE-CHLORIDE-SODIUM AEROSOL SYSTEM. 
-  !     THE COMPOSITION REGIME IS DETERMINED BY THE SULFATE & SODIUM 
+  !     AN AMMONIUM-SULFATE-NITRATE-CHLORIDE-SODIUM AEROSOL SYSTEM.
+  !     THE COMPOSITION REGIME IS DETERMINED BY THE SULFATE & SODIUM
   !     RATIOS AND BY THE AMBIENT RELATIVE HUMIDITY.
   !
   ! *** COPYRIGHT 1996-2006, UNIVERSITY OF MIAMI, CARNEGIE MELLON UNIVERSITY,
@@ -175,7 +175,7 @@
   !
   ! *** CHECK IF TOO MUCH SODIUM ; ADJUST AND ISSUE ERROR MESSAGE *********
   !
-        REST = 2.D0*W(2) + W(4) + W(5) 
+        REST = 2.D0*W(2) + W(4) + W(5)
         IF (W(1).GT.REST) THEN            ! NA > 2*SO4+CL+NO3 ?
            W(1) = (ONE-1D-6)*REST         ! Adjust Na amount
            CALL PUSHERR (0050, 'ISRP3F')  ! Warning error: Na adjusted
@@ -187,42 +187,42 @@
         SODRAT = W(1)/W(2)
   !
   ! *** FIND CALCULATION REGIME FROM (SULRAT,RH) **************************
-  
+
   ! *** SULFATE POOR ; SODIUM POOR
   !
-        IF (2.0.LE.SULRAT .AND. SODRAT.LT.2.0) THEN                
+        IF (2.0.LE.SULRAT .AND. SODRAT.LT.2.0) THEN
   !
            SCASE = 'G5'
            CALL CALCG5                 ! Only liquid (metastable)
-     
+
   !
   ! *** SULFATE POOR ; SODIUM RICH
   !
-        ELSE IF (SULRAT.GE.2.0 .AND. SODRAT.GE.2.0) THEN                
+        ELSE IF (SULRAT.GE.2.0 .AND. SODRAT.GE.2.0) THEN
   !
            SCASE = 'H6'
            CALL CALCH6                 ! Only liquid (metastable)
   !
-  ! *** SULFATE RICH (NO ACID) 
+  ! *** SULFATE RICH (NO ACID)
   !
-        ELSEIF (1.0.LE.SULRAT .AND. SULRAT.LT.2.0) THEN 
+        ELSEIF (1.0.LE.SULRAT .AND. SULRAT.LT.2.0) THEN
   !
            SCASE = 'I6'
            CALL CALCI6                 ! Only liquid (metastable)
-  !                                    
-        CALL CALCNHA                ! MINOR SPECIES: HNO3, HCl       
-        CALL CALCNH3                !                NH3 
+  !
+        CALL CALCNHA                ! MINOR SPECIES: HNO3, HCl
+        CALL CALCNH3                !                NH3
   !
   ! *** SULFATE RICH (FREE ACID)
   !
-        ELSEIF (SULRAT.LT.1.0) THEN             
+        ELSEIF (SULRAT.LT.1.0) THEN
   !
            SCASE = 'J3'
            CALL CALCJ3                 ! Only liquid (metastable)
-  
-  !                                    
-        CALL CALCNHA                ! MINOR SPECIES: HNO3, HCl       
-        CALL CALCNH3                !                NH3 
+
+  !
+        CALL CALCNHA                ! MINOR SPECIES: HNO3, HCl
+        CALL CALCNH3                !                NH3
         ENDIF
   !
   ! *** RETURN POINT
@@ -344,7 +344,7 @@
   !
            SCASE = 'O7'
            CALL CALCO7                 ! Only liquid (metastable)
-  
+
   !
   ! *** SULFATE POOR: Rso4>2; (DUST + SODIUM) RICH: R(Cr+Na)>2; DUST POOR: Rcr<2.
   !
@@ -354,7 +354,7 @@
   !
            SCASE = 'M8'
            CALL CALCM8                 ! Only liquid (metastable)
-  
+
   !        CALL CALCHCO3
   !
   ! *** SULFATE POOR: Rso4>2; (DUST + SODIUM) RICH: R(Cr+Na)>2; DUST POOR: Rcr<2.
@@ -363,7 +363,7 @@
   !
            SCASE = 'P13'
            CALL CALCP13                 ! Only liquid (metastable)
-  
+
   !        CALL CALCHCO3
          ENDIF
   !
@@ -373,7 +373,7 @@
   !
            SCASE = 'L9'
            CALL CALCL9                ! Only liquid (metastable)
-  
+
   !
         CALL CALCNHA                ! MINOR SPECIES: HNO3, HCl
         CALL CALCNH3                !                NH3
@@ -384,7 +384,7 @@
   !
            SCASE = 'K4'
            CALL CALCK4                 ! Only liquid (metastable)
-  
+
   !
         CALL CALCNHA                  ! MINOR SPECIES: HNO3, HCl
         CALL CALCNH3                  !                NH3
@@ -398,7 +398,7 @@
   !
   ! *** ISORROPIA CODE
   ! *** SUBROUTINE CALCA2
-  ! *** CASE A2 
+  ! *** CASE A2
   !
   !     THE MAIN CHARACTERISTICS OF THIS REGIME ARE:
   !     1. SULFATE POOR (SULRAT >= 2.0)
@@ -444,7 +444,7 @@
         DO 10 I=1,NDIV
            X2 = MAX(X1-DX, OMELO)
            Y2 = FUNCA2 (X2)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
            X1 = X2
            Y1 = Y2
   10    CONTINUE
@@ -461,7 +461,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCA2 (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -482,13 +482,13 @@
   ! *** END OF SUBROUTINE CALCA2 ****************************************
   !
       END SUBROUTINE CALCA2
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE
   ! *** FUNCTION FUNCA2
-  ! *** CASE A2 
-  !     FUNCTION THAT SOLVES THE SYSTEM OF EQUATIONS FOR CASE A2 ; 
+  ! *** CASE A2
+  !     FUNCTION THAT SOLVES THE SYSTEM OF EQUATIONS FOR CASE A2 ;
   !     AND RETURNS THE VALUE OF THE ZEROED FUNCTION IN FUNCA2.
   !
   !=======================================================================
@@ -526,7 +526,7 @@
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
            IF (FRST.AND.CALAOU .OR. .NOT.FRST.AND.CALAIN) THEN
-              CALL CALCACT     
+              CALL CALCACT
            ELSE
               GOTO 20
            ENDIF
@@ -542,11 +542,11 @@
   !
       END FUNCTION FUNCA2
   !=======================================================================
-  
+
   !
   ! *** ISORROPIA CODE
   ! *** SUBROUTINE CALCB4
-  ! *** CASE B4 
+  ! *** CASE B4
   !
   !     THE MAIN CHARACTERISTICS OF THIS REGIME ARE:
   !     1. SULFATE RICH, NO FREE ACID (1.0 <= SULRAT < 2.0)
@@ -575,9 +575,9 @@
   ! *** CALCULATE WATER CONTENT ******************************************
   !
         CALL CALCB1A         ! GET DRY SALT CONTENT, AND USE FOR WATER.
-        MOLALR(13) = CLC       
-        MOLALR(9)  = CNH4HS4   
-        MOLALR(4)  = CNH42S4   
+        MOLALR(13) = CLC
+        MOLALR(9)  = CNH4HS4
+        MOLALR(4)  = CNH42S4
         CLC        = ZERO
         CNH4HS4    = ZERO
         CNH42S4    = ZERO
@@ -661,12 +661,12 @@
   ! ******************************************
   !
       END SUBROUTINE CALCB1A
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE
   ! *** SUBROUTINE CALCC2
-  ! *** CASE C2 
+  ! *** CASE C2
   !
   !     THE MAIN CHARACTERISTICS OF THIS REGIME ARE:
   !     1. SULFATE RICH, FREE ACID (SULRAT < 1.0)
@@ -709,11 +709,11 @@
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
            IF (.NOT.CALAIN) GOTO 30
-           CALL CALCACT     
+           CALL CALCACT
   20    CONTINUE
-  ! 
+  !
   30    RETURN
-  !    
+  !
   ! *** END OF SUBROUTINE CALCC2 *****************************************
   !
         END SUBROUTINE CALCC2
@@ -757,8 +757,8 @@
   !
         PSI1 = CNH4NO3               ! ASSIGN INITIAL PSI's
         PSI2 = CHI2
-        PSI3 = ZERO   
-        PSI4 = ZERO  
+        PSI3 = ZERO
+        PSI4 = ZERO
   !
         MOLAL(5) = PSI2              ! Include initial amount in water calc
         MOLAL(6) = ZERO
@@ -786,15 +786,15 @@
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y2 = FUNCD3 (X2)
            IF (((Y1) .LT. ZERO) .AND. ((Y2) .GT. ZERO)) GOTO 20  ! (Y1*Y2.LT.ZERO) (slc.1.2012)
-  !         IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20
+  !         IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20
            X1 = X2
            Y1 = Y2
   10    CONTINUE
   !
-  ! *** NO SUBDIVISION WITH SOLUTION FOUND 
+  ! *** NO SUBDIVISION WITH SOLUTION FOUND
   !
         YHI= Y1                      ! Save Y-value at Hi position
-        IF (ABS(Y2) .LT. EPS) THEN   ! X2 IS A SOLUTION 
+        IF (ABS(Y2) .LT. EPS) THEN   ! X2 IS A SOLUTION
            RETURN
   !
   ! *** { YLO, YHI } < 0.0 THE SOLUTION IS ALWAYS UNDERSATURATED WITH NH3
@@ -835,7 +835,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCD3 (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -851,7 +851,7 @@
   40    X3 = 0.5*(X1+X2)
         CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
         Y3 = FUNCD3 (X3)
-  ! 
+  !
   ! *** CALCULATE HSO4 SPECIATION AND RETURN *******************************
   !
   50    CONTINUE
@@ -866,13 +866,13 @@
   ! *** END OF SUBROUTINE CALCD3 ******************************************
   !
       END SUBROUTINE CALCD3
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE
   ! *** FUNCTION FUNCD3
-  ! *** CASE D3 
-  !     FUNCTION THAT SOLVES THE SYSTEM OF EQUATIONS FOR CASE D3 ; 
+  ! *** CASE D3
+  !     FUNCTION THAT SOLVES THE SYSTEM OF EQUATIONS FOR CASE D3 ;
   !     AND RETURNS THE VALUE OF THE ZEROED FUNCTION IN FUNCD3.
   !
   !=======================================================================
@@ -902,7 +902,7 @@
            A7   = XKW *RH*WATER*WATER
   !
            PSI3 = A3*A4*CHI3*(CHI4-PSI4) - PSI1*(2.D0*PSI2+PSI1+PSI4)
-           PSI3 = PSI3/(A3*A4*(CHI4-PSI4) + 2.D0*PSI2+PSI1+PSI4) 
+           PSI3 = PSI3/(A3*A4*(CHI4-PSI4) + 2.D0*PSI2+PSI1+PSI4)
            PSI3 = MIN(MAX(PSI3, ZERO), CHI3)
   !
            BB   = PSI4 - PSI3
@@ -931,7 +931,7 @@
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
            IF (FRST.AND.CALAOU .OR. .NOT.FRST.AND.CALAIN) THEN
-              CALL CALCACT     
+              CALL CALCACT
            ELSE
               GOTO 20
            ENDIF
@@ -940,8 +940,8 @@
   ! *** CALCULATE OBJECTIVE FUNCTION ************************************
   !
   20    CONTINUE
-  !CC      FUNCD3= NH4I/HI/MAX(GNH3,TINY)/A4 - ONE 
-        FUNCD3= MOLAL(3)/MOLAL(1)/MAX(GNH3,TINY)/A4 - ONE 
+  !CC      FUNCD3= NH4I/HI/MAX(GNH3,TINY)/A4 - ONE
+        FUNCD3= MOLAL(3)/MOLAL(1)/MAX(GNH3,TINY)/A4 - ONE
         RETURN
   !
   ! *** END OF FUNCTION FUNCD3 ********************************************
@@ -979,7 +979,7 @@
   !
   ! *** CALCULATE NH4NO3 THAT VOLATIZES *********************************
   !
-        CNH42S4 = W(2)                                    
+        CNH42S4 = W(2)
         X       = MAX(ZERO, MIN(W(3)-2.0*CNH42S4, W(4)))  ! MAX NH4NO3
         PS      = MAX(W(3) - X - 2.0*CNH42S4, ZERO)
         OM      = MAX(W(4) - X, ZERO)
@@ -1027,17 +1027,17 @@
   !
   ! *** SETUP PARAMETERS ************************************************
   !
-        CALAOU = .TRUE.   
+        CALAOU = .TRUE.
         CHI1   = 0.5*W(1)
         CHI2   = MAX (W(2)-CHI1, ZERO)
         CHI3   = ZERO
         CHI4   = MAX (W(3)-2.D0*CHI2, ZERO)
         CHI5   = W(4)
         CHI6   = W(5)
-  ! 
+  !
         PSI1   = CHI1
         PSI2   = CHI2
-        PSI6LO = TINY                  
+        PSI6LO = TINY
         PSI6HI = CHI6-TINY    ! MIN(CHI6-TINY, CHI4)
   !
         WATER  = CHI2/M0(4) + CHI1/M0(2)
@@ -1046,17 +1046,17 @@
   !
         X1 = PSI6LO
         Y1 = FUNCG5A (X1)
-        IF (CHI6.LE.TINY) GOTO 50  
-  !cc      IF (ABS(Y1).LE.EPS .OR. CHI6.LE.TINY) GOTO 50  
+        IF (CHI6.LE.TINY) GOTO 50
+  !cc      IF (ABS(Y1).LE.EPS .OR. CHI6.LE.TINY) GOTO 50
   !cc      IF (WATER .LE. TINY) RETURN                    ! No water
   !
   ! *** ROOT TRACKING ; FOR THE RANGE OF HI AND LO **********************
   !
         DX = (PSI6HI-PSI6LO)/FLOAT(NDIV)
         DO 10 I=1,NDIV
-           X2 = X1+DX 
+           X2 = X1+DX
            Y2 = FUNCG5A (X2)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
            X1 = X2
            Y1 = Y2
   10    CONTINUE
@@ -1075,7 +1075,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCG5A (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -1091,7 +1091,7 @@
   40    X3 = 0.5*(X1+X2)
         CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
         Y3 = FUNCG5A (X3)
-  ! 
+  !
   ! *** CALCULATE HSO4 SPECIATION AND RETURN *******************************
   !
   50    CONTINUE
@@ -1107,7 +1107,7 @@
   ! *** END OF SUBROUTINE CALCG5 *******************************************
   !
       END SUBROUTINE CALCG5
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE
@@ -1138,7 +1138,7 @@
   !
         PSI6   = X
         FRST   = .TRUE.
-        CALAIN = .TRUE. 
+        CALAIN = .TRUE.
   !
   ! *** SOLVE EQUATIONS ; WITH ITERATIONS FOR ACTIVITY COEF. ************
   !
@@ -1181,7 +1181,7 @@
         SMIN      = 2.d0*MOLAL(5)+MOLAL(7)+MOLAL(4)-MOLAL(2)-MOLAL(3)
         CALL CALCPH (SMIN, HI, OHI)
         MOLAL (1) = HI
-  ! 
+  !
         GNH3      = MAX(CHI4 - PSI4, TINY)              ! Gas NH3
         GHNO3     = MAX(CHI5 - PSI5, TINY)              ! Gas HNO3
         GHCL      = MAX(CHI6 - PSI6, TINY)              ! Gas HCl
@@ -1195,7 +1195,7 @@
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
         IF (FRST.AND.CALAOU .OR. .NOT.FRST.AND.CALAIN) THEN
-           CALL CALCACT     
+           CALL CALCACT
         ELSE
            GOTO 20
         ENDIF
@@ -1211,7 +1211,7 @@
   ! *** END OF FUNCTION FUNCG5A *******************************************
   !
       END FUNCTION FUNCG5A
-  
+
   !========================================================================
   !=======================================================================
   !
@@ -1243,33 +1243,33 @@
   !
   ! *** SETUP PARAMETERS ************************************************
   !
-        CALAOU = .TRUE.   
+        CALAOU = .TRUE.
         CHI1   = W(2)                                ! CNA2SO4
         CHI2   = ZERO                                ! CNH42S4
         CHI3   = ZERO                                ! CNH4CL
-        FRNA   = MAX (W(1)-2.D0*CHI1, ZERO)       
+        FRNA   = MAX (W(1)-2.D0*CHI1, ZERO)
         CHI8   = MIN (FRNA, W(4))                    ! CNANO3
         CHI4   = W(3)                                ! NH3(g)
         CHI5   = MAX (W(4)-CHI8, ZERO)               ! HNO3(g)
         CHI7   = MIN (MAX(FRNA-CHI8, ZERO), W(5))    ! CNACL
         CHI6   = MAX (W(5)-CHI7, ZERO)               ! HCL(g)
   !
-        PSI6LO = TINY                  
+        PSI6LO = TINY
         PSI6HI = CHI6-TINY    ! MIN(CHI6-TINY, CHI4)
   !
   ! *** INITIAL VALUES FOR BISECTION ************************************
   !
         X1 = PSI6LO
         Y1 = FUNCH6A (X1)
-        IF (ABS(Y1).LE.EPS .OR. CHI6.LE.TINY) GOTO 50  
+        IF (ABS(Y1).LE.EPS .OR. CHI6.LE.TINY) GOTO 50
   !
   ! *** ROOT TRACKING ; FOR THE RANGE OF HI AND LO **********************
   !
         DX = (PSI6HI-PSI6LO)/FLOAT(NDIV)
         DO 10 I=1,NDIV
-           X2 = X1+DX 
+           X2 = X1+DX
            Y2 = FUNCH6A (X2)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
            X1 = X2
            Y1 = Y2
   10    CONTINUE
@@ -1288,7 +1288,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCH6A (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -1304,7 +1304,7 @@
   40    X3 = 0.5*(X1+X2)
         CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
         Y3 = FUNCH6A (X3)
-  ! 
+  !
   ! *** CALCULATE HSO4 SPECIATION AND RETURN *******************************
   !
   50    CONTINUE
@@ -1320,7 +1320,7 @@
   ! *** END OF SUBROUTINE CALCH6 ******************************************
   !
       END SUBROUTINE CALCH6
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE
@@ -1356,9 +1356,9 @@
         PSI2   = ZERO
         PSI3   = ZERO
         PSI7   = CHI7
-        PSI8   = CHI8 
+        PSI8   = CHI8
         FRST   = .TRUE.
-        CALAIN = .TRUE. 
+        CALAIN = .TRUE.
   !
   ! *** SOLVE EQUATIONS ; WITH ITERATIONS FOR ACTIVITY COEF. ************
   !
@@ -1400,7 +1400,7 @@
         SMIN      = 2.d0*MOLAL(5)+MOLAL(7)+MOLAL(4)-MOLAL(2)-MOLAL(3)
         CALL CALCPH (SMIN, HI, OHI)
         MOLAL (1) = HI
-  ! 
+  !
         GNH3      = MAX(CHI4 - PSI4, TINY)
         GHNO3     = MAX(CHI5 - PSI5, TINY)
         GHCL      = MAX(CHI6 - PSI6, TINY)
@@ -1409,14 +1409,14 @@
         CNH4NO3   = ZERO
         CNACL     = MAX(CHI7 - PSI7, ZERO)
         CNANO3    = MAX(CHI8 - PSI8, ZERO)
-        CNA2SO4   = MAX(CHI1 - PSI1, ZERO) 
+        CNA2SO4   = MAX(CHI1 - PSI1, ZERO)
   !
         CALL CALCMR                                    ! Water content
   !
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
         IF (FRST.AND.CALAOU .OR. .NOT.FRST.AND.CALAIN) THEN
-           CALL CALCACT     
+           CALL CALCACT
         ELSE
            GOTO 20
         ENDIF
@@ -1431,7 +1431,7 @@
   ! *** END OF FUNCTION FUNCH6A *******************************************
   !
       END FUNCTION FUNCH6A
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE
@@ -1467,13 +1467,13 @@
   ! *** SETUP PARAMETERS ************************************************
   !
         CHI1 = CNH4HS4               ! Save from CALCI1 run
-        CHI2 = CLC    
+        CHI2 = CLC
         CHI3 = CNAHSO4
         CHI4 = CNA2SO4
         CHI5 = CNH42S4
   !
         PSI1 = CNH4HS4               ! ASSIGN INITIAL PSI's
-        PSI2 = CLC   
+        PSI2 = CLC
         PSI3 = CNAHSO4
         PSI4 = CNA2SO4
         PSI5 = CNH42S4
@@ -1512,12 +1512,12 @@
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
         IF (FRST.AND.CALAOU .OR. .NOT.FRST.AND.CALAIN) THEN
-           CALL CALCACT     
+           CALL CALCACT
         ELSE
            GOTO 20
         ENDIF
   10    CONTINUE
-  ! 
+  !
   20    RETURN
   !
   ! *** END OF SUBROUTINE CALCI6 *****************************************
@@ -1559,7 +1559,7 @@
         IF (FRSO4.LE.TINY) THEN
            CLC     = MAX(CLC - FRNH4, ZERO)
            CNH42S4 = 2.D0*FRNH4
-  
+
         ELSEIF (FRNH4.LE.TINY) THEN
            CNH4HS4 = 3.D0*MIN(FRSO4, CLC)
            CLC     = MAX(CLC-FRSO4, ZERO)
@@ -1646,12 +1646,12 @@
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
         IF (FRST.AND.CALAOU .OR. .NOT.FRST.AND.CALAIN) THEN
-           CALL CALCACT     
+           CALL CALCACT
         ELSE
            GOTO 50
         ENDIF
   10    CONTINUE
-  ! 
+  !
   50    RETURN
   !
   ! *** END OF SUBROUTINE CALCJ3 ******************************************
@@ -1732,7 +1732,7 @@
         DO 10 I=1,NDIV
            X2 = X1+DX
            Y2 = FUNCO7 (X2)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
            X1 = X2
            Y1 = Y2
   10    CONTINUE
@@ -1742,7 +1742,7 @@
         IF (ABS(Y2) .GT. EPS) THEN
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y2 = FUNCO7 (PSI6LO)
-        ENDIF 
+        ENDIF
         GOTO 50
   !
   ! *** PERFORM BISECTION ***********************************************
@@ -1751,7 +1751,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCO7 (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -1966,7 +1966,7 @@
         DO 10 I=1,NDIV
            X2 = X1+DX
            Y2 = FUNCM8 (X2)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
            X1 = X2
            Y1 = Y2
   10    CONTINUE
@@ -1985,7 +1985,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCM8 (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -2017,7 +2017,7 @@
   ! *** END OF SUBROUTINE CALCM8 ******************************************
   !
         END SUBROUTINE CALCM8
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE II
@@ -2138,7 +2138,7 @@
   ! *** END OF FUNCTION FUNCM8 *******************************************
   !
         END FUNCTION FUNCM8
-  
+
   !=======================================================================
   !
   ! *** ISORROPIA CODE II
@@ -2166,7 +2166,7 @@
                        CHI16, CHI17, PSI1, PSI2, PSI3, PSI4, PSI5, PSI6,    &
                        PSI7, PSI8, PSI9, PSI10, PSI11, PSI12, PSI13,        &
                        PSI14, PSI15, PSI16, PSI17, A1, A2, A3, A4, A5, A6,  &
-                       A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17 
+                       A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17
   !
   ! *** SETUP PARAMETERS ************************************************
   !
@@ -2227,7 +2227,7 @@
         DO 10 I=1,NDIV
            X2 = X1+DX
            Y2 = FUNCP13 (X2)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y2).LT.ZERO) GOTO 20  ! (Y1*Y2.LT.ZERO)
            X1 = X2
            Y1 = Y2
   10    CONTINUE
@@ -2246,7 +2246,7 @@
            X3 = 0.5*(X1+X2)
            CALL RSTGAMP            ! reinitialize activity coefficients (slc.1.2012)
            Y3 = FUNCP13 (X3)
-           IF (SIGN(1.d0,Y1)*SIGN(1.d0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
+           IF (SIGN(1.0,Y1)*SIGN(1.0,Y3) .LE. ZERO) THEN  ! (Y1*Y3 .LE. ZERO)
               Y2    = Y3
               X2    = X3
            ELSE
@@ -2277,8 +2277,8 @@
   !
   ! *** END OF SUBROUTINE CALCP13 ******************************************
   !
-        END SUBROUTINE CALCP13 
-  
+        END SUBROUTINE CALCP13
+
   !
   !=======================================================================
   !
@@ -2307,7 +2307,7 @@
                        CHI16, CHI17, PSI1, PSI2, PSI3, PSI4, PSI5, PSI6,   &
                        PSI7, PSI8, PSI9, PSI10, PSI11, PSI12, PSI13,       &
                        PSI14, PSI15, PSI16, PSI17, A1, A2, A3, A4, A5, A6, &
-                       A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17  
+                       A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17
   !
   ! *** SETUP PARAMETERS ************************************************
   !
@@ -2436,7 +2436,7 @@
         RETURN
   !
   ! *** END OF FUNCTION FUNCP13 *******************************************
-  ! 
+  !
         END FUNCTION FUNCP13
   !=======================================================================
   !
@@ -2528,7 +2528,7 @@
         CKHSO4   = ZERO
   !
         CALL CALCMR                                         ! Water content
-  
+
   !
   ! *** CALCULATE ACTIVITIES OR TERMINATE INTERNAL LOOP *****************
   !
@@ -2591,7 +2591,7 @@
         IF (FRSO4.LE.TINY) THEN
            CLC     = MAX(CLC - FRNH4, ZERO)
            CNH42S4 = 2.D0*FRNH4
-  
+
         ELSEIF (FRNH4.LE.TINY) THEN
            CNH4HS4 = 3.D0*MIN(FRSO4, CLC)
            CLC     = MAX(CLC-FRSO4, ZERO)
@@ -2715,4 +2715,3 @@
   ! *** END OF SUBROUTINE CALCK4
   !
         END SUBROUTINE CALCK4
-  

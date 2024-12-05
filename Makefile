@@ -3,27 +3,31 @@
 PROG =	emepctm
 ###################################################
 
-include Makefile.SRCS
+#include Makefile.SRCS
 
 ###################################################
 
 # prefered netCDF 4.2.1.1 or later
 LIBS = -lnetcdf -lnetcdff
-#explicit pathes needed only if nc-config does not work
-INCL = -I/global/hds/software/cpu/eb3/netCDF-Fortran/4.4.4-foss-2017a-HDF5-1.8.18/include
-LLIB = -L/global/hds/software/cpu/eb3/netCDF-Fortran/4.4.4-foss-2017a-HDF5-1.8.18/lib
+#explicit pathes needed only if nf-config does not work
+INCL = -I/my/path/to/include
+LLIB = -L/my/path/to/lib
 
-# options by nc-config/nf-config utility
-INCL = $(shell nc-config --fflags)
-LLIB = $(shell nc-config --flibs)
+# options using nf-config utility (older versions used nc-config)
+INCL = -I$(shell nf-config --includedir)
+LLIB = -L$(shell nf-config --flibs)
 
 F90 = mpif90
 
-# GNU gfortran compiler (version 4.4.3 or later)
-F90FLAGS = -ffree-line-length-none -fdefault-real-8 -fdefault-double-8 -O2
+# GNU gfortran compiler (tested for version 8.5.0)
+F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O3 -g
+# GNU gfortran compiler (tested for version 12.2.0 and 11.3.0)
+F90FLAGS = -fdefault-real-8 -fallow-argument-mismatch  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O3 -g
+#DEBUG flag
+#F90FLAGS += -Wall -fbacktrace -fbounds-check -fimplicit-none -pedantic
 
 # Intel ifort compiler (comment out if gfortran used)
-F90FLAGS = -r8 -IPF_fp_relaxed -assume noold_maxminloc -O2 -march=core-avx2
+F90FLAGS = -g -r8 -IPF_fp_relaxed -assume noold_maxminloc -O2 -march=core-avx2
 
 ###################################################
 

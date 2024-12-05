@@ -1,7 +1,7 @@
-! <Country_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Country_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -66,10 +66,10 @@ module Country_mod
 
    character(len=10), public, parameter :: &
       EU15(15) = (/"AT", "BE", "DK", "FI", "FR", "DE", "GR", "IE", "IT", &
-                   "NL", "PT", "ES", "SE", "GB", "LU"/), &
+                   "NL", "PT", "ES", "SE", "HR", "LU"/), &
       EU27(27) = (/EU15, "HU", "PL", "CY", "CZ", "EE", "LT", "LV", "MT", &
                    "SK", "SI", "BG", "RO"/), &
-      EU28(28) = (/EU27, "HR"/), &
+      EU28(28) = (/EU27, "GB"/), &
       EEA(31) = (/EU28, "NO", "IS", "LI"/), &
       ! Countries fully inside MACC2 emission area, excluding EEA.
       !                     1     2     3    4     5     6     7     8     9   10

@@ -1,7 +1,7 @@
-! <PhysicalConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <PhysicalConstants_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -66,7 +66,7 @@ real, public, parameter :: NMOLE_M3 = 1.0e6*1.0e9/AVOG
 real, public, parameter  ::  &
      DAY_ZEN   = 89.9999999942704 & !
     ,DAY_COSZEN = 1.0e-10
-
+    
 !=================== DEP CODE ================================Y:0
 
 ! CHARNOCK is used to calculate the roughness length for the 

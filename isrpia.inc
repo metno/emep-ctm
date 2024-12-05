@@ -2,7 +2,7 @@
 ! *** ISORROPIA CODE II
 ! *** INCLUDE FILE 'ISRPIA.INC'
 ! *** THIS FILE CONTAINS THE DECLARATIONS OF THE GLOBAL CONSTANTS
-!     AND VARIABLES. 
+!     AND VARIABLES.
 !
 ! *** COPYRIGHT 1996-2008, UNIVERSITY OF MIAMI, CARNEGIE MELLON UNIVERSITY,
 ! *** GEORGIA INSTITUTE OF TECHNOLOGY
@@ -16,7 +16,7 @@
                  NERRMX=25,NORG=3)
 !
 ! *** INPUT VARIABLES **************************************************
-!     
+!
       COMMON /INPT/ W(NCOMP), ORG(NORG), WAER(NCOMP), TEMP, RH, IPROB,&
                     NADJ
 !
@@ -31,7 +31,7 @@
 ! *** DELIQUESCENCE RELATIVE HUMIDITIES ********************************
 !
       INTEGER :: WFTYP
-      COMMON /DRH / DRH2SO4,  DRNH42S4, DRNAHSO4, DRNACL,   DRNANO3,& 
+      COMMON /DRH / DRH2SO4,  DRNH42S4, DRNAHSO4, DRNACL,   DRNANO3,&
                     DRNA2SO4, DRNH4HS4, DRLC,     DRNH4NO3, DRNH4CL,&
                     DRCASO4,  DRCANO32, DRCACL2,  DRK2SO4,  DRKHSO4,&
                     DRKNO3,   DRKCL,    DRMGSO4,  DRMGNO32, DRMGCL2
@@ -50,7 +50,7 @@
 !
 ! *** VARIABLES FOR LIQUID AEROSOL PHASE *******************************
 !
- 
+
       REAL :: MOLAL, MOLALR, M0
       REAL :: IONIC
 	INTEGER :: ACTMOD
@@ -58,8 +58,8 @@
       COMMON /IONS/ MOLAL(NIONS), MOLALR(NPAIR), GAMA(NPAIR), ZZ(NPAIR), &
                     Z(NIONS),     GAMOU(NPAIR),  GAMIN(NPAIR),M0(NPAIR), &
                     GASAQ(NGASAQ),  &
-                    EPSACT,       COH,    CHNO3,  CHCL, &        
-                    WATER,        IONIC,  WATCMP(NPAIR+1), & 
+                    EPSACT,       COH,    CHNO3,  CHCL, &
+                    WATER,        IONIC,  WATCMP(NPAIR+1), &
                     FRST,         CALAIN, CALAOU, DRYF, ACTMOD
 
 !
@@ -72,14 +72,14 @@
 !
 ! *** VARIABLES FOR GAS PHASE ******************************************
 !
-      COMMON /GAS / GNH3, GHNO3, GHCL 
+      COMMON /GAS / GNH3, GHNO3, GHCL
 !
 ! *** EQUILIBRIUM CONSTANTS ********************************************
 !
       COMMON /EQUK/ XK1, XK2, XK3, XK4, XK5, XK6, XK7, XK8, XK9, XK10,&
                     XK11,XK12,XK13,XK14,XKW, XK21,XK22,XK31,XK32,XK41,&
                     XK42, XK15, XK16, XK17, XK18, XK19, XK20, XK23,&
-                    XK24, XK25 
+                    XK24, XK25
 !     &              , XK26, XK27
 !
 ! *** MOLECULAR WEIGHTS ************************************************
@@ -98,8 +98,8 @@
 ! *** ERROR SYSTEM *****************************************************
 !
       CHARACTER ERRMSG*40
-      INTEGER :: ERRSTK, NOFER   
-      LOGICAL :: STKOFL   
+      INTEGER :: ERRSTK, NOFER
+      LOGICAL :: STKOFL
       COMMON /EROR/ STKOFL, NOFER, ERRSTK(NERRMX), ERRMSG(NERRMX)
 !
 ! *** GENERIC VARIABLES **************************************************

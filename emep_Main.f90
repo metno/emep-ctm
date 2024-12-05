@@ -1,7 +1,7 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,6 +43,7 @@ program emep_Main
   use Aqueous_mod,       only: init_aqueous, Init_WetDep   !  Initialises & tabulates
   use AirEmis_mod,       only: lightning
   use Biogenics_mod,     only: Init_BVOC, SetDailyBVOC
+  use PBAP_mod,          only: Init_PBAPs
   use BoundaryConditions_mod, only: BoundaryConditions
   use CheckStop_mod,     only: CheckStop
   use Chemfields_mod,    only: alloc_ChemFields
@@ -63,10 +64,9 @@ program emep_Main
   use Country_mod,       only: init_Country
   use DA_3DVar_mod,      only: NTIMING_3DVAR,DA_3DVar_Init, DA_3DVar_Done
   use Debug_module,      only: DEBUG   ! -> DEBUG%MAINCODE
-  use DefPhotolysis_mod, only: readdiss
   use Derived_mod,       only: Init_Derived, wanted_iou
   use EcoSystem_mod,     only: Init_EcoSystems
-  use Emissions_mod,     only: Emissions, newmonth, Init_masks, Init_emissions,&
+  use Emissions_mod,     only: Emissions, newmonth, Init_masks, Init_Emissions,&
                                EmisUpdate
   use ForestFire_mod,    only: Fire_Emis
   use DryDep_mod,        only: init_DryDep ! sets up dry and wet dep
@@ -222,7 +222,7 @@ program emep_Main
   if (MasterProc.and.DEBUG%MAINCODE) print *,"Calling emissions with year",yyyy
 
   call Init_masks()
-  call Init_emissions !new format
+  call Init_Emissions !new format
   call Emissions(yyyy)! should be set for the enddate year, not start?
 
   call Add_2timing(3,tim_after,tim_before,"Emissions read in")
@@ -239,9 +239,14 @@ program emep_Main
 
   call Init_BVOC()
 
+  call Init_PBAPs()
+
   call tabulate()             ! sets up tab_esat, etc.
 
   call Init_WetDep()           ! sets up scavenging ratios
+
+  call Init_aqueous()          ! sets up aqu. phase equilibriun and reaction rates
+
 
   call set_output_defs()     ! Initialises outputs
   call sitesdef()            ! see if any output for specific sites is wanted
@@ -309,7 +314,6 @@ program emep_Main
     if(mm_old/=mm) then   ! START OF NEW MONTH !!!!!
 
       !subroutines/data that must be updated every month
-      call readdiss(newseason)
 
       if(MasterProc.and.DEBUG%MAINCODE) &
         print *,'maaned og sesong', mm,mm_old,newseason,oldseason
@@ -321,7 +325,7 @@ program emep_Main
 
        if(USES%LIGHTNING_EMIS) call lightning()
 
-      call init_aqueous()
+!A24      call init_aqueous()
 
       ! Monthly call to BoundaryConditions.
       if(DEBUG%MAINCODE) print *, "Into BCs" , me

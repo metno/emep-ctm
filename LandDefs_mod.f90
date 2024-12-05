@@ -1,7 +1,7 @@
-! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,8 +39,8 @@ module LandDefs_mod
   private
 
 !=============================================================================
-! This module reads  inthe basics landuse data features, e.g. defaults
-! for heights, LAI, growinf-season, etc.
+! This module reads  in the basics landuse data features, e.g. defaults
+! for heights, LAI, growing-season, etc.
 ! The list given below can be changed, extended or reduced, but then other
 ! input data files and codimg are needed.
 
@@ -95,6 +95,10 @@ end interface Check_LandCoverPresent
      real    ::  Eiso         ! Emission potential isoprene, ug/g/h
      real    ::  Emtl         ! Emission potential m-terpenes, light
      real    ::  Emtp         ! Emission potential m-terpenes, pool
+     real    ::  FungalFlux   ! Fungal flux from S. Sesartic and T.N Dallafiro (2011)
+                              ! DOI 10.5194/bg-8-1181-2011
+     real    ::  BacteriaFlux ! Bacteria flux from S. Myriokefalitakis, G. Fanourgakis and M. Kanakidou (2017)
+                              ! DOI 10.1007/978-3-319-35095-0_121
   end type land_input
                                                !##############
   type(land_input), public, dimension(NLANDUSEMAX) :: LandDefs
@@ -105,8 +109,8 @@ end interface Check_LandCoverPresent
      logical :: has_lpj ! if LPJ LAI/BVOC data to be used
      integer :: pft    ! for assignment to equivalent PFT
      logical :: is_forest
-     logical :: is_conif
-     logical :: is_decid
+     logical :: is_NDLF
+     logical :: is_BDLF
      logical :: is_crop 
      logical :: is_desert 
      logical :: is_seminat 
@@ -267,10 +271,10 @@ contains
             if ( dbg ) write(unit=*,fmt='(a,i3,a,i5)') dtxt//"PFT? ", n,&
                   trim(  wanted_codes(n) ), LandType(n)%pft
 
-           !is_decid, is_conif used mainly for BVOC and soil-NO. Not essential
+           !is_BDLF, is_NDLF used mainly for BVOC and soil-NO. Not essential
            ! for IAM-type landcover
-            LandType(n)%is_conif = ( LandInput%type == "ECF"  )
-            LandType(n)%is_decid = ( LandInput%type == "EDF"  )
+            LandType(n)%is_NDLF = ( LandInput%type == "ECF"  )
+            LandType(n)%is_BDLF = ( LandInput%type == "EDF"  )
             LandType(n)%is_crop  = ( LandInput%type == "ECR"  )
             LandType(n)%is_seminat  = ( LandInput%type == "SNL"  )
             LandType(n)%is_bulk   =  LandInput%type == "BLK"

@@ -1,7 +1,7 @@
-! <Convection_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Convection_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -83,7 +83,7 @@ contains
     real ::mass_exchanged, total, totalmass,x
     real :: mass_air_grid_k_temp,xn_buff(NSPEC,KMAX_MID)
     real :: dp(KMAX_MID)
-    integer ::k,k_fill,k1,kk,n
+    integer ::k,k_fill,kk,n
     logical, parameter ::masstest=.false.!normally, the mass should be conserved mathematically. Mostly to make demo.
 
     !-- mass_air=(dp/g)*gridarea

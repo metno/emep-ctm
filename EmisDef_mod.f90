@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -48,7 +48,7 @@ private
     !  of emission files and sector splits.                                 !
     !-----------------------------------------------------------------------!
 
-integer i, j
+integer :: i
 
 ! Sector specific information
 integer, parameter, public :: NSECTORS_MAX =  50  ! Max. total number of sector included
@@ -152,11 +152,15 @@ real, save, public :: Emis_h(Emis_heights_sec_MAX,Emis_Nlevel_MAX) ! used if set
           TFAC_IDX_POW,   &   ! Power for winter/summer change
           TFAC_IDX_DOM,   &   ! Domestic/residential, for degree-day Timefactors
           TFAC_IDX_AGR,   &   !
+          TFAC_IDX_AGRK,   &   !  livestock
+          TFAC_IDX_AGRL,   &   !  soils + AWB
           TFAC_IDX_TRAF       !
 
 ! Special sectors that need special timefactors corrections. Could be set by config?
  logical, public, save:: IS_POW(NSECTORS_MAX) = .false.
  logical, public, save:: IS_AGR(NSECTORS_MAX) = .false.
+ logical, public, save:: IS_AGRK(NSECTORS_MAX) = .false.
+ logical, public, save:: IS_AGRL(NSECTORS_MAX) = .false.
  logical, public, save:: IS_TRAF(NSECTORS_MAX) = .false.
  logical, public, save:: IS_DOM(NSECTORS_MAX) = .false.
  logical, public, save:: IS_IND(NSECTORS_MAX) = .false.
@@ -190,6 +194,7 @@ real, allocatable, public, save,  dimension(:,:,:) :: Emis_CO_Profile  ! Forest 
 integer,  public, save :: NEmis_id
 integer,  public :: NEmisMask = 0 !number of masks defined (new format)
 real,  public, allocatable :: EmisMaskValues(:,:,:) ! size will be (LIMAX,LJMAX,NEmisMask)
+character(len=TXTLEN_NAME), public, allocatable :: EmisMaskIndex2Name(:) ! size will be (NEmisMask)
 type(Emis_id_type), public, save:: Emis_id(50)
 type(EmisFile_id_type), public, save:: EmisFiles(50) !list of emission files after validation
 integer, public, save, allocatable, dimension(:,:):: EmisMaskIntVal

@@ -1,7 +1,7 @@
-! <Timing_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Timing_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,7 +39,8 @@ module My_Timing_mod
 ! Code commented out or marked with !SYS is intended for system_clock
 ! Code commented out or marked with !CPU is intended for cpu_time
 !----------------------------------------------------------------------------
-use MPI_Groups_mod
+  use MPI_Groups_mod
+  use Config_module, only : runlabel1
 implicit none
 
 public :: Init_timing
@@ -113,7 +114,7 @@ subroutine Output_timing(io, me,np,nx,ny)
   CALL MPI_ALLREDUCE(MPI_IN_PLACE,mytimm,NTIMING,MPI_DOUBLE_PRECISION, &
        MPI_MIN,MPI_COMM_WORLD,IERROR)
   if(me==0)then
-     open(io,file='Timing.out')
+     open(io,file='Timing_'//trim(runlabel1)//'.out')
      write(io,"(a18,I8)") "Number of grids = ",nx*ny
      write( 6,"(a18,I8)") "Number of grids = ",nx*ny
      write(io,"(a18,2i5)")"Number of CPUs =  ", np

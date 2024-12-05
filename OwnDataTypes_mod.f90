@@ -1,7 +1,7 @@
-! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -30,6 +30,7 @@
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
 module OwnDataTypes_mod
+use Country_mod,     only : MAXNLAND
 use NumberConstants, only : UNDEF_I, UNDEF_R
 use TimeDate_mod,    only : date
 
@@ -39,6 +40,7 @@ private
 
 public :: print_Deriv_type
 public :: print_Asc2D
+public :: print_Sector_type
 integer, public, parameter :: &
   TXTLEN_DERIV = 34, &
   TXTLEN_SHORT = 28, &
@@ -252,7 +254,7 @@ type, public :: Emis_sourceFile_id_type
    character(len=TXTLEN_FILE) :: filename = 'NOTSET'!netcdf filename with path
    character(len=TXTLEN_NAME) :: projection = 'NOTSET' !projection or 'native' if same projection and size as meteo grid
    character(len=TXTLEN_NAME) :: periodicity = 'NOTSET' !how often fresh values must be read from the netcdf file
-   character(len=TXTLEN_NAME) :: timevalidity = 'end' !if the time refers to the start, middle or end of the period   
+   character(len=TXTLEN_NAME) :: timevalidity = 'end' !if the time refers to the start, middle or end of the period
    real                       :: grid_resolution = 0.0 !resolution of the emission file
    real :: factor = -1.0 !scaling factor. multiply values for all sources by this number. Comes on top of source factors.
    type(Emis_id_type) :: source(NSOURCESMAX) ! one source defined for each netcdf field to include
@@ -267,12 +269,15 @@ type, public :: Emis_sourceFile_id_type
    logical :: include_in_local_fractions = .true. !if this is to be accounted in the local fractions (uEMEP)
    character(len=TXTLEN_NAME) :: mask_ID = 'NOTSET' ! set to ID of mask, if to be applied. Will then be default for all sources in file
    character(len=TXTLEN_NAME) :: mask_ID_reverse = 'NOTSET' ! set to ID of mask, if to be applied as reversed. Will then be default for all sources in file
+   character(len=TXTLEN_NAME) :: country_ISO_excl(MAXNLAND) = 'NOTSET' ! Exclude those countries
+   character(len=TXTLEN_NAME) :: country_ISO_incl(MAXNLAND) = 'NOTSET' ! If set, include only those countries
 end type Emis_sourceFile_id_type
 
 type, public :: Emis_mask_type
    character(len=TXTLEN_FILE) :: filename = 'NOTSET'! netcdf filename with path
    character(len=TXTLEN_NAME) :: cdfname = 'NOTSET' ! name of the mask in the netcdf file
    character(len=TXTLEN_NAME) :: ID = 'NOTSET' ! name that the user set to identify this mask
+   character(len=TXTLEN_NAME) :: type = 'CELL-FRACTION' ! Type of mask: 'NUMBER', 'CELL-FRACTION', 'THRESHOLD'
    real                       :: threshold = 1.E-20 !mask is set for where value is above threshold
    real                       :: threshold_max = 1.E60 !mask is not set if value above threshold
    real                       :: fac = 0.0 !multiplicative factor
@@ -282,7 +287,7 @@ type, public :: EmisFile_id_type
    character(len=TXTLEN_FILE) :: filename = 'NOTSET'!netcdf filename with path
    character(len=TXTLEN_NAME) :: projection = 'NOTSET' !projection or 'native' if same projection and size as meteo grid
    character(len=TXTLEN_NAME) :: periodicity = 'NOTSET' !how often fresh values must be read from the netcdf file
-   character(len=TXTLEN_NAME) :: timevalidity = 'NOTSET' !if the time refers to the start, middle or end of the period   
+   character(len=TXTLEN_NAME) :: timevalidity = 'NOTSET' !if the time refers to the start, middle or end of the period
    real                       :: grid_resolution = 0.0!resolution of the emission file
    real :: factor = -1.0 !scaling factor. multiply values for all sources by this number. Comes on top of source factors.
    type(date) :: end_of_validity_date = date(0,0,0,0,0)!internal date to know when to fetch new data
@@ -337,11 +342,34 @@ integer, public, parameter :: Max_lf_Country_groups = 30
 integer, public, parameter :: Max_lf_sectors = 50
 integer, public, parameter :: Max_lf_res = 50
 integer, public, parameter :: Max_lf_spec = 250
+integer, public, parameter :: Max_lf_out = 100
 type, public :: poll_type
   character(len=TXTLEN_NAME):: name = 'NOTSET'    ! pollutants to include
   integer, dimension(Max_lf_sectors) ::sectors = -1    ! sectors to be included for this pollutant. Zero is sum of all sectors
   integer, dimension(Max_lf_res) ::res = -1    ! resolution of sources to be included for this pollutant.
 end type poll_type
+
+type, public :: lf_set_type
+  !general
+  integer :: Nvert = 14 ! vertical extend of the tracking/local window
+  integer :: Nvertout = 1 ! number of vertical level to output (non fullchem only)
+  logical :: YEAR =.true.! Output frequency
+  logical :: MONTH =.false.
+  character(len=40)::  MONTH_ENDING = "NOTSET"
+  logical :: DAY =.false.
+  logical :: HOUR =.false.
+  logical :: HOUR_INST =.false.
+  logical :: CityMasks =.false.
+  integer, dimension(4) :: DOMAIN = -1 ! DOMAIN which will be outputted
+  !for fullchem settings
+  logical :: full_chem =.false.
+  logical :: EmisDer_all =.false. ! reduce voc, sox, nox, nh3 together
+  logical :: MDA8 = .false. ! if MDA8 and SOMO35 are to be outputed (if full_chem)
+  logical :: restart =.false.
+  logical :: save =.false.
+end type lf_set_type
+
+
 
 type, public :: lf_sources
   character(len=TXTLEN_NAME) :: species = 'NOTSET' !pollutants to include
@@ -351,33 +379,43 @@ type, public :: lf_sources
   integer :: res = 1  ! half size of the single source square (square size is 2*res+1 x 2*res+1 )
   integer :: Nvert = 7 ! vertical extend of the tracking/local rwindow
   integer :: sector = 0 ! sector for this source. Zero is sum of all sectors
-  integer :: poll = 1 !index of pollutant in loc_tot (set by model). One poll for all sources related to that poll
+  integer :: poll = 1 !index of pollutant. One poll for all sources related to that poll (set by model)
   integer :: start = 1 ! first position index in lf_src (set by model)
   integer :: end = 1 ! last position index in lf_src (set by model)
   integer :: iem = 0 ! index of emitted pollutant, emis (set by model)
   integer :: iem_deriv = 0 ! index of emitted pollutant to track, emis (set by model)
-  integer :: iem_lf ! index of emitted internal for LF (1 for nox, 2 for voc)
+  integer :: iem_lf ! index of emitted internal for LF (1 for nox, 2 for voc, ...)
   integer :: Npos = 0 ! number of position indices in lf_src (set by model)
+  integer :: nhour = -1 ! number of hours between timestamps, and resets. Not used if <0. Must be <=24
+  integer :: time_ix = 0 ! start of hour at which the emissions are set (set by model)
   integer :: Nsplit = 0 ! into how many species the emitted pollutant is split into (set by model)
   integer :: species_ix = -1 !species index, if single pollutant (for example NO or NO2, instead of nox)
   integer :: iqrc = -1 !index for emissplits, if single pollutant (for example NO or NO2, instead of nox)
-  integer, dimension(4) :: DOMAIN = -1 ! DOMAIN which will be outputted
   integer, dimension(15) :: ix = -1 ! internal index of the  (splitted) species (set by model)
   real, dimension(15) :: mw=0.0  ! molecular weight of the (splitted) species (set by model)
   character(len=TXTLEN_NAME) :: country_ISO = 'NOTSET' !country name, for example FR for France, as defined in Country_mod
   integer :: country_ix = -1 !Internal country index. Does not have any meaning outside of code
   logical :: DryDep = .false. ! if drydep is to be outputed
   logical :: WetDep = .false. ! if wetdep is to be outputed
-  logical :: MDA8 = .false. ! if MDA8 is to be outputed
-  logical     :: YEAR =.true.! Output frequency
-  logical     :: MONTH =.false.
-  logical     :: make_fracsum =.false.
+  logical     :: YEAR = .true.! Output frequency
+  logical     :: MONTH = .false.
+  logical     :: make_fracsum = .false.
   character(len=40)::  MONTH_ENDING = "NOTSET"
-  logical     :: DAY =.false.
-  logical     :: HOUR =.false.
-  logical     :: HOUR_INST =.false.
-  logical     :: full_chem =.false.
+  logical     :: DAY = .false.
+  logical     :: HOUR = .false.
+  logical     :: HOUR_INST = .false.
+  logical     :: is_ASOA = .false.
+  logical     :: is_NATURAL = .false.
 end type lf_sources
+
+type, public :: lf_out_type
+  character(len=TXTLEN_NAME):: name = "NOTSET"
+  character(len=TXTLEN_NAME):: species(30) = "NOTSET"
+  real                      :: species_fac(30) = 1.0
+  integer                   :: ix(30) = -1 ! internal index in loc_frac_drydep
+  logical                   :: DryDep
+  logical                   :: WetDep
+end type lf_out_type
 
 integer, parameter, public :: MAX_lf_country_group_size = 50 !max 50 countries in each group
 type, public :: lf_country_group_type
@@ -391,6 +429,7 @@ type, public :: lf_country_type
    integer :: mask_val_max = 0
    integer,dimension(Max_lf_Country_list) :: mask_val = -9999999
    character(len=10) :: list(Max_lf_Country_list) = 'NOTSET'
+   character(len=TXTLEN_NAME) :: cellmask_name(Max_lf_Country_list) = 'NOTSET'
    type(lf_country_group_type) :: group(Max_lf_Country_groups)
    integer :: sector_list(Max_lf_sectors)=-1
 end type lf_country_type
@@ -432,5 +471,23 @@ subroutine print_Deriv_type(w)
   write(*,*)            "dt_scale:", w%dt_scale
   write(*,*)            "avg    :", w%avg
 end subroutine print_Deriv_type
+!=========================================================================
+subroutine print_Sector_type(secs,txt)
+  type(Sector_type), dimension(:), intent(in) :: secs
+  type(Sector_type) :: s
+  character(len=*), intent(in) :: txt
+  integer :: i
+  do i = 1, size(secs)
+    s = secs(i)
+    if ( s%name=='NOTSET' ) then
+      write(*,'(a,i3,a)') 'prSecs'//txt//':',i, 'End print_Sector_type'
+      return
+    else
+      write(*,'(a,i3,3a10,3i3,2x,a)') 'prSecs'//txt//':',i, trim(s%name), &
+        s%longname, s%cdfname, s%timefac, s%height, s%split,&
+         trim(s%species)//'    :'//trim(s%description)
+    end if
+  end do
+end subroutine print_Sector_type
 !=========================================================================
 endmodule OwnDataTypes_mod

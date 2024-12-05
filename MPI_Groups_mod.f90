@@ -1,7 +1,7 @@
-! <MPI_Groups_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <MPI_Groups_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -27,7 +27,7 @@
 module MPI_Groups_mod
 
 use mpi,only: MPI_REAL8,MPI_DOUBLE_PRECISION,MPI_DOUBLE_COMPLEX,&
-              MPI_INTEGER,MPI_LOGICAL, MPI_BYTE,MPI_CHARACTER, &
+              MPI_INTEGER,MPI_LOGICAL, MPI_BYTE,MPI_CHARACTER, MPI_REAL,&
               MPI_SUM,MPI_LOR,MPI_LAND,MPI_MAX,MPI_MIN, &
               MPI_COMM_WORLD,MPI_IN_PLACE,&
               MPI_ADDRESS_KIND,MPI_INFO_NULL,MPI_STATUS_SIZE,&

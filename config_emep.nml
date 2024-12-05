@@ -1,105 +1,107 @@
 &Model_config
-  GRID      = 'EECCA',
-  iyr_trend = 2015,
+  GRID      = 'EMEP0302',
+  iyr_trend = 2018,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2023',
-  startdate = 2015,01,01,00,
-  enddate   = 2015,12,31,24,
+  runlabel2 = 'Opensource_Setup_2024',
+  startdate = 2018,01,01,00,
+  enddate   = 2018,12,31,24,
 !------------------------------
   DataPath(1) = '../input',
 !------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
-  DegreeDayFactorsFile  = 'MetDir/DegreeDayFactors.nc',
-  MonthlyFacFile        = 'DataDir/MonthlyFacs_eclipse_V6b_snap_xJun2012/MonthlyFacs.POLL',
-  MonthlyFacBasis       = 'GENEMIS',
-  Monthly_timezoneFile  = 'DataDir/monthly_timezones_GLOBAL05.nc',
-  DailyFacFile          = 'DataDir/DailyFac.POLL',
-  HourlyFacFile         = 'DataDir/HourlyFacs.INERIS',
-  EMEP_EuroBVOCFile     = 'DataDir/EMEP_EuroBVOC.nc',
+
+  DegreeDayFactorsFile  = 'MetDir/HDD18-GRID-YYYY.nc',
+  Monthly_timezoneFile  = 'DataDir/Timefactors/monthly_timezones_GLOBAL05.nc',
+
+  Emis_sourceFiles(1)%filename    = 'DataDir/emis_EMEPreport_2023/GNFREmis_EMEP01_2020_27062023.nc',
+
+  MonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
+  DailyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL',
+  HourlyFacFile  = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL',
+  GriddedMonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/CAMS_TEMPO_GLOB4emep_v2024-1.nc',
+
+! GNFR sector definitions needed for use with the above CAMS_TEMPO time factors
+  SECTORS_ADD(1)  = 'GNFR_CAMS', 'GNFR_A',  'sec01',  1, 1,  1, 'Public Power', 'ALL',
+  SECTORS_ADD(2)  = 'GNFR_CAMS', 'GNFR_B',  'sec02',  2, 3,  2, 'Industry', 'ALL',
+  SECTORS_ADD(3)  = 'GNFR_CAMS', 'GNFR_C',  'sec03',  3, 2,  3, 'OtherStationaryComb', 'ALL',
+  SECTORS_ADD(4)  = 'GNFR_CAMS', 'GNFR_D',  'sec04',  4, 5,  4, 'Fugitive', 'ALL',
+  SECTORS_ADD(5)  = 'GNFR_CAMS', 'GNFR_E',  'sec05',  5, 2,  5, 'Solvents', 'ALL',
+  SECTORS_ADD(6)  = 'GNFR_CAMS', 'GNFR_F',  'sec06',  6, 2,  6, 'RoadTransport', 'ALL',
+  SECTORS_ADD(7)  = 'GNFR_CAMS', 'GNFR_G',  'sec07',  7, 8,  7, 'Shipping', 'ALL',
+  SECTORS_ADD(8)  = 'GNFR_CAMS', 'GNFR_H',  'sec08',  8, 7,  8, 'Aviation', 'ALL',
+  SECTORS_ADD(9)  = 'GNFR_CAMS', 'GNFR_I',  'sec09',  9, 2,  9, 'Offroad', 'ALL',
+  SECTORS_ADD(10) = 'GNFR_CAMS', 'GNFR_J',  'sec10', 10, 6, 10, 'Waste', 'ALL',
+  SECTORS_ADD(11) = 'GNFR_CAMS', 'GNFR_K',  'sec11', 11, 2, 11, 'AgriLivestock', 'ALL',
+  SECTORS_ADD(12) = 'GNFR_CAMS', 'GNFR_L',  'sec12', 12, 2, 12, 'AgriOther', 'ALL',
+  SECTORS_ADD(13) = 'GNFR_CAMS', 'GNFR_M',  'sec13', 13, 5, 13, 'Other', 'ALL',
+  SECTORS_ADD(14) = 'GNFR_CAMS', 'GNFR_A1', 'sec14', 14, 1,  1, 'PublicPower_Point', 'ALL',
+  SECTORS_ADD(15) = 'GNFR_CAMS', 'GNFR_A2', 'sec15', 15, 3,  1, 'PublicPower_Area', 'ALL',
+  SECTORS_ADD(16) = 'GNFR_CAMS', 'GNFR_F1', 'sec16', 16, 2, 16, 'RoadTransportExhaustGasoline', 'ALL',
+  SECTORS_ADD(17) = 'GNFR_CAMS', 'GNFR_F2', 'sec17', 17, 2, 17, 'RoadTransportExhaustDiesel', 'ALL',
+  SECTORS_ADD(18) = 'GNFR_CAMS', 'GNFR_F3', 'sec18', 18, 2, 18, 'RoadTransportExhaustLPGgas', 'ALL',
+  SECTORS_ADD(19) = 'GNFR_CAMS', 'GNFR_F4', 'sec19', 19, 2, 19, 'RoadTransportNonExhaustOther', 'ALL',
+
+  EMEP_EuroBVOCFile     = 'DataDir/LandInputs_Mar2011/EMEP_EuroBVOC.nc',
   DustFile              = 'DataDir/Dust2014_month.nc',
-  TopoFile              = 'DataDir/topoGRID.nc'
+  TopoFile              = 'DataDir/GRID/topography.nc',
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
-  Vertical_levelsFile   = 'DataDir/Vertical_levels20_EC.txt'
   AircraftEmis_FLFile   = 'DataDir/AircraftEmis_FL.nc',
  !from ECCAD:
   soilnox_emission_File = 'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc',
 !------------------------------
-  ZCMDIR                     = 'DataDir/ZCM_EmChem19r',
-  SplitDefaultFile           = 'ZCMDIR/emissplit_defaults_POLL.csv',
-  SplitSpecialsFile          = 'ZCMDIR/emissplit_specials_POLL.csv',
+  ZCMDIR                     = 'DataDir/ZCM_DIRS/ZCM_EmChem19',
+  SplitDefaultFile           = 'ZCMDIR/emissplits_gnfr/CAMS-REG-v5_1_with_Ref2_0_1_year2018_DT_rnr/emissplit_defaults_POLL.csv',
+  SplitSpecialsFile          = 'ZCMDIR/emissplits_gnfr/CAMS-REG-v5_1_with_Ref2_0_1_year2018_DT_rnr/emissplit_specials_POLL.csv',
   cmxbicDefaultFile          = 'ZCMDIR/CMX_BoundaryConditions.txt',
   cmxBiomassBurning_FINN     = 'ZCMDIR/CMX_BiomassBurning_FINNv2p5.txt',
   cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1.txt',
 !------------------------------
-  EmBio%GlobBvocMethod  = 'GLC-CLM', ! default for GLOBAL runs, not used for Europe
-  EmBio%CLF             =  0.59,     ! 1/1.7 for CLM
-  LandCoverInputs%LandDefs  = 'DataDir/Inputs_LandDefs.csv',
-  LandCoverInputs%Do3seDefs = 'DataDir/Inputs_DO3SE.csv',
-  LandCoverInputs%MapFile   = 'DataDir/Landuse_PS_5km_LC.nc',
-                              'DataDir/glc2000xCLMf18.nc',
-  LandCoverInputs%mapMed    = 'DataDir/medMap_0.5deg.nc',
-  LandCoverInputs%desert    = 'DataDir/Olson_2001_DEforEmep.nc',
-  YieldModifications    = 'VBS-T10',
-  PBL%ZiMIN             =  50.0,
-  PBL%HmixMethod        = "JcRb_t2m",! rv4.52 default
+  LandCoverInputs%LandDefs  = 'DataDir/LandInputs_Oct2024/Inputs_LandDefs.csv',
+  LandCoverInputs%Do3seDefs = 'DataDir/LandInputs_Oct2024/Inputs_DO3SE.csv',
+  LandCoverInputs%MapFile   = 'DataDir/Landuse/Landuse_PS_5km_LC.nc',
+                              'DataDir/LandInputs_Feb2018/glc2000xCLMf18.nc',
+  LandCoverInputs%mapMed    = 'DataDir/LandInputs_Oct2024/medMap_0.5deg.nc',
+  LandCoverInputs%desert    = 'DataDir/LandInputs_Oct2024/Olson_2001_DEforEmep.nc',
 !------------------------------
-  USES%testname         = 'EMEPSTD',
-  USES%FOREST_FIRES     = F,
-  USES%FFireDispMethod  = "P800",    ! old dispersion method
-  USES%EMISSTACKS       = F,         ! Reads PointSources file
-  USES%DEGREEDAY_FACTORS = T,
-  USES%PlumeMethod      = 'PVDI',    ! default PVDI, possible: NILU, ASMI, PVDI
-  USES%n2o5HydrolysisMethod = 'Smix' ! 'Smix', 'SmixTen', 'Gamma:0.002', NOT:'OrigRiemer'
-  USES%WHITECAPS        = 'Callaghan'! 'Callaghan', 'Norris', 'Monahan'
-  USES%MonthlyNH3       = 'LOTOS',   ! Better monthly profile, for Europe only!
+  ! Use 'EMEPDOMAIN'/'GenericDOMAIN' for Euro/Glob model default settings
+  USES%DOMAIN_SETUP_TYPE = 'EMEPDOMAIN',
+  USES%OCEAN_DMS         = T,
+
 ! 2021-2022 updates:
 ! CAMS81-based SOILNOX DANGER - some inventories already have fertilizer-induced soil NOx.
 ! Choose one of:
-! USES%SOILNOX_METHOD = 'Total',    ! for CAMS-REG, ECLIPSE v5
-  USES%SOILNOX_METHOD = 'NoFert',   ! for EMEP/CEIP, ECLIPSE v6
+!   USES%SOILNOX_METHOD = 'Total'  for CAMS-REG,  ECLIPSE v5
+!   USES%SOILNOX_METHOD = 'NoFert' for EMEP/CEIP, ECLIPSE v6, HTAPv3
+  USES%SOILNOX_METHOD = 'NoFert',
 !------------------------------
-  USES%SOILWATER        = T,         ! Uses SMI from meteo data
-  USES%CONVECTION       = F,
   USES%SEASALT          = T,
-  USES%AIRCRAFT_EMIS    = T,         ! Needs global file, see manual
+  USES%AIRCRAFT_EMIS    = T,
   USES%LIGHTNING_EMIS   = T,
-!------------------------------
-  USES%PROGRESS_FILES   = F,         ! write to file.msg for each output in file.nc
-  USES%SKIP_INCOMPLETE_OUTPUT = F,   ! skip daily/montly/fullrun output for runs under 1/28/181 days
-  USES%POLLEN           = F,
-  USES%ROADDUST         = T,
   USES%DUST             = T,
-  USES%CLOUDJ           = F,
-  NETCDF_DEFLATE_LEVEL  = 4,         ! 1-9 GZIP compress, 0 no compress, -1 netcdf3
-  INERIS_SNAP1          = F,
-  INERIS_SNAP2          = F,
+
+  ! paths to folders with CloudJ spectral data and stratospheric ozone inputs
+  cloudjx_initf = 'DataDir/input_cjx/unified_cjx/',
+  cloudjx_strat = 'DataDir/input_cjx/OzoneObs_v3/',
 !------------------------------
-  emis_inputlist(1)%name= 'DataDir/GNFRemis_EMEP01_2015.nc', ! fractions emiss format
-  emis_inputlist(2)%name= 'DataDir/DMS_SOLAS.nc',
-  emis_inputlist(2)%type= 'DMS',
-  EMIS_OUT              = F,          ! Output emissions in separate files (memory demanding)
-!------------------------------
-  USES%ASH              = T,          ! Ash from historical Volcanic Eruptions
-  ANALYSIS              = F,          ! EXPERIMENTAL: 3DVar data assimilation
-  BGND_CH4              = -1,         ! Reset CH4 (use ppb). (Use -1 for defaults)
-  SKIP_RCT              = -1,         ! Will zero-out some rct, for tests. (Use -1 for defaults)
+  ! Output emissions in separate files (memory demanding)
+  EMIS_OUT              = F,
 !------------------------------
 ! In v5.0, we do not give FLUX_VEGS as before. Set from OutputVegO3 landcovers.
 ! Still need to ignore some classes:
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE',  ! Ignore these for FLUX calcs.
+
 !-------- volcanic emissions from passive degassing and historical eruptions
   flocdef='DataDir/columnsource_location.csv_2023',
   femsdef='DataDir/columnsource_emission.csv_2023',
-  need_topo=T, ! do not use column emissions if TopoFile not found
-  NMAX_LOC=-1, ! estimate from lines in flocdef
-  NMAX_EMS=-1, ! estiamte from lines in femsdef
+
 !-------- ForestFire emissions
-  BBneed_poll = F,
+  USES%FOREST_FIRES = F,
   BBMAP = 'FINN', ! FINN, GFAS or GFED
   FINN_PATTERN = 'DataDir/FINN_ForestFireEmis_YYYY.nc',
   GFAS_PATTERN = 'DataDir/GFAS_ForestFireEmis_YYYY.nc',
   GFED_PATTERN = 'DataDir/GFED_ForestFireEmis.nc',
+
 !-------- Read/Write MODEs
   NEST_MODE_READ = 'NONE',         ! do nothing
 ! NEST_MODE_READ = 'NHOUR',        ! every NHOURREAD
@@ -111,8 +113,8 @@
 ! NEST_NHOURREAD = 1,              ! hours between reads. Fraction of 24
 ! NEST_NHOURSAVE = 3,              ! hours between saves. Fraction of 24
 ! NEST_OUTDATE_NDUMP = 2,          ! dump (save) 2 dates (max 4)
-! NEST_outdate(1)= 2015,1,1,1,0    ! first date to save
-! NEST_outdate(2)= 2015,1,1,7,0    ! second date to save
+! NEST_outdate(1)= 2015,1,1,1,0,   ! first date to save
+! NEST_outdate(2)= 2015,1,1,7,0,   ! second date to save
 !-------- File name templates for Nest I/O
   NEST_template_read_3D = 'EMEP_IN.nc',  ! a different path can be set here
   NEST_template_read_BC = 'EMEP_IN.nc',  ! for each of the IO IC/BC files,
@@ -122,7 +124,7 @@
 ! NEST_out_DOMAIN  = 370, 420, 270, 320, !restrict the save data to this part
 !------------------------------
   fileName_O3_Top   = 'NOTSET',
-  fileName_CH4_ibcs = 'NOTSET',
+  fileName_CH4_ibcs = 'DataDir/BoundaryConditions/bgnd_ch4/ch4_hist_CLE.txt',
   USE_EXTERNAL_BIC  = F,
   EXTERNAL_BIC_NAME = 'DUMMY',
 !------------------------------
@@ -207,12 +209,14 @@ OutputVegO3=
   'EUAOT40_Forests','AOT',40.0,'EU','IAM_DF',F,0,999,'YM',
 
 DDEP_ECOS =
-  'Grid'     ,'YMD',
-  'Conif'    ,'YM',
-  'Seminat'  ,'YM',
-  'Water_D'  ,'Y',
-  'Decid'    ,'Y',
-  'Crops'    ,'Y',
+  'Grid'      ,'YMD',
+  'Forest'    ,'YM',
+  'nonForest' ,'YM',
+  'NeedleLeaf','YM',
+  'BroadLeaf' ,'YM',
+  'Seminat'   ,'YM',
+  'Water_D'   ,'YM',
+  'Crops'     ,'YM',
 
 DDEP_WANTED =
   'SOX'      ,'GROUP','mgS',
@@ -239,4 +243,5 @@ WDEP_WANTED =
 ! num_lev3d=3,lev3d_from_surface=T, ! 3 levels from surface: 20,19,18
 ! num_lev3d=3,lev3d_from_surface=F, ! 3 levels from model top: 1,2,3
 ! num_lev3d=8,lev3d_from_surface=T,lev3d=1,2,3,4,6,9,10,12, ! 8 levels from surface
+  LAST_CONFIG_LINE = 'End of standard nml',
 &end

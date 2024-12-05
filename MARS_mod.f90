@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -917,6 +917,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
         CALL AWATER ( fRH, TSO4_HighA, YNH4, XNO3, AH2O_High)
         GNO3_High = HNO3
         GNH3_High = max(FLOOR,(TNH4 - YNH4))*MWNH3
+        ERRMARK = -999 !to tell that the solution is not good
 
 !        RETURN
         goto 333
@@ -1120,7 +1121,8 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
         GNO3_Low = HNO3
         ANO3_Low = NO3
         ASO4_Low = TSO4 * MWSO4    ! PW after [rjp, 12/17/01]
- 
+        ERRMARK = -999 !to tell that the solution is not good
+
         CALL AWATER ( fRH, TSO4_LowA, TNH4, TNO3, AH2O_Low )      
 !        RETURN
            goto 111

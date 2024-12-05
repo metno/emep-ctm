@@ -1,7 +1,7 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -41,11 +41,13 @@ module RunChem_mod
   use AOD_PM_mod,        only: AOD_Ext
   use Aqueous_mod,       only: Setup_Clouds, prclouds_present, WetDeposition
   use Biogenics_mod,     only: setup_bio
+  use PBAP_mod,          only: set_PBAPs
   use CellMet_mod,       only: Get_CellMet, z0_out_ix, invL_out_ix
   use CheckStop_mod,     only: CheckStop, StopAll
   use Chemfields_mod,    only: xn_adv    ! For DEBUG 
   use Chemsolver_mod,    only: chemistry
   use ChemDims_mod,      only: NSPEC_SHL, NSPEC_TOT 
+  use ChemRates_mod,    only:  setChemrates ! rct, NRCT
   use ChemSpecs_mod,     only: 
   use ColumnSource_mod,  only: Winds, getWinds
   use Config_module,    only: MasterProc, & 
@@ -54,7 +56,6 @@ module RunChem_mod
                               , OH_ix,NH3_ix,SO2_ix,SO4_ix, NO_ix, C5H8_ix
   use Debug_module,      only: DebugCell, DEBUG  ! -> DEBUG%RUNCHEM
                                                  !  ,DEBUG%EMISSTACKS ! MKPS
-  ! use DefPhotolysis_mod, only: setup_phot
   use DerivedFields_mod, only: f_2d
   use DryDep_mod,        only: drydep
   use DustProd_mod,      only: WindDust  !DUST -> USES%DUST
@@ -72,12 +73,11 @@ module RunChem_mod
                               gi0, gj0, me,IRUNBEG, JRUNBEG  !! for testing
   use PointSource_mod,    only: pointsources, get_pointsources
   use SeaSalt_mod,       only: SeaSalt_flux
-  use Setup_1d_mod,      only: setup_1d, setup_rcemis, reset_3d, sum_rcemis
+  use Setup_1d_mod,      only: setup_1d, setup_rcemis, reset_3d, sum_rcemis, checkChemRates
   use ZchemData_mod,only: first_call, rcphotslice, &
                               M, rct, rcemis, rcbio, rcphot, xn_2d  ! DEBUG for testing
   use SmallUtils_mod,    only: find_index
   use TimeDate_mod,      only: current_date,daynumber,print_date
-  use DefPhotolysis_mod
 !--------------------------------
   implicit none
   private
@@ -90,7 +90,7 @@ contains
 subroutine runchem()
 
 !  local
-  integer :: i, j
+  integer :: i, j, deriv_iter
   integer :: errcode
   integer :: nmonth, nday, nhour     
   logical ::  Jan_1st
@@ -173,11 +173,19 @@ subroutine runchem()
 
       call Setup_Clouds(i,j,debug_flag)
 
+      !needs to be after Setup_clouds which makes FGAS
+      call setChemRates() 
+
+      call checkChemRates(i,j,debug_flag) 
+
       call setup_bio(i,j)   ! Adds bio/nat to rcemis
+
+      if (USES%FUNGAL_SPORES .or. USES%BACTERIA .or. USES%MARINE_OA) &
+          call set_PBAPs(i,j) !Adds PBAPs to rcemis
 
       call emis_massbudget_1d(i,j)   ! Adds bio/nat to rcemis
 
-      if(USES%CLOUDJ)then
+      if(USES%PHOTOLYSIS) then
         if(USES%HRLYCLOUDJ) then
           if(nhour>photstep) then
             call setup_phot_cloudj(i,j,errcode,0) ! fills up rcphotslice
@@ -186,10 +194,8 @@ subroutine runchem()
           call setup_phot_cloudj(i,j,errcode,0) ! fills up rcphotslice
         endif
         rcphot(:,:) = rcphotslice(:,:,i,j) ! populate from (hrly) slice array
-      else
-         call setup_phot(i,j,errcode)
       end if
-
+      
       call write_jvals(i,j)
 
       call CheckStop(errcode,"setup_photerror in Runchem") 
@@ -272,13 +278,11 @@ subroutine runchem()
       !_________________________________________________
 
       call Add_2timing(29,tim_after,tim_before,"Runchem:chemistry")
-                
+
       !  Alternating Dry Deposition and Equilibrium chemistry
       !  Check that one and only one eq is chosen
       if(mod(step_main,2)/=0) then
-        if(USES%LocalFractions) call lf_aero_pre(i,j)
-        call AerosolEquilib(i,j,debug_flag)
-        if(USES%LocalFractions) call lf_aero_pos(i,j)
+        call AerosolEquilib(i,j,debug_flag)        
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
         !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
@@ -291,9 +295,7 @@ subroutine runchem()
         call DryDep(i,j)
         call Add_2timing(31,tim_after,tim_before,"Runchem:DryDep")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'F')
-        if(USES%LocalFractions) call lf_aero_pre(i,j)
         call AerosolEquilib(i,j,debug_flag)
-        if(USES%LocalFractions) call lf_aero_pos(i,j)
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
         if(DEBUG%RUNCHEM) call check_negs(i,j,'G')
         !if(AERO%EQUILIB=='EMEP' ) call ammonium() 

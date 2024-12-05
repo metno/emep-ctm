@@ -1,7 +1,7 @@
-! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Debug_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,6 +39,7 @@ module Debug_module
     ,ADV             = .false. & ! 
     ,AEROSOL         = .false. & ! ...needed for intended debugs are to work
     ,AQUEOUS         = .false. &
+    ,BACTERIA        = .false. &
     ,BCS             = .false. & ! BoundaryConditions
     ,BIO             = .false. & ! Biogenic emissions
     ,BIDIR           = .false. & ! FUTURE Bi-directional exchange
@@ -49,12 +50,15 @@ module Debug_module
     ,DRYDEP          = .false. & ! 
     ,DRYRUN          = .false. & ! Skips fast chemistry to save some CPU
     ,DUST            = .false. & ! Skips fast chemistry to save some CPU
+    ,ECAGE           = .false. & ! Outputs different ECC-age rates for DebugCell
     ,ECOSYSTEMS      = .false. &
     ,EMISSIONS       = .false. & ! 
+    ,EMISSIONS2      = .false. & !  Extra info. Helpful with testing new-formats
     ,EMISSTACKS      = .false. & ! 
     ,EMISTIMEFACS    = .false. &
     ,EQUIB           = .false. &   !MARS, EQSAM etc.
     ,FORESTFIRE      = .false. &
+    ,FUNGAL_SPORES   = .false. &
     ,GETEMIS         = .false. &
     ,GLOBBC          = .false. &
     ,GRIDVALUES      = .false. &
@@ -64,6 +68,7 @@ module Debug_module
     ,LANDDEFS        = .false. &
     ,LANDIFY         = .false. &
     ,MAINCODE        = .false. & !< debugs main code (emepctm) driver
+    ,MARINE_OA       = .false. &
     ,MASS            = .false. &
     ,MET             = .false. &
     ,MOSAICS         = .false. &
@@ -79,7 +84,7 @@ module Debug_module
     ,ROADDUST        = .false. &
     ,RSUR            = .false. & ! Surface resistance
     ,RUNCHEM         = .false. & ! DEBUG%RUNCHEM is SPECIAL, need for some other debugs
-       ,MY_WETDEP    = .false. &
+    ,MY_WETDEP       = .false. &
     ,SEASALT         = .false. &
     ,SETUP_1DCHEM    = .false. &
     ,SETUP_1DBIO     = .false. &
@@ -89,7 +94,7 @@ module Debug_module
     ,SOLVER          = .false. &
     ,STOFLUX         = .false. &
     ,VERT_DIFF       = .false. &
-    ,VDS             = .false.
+    ,VDS             = .false. 
   ! integer debug options allow different levels of verbosity
    integer               :: &
       PFT_MAPS  = 0         & !< Future option

@@ -1,7 +1,7 @@
-! <SmallUtils_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <SmallUtils_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,6 +50,8 @@ module SmallUtils_mod
   public :: trims        !> removes all blanks from string
   public :: str_replace  !> replaces string
   public :: blank_replace !> replaces ' ' in string 
+  public :: basename     !> gets e.g. abc from /home/someone/Work/abc
+  public :: basedir      !> gets e.g. /home/someone/Work from /home/someone/Work/abc
   public :: key2str      ! replace keyword occurence(s) on a string by given value
   private :: skey2str    !
   private :: ikey2str
@@ -223,11 +225,12 @@ end subroutine WriteArray
 !>===========================================================================
 !! A series of find_index routines, for character (c) and integer (i) arrays:
 !!===========================================================================
-function find_index_c(wanted, list, first_only, any_case, debug)  result(Index)
+function find_index_c(wanted, list, first_only, any_case, nth, debug)  result(Index)
   character(len=*), intent(in) :: wanted
   character(len=*), dimension(:), intent(in) :: list
   logical, intent(in), optional :: first_only
   logical, intent(in), optional :: any_case  ! matches e.g. ABC == abC
+  integer, intent(in), optional :: nth ! match the first occurence for nth=1, the second for nth= 2...
   logical, intent(in), optional :: debug
 ! Interim
   character(len=len(list(1))), dimension(size(list)) :: list_copy
@@ -245,6 +248,7 @@ function find_index_c(wanted, list, first_only, any_case, debug)  result(Index)
   Index =  NOT_FOUND
   debug_print=.false.;if(present(debug))debug_print=debug
   OnlyFirst=.true.;if(present(first_only))OnlyFirst=first_only
+  if(present(nth))OnlyFirst=.false.
   wanted_copy = wanted
   list_copy   = list
   if ( present(any_case) ) then
@@ -259,6 +263,13 @@ function find_index_c(wanted, list, first_only, any_case, debug)  result(Index)
       Index = n
       n_match = n_match + 1
       if( OnlyFirst ) return
+      if(present(nth)) then
+         if (nth == n_match) then
+            return
+         else
+            Index = -1 !not found the right one
+         end if
+      end if
       if(debug_print) &
       print debug_fmt,n,n_match,trim(list(n)),"==",trim(wanted)
     elseif ( debug_print ) then
@@ -425,6 +436,30 @@ function str_replace (s,text,rep,dbg)  result(outs)
      outs = outs(:i-1) // rep(:nr) // outs(i+nt:)
   end do
 end function str_replace
+!============================================================================
+  function basename(str) result(bname)
+    character(len=*), intent(in) :: str
+    integer, parameter :: NWMAX=20
+    character(len=80), dimension(NWMAX):: words
+    character(len=96) bname
+    integer :: nwords, errcode
+
+    call wordsplit(str,NWMAX,words,nwords,errcode,separator='/')
+    bname =  words(nwords)
+
+  end function basename
+!============================================================================
+  function basedir(str) result(bdir)
+    character(len=*), intent(in) :: str
+    integer, parameter :: NWMAX=20
+    character(len=80), dimension(NWMAX):: words
+    character(len=300) ::  bdir
+    integer :: nwords, errcode
+
+    call wordsplit(str,NWMAX,words,nwords,errcode,separator='/')
+    bdir = str_replace(str,words(nwords),'')
+
+  end function basedir
 !============================================================================
 
 !> Function posted by SethMMorton at: 
@@ -654,6 +689,12 @@ print *, 'INTO CHAR_R1'
   print *, 'TESTING str_replace w trim:'//trim(  str_replace(trim(adjustl(' ABC D EF   ')),'B','_'))// ':END'
   print *, 'TESTING find_duplicates', &
       find_duplicates(['AAA', 'BB ', 'AA ', 'CC ', 'DD ', 'AA ' ],debug=.true. )
+
+  ! Testing basename, basedir
+  tmpstr='/aaaa/bbbb/cef'
+  print *, 'BASENAME:', basename(tmpstr)
+  print *, 'BASEDIR:',  basedir(tmpstr)
+
 end subroutine Self_test
 
 end module SmallUtils_mod

@@ -1,7 +1,7 @@
-! <SOA_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <SOA_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

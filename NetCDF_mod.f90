@@ -1,7 +1,7 @@
-! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <NetCDF_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,7 +47,7 @@ use Config_module,       only: KMAX_MID,KMAX_BND, runlabel1, runlabel2&
                              ,MasterProc, NETCDF_DEFLATE_LEVEL &
                              ,NPROC, IIFULLDOM,JJFULLDOM &
                              ,IOU_INST,IOU_YEAR,IOU_MON,IOU_DAY &
-                             ,IOU_HOUR,IOU_HOUR_INST &
+                             ,IOU_HOUR,IOU_HOUR_INST,HOURLYFILE_ending &
                              ,PT,Pref,NLANDUSEMAX, model&
                              ,USES,RUNDOMAIN&
                              ,fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,hour_DOMAIN&
@@ -56,6 +56,7 @@ use Config_module,       only: KMAX_MID,KMAX_BND, runlabel1, runlabel2&
                              , startdate, step_main
 use Country_mod,        only : NLAND, Country
 use Debug_module,       only : DEBUG ! old:_NETCDF, DEBUG_NETCDF_RF
+use EmisDef_mod,        only : NEmisMask, EmisMaskValues,EmisMaskIndex2Name
 use Functions_mod,       only: StandardAtmos_km_2_kPa
 use GridValues_mod,     only : GRIDWIDTH_M,fi,xp,yp,xp_EMEP_official&
                              ,debug_proc, debug_li, debug_lj &
@@ -89,7 +90,8 @@ use Par_mod,            only : me,GIMAX,GJMAX,MAXLIMAX, MAXLJMAX, &
 use PhysicalConstants_mod,  only : PI, EARTH_RADIUS
 use TimeDate_mod,       only: nmdays,leapyear ,current_date, date,julian_date
 use TimeDate_ExtraUtil_mod,only: date2nctime
-use SmallUtils_mod,      only: wordsplit, find_index, str_replace
+use SmallUtils_mod,      only: wordsplit, find_index, str_replace, key2str
+use SmallUtils_mod,      only: trims
 
 implicit none
 
@@ -131,6 +133,8 @@ public :: check_lon_lat
 public :: make_gridresolution
 public :: create_country_emission_file
 public :: output_country_emissions
+public :: CreateCityFile
+public :: CityFileWrite
 
 
 
@@ -574,9 +578,15 @@ case default
 end select
 
 if(MasterProc.and.DEBUG%NETCDF)&
-  write(*,*) "Creating ", trim(fileName),' ',trim(period_type)
-call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
-                      num_lev3d,KLEVcdf=lev3d,KLEVcdf_from_top=.true.)
+     write(*,*) "Creating ", trim(fileName),' ',trim(period_type)
+!to be tested:
+!if(iotyp==IOU_HOUR_INST .or. iotyp==IOU_HOUR)then
+!   call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
+!        num_lev3d,ntime=24,KLEVcdf=lev3d,KLEVcdf_from_top=.true.)
+!else
+   call CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
+        num_lev3d,KLEVcdf=lev3d,KLEVcdf_from_top=.true.)
+!end if
 
 if(MasterProc.and.DEBUG%NETCDF)&
   write(*,*) "Finished Init_new_netCDF", trim(fileName),' ',trim(period_type)
@@ -584,11 +594,12 @@ if(MasterProc.and.DEBUG%NETCDF)&
 end subroutine Init_new_netCDF
 
 subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
-     KMAXcdf,KLEVcdf,KLEVcdf_from_top,RequiredProjection)
+     KMAXcdf,ntime,KLEVcdf,KLEVcdf_from_top,RequiredProjection)
 
 !IBEGcdf,JBEGcdf relative to fulldomain
   integer, intent(in) :: GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,KMAXcdf
   character(len=*),  intent(in)  :: fileName
+  integer, intent(in), optional :: ntime !if present define time dimension as fixed
   integer, intent(in), optional :: KLEVcdf(KMAXcdf)
   logical, intent(in), optional :: KLEVcdf_from_top
   character(len=*),optional, intent(in):: RequiredProjection
@@ -708,8 +719,11 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
     call check(nf90_def_dim(ncFileID,"ilev",KMAXcdf+1,ilevDimID))
     call check(nf90_put_att(ncFileID, nf90_global,"vert_coord",vert_coord))
 
-    call check(nf90_def_dim(ncFileID,"time",nf90_unlimited,timeDimID))
-
+    if(present(ntime))then
+       call check(nf90_def_dim(ncFileID,"time",ntime,timeDimID))
+    else
+       call check(nf90_def_dim(ncFileID,"time",nf90_unlimited,timeDimID))
+    end if
     call Date_And_Time(date=created_date,time=created_hour)
     if(DEBUG%NETCDF)write(*,"(2A)")&
       'created_date: ',created_date,'created_hour: ',created_hour
@@ -1263,7 +1277,12 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
 
       if(MasterProc)write(6,fmt='(A,12I6)') 'creating file: '//trim(fileName_given)//" with sizes ",GIMAXcdf,GJMAXcdf,KMAX
       period_type = 'unknown'
-      call CreatenetCDFfile(trim(fileName_given),GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,KMAX)
+      if((iotyp==IOU_HOUR .or. iotyp==IOU_HOUR_INST).and.&
+           (index(HOURLYFILE_ending,'DD')>0 .or. index(HOURLYFILE_ending,'JJJ')>0)) then
+         call CreatenetCDFfile(trim(fileName_given),GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,KMAX,ntime=24)
+      else
+         call CreatenetCDFfile(trim(fileName_given),GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,KMAX)
+      end if
       if(present(ncFileID_given))then
         !the file should be opened, but by MasterProc only
         CALL MPI_BARRIER(MPI_COMM_CALC, IERROR)!wait until the file creation is finished
@@ -1418,7 +1437,6 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
   if(ndim-2>0)countvec(ndim-2)=i2-i1+1
   if(ndim-1>0)countvec(ndim-1)=j2-j1+1
   countvec(ndim)=kmax
-  
   !buffer the wanted part of data
   ijk=0
   allocate(buff(MAXLIMAX*MAXLJMAX*kmax*extradim))
@@ -1522,7 +1540,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
         t1=MPI_WTIME()
         if(d>0) CALL MPI_RECV(buff, 8*tlimax(d)*tljmax(d)*kmax*extradim, MPI_BYTE, d, &
              outCDFtag, MPI_COMM_CALC, MPISTATUS, IERROR)
-        
+     
         tmpi = tmpi + MPI_WTIME()-t1
         if(ndim==5 .and. size5D<=0)then
            ! write one buffer at a time to save memory              
@@ -1635,7 +1653,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      case(Real4)           ! type Real4
         if(ndim==5)then
            if(size5D>0) call check(nf90_put_var(ncFileID,VarID,R4data5D(1:dimSizes(1),&
-                1:dimSizes(2),i1:i2,j1:j2,1),start=(/1,1,1,1,1,nrecords/)),&
+                1:dimSizes(2),i1:i2,j1:j2,1:kmax),start=(/1,1,1,1,1,nrecords/)),&
                 "5D put failed "//trim(varname))
         else if(ndim==3)then
            if(present(ik))then
@@ -1908,26 +1926,32 @@ subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype,chunksize
 end subroutine  createnewvariable
 !_______________________________________________________________________
 
-subroutine CloseNetCDF
+subroutine CloseNetCDF(ncFileID_given)
 !close open files
 !NB the data in a NetCDF file is not "safe" before the file is closed.
 !The files are NOT automatically properly closed after end of program,
-! and data may be lost if the files are not closed explicitely.
+  ! and data may be lost if the files are not closed explicitely.
+  integer, optional :: ncFileID_given
   integer :: i,ncFileID
 
   if(MasterProc)then
-    do i=IOU_INST,IOU_HOUR_INST
-      ncFileID=ncFileID_iou(i)
-      if(ncFileID/=closedID)then
-        call check(nf90_close(ncFileID))
-        ncFileID_iou(i)=closedID
-      end if
-      ncFileID=LF_ncFileID_iou(i)
-      if(ncFileID/=closedID)then
-        call check(nf90_close(ncFileID))
-        LF_ncFileID_iou(i)=closedID
-      end if
-    end do
+     if(present(ncFileID_given))then
+        call check(nf90_close(ncFileID_given))
+     else
+        !close all
+        do i=IOU_INST,IOU_HOUR_INST
+           ncFileID=ncFileID_iou(i)
+           if(ncFileID/=closedID)then
+              call check(nf90_close(ncFileID))
+              ncFileID_iou(i)=closedID
+           end if
+           ncFileID=LF_ncFileID_iou(i)
+           if(ncFileID/=closedID)then
+              call check(nf90_close(ncFileID))
+              LF_ncFileID_iou(i)=closedID
+           end if
+        end do
+     end if
   end if
 end subroutine CloseNetCDF
 
@@ -2058,15 +2082,16 @@ subroutine GetCDF(varname,fileName,Rvar,varGIMAX,varGJMAX,varKMAX,nstart,nfetch,
 end subroutine GetCDF
 
 subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
-                            unit,validity,i_start,j_start,imax_in,jmax_in,reverse_k,needed,found)
+                            unit,validity,i_start,j_start,imax_in,jmax_in,reverse_k,needed,found,ncFileID_in)
 ! open and reads CDF file
 ! The grid MUST be in the same projection and resolution as the model grid
 ! the field are read directly into the subdomains
 ! k_start,k_end are the vertical levels to read, k=k_start,k_end
 ! for instance k_start=KMAX_MID,k_end=KMAX_MID gives only surface
-! for instance k_start1,k_end=KMAX_MID gives all levels
+! for instance k_start=1,k_end=KMAX_MID gives all levels
 ! if reverse_k=.true. , the k dimension in the file is reversed
 ! i_start,j_start can give a new origin instead of (1,1); i_start=2, menas that only i>=2 is read.
+! if file is created and read with limited RUNDOMAIN, define _start=2-RUNDOMAIN(1), j_start=2-RUNDOMAIN(3)
 ! the dimensions of Rvar are assumed:
 ! Rvar(LIMAX,LJMAX,k_end-k_start+1,nfetch)
 
@@ -2078,6 +2103,7 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   real, intent(out) :: Rvar(*)
   character(len=*), optional, intent(out) ::unit,validity
   integer, optional, intent(in) :: i_start,j_start,imax_in,jmax_in
+  integer, optional, intent(inout) :: ncFileID_in
   logical, optional, intent(in) :: reverse_k,needed
   logical, optional, intent(out):: found
 
@@ -2119,15 +2145,32 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   if(present(needed))fileneeded=needed
   if(present(found))found=.false.
 
-  if(fileneeded)then
-    call check(nf90_open(trim(fileName),nf90_nowrite,ncFileID),&
-               trim(fileName)//" not found")
+  if(.not. present(ncFileID_in))then
+     if(fileneeded)then
+        call check(nf90_open(trim(fileName),nf90_nowrite,ncFileID),&
+             trim(fileName)//" not found")
+     else
+        status=nf90_open(trim(fileName),nf90_nowrite,ncFileID)
+        if(status/=nf90_noerr)then
+           if(MasterProc) write(*,*)trim(fileName),' not found (but not needed)'
+           return
+        end if
+     end if
   else
-    status=nf90_open(trim(fileName),nf90_nowrite,ncFileID)
-    if(status/=nf90_noerr)then
-      if(MasterProc) write(*,*)trim(fileName),' not found (but not needed)'
-      return
-    end if
+     if(ncFileID_in  == closedID)then
+        if(fileneeded)then
+           call check(nf90_open(trim(fileName),nf90_nowrite,ncFileID),&
+                trim(fileName)//" not found")
+        else
+           status=nf90_open(trim(fileName),nf90_nowrite,ncFileID)
+           if(status/=nf90_noerr)then
+              if(MasterProc) write(*,*)trim(fileName),' not found (but not needed)'
+              return
+           end if
+        end if
+        ncFileID_in = ncFileID
+     end if
+     ncFileID = ncFileID_in
   end if
 
   !test if the variable is defined and get varID:
@@ -2140,7 +2183,9 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
       write(*,*)'variable does not exist: ',trim(varname)
     call CheckStop(fileneeded, "NetCDF_mod : variable needed but not found "&
          //trim(varname)//' '//trim(fileName))
-    call check(nf90_close(ncFileID))
+    if(.not. present(ncFileID_in))then
+      call check(nf90_close(ncFileID))
+    end if
     return
   end if
 
@@ -2209,8 +2254,10 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
 
   if(dims(1)<1 .or. dims(2)<1)then
 !     Rvar(1:LIMAX*LJMAX*(k_end-k_start+1)) = 0.0
-     call check(nf90_close(ncFileID))
-     return
+       if(.not. present(ncFileID_in))then
+         call check(nf90_close(ncFileID))
+       end if
+       return
   endif
   totsize=dims(1)*dims(2)*(k_end-k_start+1)*dims(ndims)
 
@@ -2285,8 +2332,12 @@ subroutine GetCDF_modelgrid(varname,fileName,Rvar,k_start,k_end,nstart,nfetch,&
   end if
 
   deallocate(Rvalues)
-  call check(nf90_close(ncFileID))
+
+  if(.not. present(ncFileID_in))then
+     call check(nf90_close(ncFileID))
+  end if
   if(DEBUG%NETCDF)write(*,*)'finished GetCDF_modelgrid', me
+
 end subroutine GetCDF_modelgrid
 
 subroutine WriteCDF(varname,vardate,filename_given,newfile)
@@ -2479,7 +2530,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
   implicit none
   character(len=*), parameter :: dtxt = 'ReadF:' ! debug text
-  character(len=99) :: dtxt_msg
+  character(len=149) :: dtxt_msg
   character(len = *),intent(in) ::fileName,varname
   real,intent(out) :: Rvar(*)
   integer,intent(in) :: nstart
@@ -3121,9 +3172,11 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
      allocate(Rvalues(totsize), stat=alloc_err)
      if ( mydebug ) then
-        do i=1, ndims ! NF90_MAX_VAR_DIMS would be 1024
-           write(*,"(a,6i8)") 'ReadCDF reading chunk ',i ,startvec(i), dims(i)
-        end do
+       do i=1, ndims ! NF90_MAX_VAR_DIMS would be 1024
+         write(*,"(a,3i8,a,i8)") 'ReadCDF reading chunk ',i ,startvec(i), dims(i),&
+            'varID:'//trim(varname), varID
+       end do
+       !print *, dtxt//'PRE-CHECK'//trim(varname), varID, size(Rvalues), startvec, dims
      end if
      call check(nf90_get_var(ncFileID, VarID, Rvalues,start=startvec,count=dims),&
           errmsg=dtxt_msg//"lonlatRRvalues")
@@ -3149,7 +3202,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
         lon_shift_Mask=0
         status=nf90_get_var(ncFileID_Mask, dimids_Mask(1), lon_mask)
         if(status==nf90_noerr)then
-           lon_shift_Mask=nint((Rlon(1)-lon_mask(1))*dRloni)
+           lon_shift_Mask=nint((1.e-5+Rlon(1)-lon_mask(1))*dRloni) ! 1e-5 to avoid random result for real number ending with exactly .5
            if(lon_shift_Mask/=0)then
               write(*,*)'ReadCDF mask: should shifting longitude by ',lon_shift_Mask,'=',Rlon(1)-lon_mask(1),'degrees'
               call StopAll("Longitude shift for Mask not implemented")
@@ -3605,7 +3658,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
               do i=1,limax
                  ij=i+(j-1)*LIMAX
                  ijk=k+(ij-1)*k2
-                 ig=nint((glon(i,j)-Rlon(startvec(1)))*dRloni)+1
+                 ! 1e-5 to avoid random result for real number ending with exactly .5
+                 ig=nint((1.e-5+glon(i,j)-Rlon(startvec(1)))*dRloni)+1
                  if(ig<0.5 .or. ig>dims(1))then
                     !try to come from the other side
                     !check first that it covers all latitudes
@@ -3616,7 +3670,8 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
                  endif
                  !nearest must always give something
                  ig=max(1,min(dims(1),ig))
-                 jg=max(1,min(dims(2),nint((glat(i,j)-Rlat(startvec(2)))*dRlati)+1))
+                 ! 1e-5 to avoid random result for real number ending with exactly .5
+                 jg=max(1,min(dims(2),nint((1.e-5+glat(i,j)-Rlat(startvec(2)))*dRlati)+1))
                  igjgk=ig+(jg-1)*dims(1)+(k-1)*dims(1)*dims(2)
                  if(OnlyDefinedValues.or.(Rvalues(igjgk)/=FillValue.and. .not.isnan(Rvalues(igjgk))))then
                     Rvar(ijk)=Rvalues(igjgk)
@@ -3928,7 +3983,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      deallocate(ivalues)
   else ! data_projection /="lon lat" .and. data_projection/="Stereographic"
 
-     if(debug1) write(*,*)'interpolatingL from ', &
+     if(debug1) write(*,*)'interpolating from ', &
         trim(data_projection), ' to ',trim(projection)
 
      if(interpol_used=='conservative'.or.interpol_used=='mass_conservative')then
@@ -4775,10 +4830,13 @@ if(DEBUG%NETCDF) write(*,*) dtxt//'HEREtimeB:'//trim(timeunit), NTime_Read, find
              TimesInDays(i) = 30*(times(i)-1)+15
      else
         !must be of the form " xxxx since yyyy-mm-dd hh:mm:ss"
-
+        ! or at least days since yyyy-mm-dd
         !    read(timeunit,fmt="(a,a,a,a)")period,since,date,time
         call wordsplit(trim(timeunit),wordarraysize,wordarray,nwords,errcode,separator='-')
-        if(dbg0) write(*,*)"time@units:",(" ",trim(wordarray(i)),i=1,8)
+        if(dbg0) then
+          write(*,*) 'timeCheck:'//trim(fileName)
+          write(*,*) "time@units:",(" ",trim(wordarray(i)),i=1,8)
+        end if
         period=wordarray(1)
         since=wordarray(2)
         call CheckStop(since/='since',"since error "//trim(since))
@@ -4786,7 +4844,12 @@ if(DEBUG%NETCDF) write(*,*) dtxt//'HEREtimeB:'//trim(timeunit), NTime_Read, find
         read(wordarray(3),*)yyyy
         read(wordarray(4),*)mo
         read(wordarray(5),*)dd
-        read(wordarray(6),*)hh
+        if ( nwords == 5 ) then ! case "days since 1990-1-1 "
+          hh=0
+          call CheckStop(period/='days',trim(fileName)//":period error "//trim(period))
+        else
+          read(wordarray(6),*)hh
+        end if
         if( period == 'minutes' .or. period =='seconds' )then
            read(wordarray(7),*)mi
            read(wordarray(8),*)ss  !did not work for others?
@@ -5531,4 +5594,96 @@ end subroutine vertical_interpolate
   end if
 
 end subroutine create_country_emission_file
+
+subroutine CreateCityFile(filename, runname, Nrun, Ndate, Ntime, ncFileID)
+  character(len=*),  intent(in)  :: fileName
+  character(len=TXTLEN_NAME) , intent(in):: runname(Nrun)
+  integer, intent(in) :: Nrun, Ndate, Ntime
+  integer, intent(out) ::   ncFileID
+  integer :: cityDimID,runDimID,dateDimID,timeDimID,StringDimID,varID,cityvarID
+  integer :: i
+  character(len=TXTLEN_NAME):: datename
+  !fortran does not have string types. Use character arrays instead
+
+  if(MasterProc)then
+     !we do not use hdf5, as we do not expect much gain by compression
+     call check(nf90_create(fileName,nf90_clobber,ncFileID),"create:"//trim(fileName))
+     call check(nf90_def_dim(ncFileID,"string_length",TXTLEN_NAME,StringDimID),"dim:slen")
+     call check(nf90_def_dim(ncFileID,"city",NEmisMask,cityDimID),"dim:city")
+     call check(nf90_def_var(ncFileID,"city",nf90_char,[StringDimID,cityDimID],cityvarID),"def:city")
+     call check(nf90_put_att(ncFileID,cityvarID,"description","Receptor city name"))
+     call check(nf90_def_dim(ncFileID,"run",Nrun,runDimID),"dim:run")
+     call check(nf90_def_var(ncFileID,"run",nf90_char,[StringDimID,runDimID],varID),"def:run")
+     call check(nf90_enddef(ncFileID))
+     call check(nf90_put_var(ncFileID,VarID,runname))
+     call check(nf90_put_var(ncFileID,cityVarID,EmisMaskIndex2Name))
+     call check(nf90_redef(ncFileID),"file redef")
+     call check(nf90_put_att(ncFileID,varID,"description","Country, region or Source contributing"))
+     call check(nf90_def_dim(ncFileID,"date",1,dateDimID),"dim:date")
+     call check(nf90_def_var(ncFileID,"date",nf90_double,[datedimID],varID),"def:date")
+     datename=trim(key2str('YYYY-MM-DD 00:00:00.000000','YYYY',current_date%year))
+     datename=trim(key2str(datename,'MM',current_date%month))
+     datename=trim(key2str(datename,'DD',current_date%day))
+     call check(nf90_put_att(ncFileID,varID,"units","days since "//trim(datename)))
+     call check(nf90_put_att(ncFileID,varID,"calendar","standard"))
+     call check(nf90_def_dim(ncFileID,"time",Ntime,timeDimID),"dim:time")
+     call check(nf90_def_var(ncFileID,"time",nf90_double,[timedimID],varID),"def:time")
+     call check(nf90_put_att(ncFileID,varID,"_FillValue",nf90_fill_double ))
+     call check(nf90_put_att(ncFileID,varID,"units","days since 1900-01-01"))
+     call check(nf90_put_att(ncFileID,varID,"calendar","standard"))
+     call check(nf90_close(ncFileID))
+ end if
+
+end subroutine CreateCityFile
+
+subroutine CityFileWrite(values, varname, hour, filename, runname, Nrun, Nruntot, Runstart, Ndate, Ntime)
+  !sums contributions from all cities defined
+  real(kind=4) :: values(Nrun,NEmisMask)
+  character(len=*),  intent(in)  :: fileName, varname
+  character(len=TXTLEN_NAME) , intent(in):: runname(*)
+  integer, intent(in) :: hour, Nrun, Ndate, Ntime, Nruntot, Runstart
+  integer :: cityDimID,runDimID,dateDimID,timeDimID,StringDimID,varID,ncFileID,i,j
+  integer :: status
+  character(len=TXTLEN_FILE),save :: oldname='NOTSET'
+  real(kind=8) ::rdays
+  if(MasterProc)then
+     if (trim(oldname) /= trim(fileName)) then
+        call CreateCityFile(filename, runname, Nruntot, Ndate, Ntime,ncFileID)
+        oldname = trim(fileName)
+     end if
+     call check(nf90_open(trim(fileName),nf90_share+nf90_write,ncFileID),"open cityfile")
+     call check(nf90_inq_varid(ncFileID,'time',VarID))
+     call date2nctime(current_date,rdays)
+     if (mod(hour,24)==0) then
+        call check(nf90_put_var(ncFileID,VarID,rdays,start=(/Ntime/)))     
+     else
+        call check(nf90_put_var(ncFileID,VarID,rdays,start=(/(hour*Ntime/24)/)))      
+     end if
+     call check(nf90_inq_varid(ncFileID,'date',VarID))
+     call check(nf90_put_var(ncFileID,VarID,0)) !To improve when actual
+
+     status=nf90_inq_varid(ncFileID,varname,VarID)
+     if(status/=nf90_noerr)then
+        !if variable does not exist, create
+        call check(nf90_redef(ncFileID),"file redef:"//trim(varname))
+        call check(nf90_inq_dimid(ncFileID,"city",citydimID),"dim:city")
+        call check(nf90_inq_dimid(ncFileID,"run",rundimID),"dim:run")
+        call check(nf90_inq_dimid(ncFileID,"date",datedimID),"dim:date")
+        call check(nf90_inq_dimid(ncFileID,"time",timedimID),"dim:time")
+        !NB: time dimension is the "fastest" changing index (Fortran order is opposite as NetCDF / C)
+        call check(nf90_def_var(ncFileID,varname,nf90_float,&
+             [timeDimID,dateDimID,runDimID,cityDimID],varID),"def3d:"//trim(varname))
+        call check(nf90_put_att(ncFileID,varID,"_FillValue",nf90_fill_float ))
+        call check(nf90_enddef(ncFileID))
+     end if
+     !NB: hour=0 is midnight and is set as the last record
+     if (mod(hour,24)==0) then
+        call check(nf90_put_var(ncFileID,VarID,values,start=(/24,1,Runstart,1/),count=(/1,1,Nrun,NEmisMask/)))
+     else
+        call check(nf90_put_var(ncFileID,VarID,values,start=(/mod(hour,24),1,Runstart,1/),count=(/1,1,Nrun,NEmisMask/)))
+     end if
+     call check(nf90_close(ncFileID))
+  end if
+ end subroutine CityFileWrite
+
 endmodule NetCDF_mod

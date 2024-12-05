@@ -1,7 +1,7 @@
-! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -246,9 +246,9 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
   emiss(:,:)=0.0
   if(.not.found_source)return
   snow=date2string(SDATE_FMT,current_date)
-  
-  doLOC: do v=1,nloc 
-  
+
+  doLOC: do v=1,nloc
+
     if(USES%PreADV)then ! spread emissions in case of strong winds
     !cannot use formula below directly, because location may be in another subdomain
     !  Winds(:,1,l)=u_xmj(locdef(l)%iloc,locdef(l)%jloc,:,1)*xm2(locdef(l)%iloc,locdef(l)%jloc)*dt_advec/gridwidth_m
@@ -295,15 +295,15 @@ function ColumnRate(i,j,REDUCE_VOLCANO) result(emiss)
 
           if(DEBUG%COLSRC)write(*,MSG_FMT)snow//' Vent',me,'me',v,trim(locdef(v)%id),i,"i",j,"j",k,"k", &
             Winds(k,1,v), "xwind", Winds(k,2,v), "ywind", frac, "frac"
-          if(DEBUG%COLSRC)write(*,*)'including fraction ',frac,' for ',i,j,k,v,locdef(v)%iloc,locdef(v)%jloc 
+          if(DEBUG%COLSRC)write(*,*)'including fraction ',frac,' for ',i,j,k,v,locdef(v)%iloc,locdef(v)%jloc
 
-          emiss(itot,k)=emiss(itot,k)+frac*emsdef(v,e)%rate*uconv        
+          emiss(itot,k)=emiss(itot,k)+frac*emsdef(v,e)%rate*uconv
         end do
         if (.not. has_new_ash) cycle doEms
       else
         emiss(itot,k1:k0)=emiss(itot,k1:k0)+emsdef(v,e)%rate*uconv
       end if
-      
+
       if(DEBUG%COLSRC) &
         write(*,MSG_FMT)snow//' Erup.',me,'me',e,emsdef(v,e)%sbeg,&
           itot,trim(species(itot)%name),k1,'k1',k0,'k0',&
@@ -385,7 +385,7 @@ subroutine setRate()
   end if
   nloc=0
   l = 1
-  doLOC: do ! read all entries on file, stop simulation if are too many entries 
+  doLOC: do ! read all entries on file, stop simulation if are too many entries
     call read_line(IO_TMP,txtline,stat)
     if(stat/=0) exit doLOC            ! End of file
     call CheckStop ( l > size(PROC_LOC) , dtxt//' NEEDS larger size for PROC_LOC')
@@ -394,7 +394,7 @@ subroutine setRate()
     if ( len_trim(txtline) == 0 ) cycle doLOC  ! Empty line
     dloc=getVent(txtline)
     if(coord_in_processor(dloc%lon,dloc%lat,iloc=dloc%iloc,jloc=dloc%jloc))then
-      PROC_LOC(l) = ME!The source is located on this proc 
+      PROC_LOC(l) = ME!The source is located on this proc
       nloc=nloc+1
       call CheckStop(nloc>NMAX_LOC,&
             mname//" NMAX_LOC exceeded in "//trim(flocdef)//" read")
@@ -444,7 +444,7 @@ subroutine setRate()
   l = 1
   sbeg=date2string(SDATE_FMT,startdate)
   send=date2string(SDATE_FMT,enddate)
-  doEMS: do ! read all entries on file, stop simulation if are too many entries 
+  doEMS: do ! read all entries on file, stop simulation if are too many entries
     call read_line(IO_TMP,txtline,stat)
     if(stat/=0) exit doEMS            ! End of file
     if(.not.found_source)cycle doEMS  ! There is no vents on sub-domain
@@ -584,7 +584,8 @@ function getVent(line) result(def)
   end select
   read(words(8),*)elev            ! [m]
   igrp=find_index(words(1),chemgroups(:)%name)
-  def=loc(trim(words(1)),trim(words(2)),lat,lon,elev,trim(words(10)),igrp)
+  def=loc(trim(words(1)),trim(words(2)),lat,lon,elev,trim(words(10)),igrp,-1,-1)
+
 end function getVent
 !----------------------------!
 ! Extract Erup. info from CVS line

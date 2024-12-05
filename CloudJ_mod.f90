@@ -32,10 +32,12 @@ MODULE CloudJ_mod
     use DerivedFields_mod,     only: d_3d, f_3d
 
     use Chemfields_mod,        only: xn_adv, xn_bgn, xn_shl, NSPEC_BGN, Dobson
-    use ChemDims_mod,          only: NSPEC_ADV
+    use ChemDims_mod,          only: NSPEC_ADV, NPHOTOLRATES
     use ChemSpecs_mod
+    use ChemRates_mod,         only: photol_used, setPhotolUsed
     use PhysicalConstants_mod, only: AVOG, ATWAIR
     use AeroFunctions_mod,     only: LogNormFracBelow, GerberWetRad, GerberWetSig, pmH2O_gerberSig, DpgN2DpgV
+    use CheckStop_mod,         only: StopAll
                                   
 
     IMPLICIT NONE
@@ -69,7 +71,7 @@ MODULE CloudJ_mod
     integer, save :: photo_out_ix_ch3o2h_fj = -1 
     integer, save :: photo_out_ix_MEK_fj    = -1
     integer, save :: photo_out_ix_N2O5_fj   = -1
-    integer, save :: photo_out_ix_GLYOX_fj  = -1  ! HCOHCO 
+    integer, save :: photo_out_ix_GLYOX_fj  = -1 ! HCOHCO 
     integer, save :: photo_out_ix_CH3CHO_fj = -1 
     integer, save :: photo_out_ix_ACETON_fj = -1
     integer, save :: photo_out_ix_MGLYOX_fj = -1 ! RCOCHO
@@ -756,6 +758,87 @@ SUBROUTINE setup_phot_cloudj(i_emep,j_emep,errcode,mode)
           end do
     end do
 
+    if (first_call) then 
+      do I=1,NRATJ
+        ! name to search for must be exactly 10 characters long; first ten characters in FJX_j2j.dat
+        if ('O3        ' .eq. JLABEL(I)(:10) ) IDO3_O3P  = I
+        if ('O3(1D)    ' .eq. JLABEL(I)(:10) ) IDO3_O1D  = I
+        if ('NO2       ' .eq. JLABEL(I)(:10) ) IDNO2     = I   
+        if ('H2COa     ' .eq. JLABEL(I)(:10) ) IDHCHO_H  = I
+        if ('H2COb     ' .eq. JLABEL(I)(:10) ) IDHCHO_H2 = I 
+        if ('H2O2      ' .eq. JLABEL(I)(:10) ) IDH2O2    = I   
+        if ('CH3OOH    ' .eq. JLABEL(I)(:10) ) IDCH3O2H  = I   
+        if ('NO3c      ' .eq. JLABEL(I)(:10) ) IDNO3     = I ! lumped EMEP
+        if ('HNO4      ' .eq. JLABEL(I)(:10) ) IDHO2NO2  = I
+        if ('CH3COCHO  ' .eq. JLABEL(I)(:10) ) IDRCOCHO  = I
+        if ('BIACET    ' .eq. JLABEL(I)(:10) ) IDCH3COY  = I
+        if ('CH3COC2H5 ' .eq. JLABEL(I)(:10) ) IDMEK     = I
+        if ('CH3CHO    ' .eq. JLABEL(I)(:10) ) IDCH3CHO  = I
+        if ('CHOCHOa   ' .eq. JLABEL(I)(:10) ) IDGLYOXA  = I
+        if ('CHOCHOb   ' .eq. JLABEL(I)(:10) ) IDGLYOXB  = I
+        if ('CHOCHOc   ' .eq. JLABEL(I)(:10) ) IDGLYOXC  = I
+        if ('PAN       ' .eq. JLABEL(I)(:10) ) IDPAN     = I ! only in CJX
+        if ('HNO3      ' .eq. JLABEL(I)(:10) ) IDHNO3    = I
+        if ('HNO2      ' .eq. JLABEL(I)(:10) ) IDHONO    = I
+        if ('GLYOX     ' .eq. JLABEL(I)(:10) ) IDCHOCHO  = I ! lumped EMEP 
+        if ('NO3a      ' .eq. JLABEL(I)(:10) ) IDNO3_NO  = I 
+        if ('NO3b      ' .eq. JLABEL(I)(:10) ) IDNO3_NO2 = I 
+        if ('CH3COCH3a ' .eq. JLABEL(I)(:10) ) IDACETON  = I ! only a-channel
+        if ('N2O5      ' .eq. JLABEL(I)(:10) ) IDN2O5    = I
+
+        ! duplicates with different names for historical reasons
+        if ('CHOCHOa   ' .eq. JLABEL(I)(:10) ) IDCHOCHO_2CHO = I
+        if ('CHOCHOb   ' .eq. JLABEL(I)(:10) ) IDCHOCHO_2CO  = I
+        if ('CHOCHOc   ' .eq. JLABEL(I)(:10) ) IDCHOCHO_HCHO = I
+
+        ! non-EmChem photolysis rates
+        if ('CH3COCH3a ' .eq. JLABEL(I)(:10) ) IDCH3COCH3  = I
+        if ('MCM15     ' .eq. JLABEL(I)(:10) ) MCM_J15     = I
+        if ('MCM17     ' .eq. JLABEL(I)(:10) ) MCM_J17     = I
+        if ('MeAcr     ' .eq. JLABEL(I)(:10) ) MCM_J18     = I 
+        if ('HPALD1    ' .eq. JLABEL(I)(:10) ) MCM_J20     = I
+        if ('CH3COC2H5 ' .eq. JLABEL(I)(:10) ) MCM_J22     = I
+        if ('MVK       ' .eq. JLABEL(I)(:10) ) MCM_J23     = I
+        if ('IPRNO3    ' .eq. JLABEL(I)(:10) ) IDiC3H7ONO2 = I 
+        if ('C2H5CHO   ' .eq. JLABEL(I)(:10) ) IDC2H5CHO   = I
+        if ('HAC       ' .eq. JLABEL(I)(:10) ) IDACETOL    = I
+        if ('GLYC      ' .eq. JLABEL(I)(:10) ) IDGLYALD    = I
+        if ('MCRENOL   ' .eq. JLABEL(I)(:10) ) IDMCRENOL   = I
+        if ('ETP       ' .eq. JLABEL(I)(:10) ) IDETP       = I
+        if ('ETHP      ' .eq. JLABEL(I)(:10) ) IDETHP      = I
+        if ('ATOOH     ' .eq. JLABEL(I)(:10) ) IDATOOH     = I
+        if ('R4P       ' .eq. JLABEL(I)(:10) ) IDR4P       = I
+        if ('RIPC      ' .eq. JLABEL(I)(:10) ) IDRIPC      = I
+        if ('PRALDP    ' .eq. JLABEL(I)(:10) ) IDPRALDP    = I
+        if ('IDHPE     ' .eq. JLABEL(I)(:10) ) IDIDHPE     = I
+        if ('PIP       ' .eq. JLABEL(I)(:10) ) IDPIP       = I
+        if ('ITCNa     ' .eq. JLABEL(I)(:10) ) IDITCN      = I
+        if ('INPDa     ' .eq. JLABEL(I)(:10) ) IDINPD      = I
+        if ('MAP       ' .eq. JLABEL(I)(:10) ) IDMAP       = I
+        if ('RP        ' .eq. JLABEL(I)(:10) ) IDRP        = I
+        if ('MENO3     ' .eq. JLABEL(I)(:10) ) MCM_J51     = I
+        if ('ETNO3     ' .eq. JLABEL(I)(:10) ) MCM_J52     = I
+        if ('NPRNO3    ' .eq. JLABEL(I)(:10) ) MCM_J53     = I
+        if ('IPRNO3    ' .eq. JLABEL(I)(:10) ) MCM_J54     = I
+        if ('PROPNN    ' .eq. JLABEL(I)(:10) ) MCM_J56     = I
+        if ('R4N2      ' .eq. JLABEL(I)(:10) ) IDR4N2      = I
+        if ('MVKN      ' .eq. JLABEL(I)(:10) ) IDMVKN      = I
+        if ('INPB      ' .eq. JLABEL(I)(:10) ) IDINPB      = I
+        if ('IHN3      ' .eq. JLABEL(I)(:10) ) IDIHN3      = I
+      enddo ! NRATJ
+
+      ! place indices in the photol_used array
+      call setPhotolUsed()
+  
+      ! verify that all phot rates were found (i.e. greater than 0)
+      do I=1,NPHOTOLRATES
+        if ( photol_used(I) < 0  .and. MasterProc ) then 
+          write(*,*) 'Missing photolysis index in photol_used:', I
+          call StopAll( 'Photolysis reaction not found in CloudJ input file.')
+        endif
+      enddo
+    endif
+
     first_call=.false.
     LPRTJ=.false.
 
@@ -764,103 +847,13 @@ end subroutine setup_phot_cloudj
 
 subroutine write_jvals(i_emep,j_emep)
 
-    ! this routine writes the requested 3D J-value output. Indices are set either by 
-    ! setup_phot_cloudj (CloudJ) or setup_phot (DefPhotolysisMod.f90, tabulated)
+    ! this routine writes the requested 3D J-value output. Indices are set by 
+    ! setup_phot_cloudj (CloudJ) 
     !
     ! there is surely a prettier way to do this....but this also works...
 
     integer, intent(in) :: i_emep,j_emep
     
-    if(photo_out_ix_no2>0)then
-          d_3d(photo_out_ix_no2,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-            rcphot(IDNO2,max(KCHEMTOP,lev3d(1:num_lev3d))) !WARNING: rcphot defined only up to KCHEMTOP!
-    endif
-
-    if(photo_out_ix_o3a>0)then
-          d_3d(photo_out_ix_o3a,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-            rcphot(IDAO3,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_o3b>0)then
-          d_3d(photo_out_ix_o3b,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-            rcphot(IDBO3,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_h2o2>0)then
-      d_3d(photo_out_ix_h2o2,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDH2O2,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_hno3>0)then
-      d_3d(photo_out_ix_hno3,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDHNO3,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_ach2o>0)then
-      d_3d(photo_out_ix_ach2o,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDACH2O,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_bch2o>0)then
-      d_3d(photo_out_ix_bch2o,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDBCH2O,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_hono>0)then
-      d_3d(photo_out_ix_hono,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDHONO,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_ho2no2>0)then
-      d_3d(photo_out_ix_ho2no2,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDHO2NO2,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_no3>0)then
-      d_3d(photo_out_ix_no3,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDNO3,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_ch3o2h>0)then
-      d_3d(photo_out_ix_ch3o2h,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDCH3O2H,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_MEK>0)then
-      d_3d(photo_out_ix_MEK,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDCH3COX,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_N2O5>0)then
-      d_3d(photo_out_ix_N2O5,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDN2O5,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_GLYOX>0)then
-      d_3d(photo_out_ix_GLYOX,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDHCOHCO,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_CH3CHO>0)then
-      d_3d(photo_out_ix_CH3CHO,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDCH3CHO,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_ACETON>0)then
-      d_3d(photo_out_ix_ACETON,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDACETON,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_MGLYOX>0)then
-      d_3d(photo_out_ix_MGLYOX,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDRCOCHO,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
-    if(photo_out_ix_BIACET>0)then
-      d_3d(photo_out_ix_BIACET,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDCH3COY,max(KCHEMTOP,lev3d(1:num_lev3d))) 
-    endif
-
     ! CloudJ (_fj) photolysis rate output
 
     if(photo_out_ix_no2_fj>0)then
@@ -870,12 +863,12 @@ subroutine write_jvals(i_emep,j_emep)
 
     if(photo_out_ix_o3a_fj>0)then
           d_3d(photo_out_ix_o3a_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-            rcphot(IDAO3,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+            rcphot(IDO3_O3P,max(KCHEMTOP,lev3d(1:num_lev3d))) 
     endif
 
     if(photo_out_ix_o3b_fj>0)then
           d_3d(photo_out_ix_o3b_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-            rcphot(IDBO3,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+            rcphot(IDO3_O1D,max(KCHEMTOP,lev3d(1:num_lev3d))) 
     endif
 
     if(photo_out_ix_h2o2_fj>0)then
@@ -890,12 +883,12 @@ subroutine write_jvals(i_emep,j_emep)
 
     if(photo_out_ix_ach2o_fj>0)then
       d_3d(photo_out_ix_ach2o_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDACH2O,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+        rcphot(IDHCHO_H,max(KCHEMTOP,lev3d(1:num_lev3d))) 
     endif
 
     if(photo_out_ix_bch2o_fj>0)then
       d_3d(photo_out_ix_bch2o_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDBCH2O,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+        rcphot(IDHCHO_H2,max(KCHEMTOP,lev3d(1:num_lev3d))) 
     endif
 
     if(photo_out_ix_hono_fj>0)then
@@ -920,7 +913,7 @@ subroutine write_jvals(i_emep,j_emep)
 
     if(photo_out_ix_MEK_fj>0)then
       d_3d(photo_out_ix_MEK_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDCH3COX,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+        rcphot(IDMEK,max(KCHEMTOP,lev3d(1:num_lev3d))) 
     endif
 
     if(photo_out_ix_N2O5_fj>0)then
@@ -930,7 +923,7 @@ subroutine write_jvals(i_emep,j_emep)
 
     if(photo_out_ix_GLYOX_fj>0)then
       d_3d(photo_out_ix_GLYOX_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
-        rcphot(IDHCOHCO,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+        rcphot(IDCHOCHO,max(KCHEMTOP,lev3d(1:num_lev3d))) 
     endif
 
     if(photo_out_ix_CH3CHO_fj>0)then

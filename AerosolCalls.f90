@@ -1,7 +1,7 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,8 +46,10 @@ module AerosolCalls
                                   SO4_ix, HNO3_ix, NO3_f_ix, NH3_ix, NH4_f_ix, OM_ix, &
                                   SSf_ix, SSc_ix, Dustwbf_ix, DustSahf_ix
  use Debug_module,          only: DEBUG   ! -> DEBUG%EQUIB
+ use EmisDef_mod,           only: KEMISTOP
  use EQSAM4clim_ml,        only :  EQSAM4clim
 ! use EQSAM_v03d_mod,        only: eqsam_v03d
+ use LocalFractions_mod,    only: lf_aero_pre,lf_aero_pos,lf_Nvert,lf_fullchem
  use MARS_mod,              only: rpmares, rpmares_2900, DO_RPMARES_new
  use PhysicalConstants_mod, only: AVOG
  use SmallUtils_mod,        only: find_index
@@ -73,9 +75,18 @@ module AerosolCalls
 
 
   integer, private, save :: iSeaSalt,cSeaSalt,cNatDust  ! zero if no seasalt compounds
+
   real, parameter :: MWCL = 35.453, MWNA = 22.9897,  & ! MW Chloride, Sodium
-                     MWCA = 40.078, MWMG = 24.305, MWK = 39.098, & ! MW Calcium, Magnegium, Potassium
-                     MWH2O = 18.0153                   ! MW Water
+                     MWCA = 40.078, MWMG = 24.305,   & ! MW Calcium, Magnegium, Potassium
+                     MWK = 39.0973, MWH2O = 18.0153    ! MW Potassium,  Water
+  real, parameter :: CONMIN = 1.0e-30                  ! Concentration lower limit [mole/m3]
+  real, parameter :: Ncm3_to_molesm3 = 1.0e6 / AVOG    ! #/cm3 to moles/m3
+  real, parameter :: molesm3_to_Ncm3 = 1.0 / Ncm3_to_molesm3
+  real, parameter :: kg_to_ug = 1e9
+
+  real :: RH_thermodynamics ! used as RH input to therm. equilibrium modules, based on limitsset by AERO%RH_UPLIM_AERO, LOLIM
+  real :: OM_mass ! variable to hold organic matter mass for wateruptake calculations
+  integer :: k ! for looping over the vertical
 
 contains
 
@@ -99,11 +110,10 @@ contains
       case ( 'EMEP' )
         call ammonium()
       case ( 'MARS' , 'MARS_2900', 'GEOSCHEM')
-        call emep2MARS(debug_flag)
+        call emep2MARS(i, j, debug_flag)
       case ( 'EQSAM' )
         call emep2EQSAM(i, j, debug_flag)
       case ( 'ISORROPIA' )
-        !NOV22 call StopAll('Isorropia problems found. Removed for now')
         call emep2Isorropia(i,j,debug_flag)
       case default
         if( my_first_call .and. MasterProc ) then
@@ -132,17 +142,16 @@ contains
     character(len=15), save  :: scase
   
     ! EMEP declarations
-    real, parameter :: Ncm3_to_molesm3 = 1.0e6/AVOG    ! #/cm3 to moles/m3
-    real, parameter :: molesm3_to_Ncm3 = 1.0/Ncm3_to_molesm3
-    integer :: k, n
+    integer :: n
     real, parameter :: CONMIN = 1.0e-30   ! Concentration lower limit [mole/m3]
     real, parameter :: MWCL   = 35.453,   MWNA   = 22.9897 ! MW Chloride, Sodium
     real, parameter :: MWCA   = 40.078,   MWK    = 39.0973 ! MW Calcium, Potassium
     real, parameter :: MWH2O  = 18.0153,  MWMG   = 24.305  ! MW Water, Magnesium
   
-    real :: tmpno3, tmpnh3, tmpnhx, tmphno3
+    real :: tmpno3, tmpnh3, tmpnhx, tmphno3, therm_temp
     logical, save :: first_isor = .true.
-  
+    integer :: lf_iter, niter
+    
   !  INPUT:
   !  1. [WI]
   !     DOUBLE PRECISION array of length [8].
@@ -213,9 +222,13 @@ contains
   
      
     do n = 1,1 ! (fine, coarse) -- optional. Only fine for now; coarse needs tinkering.
-      
+         
       do k = KCHEMTOP,KMAX_MID 
-  
+        niter = 1
+        if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+        do lf_iter=1, niter !only used for LocalFractions, otherwise just one "iteration"
+        call lf_aero_pre(i,j,k,lf_iter) !only used for LocalFractions
+ 
         ! isorropia only for when T > 250 K and P > 200 hPa (CMAQ and GEOS-Chem; Shannon Capps discussion)
         if (pp(k) > 20000.0 .and. temp(k) > 250.0) then 
   
@@ -265,11 +278,25 @@ contains
           tmpno3  = tmphno3 + xn_2d(NO3_f_ix,k)
   
           ! OM25_p is the sum of the particle-phase OM25, and currently has MW 1 for simplicity
-          wo(1) = xn_2d(OM_ix,k) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter
-          wo(2) = 0.15 ! kappa organic aerosol; standard value from stand-alone input file
-          wo(3) = 1400 ! aerosol density kg/m3; Based on observations (Kakavas, 2023) & florou et al., 2014
+
+          if ( AERO%ORGANIC_WATER ) then
+            wo(1) = xn_2d(OM_ix,k) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter 
+          else 
+            wo(1) = 0.
+          endif
+          wo(2) = AERO%OM_KAPPA ! always set tot non-zero just in case it causes trouble
+          wo(3) = AERO%OM_RHO
+
+          RH_thermodynamics = min( AERO%RH_UPLIM_AERO, rh(k) )
+          RH_thermodynamics = max( AERO%RH_LOLIM_AERO, RH_thermodynamics )
+
+          if ( k >= KEMISTOP ) then ! boundary layer (emission) levels soft 255 K limit for stability
+            therm_temp = max ( temp(k), 255.0 )
+          else
+            therm_temp = temp(k)
+          end if
   
-          call isoropia ( wi, wo, rh(k),  temp(k), CNTRL, &       
+          call isoropia ( wi, wo, RH_thermodynamics, therm_temp, CNTRL, &       
                           wt, gas, aerliq, aersld, scase, other )  
   
           ! pH = -log10([H+]/M) where M = mol dm-3 in the solution. mol/m3 h2o to kg/m3 as 1e-3 * MWH20.
@@ -307,6 +334,7 @@ contains
   
             ! aerosol water (ug/m**3) -- 18.01528 MW H2O
             PM25_water_rh50(i,j) =  max( 0., aerliq(8) * MWH2O * 1e6 )
+            call lf_aero_pos(i,j,k,lf_iter,2,0)
           end if 
   
           !if ( xn_2d(NO3_f_ix,k )  < 0.0 .or.  xn_2d(NH4_f_ix,k) < 0.0 ) then
@@ -325,13 +353,17 @@ contains
           end if
           !call StopAll("ISOR")
   
-        endif ! > 200 hPa and > 250 K
+       endif ! > 200 hPa and > 250 K
+
+       call lf_aero_pos(i,j,k,lf_iter,0,0)
+       end do ! lf_iter
+    
       end do ! k = KCHEMTOP, KMAX_MID
     end do ! n = 1,2 (fine, coarse)
   end subroutine emep2isorropia
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      subroutine emep2MARS(debug_flag)
+      subroutine emep2MARS(i,j,debug_flag)
 
  !..................................................................
  ! Pretty old F. Binkowski code from EPA CMAQ-Models3
@@ -339,6 +371,7 @@ contains
  !..................................................................
 
  logical, intent(in) :: debug_flag 
+ integer, intent(in) :: i,j
  real, parameter ::    FLOOR = 1.0E-30         ! minimum concentration  
  real, parameter ::    FLOOR2 = 1.0E-9         ! minimum concentration  
 
@@ -346,7 +379,7 @@ contains
   real    :: so4in, no3in, nh4in, hno3in, nh3in,   &
              aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out,   &
              coef
-  integer :: k, errmark
+  integer :: k, errmark, niter, iter
  !-----------------------------------
   call CheckStop( SO4_ix<1, "emep2MARS:SO4 not defined" )
   call CheckStop( NH4_f_ix<1, "emep2MARS:NH4_f not defined" )
@@ -354,11 +387,13 @@ contains
   call CheckStop( NO3_f_ix<1, "emep2MARS:NO3_f not defined" )
   call CheckStop( NH3_ix<1, "emep2MARS: NH3 not defined" )
 
-   coef = 1.e12 / AVOG
+  coef = 1.e12 / AVOG
 
-   do k = KCHEMTOP, KMAX_MID
-  
-
+  do k = KCHEMTOP, KMAX_MID
+      niter = 1
+      if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+      do iter=1,niter !only used for LocalFractions
+      call lf_aero_pre(i,j,k,iter) !only used for LocalFractions
 !//.... molec/cm3 -> ug/m3
 ! Use FLOOR2 = 1.0e-8 molec/cm3 for input. Too many problems
       so4in  = max(FLOOR2, xn_2d(SO4_ix,k)) * species(SO4_ix)%molwt  *coef
@@ -367,17 +402,20 @@ contains
       no3in  = max(FLOOR2, xn_2d(NO3_f_ix,k)) * species(NO3_f_ix)%molwt  *coef
       nh4in  = max(FLOOR2, xn_2d(NH4_f_ix,k)) * species(NH4_f_ix)%molwt  *coef
 
- !--------------------------------------------------------------------------                
-      if(AERO%EQUILIB=='MARS')then 
-         call rpmares (so4in, hno3in,no3in ,nh3in, nh4in , rh(k), temp(k),   &
+      RH_thermodynamics = min( AERO%RH_UPLIM_AERO, rh(k) )
+      RH_thermodynamics = max( AERO%RH_LOLIM_AERO, RH_thermodynamics )
+
+      !--------------------------------------------------------------------------                
+      if(AERO%EQUILIB=='MARS')then
+         call rpmares (so4in, hno3in,no3in ,nh3in, nh4in , RH_thermodynamics, temp(k),   &
               aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out, &
               ERRMARK,debug_flag) 
       elseif(AERO%EQUILIB=='MARS_2900')then!svn version 2908, for testing if there are significant differences. will be deleted
-         call rpmares_2900 (so4in, hno3in,no3in ,nh3in, nh4in , rh(k), temp(k),   &
+         call rpmares_2900 (so4in, hno3in,no3in ,nh3in, nh4in , RH_thermodynamics, temp(k),   &
               aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out, &
               ERRMARK,debug_flag) 
       elseif(AERO%EQUILIB=='GEOSCHEM')then
-         call DO_RPMARES_new (so4in, hno3in,no3in ,nh3in, nh4in , rh(k), temp(k),   &
+         call DO_RPMARES_new (so4in, hno3in,no3in ,nh3in, nh4in , RH_thermodynamics, temp(k),   &
               aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out, &
               ERRMARK,debug_flag)
       end if
@@ -390,12 +428,13 @@ contains
         call CheckStop(aNO3out< 0.0, "XMARS: aNO3out")
         call CheckStop(aNH4out< 0.0, "XMARS: aNH4out")
       end if ! DEBUG%EQUIB
-
+      
       xn_2d(HNO3_ix,k)  = max (FLOOR, gNO3out / (species(HNO3_ix)%molwt *coef) )
       xn_2d(NH3_ix,k)   = max (FLOOR, gNH3out / (species(NH3_ix)%molwt  *coef) )
-      xn_2d(NO3_f_ix,k)  = max (FLOOR, aNO3out / (species(NO3_f_ix)%molwt  *coef) )
-      xn_2d(NH4_f_ix,k)  = max (FLOOR, aNH4out / (species(NH4_f_ix)%molwt  *coef) )
-
+      xn_2d(NO3_f_ix,k) = max (FLOOR, aNO3out / (species(NO3_f_ix)%molwt  *coef) )
+      xn_2d(NH4_f_ix,k) = max (FLOOR, aNH4out / (species(NH4_f_ix)%molwt  *coef) )
+      call lf_aero_pos(i,j,k,iter,0,ERRMARK)
+      end do
    end do  ! K-levels
 
  end subroutine emep2MARS
@@ -462,29 +501,58 @@ contains
   end if
 
 !//.... molec/cm3 -> micromoles/m**3
-    so4in(KCHEMTOP:KMAX_MID)  = xn_2d(SO4_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG
-    hno3in(KCHEMTOP:KMAX_MID) = xn_2d(HNO3_ix,KCHEMTOP:KMAX_MID) *1.e12/AVOG
-    nh3in(KCHEMTOP:KMAX_MID)  = xn_2d(NH3_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG 
-    no3in(KCHEMTOP:KMAX_MID)  = xn_2d(NO3_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG 
-    nh4in(KCHEMTOP:KMAX_MID)  = xn_2d(NH4_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG
-  if ( iSeaSalt > 0 .and. AERO%INTERNALMIXED) then
-    NAin(KCHEMTOP:KMAX_MID)  = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(iSeaSalt)%molwt * 0.30 / MWNA
-    CLin(KCHEMTOP:KMAX_MID)  = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(iSeaSalt)%molwt * 0.55 / MWCL
-    CAin(KCHEMTOP:KMAX_MID) = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(iSeaSalt)%molwt * 0.01 / MWCA
-    MGin(KCHEMTOP:KMAX_MID) = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(iSeaSalt)%molwt * 0.04 / MWMG
-    Kin (KCHEMTOP:KMAX_MID) = xn_2d(iSeaSalt,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(iSeaSalt)%molwt * 0.01 / MWK
+    so4in(KCHEMTOP:KMAX_MID)  = max(CONMIN, xn_2d(SO4_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG)
+    hno3in(KCHEMTOP:KMAX_MID) = max(CONMIN, xn_2d(HNO3_ix,KCHEMTOP:KMAX_MID) *1.e12/AVOG)
+    nh3in(KCHEMTOP:KMAX_MID)  = max(CONMIN, xn_2d(NH3_ix,KCHEMTOP:KMAX_MID)  *1.e12/AVOG)
+    no3in(KCHEMTOP:KMAX_MID)  = max(CONMIN, xn_2d(NO3_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG)
+    nh4in(KCHEMTOP:KMAX_MID)  = max(CONMIN, xn_2d(NH4_f_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG)
+
+  if (AERO%INTERNALMIXED .and. iSeaSalt > 0) then
+    ! Assuming composition of sea salt aerosol same as sea water
+    NAin(KCHEMTOP:KMAX_MID) = max(0., xn_2d(SSf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(SSf_ix)%molwt * 0.30 / MWNA)
+    CLin(KCHEMTOP:KMAX_MID) = max(0., xn_2d(SSf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(SSf_ix)%molwt * 0.55 / MWCL)
    else
     NAin(KCHEMTOP:KMAX_MID)  = 0.0
     CLin(KCHEMTOP:KMAX_MID)  = 0.0
+   endif
+
+   if ( AERO%INTERNALMIXED .and. AERO%CATIONS .and. SSf_ix > 0) then
+     ! mass percentages of sea salt for below species taken from GEOS-Chem
+    CAin(KCHEMTOP:KMAX_MID) = max(0., xn_2d(SSf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(SSf_ix)%molwt * 0.0116 / MWCA)
+    MGin(KCHEMTOP:KMAX_MID) = max(0., xn_2d(SSf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(SSf_ix)%molwt * 0.0369 / MWMG)
+    Kin (KCHEMTOP:KMAX_MID) = max(0., xn_2d(SSf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(SSf_ix)%molwt * 0.0110 / MWK)
+   else
     CAin(KCHEMTOP:KMAX_MID)  = 0.0
     MGin(KCHEMTOP:KMAX_MID)  = 0.0
     Kin (KCHEMTOP:KMAX_MID)  = 0.0
    endif
 
+ ! contributions from dust using values for 'other' crustal species from Karydis et al. 2015 Table 2
+   if (AERO%CATIONS .and. Dustwbf_ix > 0) then
+    NAin(KCHEMTOP:KMAX_MID) = NAin(KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(Dustwbf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(Dustwbf_ix)%molwt * 0.012 / MWNA)
+    CAin(KCHEMTOP:KMAX_MID) = CAin(KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(Dustwbf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(Dustwbf_ix)%molwt * 0.024 / MWCA)
+    MGin(KCHEMTOP:KMAX_MID) = MGin(KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(Dustwbf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(Dustwbf_ix)%molwt * 0.009 / MWMG)
+    Kin (KCHEMTOP:KMAX_MID) = Kin (KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(Dustwbf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(Dustwbf_ix)%molwt * 0.015 / MWK)
+   endif
+
+   if (AERO%CATIONS .and. DustSahf_ix > 0) then
+    NAin(KCHEMTOP:KMAX_MID) = NAin(KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(DustSahf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(DustSahf_ix)%molwt * 0.012 / MWNA)
+    CAin(KCHEMTOP:KMAX_MID) = CAin(KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(DustSahf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(DustSahf_ix)%molwt * 0.024 / MWCA)
+    MGin(KCHEMTOP:KMAX_MID) = MGin(KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(DustSahf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(DustSahf_ix)%molwt * 0.009 / MWMG)
+    Kin (KCHEMTOP:KMAX_MID) = Kin (KCHEMTOP:KMAX_MID) + &
+                              max(0., xn_2d(DustSahf_ix,KCHEMTOP:KMAX_MID)*1.e12/AVOG* species(DustSahf_ix)%molwt * 0.015 / MWK)
+   endif
 
  !===  For ambient conditions =====================
-
-    rlhum(KCHEMTOP:KMAX_MID) = min (0.999, rh(:))
+    rlhum(KCHEMTOP:KMAX_MID) = min (AERO%RH_UPLIM_AERO, rh(:))
+    rlhum(KCHEMTOP:KMAX_MID) = max (AERO%RH_LOLIM_AERO, rlhum(KCHEMTOP:KMAX_MID) )
     tmpr(KCHEMTOP:KMAX_MID)  = temp(:)
 
  !--------------------------------------------------------------------------                
@@ -496,12 +564,7 @@ contains
    call EQSAM4clim (so4in,hno3in,no3in,nh3in,nh4in,NAin,CLin,CAin,MGin,Kin,rlhum,tmpr,   &
                      aSO4out, aNO3out, aNH4out, aCLout, gSO4out, gNH3out, gNO3out, gCLout, &
                      aH2Oout, apHout, KCHEMTOP,KMAX_MID)
- 
- !.. Previous call with rh, temp - not sure if makes difference ...........................   
- !   call EQSAM4clim (so4in, hno3in,no3in,nh3in,nh4in,NAin,CLin, rh, temp,  & !aH2Oin, &
- !                    aSO4out, aNO3out, aNH4out, aNAout, aCLout,            &
- !                    gSO4out, gNH3out, gNO3out, gClout, aH2Oout, apHout, KCHEMTOP, KMAX_MID)
- !--------------------------------------------------------------------------
+ !--------------------------------------------------------------------------  
 
 !//.... micromoles/m**3  -> molec/cm3 
 !      xn_2d(NO3,KCHEMTOP:KMAX_MID)  = FLOOR !different for ACID/OZONE
@@ -517,6 +580,15 @@ contains
 
       PM25_water(i,j,KCHEMTOP:KMAX_MID) = max(FLOOR, aH2Oout(KCHEMTOP:KMAX_MID) )
 
+      if (AERO%ORGANIC_WATER) then
+        do k=KCHEMTOP, KMAX_MID
+          ! Organic water, kg/m3 air from kappa kohler theory. Kakavas 2022 (https://doi.org/10.16993/tellusb.33)
+          OM_mass = xn_2d(OM_ix,k) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter 
+          PM25_water(i,j,k) = PM25_water(i,j,k) + &
+                             ( 1000. / AERO%OM_RHO ) * AERO%OM_KAPPA * OM_mass / ( 1. / rlhum(k) - 1. ) * kg_to_ug
+        end do
+      endif
+      
 !//... apHouts [mole/m3] and aerosol water (ug/m**3) 
 !      pH (i,j) = -log10 ( max(FLOOR,apHout(KMAX_MID))/PM25_water(i,j,KMAX_MID) ) - 9.0
       pH (i,j) = apHout(KMAX_MID)
@@ -529,31 +601,22 @@ contains
 
 
  !===  PM water for Rh=50% and T=20C  conditions ================================
+      rlhums = 0.5
+      tmprs  = 293.15
 
+ !===  Only for the lowest layer KMAX_MID ================
 !//.... molec/cm3 -> micromoles/m**3
       so4ins  = so4in(KMAX_MID:KMAX_MID)
       hno3ins = hno3in(KMAX_MID:KMAX_MID)
       nh3ins  = nh3in(KMAX_MID:KMAX_MID)
       no3ins  = no3in(KMAX_MID:KMAX_MID)
       nh4ins  = nh4in(KMAX_MID:KMAX_MID)
-  if ( iSeaSalt > 0 .and. AERO%INTERNALMIXED) then
+
       NAins   = NAin(KMAX_MID:KMAX_MID)
       CLins   = CLin(KMAX_MID:KMAX_MID)
       CAins   = CAin(KMAX_MID:KMAX_MID)
       MGins   = MGin(KMAX_MID:KMAX_MID)
-      Kins    = Kin(KMAX_MID:KMAX_MID)
-  else
-      NAins   = 0.0
-      CAins   = 0.0
-      MGins   = 0.0
-      Kins    = 0.0
-      CLins   = 0.0
-  endif
-
-!//.... Only for the lowest layer KMAX_MID
-
-      rlhums = 0.5
-      tmprs  = 293.15
+      Kins    = Kin (KMAX_MID:KMAX_MID)
 
  !--------------------------------------------------------------------------                
    
@@ -570,6 +633,13 @@ contains
 !//....aerosol water (ug/m**3) 
 
       PM25_water_rh50 (i,j)  = max(0., aH2Oouts(KMAX_MID) )
+
+      if (AERO%ORGANIC_WATER) then
+        ! Organic water, kg/m3 air from kappa kohler theory. Kakavas 2022 (https://doi.org/10.16993/tellusb.33)
+        OM_mass = xn_2d(OM_ix,KMAX_MID) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter 
+        PM25_water_rh50(i,j) = PM25_water_rh50(i,j) + &
+                             ( 1000. / AERO%OM_RHO ) * AERO%OM_KAPPA * OM_mass / ( 1. / 0.5 - 1. ) * kg_to_ug
+      endif
 
   if ( debug_flag ) then ! Selected debug cell
     write(*,*)'EQSAM PMwater_rh50', PM25_water_rh50 (i,j)
@@ -597,7 +667,7 @@ contains
   real    :: so4in, no3in, nh4in, hno3in, nh3in,   &
              aSO4out, aNO3out, aH2Oout, aNH4out, gNH3out, gNO3out,   &
              coef
-  integer :: k, errmark
+  integer :: k, errmark, iter, niter
  !-----------------------------------
   if(AERO%EQUILIB/='MARS' .and. AERO%EQUILIB/='MARS_2900' .and. AERO%EQUILIB/='GEOSCHEM')then
      PM25_water(i,j,:) = 0.0
@@ -607,7 +677,8 @@ contains
    coef = 1.e12 / AVOG
 
  !.. PM2.5 water at ambient conditions (3D)
-   rlhum(:) = rh(:) 
+   rlhum(:) = min( AERO%RH_UPLIM_AERO, rh(:) )
+   rlhum(:) = max( AERO%RH_LOLIM_AERO, rlhum(:) )
    tmpr(:)  = temp(:)
 
     do k = KCHEMTOP, KMAX_MID
@@ -639,6 +710,13 @@ contains
 !//....aerosol water (ug/m**3) 
       PM25_water(i,j,k) = max (0., aH2Oout )
 
+      if (AERO%ORGANIC_WATER) then
+        ! Organic water, kg/m3 air from kappa kohler theory. Kakavas 2022 (https://doi.org/10.16993/tellusb.33)
+        OM_mass = xn_2d(OM_ix,k) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter 
+        PM25_water(i,j,k) = PM25_water(i,j,k) + &
+                          ( 1000. / AERO%OM_RHO ) * AERO%OM_KAPPA * OM_mass / ( 1. / rlhum(k) - 1. ) * kg_to_ug
+      endif
+
     end do  ! k-loop
 
 !.. PM2.5 water at equilibration conditions for gravimetric PM (Rh=50% and t=20C)
@@ -646,6 +724,10 @@ contains
     rlhum(:) = 0.5
     tmpr(:)  = 293.15
     k = KMAX_MID
+      niter = 1
+      if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+      do iter=1,niter !only used for LocalFractions
+      call lf_aero_pre(i,j,k,iter) !only used for LocalFractions
 !//.... molec/cm3 -> ug/m3
       so4in  = xn_2d(SO4_ix,k) * species(SO4_ix)%molwt  *coef *cfac(SO4_ix-NSPEC_SHL,i,j) 
       hno3in = xn_2d(HNO3_ix,k)* species(HNO3_ix)%molwt *coef *cfac(HNO3_ix-NSPEC_SHL,i,j)
@@ -669,7 +751,15 @@ contains
   !--------------------------------------------------------------------------
 
       PM25_water_rh50 (i,j) = max (0., aH2Oout )
+      call lf_aero_pos(i,j,k,iter,1,ERRMARK)
+      end do
 
+      if (AERO%ORGANIC_WATER) then
+        ! Organic water, kg/m3 air from kappa kohler theory. Kakavas 2022 (https://doi.org/10.16993/tellusb.33)
+        OM_mass = xn_2d(OM_ix,KMAX_MID) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter 
+        PM25_water_rh50(i,j) = PM25_water_rh50(i,j) + &
+                          ( 1000. / AERO%OM_RHO ) * AERO%OM_KAPPA * OM_mass / ( 1. / 0.5 - 1. ) * kg_to_ug
+      endif
 
  end subroutine  Aero_water_MARS
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

@@ -1,7 +1,7 @@
-! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -175,7 +175,7 @@ contains
  subroutine init_DryDep()
 
   integer, save ::  old_daynumber = -99
-  integer :: i, j, lc, ilc, nlc, is, iEco   ! for EcoSystem stuff
+  integer :: i, j, lc, ilc, nlc, iEco   ! for EcoSystem stuff
   logical :: debug_flag  ! for EcoSystem stuff
   real    :: coverage    ! for EcoSystem stuff
   character(len=*), parameter :: dtxt='iniDDep:'
@@ -262,8 +262,6 @@ contains
          dtz         ! scaling factor for veff ( = dt/z, where dt=timestep and 
                      ! z = height of layer)
 
-    integer :: nae
-
     real, save :: inv_gridarea  ! inverse of grid area, m2
 
     real ::  Sumcover, Sumland   ! Land-coverage
@@ -279,8 +277,6 @@ contains
 
     real :: c_hveg, Ra_diff, surf_ppb  ! for O3 fluxes and Fst where needed
     real :: c_hveg3m, o3_45m  ! TESTS ONLY
-    character(len=20), save :: fname
-    integer :: nglob
     logical :: first_ddep = .true.
     real :: r_dry, r_wet, rho_wet, Vs_dry, Vs_wet
 !    real :: S ! saturation ration = e/es ~ fRH

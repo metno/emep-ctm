@@ -202,7 +202,7 @@
    ! c     REAL start, finish   ! For CPU timing
    !
    !c      call cpu_time(start) ! For CPU timing
-   
+
    ! *** PROBLEM TYPE (0=FOREWARD, 1=REVERSE) ******************************
    !
          IPROB   = NINT(CNTRL(1))
@@ -211,7 +211,7 @@
    !
    !
    ! *** SAVE ORGANICS TO MAIN ARRAY ***************************************
-   !	
+   !
          ORG(1) = WO(1)
          ORG(2) = WO(2)
          ORG(3) = MAX(WO(3),TINY)  ! In case density declared zero because organics are zero.
@@ -322,8 +322,8 @@
          WT(6) = WI(6)
          WT(7) = WI(7)
          WT(8) = WI(8)
-   
-   
+
+
          IF (IPROB.GT.0 .AND. WATER.GT.TINY) THEN
             WT(3) = WT(3) + GNH3
             WT(4) = WT(4) + GHNO3
@@ -333,7 +333,7 @@
    !c
    !c      call cpu_time(finish)     ! For CPU timing
    !c      write (66,*) finish-start ! For CPU timing
-   
+
          RETURN
    !
    ! *** END OF SUBROUTINE ISOROPIA ******************************************
@@ -424,7 +424,7 @@
    !
          RETURN
          END SUBROUTINE SETPARM
-   
+
    !
    !=======================================================================
    !
@@ -464,7 +464,7 @@
    !
          RETURN
          END SUBROUTINE GETPARM
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -1288,9 +1288,9 @@
    ! *** END OF SUBROUTINE INIT1 *******************************************
    !
          END SUBROUTINE INIT1
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -2033,7 +2033,7 @@
          XK25 = 9.557D21  ! MGCL2(s)         <==> MG(aq)    + 2CL(aq)
    !      XK26 = 4.299D-7  ! CO2(aq) + H2O    <==> HCO3(aq)  + H(aq)
    !      XK27 = 4.678D-11 ! HCO3(aq)         <==> CO3(aq)   + H(aq)
-   
+
    !
          IF (INT(TEMP) .NE. 298) THEN   ! FOR T != 298K or 298.15K
             T0  = 298.15D0
@@ -2072,7 +2072,7 @@
    !         XK25= XK25 *EXP(  .0*(T0T-1.0) + .0*COEF)
    !         XK26= XK26 *EXP(-3.0821*(T0T-1.0) + 31.8139*COEF)
    !         XK27= XK27 *EXP(-5.9908*(T0T-1.0) + 38.844*COEF)
-   
+
          ENDIF
          XK2  = XK21*XK22
          XK42 = XK4/XK41
@@ -2535,7 +2535,7 @@
             EXNH4 = MOLAL(3) + CNH4CL + CNH4NO3 + CNH4HS4 + 2D0*CNH42S4 &
         &                    + 3D0*CLC &
         &          -WI(3)
-   
+
          ENDIF
          EXNH4 = MAX(EXNH4,ZERO)
          IF (EXNH4.LT.TINY) GOTO 20    ! No excess NH4, go to next precursor
@@ -2709,7 +2709,7 @@
    !
     50   RETURN
       END SUBROUTINE ADJUST
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -2850,8 +2850,8 @@
    !
    ! *** END OF BLOCK DATA AERSR ******************************************
    !
-          END BLOCK DATA 
-   
+          END BLOCK DATA
+
    !
    !=======================================================================
    !
@@ -2961,9 +2961,9 @@
    ! *** END OF SUBROUTINE CALCNA ******************************************
    !
          END SUBROUTINE CALCNA
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3000,15 +3000,15 @@
          MOLAL(1) = MOLAL(1) - DELT
          MOLAL(7) = MOLAL(7) - DELT
          GHNO3    = MOLAL(1)*MOLAL(7)/ALFA
-   
+
    !cc      write (*,*) ALFA, MOLAL(1), MOLAL(7), GHNO3, DELT
    !
          RETURN
    !
    ! *** END OF SUBROUTINE CALCNAP *****************************************
-   ! 
+   !
          END SUBROUTINE CALCNAP
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3063,9 +3063,9 @@
    ! *** END OF SUBROUTINE CALCNH3 *****************************************
    !
          END SUBROUTINE CALCNH3
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3102,8 +3102,8 @@
    ! *** END OF SUBROUTINE CALCNH3P ****************************************
    !
          END SUBROUTINE CALCNH3P
-   
-   
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3213,11 +3213,11 @@
    60    RETURN
    !
    ! *** END OF SUBROUTINE CALCNHA *****************************************
-   ! 
+   !
          END SUBROUTINE CALCNHA
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3271,7 +3271,7 @@
    ! *** END OF SUBROUTINE CALCNHP *****************************************
    !
          END SUBROUTINE CALCNHP
-   
+
    !=======================================================================
    !
          SUBROUTINE CALCAMAQ (NH4I, OHI, DELT)
@@ -3291,7 +3291,7 @@
          BB   =-(OM1+OM2+A22*AKW)
          CC   = OM1*OM2
          DD   = SQRT(BB*BB-4.D0*CC)
-   
+
          DEL1 = 0.5D0*(-BB - DD)
          DEL2 = 0.5D0*(-BB + DD)
    !
@@ -3319,9 +3319,9 @@
    ! *** END OF SUBROUTINE CALCAMAQ ****************************************
    !
          END SUBROUTINE CALCAMAQ
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3366,9 +3366,9 @@
    ! *** END OF SUBROUTINE CALCAMAQ2 ****************************************
    !
          END SUBROUTINE CALCAMAQ2
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3399,7 +3399,7 @@
          BB   =-(OM1+OM2+A32)
          CC   = OM1*OM2
          DD   = SQRT(BB*BB-4.D0*CC)
-   
+
          DEL1 = 0.5D0*(-BB - DD)
          DEL2 = 0.5D0*(-BB + DD)
    !
@@ -3420,9 +3420,9 @@
    ! *** END OF SUBROUTINE CALCCLAQ ****************************************
    !
          END SUBROUTINE CALCCLAQ
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3466,9 +3466,9 @@
    ! *** END OF SUBROUTINE CALCCLAQ2 ****************************************
    !
          END SUBROUTINE CALCCLAQ2
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3499,7 +3499,7 @@
          BB   =-(OM1+OM2+A42)
          CC   = OM1*OM2
          DD   = SQRT(BB*BB-4.D0*CC)
-   
+
          DEL1 = 0.5D0*(-BB - DD)
          DEL2 = 0.5D0*(-BB + DD)
    !
@@ -3523,9 +3523,9 @@
    ! *** END OF SUBROUTINE CALCNIAQ ****************************************
    !
          END SUBROUTINE CALCNIAQ
-   
-   
-   
+
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3572,7 +3572,7 @@
    ! *** END OF SUBROUTINE CALCNIAQ2 ****************************************
    !
          END SUBROUTINE CALCNIAQ2
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3853,7 +3853,7 @@
          WATER = ZERO        ! sum up all water contributions
          DO I=1,NPAIR+1
             WATER = WATER + WATCMP(I)
-         ENDDO		
+         ENDDO
          WATER = MAX(WATER, TINY)
    !
          RETURN
@@ -3863,7 +3863,7 @@
          END SUBROUTINE CALCMR
    !
    !=======================================================================
-   
+
    ! *** ISORROPIA CODE
    ! *** SUBROUTINE CALCHS4
    ! *** THIS SUBROUTINE CALCULATES THE HSO4 GENERATED FROM (H,SO4).
@@ -3927,8 +3927,8 @@
    ! *** END OF SUBROUTINE CALCHS4 *****************************************
    !
          END SUBROUTINE CALCHS4
-   
-   
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -3969,7 +3969,7 @@
    ! *** END OF SUBROUTINE CALCPH ******************************************
    !
          END SUBROUTINE CALCPH
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE II
@@ -4002,7 +4002,7 @@
    !
          RETURN
          END SUBROUTINE CALCACT
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE II
@@ -4026,7 +4026,7 @@
          REAL :: G0(6,4),ZPL,ZMI,AGAMA,SION,H,CH,F1(6),F2A(4),F2B(4)
          REAL :: MPL, XIJ, YJI
          DATA G0/24*0D0/
-   
+
    !
          GA(I,J)= (F1(I)/Z(I) + F2A(J)/Z(J+3)) / (Z(I)+Z(J+3)) - H
          GB(I,J)= (F1(I)/Z(I+4) + F2B(J)/Z(J+3)) / (Z(I+4)+Z(J+3)) - H
@@ -4062,7 +4062,7 @@
         &               G0(3,2),G0(3,4),G0(3,1),G0(1,2),G0(1,3),G0(3,3), &
         &               G0(1,4),G0(1,1),G0(2,3),G0(4,4),G0(4,1),G0(5,2), &
         &               G0(5,3),G0(5,4),G0(5,1),G0(6,2),G0(6,4),G0(6,1))
-   
+
    !
    ! *** CALCULATE MULTICOMPONENT ACTIVITY COEFFICIENTS *******************
    !
@@ -4106,7 +4106,7 @@
                F1(I) = F1(I) + SNGL(YJI*(G0(I,J) + ZPL*ZMI*H))
                F2B(J) = F2B(J) + SNGL(XIJ*(G0(I,J) + ZPL*ZMI*H))
    330   CONTINUE
-   
+
    !
    ! *** LOG10 OF ACTIVITY COEFFICIENTS ***********************************
    !
@@ -4372,11 +4372,11 @@
             IONIC=IONIC + MOLAL(I)*Z(I)*Z(I)
    30    CONTINUE
          IONIC = MAX(MIN(0.5*IONIC/WATER,100.d0), TINY)
-   
+
    !      ! slc.debug
    !      write(*,*) 'ionic: ', ionic
    !      write(*,*) 'water: ', water
-   
+
    !
    ! *** CALCULATE BINARY ACTIVITY COEFFICIENTS ***************************
    !
@@ -4388,11 +4388,11 @@
         &               G0(3,2),G0(3,4),G0(3,1),G0(1,2),G0(1,3),G0(3,3), &
         &               G0(1,4),G0(1,1),G0(2,3),G0(4,4),G0(4,1),G0(5,2), &
         &               G0(5,3),G0(5,4),G0(5,1),G0(6,2),G0(6,4),G0(6,1))
-   
+
          ! slc.debug
    !      write(*,*) 'G0: ',G0(3,2),G0(3,4),G0(1,2)
    !      write(*,*) 'G0: ',G0(1,3),G0(3,3),G0(1,4)
-   
+
    !
    ! *** CALCULATE MULTICOMPONENT ACTIVITY COEFFICIENTS *******************
    !
@@ -4406,12 +4406,12 @@
    100   CONTINUE
          F2(4)=0.0
    !
-   
+
    !      ! slc.debug
    !      write(*,*) 'Z: ',Z
    !      write(*,*) 'H: ',H
    !      WRITE(*,*) 'MOLAL: ',MOLAL
-   
+
          DO 110 I=1,3,2
             ZPL = Z(I)
             MPL = MOLAL(I)/WATER
@@ -4423,11 +4423,11 @@
                F1(I) = F1(I) + SNGL(YJI*(G0(I,J) + ZPL*ZMI*H))
                F2(J) = F2(J) + SNGL(XIJ*(G0(I,J) + ZPL*ZMI*H))
    110   CONTINUE
-   
+
    !      ! slc.debug
    !      write(*,*) 'F1', F1
    !      write(*,*) 'F2', F2
-   
+
    !
    ! *** LOG10 OF ACTIVITY COEFFICIENTS ***********************************
    !
@@ -4818,8 +4818,8 @@
    !
          RETURN
          END SUBROUTINE KMTAB
-   
-   
+
+
    !      INTEGER FUNCTION IBACPOS(IN)
    !C
    !C     Compute the index in the binary activity coefficient array
@@ -4837,7 +4837,7 @@
    !      ibacpos = min(ibacpos, 741)
    !      return
    !      end
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -4909,8 +4909,8 @@
    !
          RETURN
          END SUBROUTINE KM198
-   
-   
+
+
          BLOCK DATA KMCF198
    !
    ! *** Common block definition
@@ -4922,7 +4922,7 @@
         &BNC13M(  561),BNC14M(  561),BNC15M(  561),BNC16M(  561), &
         &BNC17M(  561),BNC18M(  561),BNC19M(  561),BNC20M(  561), &
         &BNC21M(  561),BNC22M(  561),BNC23M(  561)
-   
+
    !
    ! *** NaCl
    !
@@ -6488,7 +6488,7 @@
         & 4.586, 4.591, 4.595 &
         & /
          END BLOCK DATA
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -6560,8 +6560,8 @@
    !
          RETURN
          END SUBROUTINE KM223
-   
-   
+
+
          BLOCK DATA KMCF223
    !
    ! *** Common block definition
@@ -6573,7 +6573,7 @@
         &BNC13M(  561),BNC14M(  561),BNC15M(  561),BNC16M(  561), &
         &BNC17M(  561),BNC18M(  561),BNC19M(  561),BNC20M(  561), &
         &BNC21M(  561),BNC22M(  561),BNC23M(  561)
-   
+
    !
    ! *** NaCl
    !
@@ -8211,8 +8211,8 @@
    !
          RETURN
          END SUBROUTINE KM248
-   
-   
+
+
          BLOCK DATA KMCF248
    !
    ! *** Common block definition
@@ -8224,7 +8224,7 @@
         &BNC13M(  561),BNC14M(  561),BNC15M(  561),BNC16M(  561), &
         &BNC17M(  561),BNC18M(  561),BNC19M(  561),BNC20M(  561), &
         &BNC21M(  561),BNC22M(  561),BNC23M(  561)
-   
+
    !
    ! *** NaCl
    !
@@ -9862,8 +9862,8 @@
    !
          RETURN
          END SUBROUTINE KM273
-   
-   
+
+
          BLOCK DATA KMCF273
    !
    ! *** Common block definition
@@ -9875,7 +9875,7 @@
         &BNC13M(  561),BNC14M(  561),BNC15M(  561),BNC16M(  561), &
         &BNC17M(  561),BNC18M(  561),BNC19M(  561),BNC20M(  561), &
         &BNC21M(  561),BNC22M(  561),BNC23M(  561)
-   
+
    !
    ! *** NaCl
    !
@@ -11513,8 +11513,8 @@
    !
          RETURN
          END SUBROUTINE KM298
-   
-   
+
+
          BLOCK DATA KMCF298
    !
    ! *** Common block definition
@@ -11526,7 +11526,7 @@
         &BNC13M(  561),BNC14M(  561),BNC15M(  561),BNC16M(  561), &
         &BNC17M(  561),BNC18M(  561),BNC19M(  561),BNC20M(  561), &
         &BNC21M(  561),BNC22M(  561),BNC23M(  561)
-   
+
    !
    ! *** NaCl
    !
@@ -13164,8 +13164,8 @@
    !
          RETURN
          END SUBROUTINE KM323
-   
-   
+
+
          BLOCK DATA KMCF323
    !
    ! *** Common block definition
@@ -13177,7 +13177,7 @@
         &BNC13M(  561),BNC14M(  561),BNC15M(  561),BNC16M(  561), &
         &BNC17M(  561),BNC18M(  561),BNC19M(  561),BNC20M(  561), &
         &BNC21M(  561),BNC22M(  561),BNC23M(  561)
-   
+
    !
    ! *** NaCl
    !
@@ -14746,8 +14746,8 @@
    ! *** END OF BLOCK DATA EXPON ******************************************
    !
          END BLOCK DATA
-   
-   
+
+
    !C*************************************************************************
    !C
    !C  TOOLBOX LIBRARY v.1.0 (May 1995)
@@ -14788,8 +14788,8 @@
          RETURN
    !
          END
-   
-   
+
+
    !C*************************************************************************
    !C
    !C  TOOLBOX LIBRARY v.1.0 (May 1995)
@@ -14827,10 +14827,10 @@
          RETURN
    !
          END
-   
-   
-   
-   
+
+
+
+
    !C*************************************************************************
    !C
    !C  TOOLBOX LIBRARY v.1.0 (May 1995)
@@ -14885,8 +14885,8 @@
          GOTO 10                     ! GO FOR NEW OCCURANCE OF 'OLD'
    !
          END
-   
-   
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -14922,10 +14922,10 @@
    !
          SUBROUTINE POLY3 (A1, A2, A3, ROOT, ISLV)
    !
-         IMPLICIT REAL (A-H, O-Z)
+         IMPLICIT REAL*8 (A-H, O-Z)
          PARAMETER (EXPON=1.D0/3.D0,     ZERO=0.D0, THET1=120.D0/180.D0, &
         &           THET2=240.D0/180.D0, PI=3.1415926535897932, EPS=1D-50)
-         REAL ::  X(3)
+         REAL*8 ::  X(3)
    !
    ! *** SPECIAL CASE : QUADRATIC*X EQUATION *****************************
    !
@@ -14967,7 +14967,7 @@
    !
             ELSE IF (D.LE.EPS) THEN    ! -EPS <= D <= EPS  : D = ZERO
                IX   = 2
-               SSIG = SIGN (1.D0, R)
+               SSIG = SIGN (1.0, R)
                S    = SSIG*(ABS(R))**EXPON
                X(1) = 2.D0*S  - EXPON*A1
                X(2) =     -S  - EXPON*A1
@@ -14977,8 +14977,8 @@
             ELSE                       ! D > EPS  : D > ZERO
                IX   = 1
                SQD  = SQRT(D)
-               SSIG = SIGN (1.D0, R+SQD)       ! TRANSFER SIGN TO SSIG
-               TSIG = SIGN (1.D0, R-SQD)
+               SSIG = SIGN (1.0, R+SQD)       ! TRANSFER SIGN TO SSIG
+               TSIG = SIGN (1.0, R-SQD)
                S    = SSIG*(ABS(R+SQD))**EXPON ! EXPONENTIATE ABS()
                T    = TSIG*(ABS(R-SQD))**EXPON
                X(1) = S + T - EXPON*A1
@@ -14999,7 +14999,7 @@
    !
          RETURN
          END SUBROUTINE POLY3
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -15048,8 +15048,8 @@
    !
          RETURN
          END FUNCTION EX10
-   
-   
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -15128,8 +15128,8 @@
    ! *** END OF BLOCK DATA EXPON ******************************************
    !
          END BLOCK DATA
-   
-   
+
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE
@@ -15162,7 +15162,7 @@
    ! *** END OF SUBROUTINE PUSHERR ****************************************
    !
          END SUBROUTINE PUSHERR
-   
+
    !=======================================================================
    !
    ! *** ISORROPIA CODE

@@ -1,7 +1,7 @@
-! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <BoundaryConditions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -69,7 +69,8 @@ use Config_module,         only: KMAX_MID  &  ! Number of levels in vertical
                      ,BGND_CH4  &  ! If positive, replaces defaults 
                      ,fileName_CH4_ibcs & ! If present, replaces uses iyr_trend
                      ,cmxbicDefaultFile & ! Table of simple defaults
-                     ,USES, MasterProc, PPB, Pref, LoganO3File, DustFile
+                     ,USES, MasterProc, PPB, Pref, LoganO3File, DustFile&
+                     ,BIC_O3_FAC, BIC_N_FAC, BIC_S_FAC, BIC_V_FAC, BIC_A_FAC !scaling variables for BIC SR reduction runs
 use Debug_module,          only: DEBUG, DebugCell   ! -> DEBUG%BCS
 use Functions_mod,         only: StandardAtmos_kPa_2_km ! for use in Hz scaling
 use GridValues_mod,        only: glon, glat   & ! full domain lat, long
@@ -1070,7 +1071,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   !---------------------------------------------------------------------------
   ! Mace Head ozone concentrations for backgroudn sectors
   ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
-  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2021
+  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2023
   real, dimension(12,MH_YEAR1:MH_YEAR2), parameter :: macehead_year=reshape(&
    [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
     36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
@@ -1115,7 +1116,9 @@ real :: trend_o3=1.0, trend_co, trend_voc
     42.1,43.6,44.8,46.9,42.8,33.8,28.0,28.9,34.3,38.9,41.5,37.8,& !2018
     40.6,43.4,44.9,44.0,37.7,35.6,28.4,32.5,31.3,37.2,38.8,38.2,& !2019
     41.5,42.4,43.6,45.5,39.2,32.1,23.4,28.7,30.8,36.9,39.7,38.4,& !2020
-    37.2,42.1,42.4,45.2,42.0,30.4,25.7,31.2,36.0,37.1,40.6,40.6]& !2021 
+    37.2,42.1,42.4,45.2,42.0,30.4,25.7,31.2,36.0,37.1,40.6,40.6,& !2021
+    41.3,44.1,42.9,43.7,41.9,34.6,26.0,30.9,37.1,37.1,40.0,41.9,& !2022
+    40.7,42.4,44.2,44.3,39.6,34.3,30.4,33.0,34.8,36.0,39.4,40.6]& !2023
     ,[12,MH_YEAR2-MH_YEAR1+1])
   real, dimension(12), parameter :: macehead_default=&
   ! Defaults from 1998-2010 average
@@ -1477,17 +1480,17 @@ real :: trend_o3=1.0, trend_co, trend_voc
     !/ trend adjustments
    select case (bcSpec)
    case ( 'O3' )
-      bc_data = bc_data*trend_o3
+      bc_data = bc_data*trend_o3*BIC_O3_FAC
    case ('C4H10' , 'C2H6' )
-      bc_data =  bc_data*trend_voc
+      bc_data =  bc_data*trend_voc*BIC_V_FAC
    case ( 'CO' )
       bc_data =  bc_data*trend_co
    case ( 'SO2','SO4')
-      bc_data = bc_data*SIAtrend%so2
+      bc_data = bc_data*SIAtrend%so2*BIC_S_FAC
    case( 'NH4_f')
-      bc_data = bc_data*SIAtrend%nh4
+      bc_data = bc_data*SIAtrend%nh4*BIC_A_FAC
    case ( 'NO3_f','NO3_c','HNO3','NO2','NO','PAN')
-      bc_data = bc_data*SIAtrend%nox
+      bc_data = bc_data*SIAtrend%nox*BIC_N_FAC
    end select
    bc_data = bc_data * specBIC%conv_fac !Convert to mixing ratio
 

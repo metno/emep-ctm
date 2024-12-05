@@ -1,7 +1,7 @@
-! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,7 +32,6 @@ module Landuse_mod
 use CheckStop_mod,   only: CheckStop,StopAll
 use Config_module,   only: NLANDUSEMAX, SEA_LIMIT, USES,  &
                             FLUX_IGNORE, &
-                            GLOBAL_settings, & ! tmp Sep 2023
                             OutputVegO3, nOutputVegO3, &
                             VEG_2dGS, VEG_2dGS_Params, &
                             NPROC, IIFULLDOM, JJFULLDOM, &
@@ -145,7 +144,7 @@ contains
     character(len=*), parameter :: dtxt='InitLanduse:'
     !=====================================
 
-    GlobRun = GLOBAL_settings == "YES" ! for IAM choices
+    GlobRun = USES%DOMAIN_SETUP_TYPE == "GLOB" ! for IAM choices
     dbg0    = MasterProc .and. DEBUG%LANDUSE>0
     dbgProc = debug_proc .and. DEBUG%LANDUSE>0
 
@@ -555,7 +554,7 @@ contains
    ! MERGE inner and outer maps (Euro and Glob usually)
 
     if ( nFiles > 1 ) then  ! we need to merge
-      if ( debug_proc ) write(*,'(a,i3,f12.4,5i6)'), dtxt//"F3  START", &
+      if ( debug_proc ) write(*,'(a,i3,f12.4,5i6)') dtxt//"F3  START", &
            NLand_codes, landuse_tot(debug_li,debug_lj), me, &
                     limax, ljmax, debug_li, debug_lj
       do j = 1, ljmax
@@ -839,7 +838,8 @@ contains
     end if
     old_daynumber = daynumber
 
-    if(MasterProc) write(*,*) dtxt//" day, pfts? ", daynumber, USES%PFT_MAPS, GlobRun
+    if(MasterProc .and. (DEBUG%LANDUSE>0.or.my_first_call)) &
+         write(*,*)dtxt//" day, pfts? ", daynumber, USES%PFT_MAPS, GlobRun
     if(dbgProc ) write(*,"(a,5i5,2L2)") dtxt//" debug me i j pft? ", me, &
          debug_li, debug_lj, limax, ljmax, USES%PFT_MAPS
 

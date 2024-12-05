@@ -1,7 +1,7 @@
-! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Setup_1d_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,24 +33,26 @@ module Setup_1d_mod
 
 use AeroConstants_mod,only: AERO,NSAREA_DEF   ! for aerosol surface area
 use AeroFunctions_mod,only: GerberWetRad, pmSurfArea, cMolSpeed, UptakeRate
-use AeroFunctions_mod,only: pmH2O_gerber  ! H2O from Gerber
+use AeroFunctions_mod,only: pmH2O_gerber, LewisSchwartz  ! H2O from Gerber
 use AirEmis_mod,      only: airn, airlig   ! airborne NOx emissions
 use Biogenics_mod,    only: SoilNOx
-use Biogenics_mod,    only: EMIS_BioNat, EmisNat  
+use Biogenics_mod,    only: EMIS_BioNat, EmisNat
 use ChemDims_mod,     only: NSPEC_SHL, NSPEC_ADV, NCHEMRATES, NEMIS_File
 use ChemFields_mod,   only: SurfArea_um2cm3, xn_adv,xn_bgn,xn_shl, &
                              pmH2Ogb, & !pH2O TMP
-                               NSPEC_COL, NSPEC_BGN, xn_2d_bgn
+                               NSPEC_COL, NSPEC_BGN, xn_2d_bgn, PM25_water
 use ChemGroups_mod,   only:  chemgroups, PM10_GROUP
-use ChemRates_mod,    only:  setChemrates ! rct, NRCT
+use ChemFunctions_mod, only: HydrolysisN2O5
 use ChemSpecs_mod  !,           only:  SO4,C5H8,NO,NO2,SO2,CO,
 use CheckStop_mod,    only:  CheckStop, StopAll,checkValidArray
 use ColumnSource_mod, only: ColumnRate
 use Config_module,    only:  &
+     SO2_ix, O3_ix, NO2_ix, SO4_ix, NH4_f_ix, NO3_ix, NO3_f_ix, &
+     NO3_c_ix, NH3_ix, HNO3_ix, C5H8_ix, NO_ix, HO2_ix, OH_ix,&
    SKIP_RCT                     & ! kHet tests
   ,dt_advec                     & ! time-step
   ,IOU_INST                     & ! for OUTMISC
-  ,MasterProc                   & 
+  ,MasterProc                   &
   ,PPB, PT                      & ! PT-pressure at top
   ,USES                         & ! forest fires, hydrolysis, dergee_days etc.
   ,DMS&
@@ -67,14 +69,15 @@ use EmisGet_mod,      only:  nrcemis, iqrc2itot, emis_nsplit, emis_masscorr
 use ForestFire_mod,   only: Fire_rcemis, burning
 use Functions_mod,    only:  Tpot_2_T
 use GasParticleCoeffs_mod, only: DDspec
-use GridValues_mod,   only:  xmd, GridArea_m2, & 
+use GridValues_mod,   only:  xmd, GridArea_m2, &
                              debug_proc, debug_li, debug_lj,&
                              A_mid,B_mid,gridwidth_m,dA,dB,&
-                             i_fdom, j_fdom
+                             i_fdom, j_fdom, glat
 use Io_Progs_mod,     only: datewrite !MASS
 use Landuse_mod,      only: water_fraction, ice_landcover
 use LocalVariables_mod, only: Grid
-use LocalFractions_mod, only: lf_fullchem
+use LocalFractions_mod, only: lf_fullchem,lf_Nvert,lf_SurfArea_pre,lf_SurfArea_pos,&
+                         spec2lfspec,lf_rcemis_nat,makeDMS,ix_DMS!,rctAk_lf,rctBk_lf
 use MassBudget_mod,   only: totem    ! sum of emissions
 use MetFields_mod,    only: ps,sst
 use MetFields_mod,    only: roa, th, q, t2_nwp, cc3dmax, zen, z_bnd,ws_10m
@@ -98,7 +101,7 @@ use ZchemData_mod,    only: &
   ,DpgNw, S_m2m3           &  ! for wet diameter and surf area
   ,aero_fom, aero_fbc, aero_fss, aero_fdust
 use BoundaryConditions_mod, only: METHBGN
- 
+
 
 implicit none
 private
@@ -106,6 +109,7 @@ private
 
 public :: setup_1d     ! Extracts results for i,j column from 3-D fields
 public :: setup_rcemis ! Emissions in i,j column
+public :: checkChemRates ! checks rct, etc
 public :: reset_3d     ! Exports final results from i,j column to 3-D fields
 ! (and XNCOL outputs if asked for)
 public :: sum_rcemis   ! sum all emissions (also natural) for output
@@ -116,6 +120,9 @@ integer, private, parameter :: NROADDUST = 2
 integer, private, parameter :: iROADF=1,  iROADC=2
 integer, private, save :: inat_RDF,  inat_RDC
 integer, private, save :: itot_RDF=-999,  itot_RDC=-999, itot_Rn222=-999
+integer, private, save :: nSKIP_RCT = 0
+! if pmH2O are wanted for d_2d output:
+logical, private, save :: pmH2O_wanted = .false.
 
 
 
@@ -132,36 +139,30 @@ contains
     character(len=*), parameter :: dtxt='setup_1d:'
     character(len=30)  :: fmt="(a32,i3,99es13.4)"  ! default format
     logical, save :: first_call = .true.
-   ! for surface area calcs: 
+   ! for surface area calcs:
    ! had: SIA_F=1,PM_F=2,SS_F=3,DU_F=4,SS_C=5,DU_C=6,PM=7 ORIG=8,NSAREA=NSAREA_DEF
-    integer, parameter :: NSAREA_CALC = NSAREA_DEF-1  ! Skip PM=7
-    integer, save, dimension(NSAREA_CALC) :: aeroDDspec 
-    real :: ugtmp, ugSIApm, ugDustF, ugSSaltF, ugDustC, ugSSaltC
+    integer, parameter :: NSAREA_CALC = NSAREA_DEF-1  ! Skip PM=9 (sum)
+    real, parameter :: Ncm3_to_molesm3 = 1.0e6 / AVOG    ! #/cm3 to moles/m3
+    integer, save, dimension(NSAREA_CALC) :: aeroDDspec
+    real :: ugtmp, ugSIApm, ugDustF, ugSSaltF, ugDustC, ugSSaltC, ugOM25
+    real :: DryAerMass, H2OAerVol, DryAerVol, WetDiam, DryAerRho
     real, save ::  ugBCf=0.0, ugBCc=0.0 !not always present
-    real :: ugSO4, ugNO3f, ugNO3c, ugRemF, ugRemC, ugpmF, ugpmC, rho
+    real :: ugSO4, ugNO3f, ugNO3c, ugRemF, ugRemC, ugpmF, ugpmC
     logical :: is_finepm, is_ssalt, is_dust, is_sia
-    logical, dimension(size(PM10_GROUP)), save  :: is_BC 
+    logical, dimension(size(PM10_GROUP)), save  :: is_BC
     ! AERO and DDspec still confusing
-    real, dimension(NSAREA_DEF)  :: Ddry ! Dry diameter. 
-    integer :: iw, ipm ! for wet rad
-   ! if rates are wanted for d_2d output, we use these indices:
-    integer, dimension(20), save :: d2index, id2rct, id2pmH2O 
-    integer, save :: nd2d, npmH2O
-    integer :: itmp
-   ! if pmH2O are wanted for d_2d output:
-    logical, save :: pmH2O_wanted = .false.
-
+    real, dimension(NSAREA_DEF)  :: Ddry ! Dry diameter.
+    integer :: iw, ipm, itmp ! for wet rad
    ! local
 
-    integer           :: k, n, ispec   ! loop variables
+    integer           :: k, n, ispec, iter, niter   ! loop variables
     real              :: qsat ! saturation water content
-    integer, save :: nSKIP_RCT = 0
     integer, save :: iSIAgroup,iSSgroup, iDUgroup, iPMfgroup
     integer, save :: iBCfgroup,iBCcgroup
     logical, save, dimension(size(PM10_GROUP)) :: & ! arrays
-       is_finepm_a,   &  ! 
-       is_ssalt_a,    &  ! 
-       is_dust_a,     &  ! 
+       is_finepm_a,   &  !
+       is_ssalt_a,    &  !
+       is_dust_a,     &  !
        is_sia_a,      &  ! not needed?
        is_bc_a           ! will add soon
 
@@ -173,13 +174,16 @@ contains
       !QUERY: Should we then set USES%SURF_AREA False?
 
 ! for surface area calculations: Skips SIA. Find indices:
-!    Skip PM=5 as mixed 
+!    Skip PM=5 as mixed
 
        aeroDDspec(AERO%PM_F)= find_index('PMf',DDspec(:)%name)
        aeroDDspec(AERO%SS_F)= find_index('SSf',DDspec(:)%name)
        aeroDDspec(AERO%DU_F)= find_index('DUf',DDspec(:)%name)
        aeroDDspec(AERO%SS_C)= find_index('SSc',DDspec(:)%name)
        aeroDDspec(AERO%DU_C)= find_index('DUc',DDspec(:)%name)
+       aeroDDspec(AERO%SS_F_LS)= find_index('SSf',DDspec(:)%name)
+       aeroDDspec(AERO%SS_C_LS)= find_index('SSc',DDspec(:)%name)
+       aeroDDspec(AERO%PM_F_EQUI)= find_index('PMf',DDspec(:)%name)
 
       ! see which groups we have:
        iSIAgroup = find_index('SIA',chemgroups(:)%name)
@@ -193,6 +197,10 @@ contains
           'SIA', iSIAgroup, 'SS', iSSgroup, 'DU', iDUgroup, &
           'BCf', iBCfgroup, 'BCc', iBCcgroup, 'PMf', iPMfgroup
 
+       do itmp = 1, size(f_2d)
+         if ( f_2d(itmp)%subclass == 'pmH2O' ) pmH2O_wanted = .true.
+       end do
+           
 
        is_BC(:) = .false.
        if ( iBCfgroup > 0 ) then
@@ -226,16 +234,36 @@ contains
           end if
        enddo
 
-       do n = 1, size(SKIP_RCT)
-          if ( SKIP_RCT(n) > 0 ) nSKIP_RCT = nSKIP_RCT  + 1
-       end do
-       if( MasterProc ) write(*,"(a,10i4)") &
-          dtxt//"SKIP_RCT:", SKIP_RCT(1:nSKIP_RCT)
-
     end if ! first_call
 
     if( debug_flag ) write(*,*) dtxt//"=DBG=======  ", first_call, me
 
+
+    do k = KCHEMTOP, KMAX_MID
+       M(k) = roa(i,j,k,1) * to_number_cm3  ! molecules air/cm3
+       pp(k) = A_mid(k) + B_mid(k)*ps(i,j,1)
+       temp(k) = th(i,j,k,1)* Tpot_2_T( pp(k) )
+    end do
+   o2(:) = 0.21 *M(:)
+   n2(:) = M(:) - o2(:)
+!   o2(:) = 0.2095 *M(:) ! more exact, but prefer o3+n2 to add to 100%
+!   n2(:) = 0.7808 *M(:)
+   if (USES%CH4GRADIENT) then 
+     ! linear North-South gradient as described in https://doi.org/10.5194/egusphere-2024-1422 sec. 4.1
+     methane(:) = METHBGN * PPB * M(:) * ( 1.0 + 0.025 * glat(i,j) / 90.0 ) 
+   else
+     methane(:) = METHBGN * PPB * M(:)
+   end if
+   hydrogen(:) = 500.0 * PPB * M(:)
+   tinv(:) = 1./temp(:)
+
+
+   cN2O5(:) = cMolSpeed(temp(:),108.0)
+   cHNO3(:) = cMolSpeed(temp(:), 63.0)
+   cHO2(:)  = cMolSpeed(temp(:), 33.0)
+   cO3(:)   = cMolSpeed(temp(:), 48.0)
+   cNO3(:)  = cMolSpeed(temp(:), 62.0)
+   cNO2(:)  = cMolSpeed(temp(:), 46.0)
 
     do k = KCHEMTOP, KMAX_MID
 
@@ -247,7 +275,7 @@ contains
        h2o(k) = max( 1.e-5*M(k), &
                      q(i,j,k,1)*M(k)*ATWAIR/18.0)
 
-      ! nb. max function for h2o used as some NWP numerics can give 
+      ! nb. max function for h2o used as some NWP numerics can give
       ! negative negative H2O....   :-(
 
        pp(k) = A_mid(k) + B_mid(k)*ps(i,j,1)
@@ -287,7 +315,15 @@ contains
       ! Surf Area
         if ( USES%SURF_AREA ) then ! GERBER
 
-            S_m2m3(:,k) = 0.0  !! Allow max 6000 um2/cm3
+           niter = 1
+           !NB: temporarily disable LF, since it is broken (?).
+           !please do not delete.
+           !           if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+           !in the LF case, we construct S_m2m3 for 4 "scenarios", in order to get derivatives
+           do iter=1, niter !iter loop only for LocalFractions
+!              call lf_SurfArea_pre(k,iter) !only used for LocalFractions
+
+           S_m2m3(:,k) = 0.0  !! Allow max 6000 um2/cm3
 
            !ispec=NO3_c ! CRUDE HARD CODE for now, but NO3 is special
 
@@ -298,7 +334,7 @@ contains
            ugpmC       = 0.0
            ugNO3f      = 0.0 !  0.27*xn_2d(i,k)*species(i)%molwt*1.0e12/AVOG
            ugNO3c      = 0.0 !  0.27*xn_2d(i,k)*species(i)%molwt*1.0e12/AVOG
-           ugSIApm     = 0.0 
+           ugSIApm     = 0.0
            ugBCf       = 0.0
            ugBCc       = 0.0
 
@@ -306,13 +342,15 @@ contains
            ugSSaltF = 0.0
            ugDustC  = 0.0
            ugSSaltC = 0.0
+           ugOM25   = 0.0
 
            do ipm = 1, size( PM10_GROUP )
              ispec = PM10_GROUP(ipm)
 
              ugtmp  = xn_2d(ispec,k)*species(ispec)%molwt*1.0e12/AVOG
-             if (lf_fullchem) then
-                !For LF remove all O3-active species             
+             if (.false. .and. lf_fullchem) then
+!             if (.true.) then
+                !For LF test remove all O3-active species
                 if (  species(ispec)%name == 'SO4' ) then
                    ugtmp = 0
                 else if ( index( species(ispec)%name, 'NO3_f' )>0) then
@@ -339,6 +377,10 @@ contains
                if(is_BC(ipm)) ugBCc = ugBCc  +  ugtmp
              end if
 
+             ! fine particle phase OM can optionally be included as delinquesced species in thermodynamic calls
+             if( species(ispec)%name == 'OM25_p' .and. AERO%ORGANIC_WATER ) ugOM25 = & 
+               xn_2d(ispec,k) * Ncm3_to_molesm3 * species(ispec)%molwt * 1e6  
+
              if (  species(ispec)%name == 'SO4' ) then
                ugSO4 = ugSO4  +  ugtmp
              else if ( index( species(ispec)%name, 'NO3_f' )>0) then
@@ -348,11 +390,11 @@ contains
              end if
 
             ! Handle surface area here:
- 
+
              if( debug_flag .and. k==KMAX_MID ) then
                write(*, fmt) dtxt//"UGSIA:"//trim(species(ispec)%name), &
                      k, ugtmp, ugpmF, ugpmC,&
-                     ugSO4,ugNO3f,ugNO3c,ugBCf,ugBCc
+                     ugSO4,ugNO3f,ugNO3c,ugBCf,ugBCc, ugOM25
                !write(*,'(a,4L2,es12.3)') dtxt//trim(species(ispec)%name), &
                !      is_finepm, is_ssalt,is_dust,is_BC(ipm), ugtmp
              end if
@@ -361,7 +403,7 @@ contains
 
          ! FRACTIONS used for N2O5 hydrolysis
          ! We use mass fractions, since we anyway don't have MW for OM, dust,
-         !  ugRemF will include OM, EC, PPM, Treat as OM 
+         !  ugRemF will include OM, EC, PPM, Treat as OM
 
            ugRemF = ugpmF - ugSIApm -ugSSaltF -ugDustF -ugBCf
 
@@ -375,7 +417,7 @@ contains
           ! now to avoid need for Inddry index
 
            pmH2Ogb(i,j,:) = 0.0
-           do iw = 1, NSAREA_CALC ! Skips PM=7 which is sum
+           do iw = 1, NSAREA_CALC -3 ! Skips PM=9 which is sum, and also L&S and thermo H2O
 
              ipm= aeroDDspec(iw)
 
@@ -388,23 +430,23 @@ contains
              Ddry(iw) =  DDspec(ipm)%DpgN  ! (m)
 
              if ( DDspec(ipm)%Gb > 0 ) then
-               DpgNw(iw,k)  = 2*GerberWetRad( 0.5*Ddry(iw), rh(k), DDspec(ipm)%Gb ) 
+               DpgNw(iw,k)  = 2*GerberWetRad( 0.5*Ddry(iw), rh(k), DDspec(ipm)%Gb )
              else
                DpgNw(iw,k)  = Ddry(iw) ! for dust, we keep dry
              end if
 
-             if ( iw == AERO%PM_F )  ugtmp = ugpmF
-             if ( iw == AERO%SS_F )  ugtmp = ugSSaltF
-             if ( iw == AERO%DU_F )  ugtmp = ugDustF
-             if ( iw == AERO%SS_C )  ugtmp = ugSSaltC
-             if ( iw == AERO%DU_C )  ugtmp = ugDustC
+             if ( iw == AERO%PM_F )  ugtmp = ugpmF    ! 1
+             if ( iw == AERO%SS_F )  ugtmp = ugSSaltF ! 2
+             if ( iw == AERO%DU_F )  ugtmp = ugDustF  ! 3
+             if ( iw == AERO%SS_C )  ugtmp = ugSSaltC ! 4
+             if ( iw == AERO%DU_C )  ugtmp = ugDustC  ! 5
 
            ! MISSES optional sigma=1.8) !,sigmaFac:
 
              S_m2m3(iw,k) = pmSurfArea(ugtmp,Dp=Ddry(iw), Dpw=DpgNw(iw,k),  &
                                   rho_kgm3=DDspec(ipm)%rho_p )
 
-             if ( k==KMAX_MID .and. pmH2O_wanted ) then 
+             if ( k==KMAX_MID .and. pmH2O_wanted ) then
 
               ! MISSES optional sigma=1.8) !,sigmaFac:
 
@@ -429,7 +471,7 @@ contains
                 if ( debug_flag ) write(*,"(a,3i5,9es10.3)") "pmH2OCHECK: "//&
                    trim(DDspec(ipm)%name), iw, ipm,&
                    DDspec(ipm)%Gb, Ddry(iw),DpgNw(iw,k), ugtmp, pmH2Ogb(i,j,:)
-                
+
              end if ! KMAX
 
              if ( k==KMAX_MID .and. debug_flag ) &
@@ -439,16 +481,127 @@ contains
 
              S_m2m3(iw,k) = min( S_m2m3(iw,k), 6.0e-3)  !! Allow max 6000 um2/cm3
 
-           end do ! iw
+           end do ! iw = 1, NSAREA_CALC - 3
+
+
+           ! OPTION: Use Lewis & Schwartz for sea salt, thermodynamics water uptake for PM_F
+           ! if thermodynamics includes fine dust cations, exclude DU_F from Gerber and likewise for fine sea salt. 
+           ! Always Lewis & Schwartz for coarse sea-salt. 
+           ! NB: Does not currently work with local fractions. Note also that coarse dust assumes no water uptake.
+           do iw = AERO%SS_F_LS, AERO%PM_F_EQUI
+
+             if ( iw == AERO%SS_F_LS ) then
+               ugtmp = ugSSaltF             ! total ug 
+               ipm = aeroDDspec(iw)         ! aerosol properties
+               Ddry(iw) = DDspec(ipm)%DpgN  ! geometric mean diameter in meters
+
+               ! calculate modal wet radius for use in surf area calc. Neglect Kelvin effect (no sigma change).
+               DpgNw(iw,k) = LewisSchwartz( Ddry(iw) , rh(k), AERO%RH_UPLIM_AERO, AERO%RH_LOLIM_AERO )
+               S_m2m3(iw,k) = pmSurfArea(ugtmp, Dp=Ddry(iw), Dpw=DpgNw(iw,k), rho_kgm3=DDspec(ipm)%rho_p )
+
+               ! DEBUG%RUNCHEM = T
+               if ( debug_flag .and. k == KMAX_MID ) write(*,"(a,i5,1es10.3)") "L&S SS_F surface area: ", &
+                    iw, S_m2m3(iw,k)
+             end if 
+
+             if ( iw == AERO%SS_C_LS ) then 
+               ugtmp = ugSSaltC             ! total ug
+               ipm = aeroDDspec(iw)         ! aerosol properties
+               Ddry(iw) = DDspec(ipm)%DpgN  ! geometric mean diameter in meters
+
+               ! calculate modal wet radius for use in surf area calc. Neglect Kelvin effect (no sigma change).
+               DpgNw(iw,k) = LewisSchwartz( Ddry(iw) , rh(k), AERO%RH_UPLIM_AERO, AERO%RH_LOLIM_AERO )
+               S_m2m3(iw,k) = pmSurfArea(ugtmp, Dp=Ddry(iw), Dpw=DpgNw(iw,k), rho_kgm3=DDspec(ipm)%rho_p )
+
+               ! DEBUG%RUNCHEM = T
+               if ( debug_flag .and. k == KMAX_MID ) write(*,"(a,i5,1es10.3)") "L&S SS_C surface area: ", &
+                    iw, S_m2m3(iw,k)
+             end if 
+
+             if ( iw == AERO%PM_F_EQUI ) then ! calculate total PMf surface area based in part on thermodynamics water uptake
+               ! thermodynamic water uptake from either ISORROPIA, EQSAM, or MARS
+               ! NB: Water uptake is stored in the PM25_water array and is calculated AFTER
+               ! setup_1d is called (i.e., PM25_water -- correctly -- corresponds to the result of the previous time-step)
+               ipm = aeroDDspec(iw)         ! fine aerosol properties
+               Ddry(iw) = DDspec(ipm)%DpgN  ! geometric mean diameter in meters
+
+               ! calculate volume aerosol water based on equilibrium calculations
+               DryAerMass = ugSIApm ! fine SIA mass, always incuded in thermodynamic calls
+               DryAerVol  = ugSIApm / 1600. ! 1600 kg/m3 density SIA
+               DryAerRho  = ugSIApm * 1600.  ! keep track of average dry aerosol density from thermodynamics
+
+               ! if fine sea salt water-uptake is included in thermodynamics (only implemented for EQSAM and ISORROPIA)
+               if ( AERO%INTERNALMIXED ) then
+                 if ( AERO%EQUILIB == 'ISORROPIA' .or. AERO%EQUILIB == 'EQSAM' ) then
+                    DryAerMass = DryAerMass + ugSSaltF
+                    DryAerVol  = DryAerVol + ugSSaltF / 2200. 
+                    DryAerRho  = DryAerRho + ugSSaltF * 2200.
+                 end if
+               end if  
+
+               ! if fine dust cations incuded in thermodynamics (only implemented for EQSAM and ISORROPIA)
+               if ( AERO%CATIONS ) then 
+                 if ( AERO%EQUILIB == 'ISORROPIA' .or. AERO%EQUILIB == 'EQSAM' ) then
+                    DryAerMass = DryAerMass + ugDustF 
+                    DryAerVol  = DryAerVol + ugDustF / 2600. 
+                    DryAerRho  = DryAerRho + ugDustF * 2600.
+                 end if
+               end if
+
+               ! if particle phase OM water uptake included in thermodynamics 
+               if ( AERO%ORGANIC_WATER ) then 
+                 DryAerMass = DryAerMass + ugOM25
+                 DryAerVol  = DryAerVol + ugOM25 / AERO%OM_RHO 
+                 DryAerRho  = DryAerRho + ugOM25 * AERO%OM_RHO 
+               end if
+
+               ! average per ug with safety limit to avoid div. by zero, and at least that of the lowest density aerosol species
+               DryAerRho = max ( DryAerRho / max( DryAerMass, 1e-12 ), 1400. ) 
+         
+               ! density unit does not matter because of frac. in eq. below, so long as the same for both h2o and aerosol are used
+               H2OAerVol = PM25_water(i,j,k) / 1000.  ! ug/m3 aerosol water conv to vol / m3; h2o density 1000 kg/m3 
+
+               ! to first approximation WetAerVol = H2OAerVol + DryAerVol
+               ! then below Eq. derived for wet radius (or equivalently diameter) growth for single particle,
+               ! being approx. equivalent to geometric radius when Kelvin effect is ignored (Gerber, 1982).
+               ! then for a single particle DryAerVol = 4/3*pi*r_dry**3, such that r_dry = ( 3*DryAerVol / (4pi) ) ** (1/3). 
+               ! Similarly, r_wet = ( 3*WetAerVol / (4pi) ) ** (1/3). Combining with  WetAerVol = H2OAerVol + DryAerVol
+               ! gives r_wet = r_dry * (1 + H2OAervol / DryAervol) ** (1/3).
+               WetDiam = Ddry(iw) * ( 1.0 + H2OAerVol / max( DryAerVol, 1e-12 ) ) ** ( 1. / 3. )
+              
+               ! surface area of species included in thermodynaics 
+               S_m2m3(iw,k) = pmSurfArea( DryAerMass,Dp=Ddry(iw), Dpw=WetDiam, &
+                                     rho_kgm3=DryAerRho )
+
+               ! calculate surface area of remaining PMf (i.e., neither sea salt nor equilibrium species)
+               ugtmp = ugpmF - DryAerMass
+
+               ! fine sea salt calculated using Lewis & Schwartz. If no dust or OM in thermodynamics, these are assumed non-hygroscopic.
+               if ( .not. AERO%INTERNALMIXED ) ugtmp = ugtmp - ugSSaltF         
+
+               ! for the remaining species assume no hygroscopic growth (Dpw = Dp) and standard PMf density
+               S_m2m3(iw,k) = S_m2m3(iw,k) + pmSurfArea( ugtmp,Dp=Ddry(iw), Dpw=Ddry(iw), rho_kgm3=DDspec(ipm)%rho_p )
+
+               ! add fine sea salt surface area only if not already included in thermodynamics                                     
+               if  ( .not. AERO%INTERNALMIXED ) S_m2m3(iw,k) = S_m2m3(iw,k) + S_m2m3(AERO%SS_F_LS,k) 
+
+               ! DEBUG%RUNCHEM = T
+               if ( debug_flag .and. k == KMAX_MID ) write(*,"(a,i5,6es10.3)") "Total ThermoH2OSurfArea: ", &
+                    iw, H2OAerVol, DryAerVol, DryAerRho, Ddry(iw), WetDiam, S_m2m3(iw,k)
+             end if ! iw = AERO%PM_F_EQUI
+           end do ! iw = AERO%SS_F_LS, AERO%PM_F_EQUI
 
           ! Add all areas (misses some BC_c etc)
-           iw=NSAREA_DEF
+           iw=NSAREA_DEF ! = 9 = AERO%PM
            S_m2m3(iw,k) = S_m2m3(AERO%PM_F,k) + S_m2m3(AERO%SS_C,k) + S_m2m3(AERO%DU_C,k)
+           
+           if ( AERO%ThermoH2OSurfArea ) S_m2m3(iw,k) = S_m2m3(AERO%PM_F_EQUI,k) + & 
+             S_m2m3(AERO%SS_C_LS,k) + S_m2m3(AERO%DU_C,k)
+
            if ( debug_flag .and. k == KMAX_MID) write(*,"(a,i5,4es10.3)") &
              "AREACHECK: "//"SUM", iw, ugpmF,ugSSaltC,ugDustC,S_m2m3(iw,k)
 
- 
-           if( DEBUG%SETUP_1DCHEM ) then ! extra checks 
+           if( DEBUG%SETUP_1DCHEM ) then ! extra checks
              if( aero_fom(k) > 1.0 .or. ugRemF < -1.0e-9 ) then
                 print "(a,i4,99es12.3)", dtxt//"AERO-F ", k, &
                   aero_fom(k), ugRemF,ugpmF, ugSSaltF, ugDustF, ugBCf
@@ -463,16 +616,27 @@ contains
               write(*,fmt) dtxt//"GERB ugDU (S um2/cm3)  ", iw, Ddry(iw), 1.0e6*S_m2m3(iw,k)
              end do
            end if
- 
+
            ! m2/m3 -> um2/cm3 = 1.0e6, only for output to netcdf
-           if( k == KMAX_MID ) then 
+           if( k == KMAX_MID ) then
               do iw = 1, NSAREA_DEF  !J2018 bug:CALC
                 SurfArea_um2cm3(iw,i,j) = 1.0e6* S_m2m3(iw,k)
               end do
            end if
 
+           ! after all surfareas are stored for output, overwrite existing indices for use in chemistry
+           if ( AERO%ThermoH2OSurfArea ) then 
+            S_m2m3(AERO%SS_F,k) = S_m2m3(AERO%SS_F_LS,k)   
+            S_m2m3(AERO%SS_C,k) = S_m2m3(AERO%SS_C_LS,k)
+            S_m2m3(AERO%PM_F,k) = S_m2m3(AERO%PM_F_EQUI,k) 
+           end if
+
+           !call lf_SurfArea_pos(S_m2m3(AERO%PM,k),i,j,k,iter) !only used for LocalFractions
+
+          end do 
+
           end if ! GERBER Surf Area
-    
+
    end do ! k
 
 ! Check that concentrations are not "contaminated" with NaN
@@ -481,30 +645,27 @@ contains
       call CheckStop( "Detected non numerical concentrations (NaN)")
    end if
 
-   o2(:) = 0.21 *M(:)
-   n2(:) = M(:) - o2(:)
-!   o2(:) = 0.2095 *M(:) ! more exact, but prefer o3+n2 to add to 100%
-!   n2(:) = 0.7808 *M(:)
-   methane(:) = METHBGN * PPB * M(:) 
-   hydrogen(:) = 500.0 * PPB * M(:)
-   tinv(:) = 1./temp(:)
-
-
-   cN2O5(:) = cMolSpeed(temp(:),108.0)
-   cHNO3(:) = cMolSpeed(temp(:), 63.0)
-   cHO2(:)  = cMolSpeed(temp(:), 33.0)
-   cO3(:)   = cMolSpeed(temp(:), 48.0)
-   cNO3(:)  = cMolSpeed(temp(:), 62.0)
-   cNO2(:)  = cMolSpeed(temp(:), 46.0)
-
   ! 5 ) Rates  (!!!!!!!!!! NEEDS TO BE AFTER RH, XN, etc. !!!!!!!!!!)
-
-
+  ! NB: need also to be after FGAS which is computed in setup_clouds
    !====================
-   call setChemRates()
+!   call setChemRates()
    !====================
+   first_call = .false.
 
-   if( DEBUG%SETUP_1DCHEM ) then ! extra checks 
+   end subroutine setup_1d
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+   subroutine checkChemRates(i,j,debug_flag)
+     integer, intent(in) :: i, j
+     logical, intent(in) :: debug_flag
+     integer :: n, itmp, ipm
+     character(len=*), parameter :: dtxt='checkChem:'
+     logical, save :: first_call = .true.
+   ! if rates are wanted for d_2d output, we use these indices:
+    integer, dimension(20), save :: d2index, id2rct, id2pmH2O
+    integer, save :: nd2d, npmH2O
+
+   if( DEBUG%SETUP_1DCHEM ) then ! extra checks
      call checkValidArray(rcphot(:,KMAX_MID),dtxt//'arrayCheck RCPHOT ')
      call checkValidArray(rct(:,KMAX_MID),dtxt//'arrayCheck RCT ')
      if ( DebugCell .and. current_date%hour == 12 ) then
@@ -514,21 +675,8 @@ contains
              print '(a,i3,es12.3)', 'RCPHOT:', n, rcphot(n,KMAX_MID)
          end if
        end do
-     end if 
+     end if
    end if
-
-  ! For sensitivity tests
-   do  n = 1, nSKIP_RCT ! can be zero
-     !if( SKIP_RCT(n) == 720 ) then
-     !   rct(72:75,:) = 0.0    ! HNO3 + SS, DU
-     !else if ( SKIP_RCT(n) == 770 ) then
-     !   rct(77:78,:) = 0.0    ! DU_f+DU_c, O3
-     !else 
-     !   if ( first_call ) call CheckStop( SKIP_RCT(n) > 100,&
-     !                                     dtxt//"SKIP_RCT too big")
-        rct(SKIP_RCT(n),:) = 0.0
-     !end if
-   end do
 
 
    if ( first_call ) then
@@ -555,14 +703,20 @@ contains
      npmH2O = 0
      do itmp = 1, size(f_2d)
        if ( f_2d(itmp)%subclass == 'pmH2O' ) then
-          pmH2O_wanted = .true.
           npmH2O = npmH2O + 1
           d2index(nd2d+npmH2O)= itmp
           id2pmH2O(npmH2O) = f_2d(itmp)%index  !index of aerosol type
           if(MasterProc) write(*,*) 'pmH2O SET', itmp, npmH2O,id2pmH2O(npmH2O)
        end if
      end do
+
+     do n = 1, size(SKIP_RCT)
+        if ( SKIP_RCT(n) > 0 ) nSKIP_RCT = nSKIP_RCT  + 1
+     end do
+     if( MasterProc ) write(*,"(a,10i4)") &
+          dtxt//"SKIP_RCT:", SKIP_RCT(1:nSKIP_RCT)
      first_call = .false.
+
    end if ! first_call
 
    do itmp = 1, nd2d
@@ -584,7 +738,20 @@ contains
    end do
 
 
-   end subroutine setup_1d
+  ! For sensitivity tests
+   do  n = 1, nSKIP_RCT ! can be zero
+     !if( SKIP_RCT(n) == 720 ) then
+     !   rct(72:75,:) = 0.0    ! HNO3 + SS, DU
+     !else if ( SKIP_RCT(n) == 770 ) then
+     !   rct(77:78,:) = 0.0    ! DU_f+DU_c, O3
+     !else
+     !   if ( first_call ) call CheckStop( SKIP_RCT(n) > 100,&
+     !                                     dtxt//"SKIP_RCT too big")
+        rct(SKIP_RCT(n),:) = 0.0
+     !end if
+   end do
+
+   end subroutine checkChemRates
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 subroutine setup_rcemis(i,j)
 !-------------------------------------------------------------------
@@ -596,17 +763,17 @@ subroutine setup_rcemis(i,j)
   integer, intent(in) ::  i,j     ! coordinates of column
 
   !  local
-  integer :: iqrc, k, itot, iem ,f, ij, is
+  integer :: iqrc, k, itot, ij, is
   real    :: Kw,fac, eland   ! for Pb210  - emissions from land
 
   integer :: i_Emis_4D,n
-  logical, save     :: first_call = .true. 
+  logical, save     :: first_call = .true.
   character(len=13) :: dtxt="setup_rcemis:"
-  real :: SC_DMS,SC_DMS_m23,SC_DMS_msqrt,SST_C,invDeltaZfac
+  real :: SC_DMS,SC_DMS_m23,SC_DMS_msqrt,SST_C
   integer,save ::IC_NH3
-  real :: ehlpcom0
+  real :: ehlpcom0, addemis
 
-  ehlpcom0 = GRAV* 0.001*AVOG!0.001 = kg_to_g / m3_to_cm3              
+  ehlpcom0 = GRAV* 0.001*AVOG!0.001 = kg_to_g / m3_to_cm3
 
 
   if(first_call)then
@@ -617,7 +784,7 @@ subroutine setup_rcemis(i,j)
     itot_Rn222=find_index( "Rn222", species(:)%name, any_case=.true. )
     IC_NH3=find_index( "NH3", species(:)%name    )
     first_call = .false.
-  end if 
+  end if
 
 ! initilize ! initilize ! initilize ! initilize
   rcemis(:,:)=0.
@@ -674,7 +841,7 @@ subroutine setup_rcemis(i,j)
     rcemis(itot_RDF,KMAX_MID) = gridrcroadd(1,i,j)
     rcemis(itot_RDC,KMAX_MID) = gridrcroadd(2,i,j)
    end if
-   
+
   ! Forest fires
   if(USES%FOREST_FIRES) then
     if(burning(i,j))call Fire_rcemis(i,j)
@@ -687,9 +854,9 @@ subroutine setup_rcemis(i,j)
      !keep separated from snapemis/rcemis in order to be able to include more
      ! advanced processes
      k=KMAX_MID
-     !convert from kg/m2/s into molecules/cm3/s . 
+     !convert from kg/m2/s into molecules/cm3/s .
      !kg->g=1000 , /m3->/cm3=1e-6 , 1000*1e-6=0.001
-     
+
      rcemis(O_NH3%index,k)=rcemis(O_NH3%index,k)+ &
        O_NH3%emis(i,j)*0.001*AVOG/species(IC_NH3)%molwt&
           *(GRAV*roa(i,j,k,1))/(dA(k)+dB(k)*ps(i,j,1))
@@ -703,7 +870,7 @@ subroutine setup_rcemis(i,j)
      !keep separated from snapemis/rcemis in order to be able to include more
      !advanced processes
      !
-     !convert from mol/cm3 into molecules/cm3/s . 
+     !convert from mol/cm3 into molecules/cm3/s .
      !Kw in cm/hour after Leonor Tarrason (1995), after Liss and Merlivat (1986)
      !assumes 20 degrees C
      !NB: misprint in gbc1385.pdf!
@@ -713,12 +880,11 @@ subroutine setup_rcemis(i,j)
 
      k=KMAX_MID
 
-
      if (DMS%ScNew ) then ! uses  Wanninkhof2014'
        SST_C=max(-2.0,min(40.0,(SST(i,j,1)-T0))) !the formula uses degrees C
        SC_DMS=2855.7-177.63*SST_C+6.0438*SST_C*SST_C- &
           0.11645*SST_C*SST_C*SST_C+0.00094743*SST_C*SST_C*SST_C*SST_C
-     else    ! LissMerlivat1986 as in "old" 
+     else    ! LissMerlivat1986 as in "old"
        SST_C=max(0.0,min(30.0,(SST(i,j,1)-T0))) !the formula uses degrees C
        SC_DMS=2674 -147.12*SST_C + 3.726*SST_C*SST_C - 0.038 * SST_C*SST_C*SST_C
      end if
@@ -755,18 +921,22 @@ subroutine setup_rcemis(i,j)
 
 !66% of DMS turns into SO2, Leonor Tarrason (1995)
      if(USES%OCEAN_DMS)then
-        rcemis(O_DMS%index,k)=rcemis(O_DMS%index,k)+ &
-          0.66*O_DMS%emis(i,j)*Kw*0.01*GRAV*roa(i,j,k,1)/ &
-                           (dA(k)+dB(k)*ps(i,j,1)) *AVOG 
+        addemis = 0.66*O_DMS%emis(i,j)*Kw*0.01*GRAV*roa(i,j,k,1)/ &
+                           (dA(k)+dB(k)*ps(i,j,1)) *AVOG
+        rcemis(O_DMS%index,k)=rcemis(O_DMS%index,k)+ addemis
+        if (USES%LocalFractions .and. makeDMS) then
+           call lf_rcemis_nat(O_DMS%index, addemis, i, j, icountry_in=ix_DMS) ! k assumed KMAX_MID
+        end if
+          
      end if
      !in g . Multiply by dz(in cm)  * dx*dx (in cm2) * ...
-     !... molwgt(SO2) /AVOG . (dz/AVOG just removed from above) 
+     !... molwgt(SO2) /AVOG . (dz/AVOG just removed from above)
      !g->Gg = 1.0E-9
      O_DMS%sum_month = O_DMS%sum_month+0.66*O_DMS%emis(i,j)*Kw *1.e4*xmd(i,j)*&
           gridwidth_m*gridwidth_m*dt_advec *64.0*1.0E-9
 
 !make map in mg/m2,    g->mg = 1.0E3  ; /cm2 -> /m2 =1e4
-     O_DMS%map(i,j)=O_DMS%emis(i,j)*Kw *1.e4*62.13*1.0E3  
+     O_DMS%map(i,j)=O_DMS%emis(i,j)*Kw *1.e4*62.13*1.0E3
 
   end if
 
@@ -808,7 +978,7 @@ subroutine setup_rcemis(i,j)
   ! z_bnd is in m, not cm, so need to divide by 100.
   if(itot_Rn222>0) &
     rcemis(itot_Rn222,KMAX_MID) = (0.00182*water_fraction(i,j)+eland)&
-      /deltaZcm(KMAX_MID) 
+      /deltaZcm(KMAX_MID)
 
 end subroutine setup_rcemis
 !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -826,8 +996,8 @@ subroutine sum_rcemis(i,j)
   !  local
   integer :: iqrc, k, itot, iem ,f
 
-  iqrc = 0 
-  do iem = 1, NEMIS_FILE   
+  iqrc = 0
+  do iem = 1, NEMIS_FILE
      EmisOut(i,j,iem) = 0.0
      do f = 1,emis_nsplit(iem)
         iqrc = iqrc + 1
@@ -838,13 +1008,13 @@ subroutine sum_rcemis(i,j)
         enddo
      enddo
   enddo
-  
+
   if(EmisSplit_OUT)then
     !put all added emissions in EmisSplit_OUT, also natural emissions
     SplitEmisOut(i,j,:)=0.0
     do k=KCHEMTOP, KMAX_MID
       do iqrc=1,nrcemis
-        !give unit mg/m2/s dt_advec multiplied in Derived_mod 
+        !give unit mg/m2/s dt_advec multiplied in Derived_mod
         itot=iqrc2itot(iqrc)
         SplitEmisOut(i,j,iqrc) = SplitEmisOut(i,j,iqrc)&
           +rcemis(itot,k)*species(itot)%molwt &

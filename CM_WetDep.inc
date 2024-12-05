@@ -29,26 +29,26 @@ type(dep_t), public, dimension(NWETDEP_ADV), save :: CM_WDepMap = (/ &
 , dep_t("NO3_f     ", "PMf       ", -999.0 ) &
 , dep_t("NO3_c     ", "PMc       ", -999.0 ) &
 , dep_t("NH4_f     ", "PMf       ", -999.0 ) &
-, dep_t("ASOC_ng1e2", "ROOH      ", -999.0 ) &
-, dep_t("ASOC_ug1  ", "ROOH      ", -999.0 ) &
-, dep_t("ASOC_ug10 ", "ROOH      ", -999.0 ) &
-, dep_t("ASOC_ug1e2", "ROOH      ", -999.0 ) &
 , dep_t("ASOC_ug1e3", "ROOH      ", -999.0 ) &
-, dep_t("non_C_ASOA_ng1e2", "ROOH      ", -999.0 ) &
-, dep_t("non_C_ASOA_ug1", "ROOH      ", -999.0 ) &
-, dep_t("non_C_ASOA_ug10", "ROOH      ", -999.0 ) &
-, dep_t("non_C_ASOA_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("ASOC_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("ASOC_ug10 ", "ROOH      ", -999.0 ) &
+, dep_t("ASOC_ug1  ", "ROOH      ", -999.0 ) &
+, dep_t("ASOC_ng1e2", "ROOH      ", -999.0 ) &
 , dep_t("non_C_ASOA_ug1e3", "ROOH      ", -999.0 ) &
-, dep_t("BSOC_ng1e2", "ROOH      ", -999.0 ) &
-, dep_t("BSOC_ug1  ", "ROOH      ", -999.0 ) &
-, dep_t("BSOC_ug10 ", "ROOH      ", -999.0 ) &
-, dep_t("BSOC_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("non_C_ASOA_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("non_C_ASOA_ug10", "ROOH      ", -999.0 ) &
+, dep_t("non_C_ASOA_ug1", "ROOH      ", -999.0 ) &
+, dep_t("non_C_ASOA_ng1e2", "ROOH      ", -999.0 ) &
 , dep_t("BSOC_ug1e3", "ROOH      ", -999.0 ) &
-, dep_t("non_C_BSOA_ng1e2", "ROOH      ", -999.0 ) &
-, dep_t("non_C_BSOA_ug1", "ROOH      ", -999.0 ) &
-, dep_t("non_C_BSOA_ug10", "ROOH      ", -999.0 ) &
-, dep_t("non_C_BSOA_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("BSOC_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("BSOC_ug10 ", "ROOH      ", -999.0 ) &
+, dep_t("BSOC_ug1  ", "ROOH      ", -999.0 ) &
+, dep_t("BSOC_ng1e2", "ROOH      ", -999.0 ) &
 , dep_t("non_C_BSOA_ug1e3", "ROOH      ", -999.0 ) &
+, dep_t("non_C_BSOA_ug1e2", "ROOH      ", -999.0 ) &
+, dep_t("non_C_BSOA_ug10", "ROOH      ", -999.0 ) &
+, dep_t("non_C_BSOA_ug1", "ROOH      ", -999.0 ) &
+, dep_t("non_C_BSOA_ng1e2", "ROOH      ", -999.0 ) &
 , dep_t("ffire_OM  ", "PMf       ", -999.0 ) &
 , dep_t("ffire_BC  ", "PMf       ", -999.0 ) &
 , dep_t("ffire_remPPM25", "PMf       ", -999.0 ) &

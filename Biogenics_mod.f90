@@ -1,7 +1,7 @@
-! <Biogenics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Biogenics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -69,9 +69,9 @@ module Biogenics_mod
   use Config_module, only : NPROC, MasterProc, TINY, &
                            NLANDUSEMAX, IOU_INST, & 
                            KT => KCHEMTOP, KG => KMAX_MID, & 
-                           EURO_SOILNOX_DEPSCALE, & 
+                           ACP2012_SOILNOX_DEPSCALE, & 
                            MasterProc, &
-                           USES, &
+                           C5H8_ix, APINENE_ix, USES, &
                            NATBIO, EmBio, EMEP_EuroBVOCFile
   use Debug_module,       only: DebugCell, DEBUG
   use GridValues_mod,     only: i_fdom,j_fdom, debug_proc,debug_li,debug_lj
@@ -81,6 +81,7 @@ module Biogenics_mod
   use LandDefs_mod,       only: LandType, LandDefs
   use LandPFT_mod,        only: MapPFT_LAI, pft_lai
   use Landuse_mod,        only: LandCover
+  use LocalFractions_mod, only: lf_rcemis_nat, makeBVOC, makeBVOC, ix_BVOC
   use LocalVariables_mod, only: Grid  ! -> izen, DeltaZ
   use MetFields_mod,      only: t2_nwp
   use MetFields_mod,      only: PARdbh, PARdif !WN17, in W/m2
@@ -106,9 +107,10 @@ module Biogenics_mod
   private :: TabulateECF
 
   !/-- subroutines for soil NO
-  public :: Set_SoilNOx
+  public :: Set_ACP2012EuroSoilNOx
   integer :: h
-  real, dimension(24), parameter :: hourlySoilFac = [ (1.0 + 0.4 * cos(2*PI*(h-13)/24.0), h=0,23) ]
+  !OLD real, dimension(24), parameter :: hourlySoilFac = 
+  ! [ (1.0 + 0.4 * cos(2*PI*(h-13)/24.0), h=0,23) ]
 
   integer, public, parameter ::   NBVOC = 3
   character(len=4),public, save, dimension(NBVOC) :: &
@@ -191,7 +193,7 @@ module Biogenics_mod
   real, public, save, dimension(N_ECF,40) :: canopy_ecf  ! Canopy env. factors
 
  ! Indices for the species defined in this routine. Only set if found
-  integer, private, save :: itot_C5H8,  itot_TERP,  itot_NO , itot_NH3
+  integer, private, save :: itot_NO , itot_NH3
 
   contains
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -237,10 +239,6 @@ module Biogenics_mod
       !call CheckStop( ibn_C5H8 < 1 , "BiogencERROR C5H8")
       !call CheckStop( ibn_TERP < 1 , "BiogencERROR TERP")
       !if( ibn_TERP < 0 ) call PrintLog("WARNING: No TERPENE Emissions")
-     
-      !call CheckStop( USES%EURO_SOILNOX .and. ibn_NO < 1 , "BiogencERROR NO")
-      !call CheckStop( USES%GLOBAL_SOILNOX .and. ibn_NO < 1 , "BiogencERROR NO")
-      !if( MasterProc ) write(*,*) "SOILNOX ibn ", ibn_NO
 
       itot_NO   = find_index( "NO", species(:)%name      )
       itot_NH3  = find_index( "NH3", species(:)%name      )
@@ -673,7 +671,7 @@ module Biogenics_mod
   EmisNat(NATBIO%TERP,i,j) = (E_MTL+E_MTP) * 1.0e-9/3600.0
 
   if ( USES%SOILNOX ) then
-    if ( USES%SOILNOX_METHOD == 'OLD_EURO' ) then
+    if ( USES%SOILNOX_METHOD == 'ACP2012EURO' ) then
       rcemis(itot_NO,KG)    = rcemis(itot_NO,KG) + &
            SoilNOx(i,j) * biofac_SOILNO/Grid%DeltaZ
       EmisNat(NATBIO%NO,i,j) =  SoilNOx(i,j) * 1.0e-9/3600.0
@@ -684,8 +682,10 @@ module Biogenics_mod
       !molecules/m2/s -> molecules/cm3/s:
       rcemis(itot_NO,KG)    = rcemis(itot_NO,KG) + &
          SoilNOx3D(i,j,gmt_3hour)/Grid%DeltaZ * 1.0e-6
-
     end if ! USES%SOILNOX_METHOD
+
+    ! Emissions should be as mg(NO)/m2, not mg(N) as before
+      EmisNat(NATBIO%NO,i,j) =  EmisNat(NATBIO%NO,i,j) * 30.0/14.0
   end if ! USES%SOILNOX
 
     !EXPERIMENTAL
@@ -698,7 +698,13 @@ module Biogenics_mod
     else
         if(NATBIO%NH3>0)EmisNat(NATBIO%NH3,i,j) = 0.0
     end if
-     
+
+    if (USES%LocalFractions .and. makeBVOC) then
+       ! k assumed KMAX_MID
+       ! somewhat hardcoded
+       call lf_rcemis_nat(C5H8_ix, rcbio(NATBIO%C5H8,KG), i, j, icountry_in=ix_BVOC)
+       call lf_rcemis_nat(APINENE_ix, rcbio(NATBIO%TERP,KG), i, j, icountry_in=ix_BVOC)
+    end if
  
     if ( dbg .and. current_date%seconds==0 ) then 
 
@@ -727,7 +733,10 @@ module Biogenics_mod
   !----------------------------------------------------------------------------
 
 
-   subroutine Set_SoilNOx()
+  ! ACP2012EuroSoilNOx uses methods from the 2012
+  ! EMEP documentation paper, Simpson et al, doi:10.5194/acp-12-7825-2012
+  ! Is only used when USES%SOILNOX_METHOD == 'ACP2012EURO'
+   subroutine Set_ACP2012EuroSoilNOx()
       integer :: i, j, nLC, iLC, LC
       logical :: my_first_call = .true.
       real    :: f, ft, fn, ftn
@@ -737,12 +746,12 @@ module Biogenics_mod
 
 
       if ( .not. USES%SOILNOX  ) return ! and fSW has been set to 1. at start
-      if ( USES%SOILNOX_METHOD /= 'OLD_EURO' ) return
+      if ( USES%SOILNOX_METHOD /= 'ACP2012EURO' ) return
 
       if( DEBUG%SOILNOX .and. debug_proc ) then
          write(*,*)"Biogenic_mod DEBUG_SOILNOX EURO: ",&
           current_date%day, current_date%hour, current_date%seconds,&
-          USES%SOILNOX_METHOD, EURO_SOILNOX_DEPSCALE
+          USES%SOILNOX_METHOD, ACP2012_SOILNOX_DEPSCALE
       end if
 
       ! We reset once per hour
@@ -766,7 +775,7 @@ module Biogenics_mod
            ! We use a factor normalised to 1.0 at 5000 mgN/m2/a
 
              fn = AnnualNdep(i,j)/5000.0 ! scale for now
-             fn = fn * EURO_SOILNOX_DEPSCALE  ! See Config_module
+             fn = fn * ACP2012_SOILNOX_DEPSCALE  ! See Config_module
 
              ftn = ft * fn * hfac 
 
@@ -788,10 +797,10 @@ module Biogenics_mod
                  f  = LandCover(i,j)%fraction(ilc) 
                  beta = 0.0
 
-                 if ( LandType(LC)%is_conif ) then
+                 if ( LandType(LC)%is_NDLF ) then
                     enox = enox + f*ftn*150.0
                     !enh3 = enh3 + f*ftn*1500.0 ! Huge?! W+E ca. 600 ngNH3/m2/s -> 1800 ugN/m2/h
-                 else if ( LandType(LC)%is_decid ) then
+                 else if ( LandType(LC)%is_BDLF ) then
                     enox = enox + f*ftn* 50.0
                     !enh3 = enh3 + f*ftn*500.0 !  Just guessing
                  else if ( LandType(LC)%is_seminat ) then
@@ -865,5 +874,5 @@ module Biogenics_mod
 
       my_first_call = .false.
 
-   end subroutine Set_SoilNOx
+   end subroutine Set_ACP2012EuroSoilNOx
 end module Biogenics_mod

@@ -1,7 +1,7 @@
-! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -655,6 +655,7 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
   integer,     intent(in),optional:: nsecs
   logical, save :: first_call=.true.
   integer :: n,dat(4)
+  character(len=*),parameter:: dtxt='init_icbc:'
 
   if(.not.first_call)return
   first_call=.false.
@@ -700,23 +701,23 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
     do n = 1,size(adv_ic%varname)
       if(.not.adv_ic(n)%found)then
         if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
-             call PrintLog("WARNING: IC variable '"//trim(adv_ic(n)%varname)//"' not found")
+             call PrintLog(dtxt//"WARNING: IC variable '"//trim(adv_ic(n)%varname)//"' not found")
       elseif(DEBUG%NEST.or.DEBUG%NEST_ICBC)then
-        write(*,*) "init_icbc filled adv_ic "//trim(adv_ic(n)%varname)
+        write(*,*) dtxt//" filled adv_ic "//trim(adv_ic(n)%varname)
       end if
     end do
     do n = 1,size(adv_bc%varname)
       if(.not.adv_bc(n)%found)then
         if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
-        call PrintLog("WARNING: BC variable '"//trim(adv_bc(n)%varname)//"' not found")
+        call PrintLog(dtxt//"WARNING: BC variable '"//trim(adv_bc(n)%varname)//"' not found")
       elseif(DEBUG%NEST.or.DEBUG%NEST_ICBC)then
-        write(*,*) "init_icbc filled adv_bc "//trim(adv_bc(n)%varname)
+        write(*,*) dtxt//" filled adv_bc "//trim(adv_bc(n)%varname)
       end if
     end do
   end if
 
   if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)then
-    write(*,"(a)") "Nest: DEBUG_ICBC Variables:",&
+    write(*,"(a)") dtxt//"Nest: DEBUG_ICBC Variables:",&
       trim(filename_read_3D),trim(filename_read_BC)
     write(*,"((1X,A,I3,'->',"//ICBC_FMT//"))") &
       ('Nest: ADV_IC',n,adv_ic(n),n=1,size(adv_ic)),&

@@ -1,7 +1,7 @@
-! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -32,16 +32,18 @@ use CheckStop_mod,     only: CheckStop
 use ChemDims_mod,      only: NSPEC_ADV,NSPEC_SHL
 use ChemGroups_mod,    only: chemgroups
 use ChemSpecs_mod,     only: species_adv
-use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY,OutputVegO3,nOutputVegO3
+use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY, OutputVegO3,&
+                             USES, nOutputVegO3
 use Debug_module,      only: DEBUG   ! -> DEBUG%MOSAICS
 use DerivedFields_mod, only: f_2d, d_2d
 use EcoSystem_mod,     only: NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS, EcoSystemFrac, &
                             FULL_ECOGRID, FULL_LCGRID, Is_EcoSystem
 use GasParticleCoeffs_mod,  only:  DDspec
-use GridValues_mod,    only: debug_proc
+use GridValues_mod,    only: debug_proc, i_fdom, j_fdom
 use Io_Progs_mod,      only: datewrite
 use LandDefs_mod,      only: LandDefs, LandType, Check_LandCoverPresent ! e.g. "CF"
 use Landuse_mod,       only: LandCover ! for POD
+use LocalFractions_mod,only: lf_POD
 use LocalVariables_mod,only: Grid,SubDat, L
 use MetFields_mod
 use OwnDataTypes_mod,  only: Deriv, print_deriv_type, typ_s5ind, typ_s1ind, typ_s3,&
@@ -86,11 +88,9 @@ subroutine Init_MosaicMMC(MOSAIC_METCONCS)
 ! not found, but that's okay I hope...
   character(len=*), dimension(:), intent(in) :: MOSAIC_METCONCS
 
-  
+
   ! MasterProc and debug_proc output at different times, so we merge
-  if (DEBUG%MOSAICS .and. debug_proc) then
-    mydbg = .true.
-  else if (MasterProc ) then
+  if (debug_proc .or. (DEBUG%MOSAICS .and. MasterProc)) then
     mydbg = .true.
   end if
 
@@ -228,7 +228,7 @@ subroutine Add_MosaicVegO3(nVEGO3)
     name = veg%name
 
     if(mydbg) write(*,"(a,i4,a,f7.1,2a)") dtxt//trim(name)//' class:'//trim(veg%class), &
-            n, ' Y=', veg%Threshold, ' defn:'//trim(veg%defn), ' txtLC:'// trim(veg%txtLC) 
+            n, ' Y=', veg%Threshold, ' defn:'//trim(veg%defn), ' txtLC:'// trim(veg%txtLC)
     !if(mydbg) write(*,*) dtxt//'veg:', veg
     select case(veg%class)
     case("POD")
@@ -371,10 +371,10 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
   dbghh = dbg .and. current_date%seconds == 0
   if(dbg) txtdate = print_date()
 
-  ! Must match areas given above, e.g. DDEP_CONIF -> Conif
+  ! Must match areas given above, e.g. DDEP_NDLF -> NeedleLeaf
 
   ! Ecosystem areas, which were assigned in Init_DryDep:
-  !  EcoFrac(CONIF)   = sum( coverage(:), LandType(:)%is_conif )
+  !  EcoFrac(NDLF)   = sum( coverage(:), LandType(:)%is_NDLF )
   !  EcoFrac(FULL_GRID)    = 1.0
 
   EcoFrac(:)    = EcoSystemFrac(:,i,j)
@@ -433,6 +433,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
     case("DDEP")
       ! Eco landcovers can include several land-cover classes, see EcoSystem_mod
       iEco = find_index(MosaicOutput(imc)%txt,DEF_ECOSYSTEMS)
+      call CheckStop(iEco<0,dtxt//"iECO NEG! "//trim(MosaicOutput(imc)%txt))
       select case(nadv)
       case(1:NSPEC_ADV)                 ! normal advected species
         Fflux = Deploss(nadv)*sum(fluxfrac(nadv,:),Is_EcoSystem(iEco,:))
@@ -485,6 +486,9 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
     case("POD")         ! Fluxes, PODY (was AFstY)
       n =  MosaicOutput(imc)%Index !Index in VEGO3_OUPUTS
       call Calc_POD( n, iLC, output, debug_flag)
+      
+      if(USES%LocalFractions) call lf_POD(i,j,VEGO3_OUTPUTS(n)%name,output)
+
       if(dbg) &
         write(*,"(2a,2g12.4)") dtxt//"MYPOD ", trim(txtdate), output, Sub(iLC)%FstO3
 

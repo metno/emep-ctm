@@ -1,7 +1,7 @@
-! <Functions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Functions_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -56,6 +56,8 @@ public :: T_2_Tpot        ! Inverse as Exner_nd
 public :: Exner_tab       ! Tabulation. Must be called first
 
 public :: ERFfunc    ! Error functions
+
+public :: monthly_convolve  ! convolves monthly data to smooth values
 
 !/- Interpolation constants
 
@@ -539,4 +541,46 @@ end function heaviside
 ! 950.000     0.98544     0.98544     0.98544     1.01477
 !1000.000     1.00000     1.00000     1.00000     1.00000
 !+------------------------------------------------------------------
+  
+ ! Smooth monthly data by convolving with simple function
+ ! which assigns a fraction, frac0 of old monthly to new monthly
+ ! and then remaining old to neighbouring months. Wraps at year
+ ! start and end.
+
+  function monthly_convolve(y,pcnt0) result(ynew)
+    real, dimension(12), intent(in) :: y
+    integer, intent(in) :: pcnt0  ! Percentage retained in central cell  
+    real :: frac0, fracLR
+    real, dimension(12) :: ynew
+    integer :: mm0, mmL, mmR
+    ynew = 0.0
+    frac0 = 0.01 * pcnt0
+    fracLR = 0.5*(1-frac0)   ! fracs to Left and Right cells
+
+    do mm0 = 1, 12
+      mmL = mm0 - 1
+      if (mmL == 0) mmL=12
+      mmR = mm0 + 1
+      if (mmR == 13) mmR=1
+      ynew(mmL) = ynew(mmL) + fracLR * y(mm0)
+      ynew(mm0) = ynew(mm0) + frac0  * y(mm0)
+      ynew(mmR) = ynew(mmR) + fracLR * y(mm0)
+    end do
+  
+  end function monthly_convolve
 endmodule Functions_mod
+
+!TSTEMX program testr
+!TSTEMX   use Functions_mod, only : monthly_convolve
+!TSTEMX   real, dimension(12) :: y, yn
+!TSTEMX   integer, dimension(5) :: tst = [ 90,70,60,50,30 ]
+!TSTEMX   integer :: i
+!TSTEMX   y= 1.0
+!TSTEMX   y(3) = 5.0
+!TSTEMX   y(12) =10.0
+!TSTEMX   print '(a,i4, 13f7.3)', 'y0 ', 100, y, sum(y)
+!TSTEMX   do i = 1, size(tst)
+!TSTEMX     yn = monthly_convolve(y,tst(i))
+!TSTEMX     print '(a,i4, 13f7.3)', 'y0 ', tst(i), yn, sum(yn)
+!TSTEMX   end do
+!TSTEMX end program testr

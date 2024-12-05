@@ -1,7 +1,7 @@
-! <EcoSystem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <EcoSystem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,7 +43,7 @@ integer, public, parameter :: FULL_ECOGRID=1
 ! These are "real" ecosystems, generally consisting of more than one land-cover
 ! We will add land-cover specific below for Tålegrenser project
 integer, private, parameter :: &
-  CONIF=2, DECID=3, CROP=4, SEMINAT=5, FOREST=6, WATER_D=7, NONFOREST=8, LAST_ECO=8 ! try to skipW
+  NDLF=2, BDLF=3, CROP=4, SEMINAT=5, FOREST=6, WATER_D=7, NONFOREST=8, LAST_ECO=8 ! try to skipW
 
 ! We also keep the parameter for FULL_LCGRID=0 here, which is used
 ! for e.g. Vg values. Do not confuse LC with ECO stuff!
@@ -60,7 +60,7 @@ integer, public, parameter :: FULL_LCGRID=0
 integer, public, parameter :: NDEF_ECOSYSTEMS = LAST_ECO + 16 ! first 16 LC
 character(len=TXTLEN_SHORT),public,dimension(NDEF_ECOSYSTEMS),parameter :: &
   DEF_ECOSYSTEMS = [character(len=TXTLEN_SHORT):: &
-    "Grid","Conif","Decid","Crops","Seminat","Forest","Water_D","nonForest", &
+    "Grid","NeedleLeaf","BroadLeaf","Crops","Seminat","Forest","Water_D","nonForest", &
      "CF", "DF", "NF", "BF", "TC", "MC", "RC", "SNL", "GR", "MS", "WE", &
      "TU", "DE", "W", "ICE", "U"]  
 
@@ -100,25 +100,25 @@ subroutine Init_EcoSystems()
 
 !  Define which landcovers belong to which ecosystem
   Is_EcoSystem(FULL_ECOGRID,:)    =  .true.
-  Is_EcoSystem(CONIF,:)   =  LandType(:)%is_conif
-  Is_EcoSystem(DECID,:)   =  LandType(:)%is_decid
+  Is_EcoSystem(NDLF,:)   =  LandType(:)%is_NDLF
+  Is_EcoSystem(BDLF,:)   =  LandType(:)%is_BDLF
   Is_EcoSystem(CROP,:)    =  LandType(:)%is_crop
   Is_EcoSystem(SEMINAT,:) =  LandType(:)%is_seminat
-  Is_EcoSystem(FOREST,:)  =  LandType(:)%is_decid .or. LandType(:)%is_conif
+  Is_EcoSystem(FOREST,:)  =  LandType(:)%is_BDLF .or. LandType(:)%is_NDLF
   Is_EcoSystem(WATER_D,:) =  LandType(:)%is_water
   Is_EcoSystem(NONFOREST,:) =  .not. Is_EcoSystem(FOREST,:)
   do iEco = 1, NDEF_ECOSYSTEMS-LAST_ECO
     Is_EcoSystem(LAST_ECO+iEco,:) = LandDefs(:)%code == DEF_ECOSYSTEMS(LAST_ECO+iEco)
-    if(MasterProc) then
+    if(MasterProc .and. DEBUG%ECOSYSTEMS) then
       do iLC = 1, 4
         write(*,"(a,2i3,2a4,L2)") 'ADD LC-ECO', iEco, iLC, LandDefs(iLC)%code,&
            DEF_ECOSYSTEMS(LAST_ECO+iEco), Is_EcoSystem(LAST_ECO+iEco,iLC)
        end do
     end if
   end do
-  if ( MasterProc ) then
+  if ( MasterProc .and. DEBUG%ECOSYSTEMS) then
     do iEco = 1, NDEF_ECOSYSTEMS
-      write(*,*) 'ECOSYS', iEco, Is_EcoSystem(FOREST,iEco), Is_EcoSystem(DECID,iEco), Is_EcoSystem(NONFOREST,iEco), Is_EcoSystem(9,iEco)
+      write(*,*) 'ECOSYS', iEco, Is_EcoSystem(FOREST,iEco), Is_EcoSystem(BDLF,iEco), Is_EcoSystem(NONFOREST,iEco), Is_EcoSystem(9,iEco)
     end do
   end if
 

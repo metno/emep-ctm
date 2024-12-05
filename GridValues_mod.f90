@@ -1,7 +1,7 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -50,8 +50,7 @@ use Config_module,      only: &
      KMAX_BND, KMAX_MID, & ! vertical extent
      MasterProc,NPROC,IIFULLDOM,JJFULLDOM,RUNDOMAIN, JUMPOVER29FEB,NPROCX,NPROCY,&
      PT,Pref,NMET,MANUAL_GRID,&
-     startdate,NPROCX,NPROCY,Vertical_levelsFile,&
-     EUROPEAN_settings, GLOBAL_settings,USES,FORCE_PFT_MAPS_FALSE
+     startdate,NPROCX,NPROCY,Vertical_levelsFile, USES
 use Debug_module, only:  DEBUG   ! -> DEBUG%GRIDVALUES
 
 use MPI_Groups_mod!, only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_LOGICAL, &
@@ -357,7 +356,7 @@ subroutine GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,projection)
   integer :: GIMAX_file,GJMAX_file,KMAX_file,wrf_proj_code
   real :: wrf_POLE_LAT=0.0
   character (len = 30) ::MAP_PROJ_CHAR
-  integer :: NTime_Read
+  integer :: NTime_Read, varid
   real :: TimesInDays(1000)
 
 
@@ -372,6 +371,10 @@ subroutine GetFullDomainSize(filename,IIFULLDOM,JJFULLDOM,KMAX,projection)
 
      projection=''
      status = nf90_get_att(ncFileID,nf90_global,"projection",projection)
+     if(status/=nf90_noerr) then
+        status = nf90_inq_varid(ncid=ncFileID, name="projection_lambert", varID=varID)
+        if(status==nf90_noerr) projection = 'lambert'
+     end if
      if(status/=nf90_noerr) then
         ! WRF projection format
         call check(nf90_get_att(ncFileID,nf90_global,"MAP_PROJ",wrf_proj_code))
@@ -563,7 +566,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
   real :: x1,x2,x3,x4,P0,x,y,mpi_out,r,t
   logical::found_hybrid=.false.,found_metlevels=.false.
   real :: CEN_LAT, CEN_LON,P_TOP_MET, WRF_DY
-  real :: P,rb,rl,rp,dx,dy,dy2,glmax,glmin,v2(2),glon_fdom1,glat_fdom1,lat
+  real :: P,rb,rl,rp,dx,dy,dy2,glmax,glmin,v2(2),glon_fdom1,glat_fdom1,lat,lat2(2)
   integer :: iloc_start, iloc_end,jloc_start, jloc_end
 
   real, dimension(-1:LIMAX+2,-1:LJMAX+2)::xm,xm_i_ext,xm_j_ext
@@ -612,9 +615,11 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       call check(nf90_inq_dimid(ncid=ncFileID, name="south_north", dimID=jdimID))
   case('lambert')
     status = nf90_inq_dimid(ncid=ncFileID, name="x", dimID=idimID)
+  if(MasterProc)print *,'x',status
     if(status/=nf90_noerr)& ! WRF format
       call check(nf90_inq_dimid(ncid=ncFileID, name="west_east", dimID=idimID))
     status = nf90_inq_dimid(ncid=ncFileID, name="y", dimID=jdimID)
+  if(MasterProc)print *,'y',status
     if(status/=nf90_noerr)& ! WRF format
       call check(nf90_inq_dimid(ncid=ncFileID, name="south_north", dimID=jdimID))
   case('lon lat')
@@ -636,6 +641,13 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
   
   !get global attributes
   status = nf90_get_att(ncFileID,nf90_global,"Grid_resolution",GRIDWIDTH_M)
+  if(status/=nf90_noerr)then
+     if(projection=='lambert')then
+        call check(nf90_inq_varid(ncid=ncFileID, name="y", varID=varID))
+        status = nf90_get_var(ncFileID, varID,lat2 , count=(/2/)   )
+        if(status==nf90_noerr)GRIDWIDTH_M=lat2(2)-lat2(1)
+     end if
+  end if
   if(status/=nf90_noerr)then
     !WRF  format
     call check(nf90_get_att(ncFileID,nf90_global,"DX",GRIDWIDTH_M))
@@ -722,7 +734,7 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       endif
       if(MasterProc)then
         if(abs(earth_radius - earth_radius_lambert)>1.0)&
-            write(*,*)'WARING: Using a new Earth Radius ',earth_radius_lambert
+            write(*,*)'WARNING: Using a new Earth Radius ',earth_radius_lambert
       end if
       earth_radius = earth_radius_lambert
       !status = nf90_get_att(ncFileID,nf90_global,"standard_parallel",(/lat_stand1_lambert,lat_stand2_lambert/))!standard latitude at which mapping factor=1
@@ -3080,169 +3092,6 @@ subroutine readneighbors_N(data,data_south,data_north,data_west,data_east,thick,
   end if
 
 end subroutine readneighbors_N
-
-
-!May 2021. Dave moved all settings to inital config. User needs to decide
-! explicitly now; things became too complicated!
-!REMsubroutine set_EuropeanAndGlobal_Config()
-!REM  !test if the grid covers Europe and the rest of the world
-!REM  !note that the two are not exclusive!
-!REM  !if the file covers more than just Europe, it is defined as GLOBAL
-!REM  !
-!REM  !If the file is GLOBAL:
-!REM  !1) USES%PFT_MAPS = .true. (can be overridden by FORCE_PFT_MAPS_FALSE)
-!REM  !2) USES%DEGREEDAY_FACTORS = .false.
-!REM  !3) USES%EURO_SOILNOX = .false.  ! May 2021 DEPRECATED!
-!REM  !4) USES%GLOBAL_SOILNOX = .true., April 2021 added USES%CAMS81_SOILNOX
-!REM  !
-!REM  !If the file is EUROPEAN:
-!REM  !nothing happens for now
-!REM
-!REM
-!REM  !could not be in Config_module because "me" is not accessible there
-!REM  
-!REM  implicit none
-!REM  real:: x1,x2,x3,x4,y1,y2,y3,y4,lon,lat,ir,jr
-!REM  character(len=*), parameter :: dtxt='EurGlobSettings:'
-!REM  integer :: EastProc
-!REM  logical :: dbgEG = .false.
-!REM
-!REM  dbgEG = DEBUG%GRIDVALUES .and. MasterProc ! mainly for printLog
-!REM
-!REM  if(EUROPEAN_settings == 'NOTSET')then
-!REM     !No value set in config input, use grid to see if it covers Europe
-!REM     !Test approximatively if any European country is included in rundomain
-!REM     !in lon lat coordinates test if the middle of the rundomain is within
-!REM     ! 40>lon>-32    70>lat>35 
-!REM
-!REM     if(gbacmax>35 .and. glacmin<40 .and. glacmax>-32)then
-!REM        
-!REM        if(MasterProc)write(*,*) dtxt//'assuming EUROPEAN_settings'
-!REM        call PrintLog(dtxt//'assuming EUROPEAN_settings',MasterProc)
-!REM        EUROPEAN_settings = 'YES' 
-!REM     else
-!REM        
-!REM        ! define middle point of middle subdomain (only values from me=NPROC/2 will be used)
-!REM        lon = glon(limax/2,ljmax/2)
-!REM        lat = glat(limax/2,ljmax/2)
-!REM        CALL MPI_BCAST(lon,8,MPI_BYTE,NPROC/2,MPI_COMM_CALC,IERROR)
-!REM        CALL MPI_BCAST(lat,8,MPI_BYTE,NPROC/2,MPI_COMM_CALC,IERROR)
-!REM        
-!REM        x1=-32;x2=40;x3=x2;x4=x1;y1=35;y2=y1;y3=70;y4=y3
-!REM18      format(A,2F6.1,A)
-!REM        if(inside_1234(x1,x2,x3,x4,y1,y2,y3,y4,lon,lat))then
-!REM           EUROPEAN_settings = 'YES' 
-!REM        else
-!REM           EUROPEAN_settings = 'NO' !default
-!REM        endif
-!REM        write(logtxt,'(a,a4,2f6.1)')  dtxt//'EUROPEAN_settings? ', &
-!REM           EUROPEAN_settings, lon,lat
-!REM        call PrintLog(dtxt//'assuming EUROPEAN_settings',MasterProc)
-!REM
-!REM     endif 
-!REM  else
-!REM    !if(MasterProc) write(*,*) dtxt//'settings from config , EUR GLOB ', EUROPEAN_settings, GLOBAL_settings
-!REM    write(logtxt,'(a,2L2)')  dtxt//'settings from config , EUR GLOB ', EUROPEAN_settings, GLOBAL_settings
-!REM    call PrintLog(dtxt//'assuming EUROPEAN_settings',MasterProc)
-!REM  endif
-!REM
-!REM  if(GLOBAL_settings == 'NOTSET')then
-!REM     !No value set in config input, use grid to see if it covers regions outside Extended Europe
-!REM     !We evaluate if the region extend outside the EMEP01 grid East, West or South
-!REM     !Note that it should also allow for PS projection which can cover the North Pole, i.e. any longitude
-!REM     GLOBAL_settings = 'NO' !default
-!REM     !find if lat < 19 are included within the domain
-!REM     !XX
-!REM     if(gbacmin<19.0)then
-!REM        GLOBAL_settings = 'YES' !default
-!REM        write(logtxt,'(a,2f6.1,a)') 'Assuming GLOBAL_settings because rundomain extends below 19 degN latitudes'
-!REM     else
-!REM        !test the Eastern point at approximatively middle in the Y direction
-!REM        EastProc = NPROCY/2 *NPROCX+NPROCX-1
-!REM        lon = glon(li1,ljmax/2)
-!REM        lat = glat(li1,ljmax/2)
-!REM        CALL MPI_BCAST(lon,8,MPI_BYTE,EastProc,MPI_COMM_CALC,IERROR)
-!REM        CALL MPI_BCAST(lat,8,MPI_BYTE,EastProc,MPI_COMM_CALC,IERROR)
-!REM        x1=-32;x2=90;x3=x2;x4=x1;y1=30;y2=y1;y3=70;y4=y3
-!REM        if(.not. inside_1234(x1,x2,x3,x4,y1,y2,y3,y4,lon,lat) )then
-!REM           GLOBAL_settings = 'YES' 
-!REM           write(logtxt,'(a,2f6.1,a)') 'assuming GLOBAL_settings: lon lat ',lon,lat,' outside Europe'
-!REM        else           
-!REM           !find if the point with lon = -40 and lat = 45 is within the domain
-!REM           call lb2ij(-40.0,45.0,ir,jr)
-!REM           if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
-!REM              GLOBAL_settings = 'YES' !default
-!REM              write(logtxt,'(a)') 'Assuming GLOBAL_settings because rundomain contains lon=-40 at lat=45'
-!REM              !if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=-40 at lat=45'
-!REM           else 
-!REM              !find if the point with lon = 92 and lat = 45 is within the domain
-!REM              call lb2ij(92.0,45.0,ir,jr)
-!REM              if(ir>=RUNDOMAIN(1).and.ir<=RUNDOMAIN(2).and.jr>=RUNDOMAIN(3).and.jr<=RUNDOMAIN(4))then
-!REM                 GLOBAL_settings = 'YES' !default
-!REM                 write(logtxt,'(a)') 'Assuming GLOBAL_settings because rundomain contains lon=92 at lat=45'
-!REM                 !if(MasterProc)write(*,*)dtxt//'Assuming GLOBAL_settings because rundomain contains lon=92 at lat=45'
-!REM              else
-!REM                 write(logtxt,'(a)') 'Not assuming GLOBAL_settings'
-!REM                 !if(MasterProc)write(*,*)dtxt//'Not assuming GLOBAL_settings'
-!REM              endif
-!REM           endif
-!REM        endif
-!REM     endif
-!REM     call PrintLog(dtxt//logtxt,MasterProc)
-!REM  endif
-!REM
-!REM  if(EUROPEAN_settings == 'YES') then
-!REM     if(USES%MonthlyNH3  == 'NOTSET' .and. GLOBAL_settings /= 'YES')then
-!REM        USES%MonthlyNH3  = 'LOTOS'
-!REM        call PrintLog(dtxt//'MonthlyNH3 set to '//trim(USES%MonthlyNH3), MasterProc)
-!REM     endif
-!REM  endif
-!REM
-!REM  if(GLOBAL_settings == 'YES') then
-!REM     if(FORCE_PFT_MAPS_FALSE)then
-!REM        if(MasterProc)write(*,*)dtxt//'WARNING: NOT USING PFT_MAPS in a GLOBAL grid'
-!REM        USES%PFT_MAPS = .false. 
-!REM     else
-!REM        if(USES%PFT_MAPS)then        
-!REM           !nothing to change
-!REM        else
-!REM           if(MasterProc)write(*,*)dtxt//'Using PFT_MAPS because GLOBAL grid'
-!REM           USES%PFT_MAPS = .true. 
-!REM        endif
-!REM     endif
-!REM     if(USES%DEGREEDAY_FACTORS)then        
-!REM        if(MasterProc)write(*,*)dtxt//'WARNING: not using DEGREEDAY_FACTORS because GLOBAL grid'
-!REM        USES%DEGREEDAY_FACTORS = .false.
-!REM     endif
-!REM
-!REM     if(.not. USES%GLOBAL_SOILNOX)then
-!REM        if(MasterProc)write(*,*)dtxt//'WARNING: setting GLOBAL_SOILNOX because GLOBAL grid'
-!REM        USES%GLOBAL_SOILNOX = .true.
-!REM     endif
-!REM
-!REM     if(USES%EURO_SOILNOX)then        
-!REM        USES%EURO_SOILNOX = .false. 
-!REM        if(MasterProc)write(*,*)dtxt//'Not using EURO_SOILNOX because GLOBAL grid'
-!REM     endif
-!REM
-!REM     if(USES%MonthlyNH3  == 'LOTOS')then
-!REM       if(MasterProc)write(*,*)dtxt//'WARNING: MonthlyNH3=LOTOS is not advised outside Europe'
-!REM     endif
-!REM
-!REM  endif
-!REM
-!REM  write(logtxt,'(4a,9(a,L))') dtxt//' Final settings,'   &
-!REM       ,'  EUR = '//trim(EUROPEAN_settings) &
-!REM       ,'; GLOB = '//trim(GLOBAL_settings)&
-!REM       ,'; MonthlyNH3 = '//trim(USES%MonthlyNH3)&
-!REM       ,'; PFT_MAPS ',USES%PFT_MAPS&
-!REM       ,'; E-SNOx = ',USES%EURO_SOILNOX&
-!REM       ,'; G-SNOx = ',USES%GLOBAL_SOILNOX&
-!REM       ,'; CAMS81-SNOx = ',USES%CAMS81_SOILNOX&
-!REM       ,'; USES%SOILNOx= ',USES%SOILNOX
-!REM   call PrintLog(logtxt, MasterProc)
-!REM
-!REMend subroutine set_EuropeanAndGlobal_Config
 
 subroutine  z2level_stdatm(z, z_topo, lev)
   !convert height z in meters to the corresponding level

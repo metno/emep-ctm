@@ -1,7 +1,7 @@
-! <Sites_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Sites_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,7 +42,7 @@ use ChemGroups_mod,     only: OXN_GROUP, PMFINE_GROUP, PMCOARSE_GROUP
 use Config_module,      only: NMET,PPBINV,PPTINV, KMAX_MID, MasterProc&
                               ,RUNDOMAIN, IOU_INST, SOURCE_RECEPTOR, meteo&
                               ,SitesFile,SondesFile,KMAX_BND,PT, NPROC,&  ! for sitesout
-                              SITE_SHL_names,SONDE_SHL_names,SONDE_ADV_names,&
+                              SITE_SHL_names,SITE_ADV_names,SONDE_SHL_names,SONDE_ADV_names,&
       NXTRA_SITE_MISC, NXTRA_SITE_D2D, &
       SITE_XTRA_MISC, SITE_XTRA_D2D, &
       NSITES_MAX, NSONDES_MAX, FREQ_SITE, NSHL_SITE_MAX, &
@@ -138,15 +138,17 @@ character(len=Spec_Att_Size), allocatable, save  :: Spec_Att(:,:)
 integer, private :: i_Att !Spec attribute index
 integer :: NSpec_Att !number of Spec attributes defined
 
-integer, public, parameter ::  NADV_SITE  = NSPEC_ADV   ! No. advected species (1 up to NSPEC_ADV)
+!D23 integer, public, parameter ::  NADV_SITE  = NSPEC_ADV   ! No. advected species (1 up to NSPEC_ADV)
 integer ::isite
-integer, public, parameter, dimension(NADV_SITE) :: &
-  SITE_ADV = [(isite, isite=1,NADV_SITE)]  ! Everything
+!D23 integer, public, parameter, dimension(NADV_SITE) :: &
+!D23   SITE_ADV = [(isite, isite=1,NADV_SITE)]  ! Everything
 
-integer, public :: NSHL_SITE, NADV_SONDE, NSHL_SONDE !number of requested species found
+
+integer, public :: NSHL_SITE, NADV_SITE , NADV_SONDE, NSHL_SONDE !number of requested species found
 !indices of requested and found species
 integer, public, dimension(NSPEC_SHL) :: SITE_SHL
 integer, public, dimension(NSPEC_SHL) :: SONDE_SHL
+integer, public, dimension(NSPEC_ADV) :: SITE_ADV   ! D23
 integer, public, dimension(NSPEC_ADV) :: SONDE_ADV 
 
  type(KeyVal), private, dimension(20)     :: KeyValues ! Info on units, coords, etc.
@@ -181,6 +183,12 @@ subroutine sitesdef()
   call Chem2Index(SITE_SHL_names,SITE_SHL,NSHL_SITE)
   call Chem2Index(SONDE_SHL_names,SONDE_SHL,NSHL_SONDE)
   call Chem2Index_adv(SONDE_ADV_names,SONDE_ADV,NADV_SONDE)
+  if ( SITE_ADV_names(1) == 'ALL' ) then ! All advected species 
+    NADV_SITE  = NSPEC_ADV 
+    SITE_ADV = [(isite, isite=1,NADV_SITE)]  ! Everything
+  else
+    call Chem2Index_adv(SITE_ADV_names,SITE_ADV,NADV_SITE)
+  end if
   NSPC_SITE  = NADV_SITE + NSHL_SITE + NXTRA_SITE_MISC + NXTRA_SITE_D2D 
   NOUT_SITE  = NSPC_SITE * 1 
   NSPC_SONDE = NADV_SONDE + NSHL_SONDE + NXTRA_SONDE

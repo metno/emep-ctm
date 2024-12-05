@@ -1,7 +1,7 @@
-! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,7 +33,7 @@ module PhyChem_mod
 !
 !-----------------------------------------------------------------------------
 use Advection_mod,     only: advecdiff_Eta
-use Biogenics_mod,     only: Set_SoilNOx
+use Biogenics_mod,     only: Set_ACP2012EuroSoilNOx
 use CheckStop_mod,     only: CheckStop
 use Chemfields_mod,    only: xn_adv,cfac,xn_shl
 use ChemDims_mod,      only: NSPEC_SHL
@@ -263,7 +263,9 @@ subroutine phyche()
 
   !===================================
   call Set_SoilWater()
-  call Set_SoilNOx()!hourly
+  !===================================
+  if(USES%SOILNOX_METHOD=="ACP2012EURO") &
+     call Set_ACP2012EuroSoilNOx()!hourly, deprecated
 
   !===================================
   call init_drydep()

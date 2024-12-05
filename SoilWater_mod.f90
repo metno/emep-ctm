@@ -85,7 +85,7 @@ contains
 
       if ( .not. USES%SOILWATER  ) return ! and fSW has been set to 1. at start
       if ( .not. foundSoilWater_deep  ) then
-        if( my_first_call ) &
+        if( my_first_call .and. me==0) &
            call PrintLog("WARNING: USES%SOILWATER=true, but no deep SW found")
         my_first_call = .false.
         return ! and fSW has been set to 1. at start

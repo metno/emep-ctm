@@ -41,26 +41,26 @@ type(dep_t), public, dimension(NDRYDEP_ADV), save :: CM_DDepMap = (/ &
 , dep_t("NO3_f     ", "PMfNO3    ", -999.0 ) &
 , dep_t("NO3_c     ", "PMc       ", -999.0 ) &
 , dep_t("NH4_f     ", "PMfNH4    ", -999.0 ) &
-, dep_t("ASOC_ng1e2", "ALD       ", -999.0 ) &
-, dep_t("ASOC_ug1  ", "ALD       ", -999.0 ) &
-, dep_t("ASOC_ug10 ", "ALD       ", -999.0 ) &
-, dep_t("ASOC_ug1e2", "ALD       ", -999.0 ) &
 , dep_t("ASOC_ug1e3", "ALD       ", -999.0 ) &
-, dep_t("non_C_ASOA_ng1e2", "ALD       ", -999.0 ) &
-, dep_t("non_C_ASOA_ug1", "ALD       ", -999.0 ) &
-, dep_t("non_C_ASOA_ug10", "ALD       ", -999.0 ) &
-, dep_t("non_C_ASOA_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("ASOC_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("ASOC_ug10 ", "ALD       ", -999.0 ) &
+, dep_t("ASOC_ug1  ", "ALD       ", -999.0 ) &
+, dep_t("ASOC_ng1e2", "ALD       ", -999.0 ) &
 , dep_t("non_C_ASOA_ug1e3", "ALD       ", -999.0 ) &
-, dep_t("BSOC_ng1e2", "ALD       ", -999.0 ) &
-, dep_t("BSOC_ug1  ", "ALD       ", -999.0 ) &
-, dep_t("BSOC_ug10 ", "ALD       ", -999.0 ) &
-, dep_t("BSOC_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("non_C_ASOA_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("non_C_ASOA_ug10", "ALD       ", -999.0 ) &
+, dep_t("non_C_ASOA_ug1", "ALD       ", -999.0 ) &
+, dep_t("non_C_ASOA_ng1e2", "ALD       ", -999.0 ) &
 , dep_t("BSOC_ug1e3", "ALD       ", -999.0 ) &
-, dep_t("non_C_BSOA_ng1e2", "ALD       ", -999.0 ) &
-, dep_t("non_C_BSOA_ug1", "ALD       ", -999.0 ) &
-, dep_t("non_C_BSOA_ug10", "ALD       ", -999.0 ) &
-, dep_t("non_C_BSOA_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("BSOC_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("BSOC_ug10 ", "ALD       ", -999.0 ) &
+, dep_t("BSOC_ug1  ", "ALD       ", -999.0 ) &
+, dep_t("BSOC_ng1e2", "ALD       ", -999.0 ) &
 , dep_t("non_C_BSOA_ug1e3", "ALD       ", -999.0 ) &
+, dep_t("non_C_BSOA_ug1e2", "ALD       ", -999.0 ) &
+, dep_t("non_C_BSOA_ug10", "ALD       ", -999.0 ) &
+, dep_t("non_C_BSOA_ug1", "ALD       ", -999.0 ) &
+, dep_t("non_C_BSOA_ng1e2", "ALD       ", -999.0 ) &
 , dep_t("shipNOx   ", "NO2       ", -999.0 ) &
 , dep_t("ffire_OM  ", "PMf       ", -999.0 ) &
 , dep_t("ffire_BC  ", "PMf       ", -999.0 ) &

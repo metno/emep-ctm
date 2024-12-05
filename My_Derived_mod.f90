@@ -1,7 +1,7 @@
-! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <My_Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -147,7 +147,7 @@ character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
 character(len=TXTLEN_DERIV), public, parameter, dimension(7+16) :: &
   D2_EXTRA = [character(len=TXTLEN_DERIV):: &
     ! all array members will have len=TXTLEN_DERIV
-    "Area_Grid_km2","Area_Conif_Frac","Area_Decid_Frac",&
+    "Area_Grid_km2","Area_NeedleLeaf_Frac","Area_BroadLeaf_Frac",&
     "Area_Forest_Frac", &
     "Area_nonForest_Frac", &
     "Area_Seminat_Frac","Area_Crops_Frac", &

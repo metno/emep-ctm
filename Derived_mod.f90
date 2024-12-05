@@ -1,7 +1,7 @@
-! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.0>
+! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2023 met.no
+!*  Copyright (C) 2007-2024 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -270,8 +270,11 @@ subroutine Init_Derived()
   !associate ( D=> DDdefs(iddefPMc) ) !does not work with gfortran
   fracPM25 = LogNormFracBelow(DDdefs(iddefPMc)%umDpgV, &
        DDdefs(iddefPMc)%sigma, 2.5, 0.001*DDdefs(iddefPMc)%rho_p)
-  if(MasterProc) write(*,*) dtxt//"fracPM25 ", DDdefs(iddefPMc)%umDpgV, &
-       trim(DDdefs(iddefPMc)%name), fracPM25
+  if(MasterProc) write(*,"(a,4(1x,a,f7.3))") dtxt//"fracPM25 ",&
+     "umDpgV", DDdefs(iddefPMc)%umDpgV, &
+     "sig", DDdefs(iddefPMc)%sigma, &
+     "rho", 0.001*DDdefs(iddefPMc)%rho_p, &
+     trim(DDdefs(iddefPMc)%name), fracPM25
   !end associate ! D=> DDdefs(iddefPMc) )
 
 !  select case(nint(DDdefs(iddefPMc)%umDpgV*10))
@@ -1023,10 +1026,9 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
   logical, allocatable, dimension(:)   :: ingrp
   integer :: wlen,ispc,kmax,iem, nerr=0
-  integer :: isec_poll,isec,iisec,ii,ipoll,itemp
-  real :: default_frac,tot_frac,loc_frac_corr
+  integer :: isec,ii,itemp
   character(len=*), parameter :: dtxt='Deriv:'
-  real pp, temp, qsat
+  real pp, qsat
   real, save, allocatable :: D8M(:,:,:,:), D8Max(:,:,:), hourM(:,:,:),D8_26Max(:,:,:)
 
   logical, save :: make_MaxD8M_nth = .false.
@@ -1035,7 +1037,8 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   integer , save :: i_MaxD8M_2nd = 0 !index in f_2d
   integer , save :: i_MaxD8M_3rd = 0 !index in f_2d
   integer , save :: i_MaxD8M_4th = 0 !index in f_2d
-  integer :: i_26th, i4th, i3rd, i2nd, i1st
+  integer , save :: i_MaxD8M_19th = 0 !index in f_2d
+  integer :: i_26th, i4th, i3rd, i2nd, i1st, ith(26), iii, iiii
   integer, save :: count_AvgMDA8_m=0,count_AvgMDA8_y=0
   integer, save :: count_AvgMDA8AprSep_m=0,count_AvgMDA8AprSep_y=0
   real :: w_m,w_y !weights
@@ -1215,6 +1218,18 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ( "SurfAreaDUC_um2cm3" )
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%DU_C,i,j)
+      end forall
+    case ( "SurfAreaSSF_LS_um2cm3" )
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%SS_F_LS,i,j)
+      end forall
+    case ( "SurfAreaSSC_LS_um2cm3" )
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%SS_C_LS,i,j)
+      end forall
+    case ( "SurfAreaPMF_EQUI_um2cm3" )
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = SurfArea_um2cm3(AERO%PM_F_EQUI,i,j)
       end forall
 
     case ( "u_ref" )
@@ -1762,7 +1777,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         !NB overwritten anyway D2_O3_DAY = 0.
       end if
 
-    case( "MaxD8M_26th", "MaxD8M_1st", "MaxD8M_2nd", "MaxD8M_3rd", "MaxD8M_4th")
+    case( "MaxD8M_26th", "MaxD8M_19th", "MaxD8M_1st", "MaxD8M_2nd", "MaxD8M_3rd", "MaxD8M_4th")
       ! do nothing, it is taken care of by "MaxD8M" case
     case( "MaxD8M" , "AvgMDA8", "AvgMDA8AprSep") ! maximum daily eight-hour mean concentration
       if (first_call) then
@@ -1783,6 +1798,11 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
             if (f_2d(i)%class=="MaxD8M_26th") then
               call CheckStop(i_MaxD8M_26th > 0, "Only one MaxD8M_26th at a time implemented!")
               i_MaxD8M_26th = i
+              make_MaxD8M_nth = .true.
+            end if
+            if (f_2d(i)%class=="MaxD8M_19th") then
+              call CheckStop(i_MaxD8M_19th > 0, "Only one MaxD8M_26th at a time implemented!")
+              i_MaxD8M_19th = i
               make_MaxD8M_nth = .true.
             end if
             if (f_2d(i)%class=="MaxD8M_1st") then
@@ -1901,11 +1921,38 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
                       endif
                    endif
                 end do
+                !primitive sort generalizing method above. ith is array with order indices ith(1) largest ith(26) smallest
+                do ii = 1, 26
+                   ith(ii) = i_26th
+                end do
+                do ii = 1, 26
+                   if(D8_26Max(ii,i,j)>D8_26Max(ith(26),i,j)) then
+                      do iii = 1, 26
+                         if(D8_26Max(ii,i,j)>D8_26Max(ith(iii),i,j)) then
+                            do iiii = 26, iii+1, -1
+                               ith(iiii) = ith(iiii-1)  
+                            end do
+                            ith(iii) = ii
+                            exit
+                         end if
+                      end do
+                   end if
+                end do
+                if (.false.) then
+                   !can be used to check results, if developping
+                   if(me==0 .and. i==5 .and. j==5)then
+                      write(*,*)i_26th,i4th,i3rd,i2nd,i1st
+                      do ii = 1, 26
+                         write(*,*)ii,ith(ii),D8_26Max(ith(ii),i,j)
+                      end do
+                   end if
+                end if
                 
                 if (i_MaxD8M_1st > 0) d_2d(i_MaxD8M_1st,i,j,IOU_YEAR) = D8_26Max(i1st,i,j)
                 if (i_MaxD8M_2nd > 0) d_2d(i_MaxD8M_2nd,i,j,IOU_YEAR) = D8_26Max(i2nd,i,j)
                 if (i_MaxD8M_3rd > 0) d_2d(i_MaxD8M_3rd,i,j,IOU_YEAR) = D8_26Max(i3rd,i,j)
                 if (i_MaxD8M_4th > 0) d_2d(i_MaxD8M_4th,i,j,IOU_YEAR) = D8_26Max(i4th,i,j)
+                if (i_MaxD8M_19th > 0) d_2d(i_MaxD8M_19th, i,j,IOU_YEAR) = D8_26Max(ith(19),i,j)
                 
               end do
             end do
@@ -1944,11 +1991,10 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
           else if ( class=="AvgMDA8AprSep" ) then
             !NB: at the end of the first day (day 2 hour 00:00), we actually start to write in the next month
             if (current_date%day == 2) count_AvgMDA8AprSep_m = 0 
-            if (current_date%day == 2) count_AvgMDA8AprSep_y = 0 
             count_AvgMDA8AprSep_m = count_AvgMDA8AprSep_m + 1!for monthes we output all anyway!
             if(current_date%month>=4 .and. current_date%month<=9)count_AvgMDA8AprSep_y = count_AvgMDA8AprSep_y + 1
             w_m = 1.0/count_AvgMDA8AprSep_m
-            w_y = 1.0/count_AvgMDA8AprSep_y
+            w_y = 1.0/(1e-30 + count_AvgMDA8AprSep_y) !NB: count_AvgMDA8AprSep_y can be zero
             do j = 1,ljmax
               do i = 1,limax
                 if(LENOUT2D>=IOU_DAY)d_2d(n,i,j,IOU_DAY) = D8Max(i,j,iou)
@@ -2645,9 +2691,9 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     end select
   end do
 
-  !the uemep fields do not fit in the general d_3d arrays. Use ad hoc routine
+  !the lf fields do not fit in the general d_3d arrays. Use ad hoc routine
   if(USES%LocalFractions .and. .not. present(ONLY_IOU))then
-    call lf_av(dt,End_of_Day)
+    call lf_av(dt)
   endif
 
   first_call = .false.
