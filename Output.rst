@@ -160,8 +160,8 @@ selected output parameters, see provided output NetCDF files, or
 Emission outputs
 ----------------
 
-``Emis_mgm2_XX`` fields in the output, give all emissions used by the model (accumulated over the relevant period). ``Sec_Emis_mgm2_XX`` are "sector emissions", i.e. includes only contributions from the files defined in emis_inputlist and Emis_sourceFiles. ``Sec_Emis_mgm2_XX`` do not include emissions such as volcanoes, forest fires, DMS, lightning, aircraft etc.
-
+``Emis_mgm2_XX`` fields in the output, give all emissions used by the model (accumulated over the relevant period). ``Sec_Emis_mgm2_XX`` are "sector emissions" as defined in the sector emission files, i.e. includes only contributions from the files defined in Emis_sourceFiles. ``Sec_Emis_mgm2_XX`` do not include emissions such as volcanoes, forest fires, DMS, lightning, aircraft etc.
+Note that for VOC, some emissions from the sector file are set as "unreactive"; those will show under ``Sec_Emis_mgm2_voc`` but not under ``Emis_mgm2_voc``.
 For hourly outputs of emissions set 
 
 .. code-block:: fortran
