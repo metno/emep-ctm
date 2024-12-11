@@ -604,7 +604,7 @@ config: SOILNOX
   USES%SOILNOX_METHOD = 'NoFert',  ! If using ECLIPSEv6 or EMEP European
   USES%SOILNOX_METHOD = 'Total',   ! If using ECLIPSEv5
 
-The model makes use of global 0.5 degree data from the CAMS2-61 project (cf Simpson et al., Ch.8 in
+By default the model makes use of global 0.5 degree data from the CAMS2-61 project (cf Simpson et al., Ch.8 in
 Denier van der Gon, 2023, doi:10.24380/q2si-ti6i,
 https://atmosphere.copernicus.eu/node/1054), but the user needs
 to specify the data to be used from this system. 
@@ -623,6 +623,15 @@ If fertlizer-induced soil NO emissions are not included in the inventory,
 then choose ``Total``. This case applies to CAMS-REG-ANT and some earlier ECLIPSE (v5
 and earlier) inventories.
 
+
+If the earlier soil-NOx methods from Simpson et al. (2012) are prefered, then these
+can be set using:
+
+.. code-block:: text
+  :caption: Alternative (ACP 2012) Soil-NO settings, for European runs.
+
+  USES%SOILNOX_METHOD = 'ACP2012',  !  Europe only
+  NdepFile            = 'DataDir/AnnualNdep_PS50x_EECCA2005_2009.nc',
 
 
 
