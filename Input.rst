@@ -69,8 +69,8 @@ IMPORTANT:
     Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
     Time factors for hourly emissions   & ``HourlyFacs.INERIS``               & ASCII
     Natural |SO2|                       & ``DMS.nc``                          & netCDF
-    Volcanoes                           & ``columnsource_emission.csv``       & ASCII
-                                        & ``columnsource_location.csv``       & ASCII
+    Volcanoes                           & ``columnsource_emission.csv_2023``  & ASCII
+                                        & ``columnsource_location.csv_2023``  & ASCII
     Lightning emissions                 & ``lt21-nox.datMM`` (12 files)       & ASCII [#YMD]_
     Emissions speciation                & ``emissplit.defaults.POLL``         & ASCII [#POLL]_
                                         & ``emissplit.specials.POLL``         & ASCII [#POLL]_ [#Optional]_
@@ -393,9 +393,9 @@ Emissions from volcanic passive degassing of |SO2| are included
 for the active Italian volcanoes, Etna, Vulcano and Stromboli, and based upon the
 officially submitted data. To consider these volcanic emissions, we need
 to feed the locations and heights of volcanoes into the model. The input
-file ``columnsource_location.csv`` contains the geographical coordinates
+file ``columnsource_location.csv_2023`` contains the geographical coordinates
 (latitudes and longitudes) and the heights (in meters) of the included
-volcanoes, while ``columnsource_emission.csv`` contains the emission
+volcanoes, while ``columnsource_emission.csv_2023`` contains the emission
 parameters.
 
 Since 2010 the EMEP/MSC-W  model has also been used to model the transport of
@@ -404,7 +404,7 @@ passive degassing of |SO2|\ , the above two input files also
 contain locations and emission parameters for two recent eruptions of
 Icelandic volcanoes (Eyjafjallajökull in 2010 and Grimsvötn in 2011).
 In order to include emissions from these eruptions one needs to set
-``USE_ASH=.true.`` in ``config_emep.nml``.
+``USES%ASH=.true.`` in ``config_emep.nml``.
 
 Gridded emissions
 ~~~~~~~~~~~~~~~~~
