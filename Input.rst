@@ -64,9 +64,9 @@ IMPORTANT:
                       & ``SoilTypes_IFS.nc``                          & netCDF [#Optional]_
     Emissions         & ``GNFREmis_EMEP01_2020_27062023.nc`` (regional, :math:`0.1\times 0.1`  lon-lat) & netCDF [#Optional]_
     Vertical level distribution         & ``Vertical_levels20_EC.txt`` (for 20lev runs) & ASCII
-    Time factors for monthly emissions  & ``MonthlyFac.POLL`` (7 files)       & ASCII [#POLL]_
-    Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
-    Time factors for hourly emissions   & ``HourlyFacs.INERIS``               & ASCII
+    Time factors for monthly emissions  & ``cams_tempo_v3_2_month.POLL`` (7 files)      & ASCII [#POLL]_
+    Time factors for daily emissions    & ``cams_tempo_v3_2_week.POLL`` (7 files)       & ASCII [#POLL]_
+    Time factors for hourly emissions   & ``cams_tempo_v3_2_hour.POLL`` (7 files)       & ASCII [#POLL]_
     Natural |SO2|                       & ``DMS_SOLAS.nc``                    & netCDF
     Volcanoes                           & ``columnsource_emission.csv_2023``  & ASCII
                                         & ``columnsource_location.csv_2023``  & ASCII
@@ -313,7 +313,7 @@ and the emission data file in NetCDF format. Download the emission data
 file and place it in the input folder.)
 
 Natural |SO2|
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 Natural |SO2| emissions (dimethylsulfide (DMS) from sea) are
 provided as monthly gridded files. The values are computed taking into account sea surface
@@ -408,17 +408,24 @@ In order to include emissions from these eruptions one needs to set
 Time factors for emissions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Monthly and daily time factors for emission can be specified for the 7
-compounds (CO, |NH3|\ , |NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC).  There is
-one file available per compound in ASCII format.
+CAMS-TEMPO time factors
+***********************
 
-The first two columns in the files represent the country code
-(http://www.emep.int/grid/country_numbers.txt), the second column represents an
-index that can be referenced by the sector definion (orginally this index
-corresponded to a SNAP sector). 
+The default emission time factors are a mixtue of CAMS-REG-TEMPO v3.2 and v4.1 clilatological time facots.
+Monthly emission time factors for GNFR sector L (Agricuture) are tanke from CAMS-REG-TEMPO v4.1
+and from v3.2 for all oterh sctors and frequencies.
+The emission time factors can be changed in ``config_emep.nml``,
+:numref:`cams-tempo` shows the relevant default values as they would be written on ``config_emep.nml``.
 
-In the monthly files (``MonthlyFacFile``), the 12 consecutive columns represent
-the time factors corresponding to the months of the year. These time factors
+Monthly, daily and hourly emission time factors can be specified on serparate ASCII files 
+for the 7 compounds (CO, |NH3|\ , |NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC).
+On all time factor files the first two columns in the files contrain the country code
+(ISO02, http://www.emep.int/grid/country_numbers.txt)
+and the the GNFR sector code as defined on :numref:`gnfr-cams-sectors`.
+
+In the monthly files, defined by ``MonthlyFacFile``,
+the time factors corresponding for January to December
+are listed on columnss 3 to 14. These time factors
 are interpolated according to whether the "current" simulation day is in the
 first or second half of the month. For days in the first half of the month, the
 monthly factor is a combination of the factor of the previous month and the
@@ -426,18 +433,30 @@ current month. For days in the second half of the month, the monthly factor
 combines the factor of the current and the next month (for details, see the
 source code).
 
-In the daily files (``DailyFacFile``) there are 7 consecutive columns
-representing the time factor for each day of the week. The monthly timefactors
+In the daily files, defined by ``DailyFacFile``,
+the time factors for Monday to Sunday are listed from columns 4 to 9.
+The monthly timefactors
 are normalized in such a way that when combined with the daily timefactors, the
 total emission stays the same.
 
-The file defined in ``HourlyFacFile`` includes factors for each of the eleven
-SNAP sectors for every hour (the columns) for each day of the week, see Simpson
-et al. (2012) section 6.1.2. An additional file defined in
-``HourlyFacSpecialsFile`` can be created by the user with modified hourly
-factors to be used for specific countries. The format is the same as for the
-default factors, except for an additional first column speicifying the country
-code number.
+In the hourly file, defined by ``HourlyFacFile``,
+column 3 represents the day of the week (1 for Monday to 7 for Sunday) and
+time factors for 00 UTC to 23 UTC are listed on columns 4 to 27.
+
+
+.. code-block:: Fortran
+  :name: cams-tempo
+  :caption: Default configuration for CAMS-TEMPO v3.2 emission time factors.
+    
+    ! mohtly, daily and hourly time factor files on CAMS-TEMPO format
+    timeFacs%Monthly = 'CAMS_TEMPO_CLIM',
+    timeFacs%Daily   = 'CAMS_TEMPO_CLIM',
+    timeFacs%Hourly  = 'CAMS_TEMPO_CLIM',
+    
+    ! mohtly, daily and hourly time factor files
+    MonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
+    DailyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL',
+    HourlyFacFile  = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL',
 
 
 Emission heights

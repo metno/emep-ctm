@@ -862,6 +862,7 @@ GNFR_CAMS sectors are predefined (SNAP also, but we recommend to use GNFR_CAMS).
 The values for split, emission release height and timefactors can be defined through settings in the config_emep.nml settings. The following will reproduce the default settings:
 
 .. code-block:: Fortran
+    :name: gnfr-cams-sectors
     :caption: Sector definitions equivalent to the predefined sectors for GNFR_CAMS.
 
     SECTORS_ADD(1) = 'GNFR_CAMS', 'GNFR_A',  'sec01',  1, 1,  1, 'Public Power', 'ALL',
