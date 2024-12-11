@@ -68,7 +68,7 @@ IMPORTANT:
     Time factors for monthly emissions  & ``MonthlyFac.POLL`` (7 files)       & ASCII [#POLL]_
     Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
     Time factors for hourly emissions   & ``HourlyFacs.INERIS``               & ASCII
-    Natural |SO2|                       & ``DMS.nc``                          & netCDF
+    Natural |SO2|                       & ``DMS_SOLAS.nc``                    & netCDF
     Volcanoes                           & ``columnsource_emission.csv_2023``  & ASCII
                                         & ``columnsource_location.csv_2023``  & ASCII
     Lightning emissions                 & ``lt21-nox.datMM`` (12 files)       & ASCII [#YMD]_
