@@ -405,38 +405,6 @@ Icelandic volcanoes (Eyjafjallajökull in 2010 and Grimsvötn in 2011).
 In order to include emissions from these eruptions one needs to set
 ``USES%ASH=.true.`` in ``config_emep.nml``.
 
-Gridded emissions
-~~~~~~~~~~~~~~~~~
-
-The official emission input for the EMEP/MSC-W model consists of gridded
-annual national emissions based on emission data reported every year to
-EMEP/MSC-W (until 2005) and to CEIP (from 2006) by each participating
-country. More details about the emission input with references can be
-found in Chapter 4 of the EMEP Status Report 1/2003 Part I (Simpson et
-al., 2003).
-
-Since 2015 different formats of gridded emissions can be used and mixed
-(with some restrictions) in the EMEP model under one common framework.
-The new emission system is described in :numref:`emisnew`. Here we focus
-only on the "old style" ASCII emission format.
-
-Seven gridded emission input files (``emislist.poll``) are available in
-ASCII format for the following compounds: CO, |NH3|\ ,
-|NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC.
-
-The gridded ASCII emission files contain 16 columns where the first
-column represents the country code
-(http://www.emep.int/grid/country_numbers.txt), the second and the third
-columns are the :math:`i` and :math:`j` indices of the EMEP grid, the fourth and
-fifth columns are the total emissions from low and high sources, and the
-last 11 columns contain emissions from 10 anthropogenic SNAP sectors
-(http://reports.eea.eu.int/technical_report_2001_3/en) and 1
-source-sector called "Other sources and sinks", which include natural and
-biogenic emission sources. The data are given with the :math:`Mg`\ .
-
-Acknowledgement:
-    EMEP
-
 Time factors for emissions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
