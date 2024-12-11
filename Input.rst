@@ -107,22 +107,23 @@ The IFS forecasts has been run by MSC-W as independent experiments on
 the HPCs at ECMWF with special requests on some output parameters.
 The meteorological fields are retrieved on a
 :math:`0.1^\circ\times 0.1^\circ` longitude latitude coordinates and
-interpolated to :math:`50\times 50 km^2` polar-stereographic grid projection.
+interpolated to :math:`0.3^\circ\times 0.2^\circ`.
 Vertically, the fields on 60 eta (\ :math:`\eta`\ ) levels from the IFS model are
-interpolated onto the 37 EMEP sigma (\ :math:`\sigma`\ ) levels. The meteorology is prepared
-into 37 sigma levels since the model is under test for a finer vertical resolution.
+interpolated onto the 37 EMEP eta (\ :math:`\eta`\ ) levels. The meteorology is prepared
+into 37 eta levels since the model is under test for a finer vertical resolution.
 
-The open source code is released with 20 sigma levels and
+The open source code is released with 20 eta levels and
 to make the model read the meteorology properly, a description of the 20
 vertical sigma levels is needed. This is provided in an ASCII file
-called ``Vertical_levels.txt`` together with the other input data (:numref:`tab-inputdata`).
-The version of the IFS model used for preparing these fields, Cycle 38r2, is
-documented in http://www.ecmwf.int/research/ifsdocs/index.html.
-Previous years are based on Cycle 36r1 with a resolution of
-:math:`0.2^\circ\times 0.2^\circ` on a spherical grid. Meteorological
-fields currently used for EMEP/MSC-W Model runs are given in
-:numref:`tab-metinput`. Some verification and description of these
-meteorological fields are given in Chapter 2 of the EMEP Status Report 1/2016.
+called ``Vertical_levels20_EC.txt`` together with the other input data (:numref:`tab-inputdata`).
+The version of the IFS model used for preparing these fields for 2018 and earlier years,
+Cycle 40r1, is documented in
+https://www.ecmwf.int/en/forecasts/documentation-and-support/changes-ecmwf-model/cycle-40r1/cycle-40r1.
+2019 and later years are based on Cycle 48r1, described in
+https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+48r1.
+Some verification and description of 2018
+meteorological fields are given in Chapter 2 of the EMEP Status Report 1/2020
+https://www.emep.int/mscw/mscw_publications.html#2020.
 
 Acknowledgement:
     ECMWF, met.no
@@ -133,31 +134,35 @@ Acknowledgement:
     :header: **Parameter**, **Unit**, **Description**
     :delim: &
 
-    **3D fields** && for 37 :math:`\sigma`
-    :math:`u, v`       & :math:`m/s`       & Horizontal wind velocity components
-    :math:`q`          & :math:`kg/kg`     & Specific humidity
-    :math:`\theta`     & :math:`K`         & Potential temperature
-    :math:`CW`         & :math:`kg/kg`     & Cloud water
-    :math:`CL`         & :math:`\%`        & 3D Cloud cover
-    :math:`cnvuf`      & :math:`kg/sm^2`   & Convective updraft flux
-    :math:`cnvdf`      & :math:`kg/sm^2`   & Convective downdraft flux
-    :math:`PR`         & :math:`mm`        & Precipitation
+    **3D fields** && for 37 :math:`\eta`
+    :math:`u_wind, v_wind`              & :math:`m/s`       & Horizontal wind velocity components
+    :math:`etadot``                     & :math:`Pa/s``     & Vertical velocity in :math:`\eta` coords
+    :math:`specific_humidity`           & :math:`kg/kg`     & Specific humidity
+    :math:`potential_temperature`       & :math:`K`         & Potential temperature
+    :math:`cloudwater`                  & :math:`kg/kg`     & Cloud water
+    :math:`cloudice`                    & :math:`kg/kg`     & Ice cloud water
+    :math:`3D_cloudcover`               & :math:`\%`        & 3D Cloud cover
+    :math:`convective_updraft_flux`     & :math:`kg/m^2/s`  & Convective updraft flux
+    :math:`convective_downdraft_flux`   & :math:`kg/m^2/s`  & Convective downdraft flux
+    :math:`precipitation`               & :math:`kg/m^2`    & Precipitation
     **2D fields** && for surface
-    :math:`PS`         & :math:`hPa`       & Surface pressure
-    :math:`T2`         & :math:`K`         & Temperature at :math:`2 m` height
-    :math:`Rh2`        & :math:`\%`        & Relative humidity at :math:`2 m` height
-    :math:`SH`         & :math:`W/m^2`     & Surface flux of sensible heat
-    :math:`LH`         & :math:`W/m^2`     & Surface flux of latent heat
-    :math:`\tau`       & :math:`N/m^2`     & Surface stress
-    :math:`SST`        & :math:`K`         & Sea surface temperature
-    :math:`SWC`        & :math:`m^3/m^3`   & Soil water content
-    :math:`lspr`       & :math:`m`         & Large scale precipitation
-    :math:`cpr`        & :math:`m`         & Convective precipitation
-    :math:`sdepth`     & :math:`m`         & Snow depth
-    :math:`ice`        & :math:`\%`        & Fraction of ice
-    :math:`SMI1`       &                   & Soil moisture index level 1
-    :math:`SMI3`       &                   & Soil moisture index level 3
-    :math:`u10, v10`   & :math:`m/s`       & Wind at :math:`10 m` height
+    :math:`surface_pressure`            & :math:`hPa`       & Surface pressure
+    :math:`temperature_2m`              & :math:`K`         & Temperature at :math:`2 m` height
+    :math:`relative_humidity_2m`        & :math:`\%`        & Relative humidity at :math:`2 m` height
+    :math:`surface_flux_sensible_heat`  & :math:`W/m^2`     & Surface flux of sensible heat
+    :math:`surface_flux_latent_heat`    & :math:`W/m^2`     & Surface flux of latent heat
+    :math:`surface_stress`              & :math:`N/m^2`     & Surface stress
+    :math:`sea_surface_temperature`     & :math:`K`         & Sea surface temperature
+    :math:`soil_water_content`          & :math:`m^3/m^3`   & Soil water content
+    :math:`deep_soil_water_content`     & :math:`m^3/m^3`   & Deep soil water content
+    :math:`large_scale_precipitations`  & :math:`m/s`       & Large scale precipitation
+    :math:`convective_precipitations`   & :math:`m/s`       & Convective precipitation
+    :math:`snow_depth`                  & :math:`m`         & Snow depth
+    :math:`fraction_of_ice`             & :math:`\%`        & Fraction of ice
+    :math:`SMI1`                        &                   & Soil moisture index level 1
+    :math:`SMI3`                        &                   & Soil moisture index level 3
+    :math:`pblh``                       & :math:`m`         & Planetary boundary layer height
+    :math:`u10, v10`                    & :math:`m/s`       & Wind at :math:`10 m` height
 
 .. _`emisnew`:
 
