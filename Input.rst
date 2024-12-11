@@ -275,14 +275,14 @@ Road Dust
 
 Road traffic produces dust. These can be handled as separate emission inputs in
 the EMEP/MSC-W model using the ``Emissions_mod.f90`` module. To include road
-dust, set ``USE_ROADDUST=.true.`` in ``config_emep.nml``. There are two
+dust, set ``USES%ROADDUST=T`` in ``config_emep.nml``. There are two
 files included in input data, ``RoadMap.nc`` and ``AVG_SMI_2005_2010.nc``.
 ``RoadMap.nc`` include gridded roads and PM emissions over Europe, while the
 Soil Moisture Index (SMI) file ``AVG_SMI_2005_2010.nc`` used to estimate
 emissions is global. Hence road dust emissions can currently only be calculated
 for the European domain. However, some countries for which road dust is important
 (e.g., Scandinavian countries), reported emissions already include road dust. By
-default we therefore set ``USE_ROADDUST=.false.``, with road dust as a separate
+default we therefore set ``USES%ROADDUST=F``, with road dust as a separate
 emission source effectively being deprecated. 
 
 .. _`emisair`:
@@ -325,7 +325,8 @@ downloaded from https://www.bodc.ac.uk/solas_integration/implementation_products
 Surface Pressure
 ~~~~~~~~~~~~~~~~
 
-If ``USE_AIRCRAFT_EMIS=.true``. in ``config_emep.nml``, then in
+Unless aircraft emissions are switched 'OFF'
+by setting ``USES%AIRCRAFT_EMIS=F`` in ``config_emep.nml``, in
 addition to the Aircraft Emission file, there will be need for a
 ``SurfacePressure.nc`` file, which is already in the ``/input`` folder. The
 NetCDF file consists of surface pressure fields for each of the months
@@ -343,7 +344,7 @@ version 1.0" (FINNv1, Wiedinmyer et al. 2011). Data are available from
 2005, with daily resolution, on a fine :math:`1 km\times1 km` grid.
 We store these data on a slightly coarser grid (\ :math:`0.2^\circ\times 0.2^\circ`\ )
 globally for access by the EMEP MSC-W model. To include forest fire
-emissions set ``USE_FOREST_FIRES=.true.`` in ``config_emep.nml`` and
+emissions set ``USES%FOREST_FIRES=.true.`` in ``config_emep.nml`` and
 download the 2012 GEOS-chem daily data
 http://bai.acom.ucar.edu/Data/fire/. The data needs to be stored with
 units mole/day in a NetCDF file called ``FINN_ForestFireEmis_2015.nc``
