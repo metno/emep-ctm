@@ -523,10 +523,10 @@ be changed by the users according to their needs.
 See the `Source Receptor (SR) Runs <https://emep-ctm.readthedocs.io/en/latest/Subrun.html#source-receptor-sr-runs>`_ section for details.
 
 
-Vertical_levels.txt
-~~~~~~~~~~~~~~~~~~~
+Vertical_levels20_EC.txt
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-Defines the vertical model layers. The numbers in Vertical_levels.txt correspond to the "A" and "B" coefficients of the hybrid (eta) coordinates (P=A+B*Psurf).
+Defines the vertical model layers. The numbers in `Vertical_levels20_EC.txt` correspond to the "A" and "B" coefficients of the hybrid (:math:``\eta`) coordinates (P=A+B*Psurf).
 
 Close to the surface, A should be small, and higher up we should use pressure levels. Then there is a gradual transition from surface to pressure levels.
 
