@@ -55,7 +55,7 @@ IMPORTANT:
     Global Ozone      & ``Logan_P.nc``                                & netCDF [#O3]_
     BVOC emissions    & ``EMEP_EuroBVOC.nc``                          & netCDF
     Landuse           & ``glc2000xCLMf18.nc`` and ``Landuse_PS_5km_LC.nc``& netCDF
-    N depositions     & ``AnnualNdep_PS50x_EECCA2005_2009.nc``        & netCDF
+    N depositions     & ``AnnualNdep_PS50x_EECCA2005_2009.nc`` or ``CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc`` & netCDF
     Road dust         & ``RoadMap.nc`` and ``AVG_SMI_2005_2010.nc``   & netCDF [#Optional]_
     Aircraft emissions& ``AircraftEmis_FL.nc``                        & netCDF [#Optional]_
     Surface Pressure  & ``SurfacePressure.nc``                        & netCDF [#Optional]_
