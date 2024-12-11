@@ -52,8 +52,7 @@ IMPORTANT:
     Meteorology       & ``meteoYYYYMMDD.nc`` (365+1 files)            & netCDF [#YMD]_
     Degree-day factor & ``DegreeDayFactors.nc``                       & netCDF
     **Other Input files**& ``input/``&
-    Global Ozone      & ``GLOBAL_O3.nc``                              & netCDF
-    New Global Ozone  & ``Logan_P.nc``                                & netCDF [#NewO3]_
+    Global Ozone      & ``Logan_P.nc``                                & netCDF [#O3]_
     BVOC emissions    & ``EMEP_EuroBVOC.nc``                          & netCDF
     Landuse           & ``glc2000xCLMf18.nc`` and ``Landuse_PS_5km_LC.nc``& netCDF
     N depositions     & ``AnnualNdep_PS50x_EECCA2005_2009.nc``        & netCDF
@@ -86,8 +85,7 @@ IMPORTANT:
 
 .. rubric:: Footnotes
 .. [#YMD] ``YYYY``: year, ``MM``: month, ``DD``: day.
-.. [#NewO3] New |O3| boundary condition data in 30 levels.
-     Can be used with ``NewLogan=.true.`` in ``BoundaryConditions_mod.f90``.
+.. [#O3] |O3| boundary condition data in 30 levels.
 .. [#Optional] Optional, in most cases.
 .. [#POLL] ``POLL``: pollutant type (|NH3|\ , CO, |NOx|\ , |SOx|\ , NMVOC, |PM25| and |PMco|\ ).
 .. [#SEASON] ``SEASON``: seasonal files (jan, apr, jul, oct).
