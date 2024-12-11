@@ -15,7 +15,7 @@ downloaded using the catalog tool (:numref:`sec-ModelCode`) as follows:
 .. code-block:: bash
 
     # download the output
-    catalog.py -R 5.0 --output
+    catalog.py -R 5.5 --output
 
 Unpacked files are placed in an output directory with model run results
 for a whole year, and sometimes with a smaller test run for e.g. April.

@@ -19,23 +19,20 @@ Download the input via the catalog tool (:numref:`sec-ModelCode`) as follows:
 
 .. code-block:: bash
 
-    # download 2015 meteorology for the EECCA domain
-    catalog.py -Y 2015 -m --met-domain EECCA
-
-    # download 2015 meteorology for the EMEP01 domain
-    catalog.py -Y 2015 -m --met-domain EMEP01
+    # download 2018 meteorology for the EMEP01 domain
+    catalog.py -Y 2018 -m --met-domain EMEP0201
 
     # download other input files
     catalog.py --input
 
 The meteorology files will be placed under
-``EMEP_MSC-W_model.rv4.45.OpenSource/meteo2015/``,
+``EMEP_MSC-W_model.v5.5.OpenSource/meteo2018/EMEP0201/``,
 and the remaining input files will be placed under
-``EMEP_MSC-W_model.rv4.45.OpenSource/input/``
+``EMEP_MSC-W_model.v5.5.OpenSource/input/``
 
 This are all input files needed to run the EMEP/MSC-W model,
 except the aircraft emissions (``AircraftEmis_FL.nc``),
-and forest fire emissions (``FINN_ForestFireEmis_2015.nc``).
+and forest fire emissions (``FINN_ForestFireEmis_2018.nc``).
 See sections :numref:`emisair` and :numref:`emisff`
 for details about these emissions data.
 
@@ -290,9 +287,9 @@ emission source effectively being deprecated.
 Aircraft emissions
 ~~~~~~~~~~~~~~~~~~
 
-In the EMEP/MSC-W model aircraft emissions are 'OFF' by default. They
-can be switched 'ON' by setting ``USE_AIRCRAFT_EMIS=.true.`` in
-``config_emep.nml``. When using aircraft emissions there are two options:
+In the EMEP/MSC-W model aircraft emissions are 'ON' by default.
+It can be switched 'OFF' by setting ``USES%AIRCRAFT_EMIS=F`` in ``config_emep.nml``.
+When using aircraft emissions there are two options:
 Either the dataset provided by the EU-Framework Programme 6 Integrated
 Project QUANTIFY (http://www.pa.op.dlr.de/quantify), or the more recent
 CAMS-GLOB-AIR dataset which can be downloaded from the Atmosphere Data Store
