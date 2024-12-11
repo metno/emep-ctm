@@ -62,8 +62,7 @@ IMPORTANT:
     Forest Fire       & ``FINN_ForestFireEmis_YYYY.nc``               & netCDF [#Optional]_
     Dust files        & ``Soil_Tegen.nc``                             & netCDF [#Optional]_
                       & ``SoilTypes_IFS.nc``                          & netCDF [#Optional]_
-    Emissions         & ``EECCA/emislist.POLL`` (7 files, EMEP 50km PS grid)             & ASCII [#POLL]_
-                      & ``EMEP01/GNFRemis_EMEP01_2015.nc`` (regional, :math:`0.1\times 0.1`  lon-lat) & netCDF [#Optional]_
+    Emissions         & ``GNFREmis_EMEP01_2020_27062023.nc`` (regional, :math:`0.1\times 0.1`  lon-lat) & netCDF [#Optional]_
     Vertical level distribution         & ``Vertical_levels20_EC.txt`` (for 20lev runs) & ASCII
     Time factors for monthly emissions  & ``MonthlyFac.POLL`` (7 files)       & ASCII [#POLL]_
     Time factors for daily emissions    & ``DailyFac.POLL`` (7 files)         & ASCII [#POLL]_
@@ -170,7 +169,7 @@ Gridded emissions
 ~~~~~~~~~~~~~~~~~
 
 Gridded emissions in NetCDF care be used in conjunction with sector definitions.
-See section ``Defining own sectors`` and ``Country Variable (CV) format``
+See section :numref:`sec-emission-own-sectors` ``Defining own sectors`` and :numref:`sec-emission-cv-format` ``Country Variable (CV) format``
 
     The main advantage of NetCDF emissions is that all the information
     about the data (projection, units) is given in the same file. This

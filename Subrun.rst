@@ -634,6 +634,7 @@ can be set using:
   NdepFile            = 'DataDir/AnnualNdep_PS50x_EECCA2005_2009.nc',
 
 
+.. _`sec-emission-cv-format`:
 
 Country Variable (CV) format
 ----------------------------
@@ -839,6 +840,8 @@ Negative values means netcdf3 format.
 ``END_OF_EMEPDAY``: (integer) Hour when to start and end a "day". For daily averages gives for example averages from 06:00 to 06:00 next day, if ``END_OF_EMEPDAY = 6``.
 
 ``USES%SKIP_INCOMPLETE_OUTPUT`` : if T, will skip daily/montly/fullrun output for runs under 1/28/181 days.
+
+.. _`sec-emission-own-sectors`:
 
 Defining own sectors
 --------------------
