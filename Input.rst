@@ -74,9 +74,8 @@ IMPORTANT:
     Emissions speciation                & ``emissplit.defaults.POLL``         & ASCII [#POLL]_
                                         & ``emissplit.specials.POLL``         & ASCII [#POLL]_ [#Optional]_
     Emission factors for scenario runs  & ``femis.dat``                       & ASCII
-    Photo-dissociation rates            & ``jclear.SEASON`` (4 files)         & ASCII [#SEASON]_
-                                        & ``jcl1.SEASON`` (4 files)           & ASCII [#SEASON]_
-                                        & ``jcl3.SEASON`` (4 files)           & ASCII [#SEASON]_
+    Photo-dissociation rates            & ``unified_cjx/*`` (8 files)         & ASCII [#MOLECULAR]_
+                                        & ``OzoneObs_v3/*`` (216 files)       & ASCII [#MONTHLY]_
     Landuse definitions                 & ``Inputs_LandDefs.csv``             & ASCII
     Stomatal conductance                & ``Inputs_DO3SE.csv``                & ASCII
     Sites locations for surface output  & ``sites.dat``                       & ASCII
@@ -87,8 +86,8 @@ IMPORTANT:
 .. [#O3] |O3| boundary condition data in 30 levels.
 .. [#Optional] Optional, in most cases.
 .. [#POLL] ``POLL``: pollutant type (|NH3|\ , CO, |NOx|\ , |SOx|\ , NMVOC, |PM25| and |PMco|\ ).
-.. [#SEASON] ``SEASON``: seasonal files (jan, apr, jul, oct).
-
+.. [#MONTHLY] ``MONTHLY``: monthly mean gridded stratospheric ozone and temperature data for years between 2005-2021. Also includes monthly climatologies constructed based on the years of available measurements.
+.. [#MOLECULAR] ``MOLECULAR``: spectral data on aerosol and cloud radiative scattering and absorption, as well as molecular data on reaction-specific cross-section and quantum yields. 
 
 NetCDF files
 ------------
@@ -603,26 +602,26 @@ The next 22 values are different phenology factors.
 Photo-dissociation rates
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The photo-dissociation rates (J-values) are provided as lookup tables.
-The method is previously described in Jonson *et al.*, (2001). J-values
-are provided as clear sky, light cloud and dense cloud conditions, and
-the model interpolates between these according to cloudiness from the
-meteorological input data. In the lookup tables data are listed for
-every 10 degree latitude at an interval of 1 degree zenith angle at
-every model height.
+The photo-dissociation rates (J-values) are calculated using the online
+Cloud-J radiative transfer code, with the old system based on tabulated
+values being deprecated. Cloud-J calculates aerosol and cloud radiative 
+scattering and reaction-specific photolysis rates at model run time, based 
+on the instantaneous modeled abundance of radiatively active species. 
 
-For the two types of cloud conditions there are one ASCII file
-averaged for each season (``SS``); 01, 02, 03 and 04. For light cloud the
-four seasonal files are called ``jcl1kmSS.dat``, for dense cloud
-conditions the four seasonal files are called ``jcl3kmSS.dat``, and then
-for clear sky four files called ``jclearSS.dat``. In addittion
-there are two files for June called ``jcl1.jun`` and ``jcl3.jun``.
+The input files include molecular cross-section and quantum yield data (``FJX_spec``), 
+determining the reaction rates of each individual photolysis reaction.
+For the photo-dissociation of tropospheric ozone, absorption of the relevant
+wavelengths by stratospheric ozone is important. Monthly mean overhead
+stratospheric ozone concentrations are provided as separate input files, 
+which are read in automatically when the model is configured to use these
+files (available between 2005-2021). However, by default the EMEP model
+uses climatological monthly mean files, which are provided as separate inputs.
 
-Each file contains 18 columns. The first column is latitude of zenith
-angle and then the next 17 are the values for the model levels with the
-1/s. For more details about these rates, please read
-Chapter 7.2 of the EMEP Status Report 1/2003 Part I (Simpson *et al.*,
-2003).
+Input files further include cloud and aerosol radiative scattering and 
+absorption phase functions, as well as parameter fields representative of 
+a climatological background atmosphere. Lastly, the input files include 
+a file describing the mapping of photolysis rates to reactions present
+in the EMEP model chemistry (``FJX_j2j.dat``).
 
 .. _`sec-sitessondes-input`:
 
