@@ -412,8 +412,9 @@ which are briefly descrived on Simpson *et al.*, 2023.
 Monthly emission time factors for non-livestock agricultural emissions (GNFR Sector L)
 are tanken from CAMS-REG-TEMPO v4.1 and from v3.2 for all other sctors and frequencies.
 
-The emission time factors can be changed in ``config_emep.nml``,
-:numref:`cams-tempo` shows the relevant default values as they would be written on ``config_emep.nml``.
+The emission time factors can be changed in ``config_emep.nml``.
+:numref:`cams-tempo` shows the relevant default values as they would be written on ``config_emep.nml``, and
+:numref:`legacy-tempo` shows an example configuration using time factors included with version 5.0 release.
 For runs outsude Europe, :numref:`cams-tempo-gridded` shows how configure the model
 for using gridded montly factors from CAMS-TEMPO v3.2/v4.1 descrived on Simpson *et al.*, 2023.
 
@@ -443,20 +444,38 @@ In the hourly file, defined by ``HourlyFacFile``,
 column 3 represents the day of the week (1 for Monday to 7 for Sunday) and
 time factors for 00 UTC to 23 UTC are listed on columns 4 to 27.
 
+Before version 5.5, hourly time factors were defined on a single file,
+including factors for each of the eleven SNAP sectors for every hour (the columns) for each day of the week,
+see Simpson et al. (2012) section 6.1.2.
+:numref:`legacy-tempo` shows an example configuration using emission time factors from a previous release.
+
 
 .. code-block:: Fortran
   :name: cams-tempo
   :caption: Default configuration for CAMS-TEMPO emission time factors.
-    
-    ! mohtly, daily and hourly time factor files on CAMS-TEMPO format
-    timeFacs%Monthly = 'CAMS_TEMPO_CLIM',
+
+    timeFacs%Monthly = 'CAMS_TEMPO_CLIM', 
+    MonthlyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
+
     timeFacs%Daily   = 'CAMS_TEMPO_CLIM',
+    DailyFacFile     = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL',
+
     timeFacs%Hourly  = 'CAMS_TEMPO_CLIM',
-    
-    ! mohtly, daily and hourly time factor files
-    MonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
-    DailyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL',
-    HourlyFacFile  = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL',
+    HourlyFacFile    = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL',
+
+
+.. code-block:: Fortran
+  :name: legacy-tempo
+  :caption: Alternative configuration for emission time factors from version 5.0 release.
+
+    timeFacs%Monthly = 'GENEMIS',
+    MonthlyFacFile   = 'DataDir/MonthlyFacs_eclipse_V6b_snap_xJun2012/MonthlyFacs.POLL',
+
+    timeFacs%Daily   = 'Legacy', ! anything other than 'CAMS_TEMPO_CLIM' will work
+    DailyFacFile     = 'DataDir/DailyFac.POLL',
+
+    timeFacs%Hourly  = 'Legacy', ! anything other than 'CAMS_TEMPO_CLIM' will work
+    HourlyFacFile    = 'DataDir/HourlyFacs.INERIS',
 
 
 .. code-block:: Fortran
