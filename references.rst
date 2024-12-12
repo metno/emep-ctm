@@ -89,11 +89,27 @@ Simpson *et al.*, 2017
   2020
   
  Simpson *et al.*, 2020b
-  Simpson, D., Bergström, R.,Briolat, A., Imhof, H., Johansson, J.
+  Simpson, D., Bergström, R.,Briolat, A., Imhof, H., Johansson, J.,
   Priestley, M., Valdebenito, A., GenChem v1.0 - a chemical pre-processing and testing system for
   atmospheric modelling, *Geosci. Model Devel.*, https://doi.org/10.5194/gmd-2020-147
   2020
-  
+
+ Simpson *et al.*, 2023
+  Simpson, D., van Caspel, W., Benedictow, A., Fagerli, H., Jonson, J.E.,
+  Tsyro, S., Valdebenito, A, and Wind P.
+  Updates to the EMEP/MSC-W model, 2022-2023, in 
+  EMEP Status Report 1/2023, pp159-179,
+  The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+  2023
+
+ Simpson *et al.*, 2024
+  Simpson, D., van Caspel, W., Benedictow, A., Fagerli, H., Guevara, M.,
+  Jonson, J.E., Klein, H., Nyíri, Á., Tsyro, S. and Wind, P.,
+  Updates to the EMEP/MSC-W model, 2023-2024, in 
+  EMEP Status Report 1/2024, pp147-164,
+  The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+  2024
+
 Tuovinen *et al.*, 2004
     Tuovinen, J.-P.; Ashmore, M.; Emberson, L. & Simpson, D. Testing and
     improving the EMEP ozone deposition module *Atmos. Environ.*, 2004,

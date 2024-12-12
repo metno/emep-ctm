@@ -407,14 +407,15 @@ In order to include emissions from these eruptions one needs to set
 Time factors for emissions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-CAMS-TEMPO time factors
-***********************
+The default emission time factors are a mixtue of CAMS-TEMPO v3.2 and v4.1 regional clilatological time factors,
+which are briefly descrived on Simpson *et al.*, 2023.
+Monthly emission time factors for non-livestock agricultural emissions (GNFR Sector L)
+are tanken from CAMS-REG-TEMPO v4.1 and from v3.2 for all other sctors and frequencies.
 
-The default emission time factors are a mixtue of CAMS-REG-TEMPO v3.2 and v4.1 clilatological time facots.
-Monthly emission time factors for GNFR sector L (Agricuture) are tanke from CAMS-REG-TEMPO v4.1
-and from v3.2 for all oterh sctors and frequencies.
 The emission time factors can be changed in ``config_emep.nml``,
 :numref:`cams-tempo` shows the relevant default values as they would be written on ``config_emep.nml``.
+For runs outsude Europe, :numref:`cams-tempo-gridded` shows how configure the model
+for using gridded montly factors from CAMS-TEMPO v3.2/v4.1 descrived on Simpson *et al.*, 2023.
 
 Monthly, daily and hourly emission time factors can be specified on serparate ASCII files 
 for the 7 compounds (CO, |NH3|\ , |NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC).
@@ -445,7 +446,7 @@ time factors for 00 UTC to 23 UTC are listed on columns 4 to 27.
 
 .. code-block:: Fortran
   :name: cams-tempo
-  :caption: Default configuration for CAMS-TEMPO v3.2 emission time factors.
+  :caption: Default configuration for CAMS-TEMPO emission time factors.
     
     ! mohtly, daily and hourly time factor files on CAMS-TEMPO format
     timeFacs%Monthly = 'CAMS_TEMPO_CLIM',
@@ -456,6 +457,14 @@ time factors for 00 UTC to 23 UTC are listed on columns 4 to 27.
     MonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
     DailyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL',
     HourlyFacFile  = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL',
+
+
+.. code-block:: Fortran
+  :name: cams-tempo-gridded
+  :caption: Alternative configuration for CAMS-TEMPO gridded monthly emission time factors.
+
+    timeFacs%Monthly      = 'GRIDDED',
+    GriddedMonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/CAMS_TEMPO_GLOB4emep_v2024-1.nc',
 
 
 Emission heights
