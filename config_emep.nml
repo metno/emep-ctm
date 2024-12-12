@@ -76,7 +76,7 @@
   USES%SOILNOX_METHOD = 'NoFert',
 !------------------------------
   USES%SEASALT          = T,
-  USES%AIRCRAFT_EMIS    = T,
+  USES%AIRCRAFT_EMIS    = F,
   USES%LIGHTNING_EMIS   = T,
   USES%DUST             = T,
 
