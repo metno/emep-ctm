@@ -26,7 +26,9 @@ for a whole year, and sometimes with a smaller test run for e.g. April.
    :header: **Output data files**, **Short description**, **Format**
    :delim: &
 
-   ``Base_hour.nc``     & Gridded hourly  values of a          & NetCDF
+   ``Base_hourInst.nc`` & Gridded hourly instantaneous values of a & NetCDF
+                        & selection of compounds               &
+   ``Base_hour.nc``     & Gridded hourly mean values of a      & NetCDF
                         & selection of compounds               &
    ``Base_day.nc``      & Gridded daily   values of a          & NetCDF
                         & selection of compounds               &
@@ -43,7 +45,8 @@ for a whole year, and sometimes with a smaller test run for e.g. April.
    **Additional files**
    ``RunLog.out``       & Summary log of runs, including total emissions & ASCII
                         & of different air pollutants per country        &
-   ``Timing.out``       & Timing log file                                & ASCII
+   ``Timing_Baser.out`` & Timing log file                                & ASCII
+   ``MassBudgetSummary.txt`` & Mass balance summary                      & ASCII
 
 .. rubric:: Footnotes
 .. [#YY] ``YYYY``: year.
