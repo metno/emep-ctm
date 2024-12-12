@@ -127,3 +127,22 @@ Wind *et al.*, 2020
     Local fractions -- a method for the calculation of local source contributions to air pollution, 
     illustrated by examples using the EMEP MSC-W model (rv4\_33),
     *Geosci. Model Devel.*, 13, 3, 1623-1634, https://www.geosci-model-dev.net/13/1623/2020/, 2020
+
+Prather, 2015
+    Prather, M. J.: Photolysis rates in correlated overlapping cloud fields: Cloud-J 7.3c, 
+    *Geosci. Model Devel.*, 8, 2587–2595, https://doi.org/10.5194/gmd-8-2587-2015, 2015. 
+
+van Caspel *et al.*, 2023
+    van Caspel, W. E., Simpson, D., Jonson, J. E., Benedictow, 
+    A. M. K., Ge, Y., di Sarra, A., Pace, G., Vieno, M., Walker, H. L., 
+    and Heal, M. R.: Implementation and evaluation of updated photolysis rates in the EMEP MSC-W 
+    chemistry-transport model using Cloud-J v7.3e, Geosci. Model Dev., 
+    16, 7433–7459, https://doi.org/10.5194/gmd-16-7433-2023, 2023. 
+
+
+Sofieva *et al.*, 2021
+    Sofieva, V. F., Szeląg, M., Tamminen, J., Kyrölä, E., Degenstein, D., Roth, C., Zawada, D., 
+    Rozanov, A., Arosio, C., Burrows, J. P., Weber, M., Laeng, A., Stiller, G. P., von Clarmann, T., 
+    Froidevaux, L., Livesey, N., van Roozendael, M., and Retscher, C.: Measurement report: regional 
+    trends of stratospheric ozone evaluated using the MErged GRIdded Dataset of Ozone Profiles 
+    (MEGRIDOP), Atmos. Chem. Phys., 21, 6707–6720, https://doi.org/10.5194/acp-21-6707-2021, 2021. 

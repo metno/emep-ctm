@@ -612,19 +612,21 @@ Photo-dissociation rates
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 The photo-dissociation rates (J-values) are calculated using the online
-Cloud-J radiative transfer code, with the old system based on tabulated
+Cloud-J v7.3e radiative transfer code (Prather, 2015), with the old system based on tabulated
 values being deprecated. Cloud-J calculates aerosol and cloud radiative 
 scattering and reaction-specific photolysis rates at model run time, based 
 on the instantaneous modeled abundance of radiatively active species. 
+The implemention of Cloud-J in the EMEP model and the input files are described 
+in detail in van Caspel *et al.* (2023).
 
 The input files include molecular cross-section and quantum yield data (``FJX_spec``), 
 determining the reaction rates of each individual photolysis reaction.
 For the photo-dissociation of tropospheric ozone, absorption of the relevant
 wavelengths by stratospheric ozone is important. Monthly mean overhead
-stratospheric ozone concentrations are provided as separate input files, 
-which are read in automatically when the model is configured to use these
-files (available between 2005-2021). However, by default the EMEP model
-uses climatological monthly mean files, which are provided as separate inputs.
+stratospheric ozone concentrations based on the MEGRIDOP dataset (Sofieva *et al.*, 2021) are 
+provided as separate input files, which are read in automatically when the model is 
+configured to use these files (available between 2005-2021). However, by default the 
+EMEP model uses climatological monthly mean files, which are provided as separate inputs.
 
 Input files further include cloud and aerosol radiative scattering and 
 absorption phase functions, as well as parameter fields representative of 
