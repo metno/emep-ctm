@@ -12,8 +12,10 @@ import tarfile
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
+import warnings
 
 assert sys.version_info >= (3, 6), "This script requires python3.6 or better"
+warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
 
 _CONST = {
     "VERSION": "0.4.0",  # script version
