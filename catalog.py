@@ -6,8 +6,8 @@ simplified access to the source code, input data and benchmark results.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import hashlib
-import json
 import shutil
 import sys
 import tarfile
@@ -486,27 +486,20 @@ class DataPoint:
 class DataSet:
     """Info and retrieval/check methods"""
 
-    def __init__(self, tag, release, year, status, dataset=None, byteSize=None):
+    def __init__(self, tag, release, year, status, dataset: dict[str, list[DataPoint]]):
         """Initialize object"""
         self.tag = str(tag)  # revision tag
         self.release = int(release)  # release date (YYYYMM)
         self.year = year  # met-year(meteo)/status-year(model)
         self.status = status  # Status report
         self.dataset = dataset  # {'input':input,'meteo':meteo,..}
-        self.size = 0
-        if byteSize:
-            self.size = float(byteSize) or 0
-        else:
-            self.size = sum(x.size for x in self.dataset.values() if hasattr(x, "size"))
 
     def __str__(self):
-        return f"{self.tag:>8} (meteo:{self.year}, status:{self.status})"
-
-    def __repr__(self):
-        return f"{self}: {json.dumps(self.dataset)}"
+        return f"{self.tag:>8} (release:{self.release} meteo:{self.year}, status:{self.status})"
 
 
-def read_catalog(filename: Path, verbose: int = 1):
+
+def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
     """
     Returns releases read from catalog csv-file
 
@@ -522,63 +515,50 @@ def read_catalog(filename: Path, verbose: int = 1):
 
     # download catalog if file not found
     if not filename.is_file():
-        DataPoint(0, "catalog", 0, "", _CONST["RAW"], filename).download(verbose)
+        remote: str = _CONST["RAW"]  # type:ignore[assignment]
+        DataPoint(0, "catalog", 0, "", remote, filename).download(verbose)
 
     # catalog file should be present at this point
     with open(filename) as file:
         csv = reader(file, delimiter=",")
         next(csv)  # skip header
-        catalog: list = []  # list all src files (1 file per row)
-        rels, keys = set(), set()  # unique DataPoint.release/.keys for indexing
+        catalog: list[DataPoint] = []  # list all src files (1 file per row)
 
         if verbose > 2:
             print(f"Reading {filename}")
         for row in csv:
-            if not row or "".join(row).strip() == "":
+            if not row or not any(row):
                 continue  # skip empty lines
             try:
-                catalog += [DataPoint(*row)]
-                rels.add(catalog[-1].release)  # unique releases
-                keys.add(catalog[-1].key)  # unique keys (meteo,source,&c)
+                catalog.append(DataPoint(*row))
                 if verbose > 2:
                     print(f"  {catalog[-1]}")
-            except:
-                print("Failed to parse ({filename}): {row}")
-                print(DataPoint(*row))
+            except Exception:
+                print(f"Failed to parse ({filename}): {row}", DataPoint(*row), sep="\n")
                 raise
         if verbose > 1:
             print(f"{filename} read(srcs:{len(catalog)})")
 
-    index = dict.fromkeys(rels)  # index[releases][keys:meteo,source,&c]
-    if verbose > 2:
-        print("Indexing")
-    for r in rels:  # r:release
-        index[r] = dict.fromkeys(keys)
-        for k in keys:  # k:meteo,source,&c
-            index[r][k] = [x for x in catalog if (x.release == r) and (x.key == k)]
-            if verbose > 2:
-                print(f"  index[{r}][{k}](srcs:{len(index[r][k])})")
+    index: dict[int, DataSet] = {}
     if verbose > 1:
-        print(f"{filename} index[release:{len(rels)}][sets:{len(keys)}]")
+        print(f"Indexing {filename}")
 
-    # repack index from dict({key:DataPoint,}) to dict(DataSet)
-    if verbose > 2:
-        print("Compiling releases")
-    for r, v in index.items():
-        # pack index[r] into a DataSet object
-        #   before index[r]:{meteo:DataPoint,source:DataPoint,..}
-        #   after  index[r]:DataSet (with search metadata)
-        index[r] = DataSet(
-            v["source"][0].model,
-            r,
-            v["meteo"][0].year if v["meteo"] else None,
-            v["source"][0].year,
-            v,
+    dataset: defaultdict[str, list[DataPoint]]
+    for rel in {c.release for c in catalog}:
+        dataset = defaultdict(list)
+        for c in catalog:
+            if c.release == rel:
+                dataset[c.key].append(c)
+
+        index[rel] = DataSet(
+            dataset["source"][0].model,
+            rel,
+            dataset["meteo"][0].year,
+            dataset["source"][0].year,
+            dataset,
         )
         if verbose > 2:
-            print(f"  index[{r}]: {index[r]}")
-    if verbose > 1:
-        print(f"{filename} index(release:{len(rels)})")
+            print(f"  {index[rel]}")
 
     return index
 
