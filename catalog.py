@@ -9,12 +9,12 @@ import json
 import shutil
 import sys
 import tarfile
+import warnings
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
-import warnings
 
-assert sys.version_info >= (3, 6), "This script requires python3.6 or better"
+assert sys.version_info >= (3, 8), "This script requires python3.8 or better"
 warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
 
 _CONST = {
