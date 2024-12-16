@@ -12,6 +12,7 @@ import sys
 import tarfile
 import warnings
 from collections import defaultdict
+from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
@@ -575,68 +576,59 @@ def main(
 ) -> None:
     """Command line function"""
 
-    def get_datasets(catalog: dict[int, DataSet], attr: str, targets: list[str]) -> list[DataSet]:
-        """Search catalog for tag|status|year DataSet"""
+    def get_datasets(
+        catalog: dict[int, DataSet], attr: str, targets: list[str]
+    ) -> Iterator[DataSet]:
+        """search catalog for tag|status|year DataSet"""
         if verbose > 1:
             print(f"Searching {attr}(s):{targets}")
-        try:
-            dataset = [v for v in catalog.values() if getattr(v, attr) in targets]
-            if len(dataset) == 0:
-                raise IndexError
-        except IndexError:
-            print(f"No datasets found for --{attr}={targets}")
-            sys.exit(-1)
-        if verbose > 1:
-            for x in dataset:
-                print(f"  Found {x}")
-        return dataset
+
+        for v in catalog.values():
+            if getattr(v, attr) in targets:
+                yield v
 
     def get_downloads(
         catalog: dict[int, DataSet], attr: str, targets: list[str]
-    ) -> list[DataPoint]:
-        """List downloads for tag|status|year DataSet"""
-        downloads: list[DataPoint] = []
+    ) -> Iterator[DataPoint]:
+        """downloads for tag|status|year DataSet"""
         if verbose > 1:
             print(f"Searching datasets:{data}")
 
-        ds: DataSet | dict[str, list[DataPoint]]
         for ds in get_datasets(catalog, attr, targets):
-            try:
-                assert isinstance(ds, DataSet)
-                ds = {key: ds.dataset[key] for key in data}
-                # only download meteo with matching --met-domain option
-                if "meteo" in ds and domain:
-                    ds["meteo"] = [x for x in ds["meteo"] if x.model == domain]
-            except KeyError:
-                print(f"No datasets found for --{attr}={targets}")
-                sys.exit(-1)
-            if verbose > 1:
-                for key in ds:
-                    print(f"  Found {key:>6}:{ds[key]}")
-
-            assert isinstance(ds, dict)
-            for key in ds:
+            for key in data:
+                assert key in ds.dataset, f"no --{attr}={targets} for {ds}"
                 # do not try to download 0-size files
-                aux = [x for x in ds[key] if x.size > 0]
-                total = sum(x.size for x in aux)
-                if total > 0:
-                    downloads.extend(aux)
-                if verbose and aux:
-                    print(f"Queue download: {file_size(total):>6} {aux[0].tag}")
-        return downloads
+                dataset = (x for x in ds.dataset[key] if x.size > 0)
+                if key == "meteo" and domain is not None:
+                    dataset = (x for x in dataset if x.model == domain)
+
+                total = 0
+                for x in dataset:
+                    yield x
+                    total += x.size
+                if verbose and total:
+                    print(f"Queue download: {file_size(total):>6} {key:>6} {ds.tag}")
 
     # list files to download
     catalog = read_catalog(path, verbose)
-    downloads = []  # files to download
+    downloads: set[DataPoint] = set()  # files to download
     if tag is not None:
-        downloads.extend(get_downloads(catalog, "tag", tag))
+        aux = set(get_downloads(catalog, "tag", tag))
+        if not aux:
+            print(f"No datasets found for --tag={tag}")
+        downloads.update(aux)
     if status is not None:
-        downloads.extend(get_downloads(catalog, "status", status))
+        aux = set(get_downloads(catalog, "status", status))
+        if not aux:
+            print(f"No datasets found for --status={status}")
+        downloads.update(aux)
     if year is not None:
-        downloads.extend(get_downloads(catalog, "year", year))
+        aux = set(get_downloads(catalog, "year", year))
+        if not aux:
+            print(f"No datasets found for --year={year}")
+        downloads.update(aux)
 
     # list file_sizes to download
-    downloads = list(set(downloads))  # unique files, for single download and total size
     total = file_size(sum(x.size for x in downloads))
     print(f"Queue download: {total:>6} Total")
     if not user_consent("Do you wish to proceed?", ask):
