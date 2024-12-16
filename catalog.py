@@ -12,7 +12,7 @@ import sys
 import tarfile
 import warnings
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
@@ -498,18 +498,8 @@ class DataSet:
         return f"{self.tag:>8} (release:{self.release} meteo:{self.year}, status:{self.status})"
 
 
-def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
-    """
-    Returns releases read from catalog csv-file
-
-    Definitions
-      DataPoint(class): single remote file/tarfile
-      DataSet(class):   dataPoints from a model release,
-                        sorted into meteo|input|output|source|docs
-      catalog(list):    all dataPoints
-      index(dict):      catalog sorted into meteo|input|output|source|docs
-      archive(list):    all DataSet
-    """
+def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
+    """releases read from catalog csv-file"""
     from csv import reader
 
     # download catalog if file not found
@@ -538,7 +528,6 @@ def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
         if verbose > 1:
             print(f"{filename} read(srcs:{len(catalog)})")
 
-    index: dict[int, DataSet] = {}
     if verbose > 1:
         print(f"Indexing {filename}")
 
@@ -549,7 +538,7 @@ def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
             if c.release == rel:
                 dataset[c.key].append(c)
 
-        index[rel] = DataSet(
+        ds = DataSet(
             dataset["source"][0].model,
             rel,
             dataset["meteo"][0].year,
@@ -557,9 +546,8 @@ def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
             dataset,
         )
         if verbose > 2:
-            print(f"  {index[rel]}")
-
-    return index
+            print(f"  {ds}")
+        yield ds
 
 
 def main(
@@ -577,18 +565,18 @@ def main(
     """Command line function"""
 
     def get_datasets(
-        catalog: dict[int, DataSet], attr: str, targets: list[str]
+        catalog: Collection[DataSet], attr: str, targets: list[str]
     ) -> Iterator[DataSet]:
         """search catalog for tag|status|year DataSet"""
         if verbose > 1:
             print(f"Searching {attr}(s):{targets}")
 
-        for v in catalog.values():
+        for v in catalog:
             if getattr(v, attr) in targets:
                 yield v
 
     def get_downloads(
-        catalog: dict[int, DataSet], attr: str, targets: list[str]
+        catalog: Collection[DataSet], attr: str, targets: list[str]
     ) -> Iterator[DataPoint]:
         """downloads for tag|status|year DataSet"""
         if verbose > 1:
@@ -610,7 +598,7 @@ def main(
                     print(f"Queue download: {file_size(total):>6} {key:>6} {ds.tag}")
 
     # list files to download
-    catalog = read_catalog(path, verbose)
+    catalog = set(read_catalog(path, verbose))
     downloads: set[DataPoint] = set()  # files to download
     if tag is not None:
         aux = set(get_downloads(catalog, "tag", tag))
