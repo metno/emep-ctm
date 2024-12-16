@@ -6,7 +6,6 @@ simplified access to the source code, input data and benchmark results.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 import hashlib
 import shutil
 import sys
@@ -226,7 +225,7 @@ def parse_arguments(args):
     parser.add_option_group(group)
 
     opts, args = parser.parse_args(args)
-    if all(getattr(opts, attr) is None for attr in ["tag", "status", "year"]):
+    if opts.tag is None and opts.status is None and opts.year is None:
         opts.tag = [_CONST["RELEASE"][-1]]
     if opts.data is None:
         opts.data = ["meteo", "input", "output", "source", "docs"]
@@ -498,7 +497,6 @@ class DataSet:
         return f"{self.tag:>8} (release:{self.release} meteo:{self.year}, status:{self.status})"
 
 
-
 def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
     """
     Returns releases read from catalog csv-file
@@ -563,77 +561,106 @@ def read_catalog(filename: Path, verbose: int = 1) -> dict[int, DataSet]:
     return index
 
 
-def main(opts):
+def main(
+    path: Path,
+    *,
+    tag: list[str] | None,
+    status: list[str] | None,
+    year: list[str] | None,
+    data: list[str],
+    domain: str | None,
+    ask: bool,
+    cleanup: bool,
+    verbose: int,
+) -> None:
     """Command line function"""
 
-    def get_datasets(catalog, attr, target):
+    def get_datasets(catalog: dict[int, DataSet], attr: str, targets: list[str]) -> list[DataSet]:
         """Search catalog for tag|status|year DataSet"""
-        if opts.verbose > 1:
-            print(f"Searching {attr}(s):{target}")
+        if verbose > 1:
+            print(f"Searching {attr}(s):{targets}")
         try:
-            dataset = [v for v in catalog.values() if getattr(v, attr) in target]
+            dataset = [v for v in catalog.values() if getattr(v, attr) in targets]
             if len(dataset) == 0:
                 raise IndexError
         except IndexError:
-            print(f"No datasets found for --{attr}={target}")
+            print(f"No datasets found for --{attr}={targets}")
             sys.exit(-1)
-        if opts.verbose > 1:
+        if verbose > 1:
             for x in dataset:
                 print(f"  Found {x}")
         return dataset
 
-    def get_downloads(catalog, attr, target):
+    def get_downloads(
+        catalog: dict[int, DataSet], attr: str, targets: list[str]
+    ) -> list[DataPoint]:
         """List downloads for tag|status|year DataSet"""
-        downloads = []
-        if opts.verbose > 1:
-            print(f"Searching datasets:{opts.data}")
-        for ds in get_datasets(catalog, attr, target):
+        downloads: list[DataPoint] = []
+        if verbose > 1:
+            print(f"Searching datasets:{data}")
+
+        ds: DataSet | dict[str, list[DataPoint]]
+        for ds in get_datasets(catalog, attr, targets):
             try:
-                ds = {key: ds.dataset[key] for key in opts.data}
+                assert isinstance(ds, DataSet)
+                ds = {key: ds.dataset[key] for key in data}
                 # only download meteo with matching --met-domain option
-                if "meteo" in ds and opts.domain:
-                    ds["meteo"] = [x for x in ds["meteo"] if x.model == opts.domain]
+                if "meteo" in ds and domain:
+                    ds["meteo"] = [x for x in ds["meteo"] if x.model == domain]
             except KeyError:
-                print(f"No datasets found for --{attr}={target}")
+                print(f"No datasets found for --{attr}={targets}")
                 sys.exit(-1)
-            if opts.verbose > 1:
+            if verbose > 1:
                 for key in ds:
                     print(f"  Found {key:>6}:{ds[key]}")
 
+            assert isinstance(ds, dict)
             for key in ds:
                 # do not try to download 0-size files
                 aux = [x for x in ds[key] if x.size > 0]
                 total = sum(x.size for x in aux)
                 if total > 0:
-                    downloads += aux
-                if opts.verbose and aux:
+                    downloads.extend(aux)
+                if verbose and aux:
                     print(f"Queue download: {file_size(total):>6} {aux[0].tag}")
         return downloads
 
     # list files to download
-    catalog = read_catalog(opts.catalog, opts.verbose)
+    catalog = read_catalog(path, verbose)
     downloads = []  # files to download
-    for attr in ["tag", "status", "year"]:
-        target = getattr(opts, attr)
-        if target is None:
-            continue
-        downloads += get_downloads(catalog, attr, target)
+    if tag is not None:
+        downloads.extend(get_downloads(catalog, "tag", tag))
+    if status is not None:
+        downloads.extend(get_downloads(catalog, "status", status))
+    if year is not None:
+        downloads.extend(get_downloads(catalog, "year", year))
 
     # list file_sizes to download
     downloads = list(set(downloads))  # unique files, for single download and total size
     total = file_size(sum(x.size for x in downloads))
     print(f"Queue download: {total:>6} Total")
-    if not user_consent("Do you wish to proceed?", opts.ask):
+    if not user_consent("Do you wish to proceed?", ask):
         print("OK, bye")
         sys.exit(0)
 
     # download files
     for x in downloads:
-        x.download(opts.verbose)
-        x.unpack(opts.verbose, opts.ask)
-        if opts.cleanup:
-            x.cleanup(opts.verbose)
+        x.download(verbose)
+        x.unpack(verbose, ask)
+        if cleanup:
+            x.cleanup(verbose)
 
 
 if __name__ == "__main__":
-    main(parse_arguments(sys.argv[1:] or ["-h"])[0])
+    opts = parse_arguments(sys.argv[1:] or ["-h"])[0]
+    main(
+        opts.catalog,
+        tag=opts.tag,
+        status=opts.status,
+        year=opts.year,
+        data=opts.data,
+        domain=opts.domain,
+        ask=opts.ask,
+        cleanup=opts.cleanup,
+        verbose=opts.verbose,
+    )
