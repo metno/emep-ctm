@@ -16,7 +16,7 @@ from textwrap import dedent
 assert sys.version_info >= (3, 6), "This script requires python3.6 or better"
 
 _CONST = {
-    "VERSION": "0.3.0",  # script version
+    "VERSION": "0.4.0",  # script version
     "RELEASE": [  # released model versions
         "rv3",
         "v201106",
@@ -33,7 +33,8 @@ _CONST = {
         "rv4_34",
         "rv4_36",
         "rv4_45",
-        "5.0"
+        "5.0",
+        "5.5",
     ],
     "METYEAR": [  # released met-years
         2005,
@@ -45,6 +46,7 @@ _CONST = {
         2014,
         2015,
         2017,
+        2018,
     ],
     "THREDDS": "https://projects.met.no/emep/Thredds_Meteo",
     "FTP": "https://projects.met.no/emep",
@@ -363,7 +365,7 @@ class DataPoint:
             if self.dst.parent != "":
                 self.dst.parent.rmdir()
         except OSError as error:
-            if error.errno == 1:  # opperation not permitted (permissions?)
+            if error.errno == 1:  # operation not permitted (permissions?)
                 pass
             elif error.errno == 39:  # directory was not empty
                 pass
