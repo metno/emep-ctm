@@ -4,12 +4,15 @@ Open Source EMEP/MSC-W model
 simplified access to the source code, input data and benchmark results.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import shutil
 import sys
 import tarfile
 import warnings
+from collections import defaultdict
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
@@ -55,10 +58,14 @@ _CONST = {
     "GIT": "https://github.com/metno/emep-ctm/",
     "DOC": "https://emep-ctm.readthedocs.io/",
     "RTD": "https://emep-ctm.readthedocs.io/_/downloads/en",
-    "CSV": Path(__file__).parent / "catalog.csv",  # list all files from all releases
-    "RAW": "https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",  # catalog on the repo
-    "TMPDIR": "./downloads",  # temp path for downloads
-    "DATADIR": Path("."),  # base path for datasets
+    # list all files from all releases
+    "CSV": Path(__file__).with_name("catalog.csv"),
+    # catalog on the repo
+    "RAW": "https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",
+    # temp path for downloads
+    "TMPDIR": Path("./downloads/"),
+    # base path for datasets
+    "DATADIR": Path("."),
 }
 
 
@@ -90,9 +97,7 @@ def parse_arguments(args):
         dest="verbose",
         help="don't print status messages to stdout",
     )
-    parser.add_option(
-        "-v", "--verbose", action="count", dest="verbose", help="Increase verbosity"
-    )
+    parser.add_option("-v", "--verbose", action="count", dest="verbose", help="Increase verbosity")
     parser.add_option(
         "--catalog",
         default=_CONST["CSV"],
@@ -192,7 +197,7 @@ def parse_arguments(args):
     group = OptionGroup(parser, "Download options", "")
     group.add_option(
         "--yes",
-        default=True,  # help="YEAR's status report")
+        default=True,
         action="store_false",
         dest="ask",
         help="Don't ask before start downloading/unpacking",
@@ -200,12 +205,14 @@ def parse_arguments(args):
     group.add_option(
         "--outpath",
         action="store",
+        type="string",
         dest="outpath",
         help="Override output (dataset) directory",
     )
     group.add_option(
         "--tmppath",
         action="store",
+        type="string",
         dest="tmppath",
         help="Override temporary (download) directory",
     )
@@ -228,11 +235,11 @@ def parse_arguments(args):
     if opts.outpath:
         _CONST["DATADIR"] = Path(opts.outpath)
     if opts.tmppath:
-        _CONST["TMPDIR"] = opts.tmppath
+        _CONST["TMPDIR"] = Path(opts.tmppath)
     return opts, args
 
 
-def user_consent(question, ask=True, default="yes"):
+def user_consent(question, ask: bool = True, default: str = "yes"):
     """Ask user for confirmation"""
 
     # format question
@@ -261,7 +268,9 @@ def user_consent(question, ask=True, default="yes"):
 
 # Print iterations progress
 # http://stackoverflow.com/a/34325723/2576368
-def print_progress(iteration, total, prefix="", suffix="", decimals=2, length=100):
+def print_progress(
+    iteration, total: int, prefix: str = "", suffix: str = "", decimals: int = 2, length: int = 100
+):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -282,13 +291,13 @@ def print_progress(iteration, total, prefix="", suffix="", decimals=2, length=10
         sys.stdout.flush()
 
 
-def file_size(value):
+def file_size(value: float):
     """
     Human readable file size (K/M/G/T bytes)
       derived from http://stackoverflow.com/a/1094933/2576368
     """
-    num = max(float(value), 0)
-    for unit in ["B", "K", "M", "G"]:
+    num = max(value, 0)
+    for unit in "B", "K", "M", "G":
         if num < 1024.0:
             return f"{num:.1f}{unit}"
         num /= 1024.0
@@ -298,26 +307,41 @@ def file_size(value):
 class DataPoint:
     """Info and retrieval/check methods"""
 
-    def __init__(self, release, key, year, model, src, dst="", byteSize=0, md5sum=None):
+    def __init__(
+        self,
+        release: str | int,
+        key: str,
+        year: str | int,
+        model: str,
+        src: str,
+        dst: str | Path = "",
+        byteSize: str | int = 0,
+        md5sum: str | None = None,
+    ):
         """Initialize object"""
 
-        self.release = int(release)  # release date (YYYYMM)
-        self.key = str(key)
-        self.tag = {  # eg 'rv4_8source'
+        self.release: int = int(release)  # release date (YYYYMM)
+        self.key: str = key
+        self.tag: str = {  # eg 'rv4_8source'
             "other": "{KEY}{REL}",
             "meteo": "{KEY}{YEAR}",
         }.get(self.key, "{MOD}{KEY}")
+
+        self.year: int | None
         try:
             self.year = int(year)  # met-year
         except ValueError:
             self.year = None
+
+        self.model: str | None
         try:
             self.model = str(model)  # model version (or meteo domain)
         except ValueError:
             self.model = None
+
         self.src: str  # single source url/file
         self.dst: Path  # path for uncompressed self.dst
-        self.size = float(byteSize)  # self.src file size [bytes]
+        self.size: int = int(byteSize)  # self.src file size [bytes]
         self.md5sum = md5sum  # self.src checksum
 
         # replace keywords
@@ -326,10 +350,14 @@ class DataPoint:
         self.tag = self.tag.format_map(kwargs)
         kwargs.update(TAG=self.tag)
         self.src = src.format_map(kwargs)
-        if isinstance(dst, str):
-            dst = dst.format_map(kwargs)
-        self.dst = Path(dst)
-        if self.dst.name == "":
+        if isinstance(dst, Path):
+            self.dst = dst
+        elif not dst:
+            assert isinstance(_CONST["TMPDIR"], Path)
+            self.dst = _CONST["TMPDIR"] / self.tag / Path(self.src).name
+        else:
+            self.dst = Path(dst.format_map(kwargs))
+        if not self.dst.name:
             self.dst /= Path(self.src).name
 
     def __str__(self) -> str:
