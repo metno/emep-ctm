@@ -2,6 +2,18 @@
 
 This is the incomplete list of source code contributions to the Open Source EMEP MSC-W model.
 
+## [OpenSource v5.5 (202412)](https://github.com/metno/emep-ctm/releases/tag/5.5)
+
+- Peter Wind
+- David Simpson
+- Gunnar Lange
+- Willem van Caspel
+- Heiko Klein
+- Agnes Nyiri
+- Alvaro Valdebenito
+- Anna Benedictow
+- Svetlana Tsyro
+
 ## [OpenSource v5.0 (202310)](https://github.com/metno/emep-ctm/releases/tag/5.0)
     
 - David Simpson

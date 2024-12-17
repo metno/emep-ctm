@@ -14,7 +14,8 @@ which supports the development of air quality polices in the European Union.
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
 [guide]:    http://emep-ctm.readthedocs.io/en/latest
-[publ2023]: http://emep.int/publ/emep2023_publications.html
+[publ2024]: http://emep.int/publ/emep2024_publications.html
+[rel5.5]:   http://github.com/metno/emep-ctm/releases/tag/5.5
 [rel5.0]:   http://github.com/metno/emep-ctm/releases/tag/5.0
 [rel445]:   http://github.com/metno/emep-ctm/releases/tag/rv4_45
 [rel436]:   http://github.com/metno/emep-ctm/releases/tag/rv4_36
@@ -44,19 +45,20 @@ The Open Source releases are intended to:
 
 ## Releases
 
-The latest Open Source EMEP MSC-W model version ([5.0][rel5.0])
-is based on the version used on the [EMEP status reporting of the year 2023][publ2023].
+The latest Open Source EMEP MSC-W model version ([5.5][rel5.5])
+is based on the version used on the [EMEP status reporting of the year 2024][publ2024].
 The source code, together with a set of input data,
-an updated user guide and a full year model results for the year 2015,
+an updated user guide and a full year model results for the year 2018,
 under [GPL license v3][GPLv3].
 
 You can download the source code and input data by following the instructions on the 
-[OpenSource v5.0 (202310)][rel5.0] release page.
+[OpenSource v5.5 (202412)][rel5.5] release page.
 
 Information on use of the model can be found in the [EMEP MSC-W model User Guide][guide]
 
 #### Previous releases (YYYYMM - date of release)
 
+* [OpenSource v5.0 (202310)][rel5.0]
 * [OpenSource rv4.45 (202203)][rel445].
 * [OpenSource rv4.36 (202011)][rel436].
 * [OpenSource rv4.34 (202001)][rel434].
@@ -78,12 +80,8 @@ Information on use of the model can be found in the [EMEP MSC-W model User Guide
 The EMEP MSC-W model is very flexible with regard to the horizontal resolution
 and vertical resolutions. In 2008 the EMEP domain was extended to include EECCA countries.
 In 2017 the vertical resolution increased from 20 to 34 model levels.
-In the latest release, the provided gridded input and output data
-are provided on 2 different model domains and resolutions:
-- `EECCA` domain with a horizontal resolution of 50x50 km2 (at 60°N), 
-  on polar stereographic projection, and 20 vertical levels;
-- `EMEP01` domain with a 0.1x0.1 degrees on long-lat projection,
-  and 34 vertical levels.
+Together wit the latest release gridded input and output data are provided on the `EMEP0302` model domain
+with a 0.3x0.2 degrees on long-lat projection and 34 vertical levels.
 
 ### Input data
 
@@ -215,6 +213,15 @@ The reports can be found under the following links:
   pages = {7825--7865},
   doi = {10.5194/acp-12-7825-2012},
   url = {https://www.atmos-chem-phys.net/12/7825/2012/}
+}
+
+@misc{emep-ctm_v5.5,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model v5.5 (202412)},
+  month        = dec,
+  year         = 2024,
+  doi          = {10.5281/zenodo.14507729},
+  url          = {https://doi.org/10.5281/zenodo.14507729}
 }
 
 @misc{emep-ctm_v5.0,
