@@ -17,6 +17,7 @@ from collections.abc import Collection, Iterator
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
+from typing import NamedTuple
 
 assert sys.version_info >= (3, 8), "This script requires python3.8 or better"
 warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
@@ -216,21 +217,21 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
         help="Remove ALL temporary (download) files",
     )
 
-    args = parser.parse_args(args)
-    if args.tag is None and args.year is None:
-        args.tag = [_CONST["RELEASE"][-1]]
-    if args.data is None:
-        args.data = ["meteo", "input", "output", "source", "docs"]
-    if args.extras:
-        args.data.append("extra")
-    if args.outpath:
-        assert isinstance(args.outpath, Path)
-        _CONST["DATADIR"] = args.outpath
-    if args.tmppath:
-        assert isinstance(args.tmppath, Path)
-        _CONST["TMPDIR"] = args.tmppath
+    opts = parser.parse_args(args)
+    if opts.tag is None and opts.year is None:
+        opts.tag = _CONST["RELEASE"][-1]
+    if opts.data is None:
+        opts.data = ["meteo", "input", "output", "source", "docs"]
+    if opts.extras:
+        opts.data.append("extra")
+    if opts.outpath:
+        assert isinstance(opts.outpath, Path)
+        _CONST["DATADIR"] = opts.outpath
+    if opts.tmppath:
+        assert isinstance(opts.tmppath, Path)
+        _CONST["TMPDIR"] = opts.tmppath
 
-    return args
+    return opts
 
 
 def user_consent(question, ask: bool = True, default: str = "yes"):
@@ -477,19 +478,37 @@ class DataPoint:
             shutil.copyfile(self.dst, outfile)
 
 
-class DataSet:
+class DataSet(NamedTuple):
     """Info and retrieval/check methods"""
 
-    def __init__(self, tag, release, year, status, dataset: dict[str, list[DataPoint]]):
-        """Initialize object"""
-        self.tag = str(tag)  # revision tag
-        self.release = int(release)  # release date (YYYYMM)
-        self.year = year  # met-year(meteo)/status-year(model)
-        self.status = status  # Status report
-        self.dataset = dataset  # {'input':input,'meteo':meteo,..}
+    """release date (YYYYMM)"""
+    release: int
+
+    meteo: set[DataPoint]
+    input: set[DataPoint]
+    output: set[DataPoint]
+    source: set[DataPoint]
+    docs: set[DataPoint]
+    extra: set[DataPoint]
+
+    @property
+    def tag(self) -> str:
+        """revision tag"""
+        for src in self.source:
+            return src.model
+        else:
+            raise ValueError("no sources in DataSet")
+
+    @property
+    def year(self) -> int:
+        """ "met year"""
+        for met in self.meteo:
+            return met.year
+        else:
+            raise ValueError("no meteo in DataSet")
 
     def __str__(self):
-        return f"{self.tag:>8} (release:{self.release} meteo:{self.year}, status:{self.status})"
+        return f"{self.tag:>8} (release:{self.release}, meteo:{self.year})"
 
 
 def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
@@ -525,19 +544,21 @@ def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
     if verbose > 1:
         print(f"Indexing {filename}")
 
-    dataset: defaultdict[str, list[DataPoint]]
+    dataset: defaultdict[str, set[DataPoint]]
     for rel in {c.release for c in catalog}:
-        dataset = defaultdict(list)
+        dataset = defaultdict(set)
         for c in catalog:
             if c.release == rel:
-                dataset[c.key].append(c)
+                dataset[c.key].add(c)
 
         ds = DataSet(
-            dataset["source"][0].model,
             rel,
-            dataset["meteo"][0].year,
-            dataset["source"][0].year,
-            dataset,
+            meteo=dataset["meteo"],
+            input=dataset["input"],
+            output=dataset["output"],
+            source=dataset["source"],
+            docs=dataset["docs"],
+            extra=dataset["extra"],
         )
         if verbose > 2:
             print(f"  {ds}")
@@ -556,6 +577,8 @@ def main(
     verbose: int,
 ) -> None:
     """Command line function"""
+    if not set(data).issubset(DataSet._fields):
+        raise ValueError(f"unsupported {set(data) - set(DataSet._fields)}")
 
     def get_datasets(
         catalog: Collection[DataSet], attr: str, target: str | int
@@ -575,12 +598,8 @@ def main(
 
         for ds in get_datasets(catalog, attr, target):
             for key in data:
-                if key not in ds.dataset:
-                    print(f"no {key} in {ds}")
-                    sys.exit(-1)
-
                 # do not try to download 0-size files
-                dataset = (x for x in ds.dataset[key] if x.size > 0)
+                dataset = (x for x in getattr(ds, key) if x.size > 0)
                 if key == "meteo" and domain is not None:
                     dataset = (x for x in dataset if x.model == domain)
 
@@ -592,7 +611,7 @@ def main(
                     print(f"Queue download: {file_size(total):>6} {key:>6} {ds.tag}")
 
     # list files to download
-    catalog = set(read_catalog(path, verbose))
+    catalog = tuple(read_catalog(path, verbose))
     downloads: set[DataPoint] = set()  # files to download
     if tag is not None:
         aux = set(get_downloads(catalog, "tag", tag))
