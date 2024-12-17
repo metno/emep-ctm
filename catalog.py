@@ -6,6 +6,7 @@ simplified access to the source code, input data and benchmark results.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import shutil
 import sys
@@ -54,76 +55,80 @@ _CONST = {
 }  # fmt:skip
 
 
-def parse_arguments(args):
+def parse_arguments(args: list[str]) -> argparse.Namespace:
     """Arguments from command line"""
-    from optparse import SUPPRESS_HELP, OptionGroup, OptionParser
 
-    usage = f"""
-            usage: %prog [options]
+    usage = dedent(
+        f"""
+        %(prog)s [options]
 
-            Examples:
+        Examples:
 
-            Retrieve release dataset for revision REV ({"|".join(_CONST["RELEASE"])})
-                %prog -R REV
+        Retrieve release dataset for revision REV ({",".join(_CONST["RELEASE"])})
+            %(prog)s -R REV
 
-            Get Only the source code and user guide for revision REV
-                %prog -R REV --source --docs
+        Get Only the source code and user guide for revision REV
+            %(prog)s -R REV --source --docs
 
-            Download meteorological input for YEAR ({"|".join(str(y) for y in _CONST["METYEAR"])})
-                %prog -Y YEAR --meteo
-            """
-
-    parser = OptionParser(dedent(usage), version=_CONST["VERSION"])
-    parser.set_defaults(verbose=1)
-    parser.add_option(
+        Download meteorological input for YEAR ({",".join(str(y) for y in _CONST["METYEAR"])})
+            %(prog)s -Y YEAR --meteo
+        """
+    ).strip()
+    parser = argparse.ArgumentParser(usage=usage)
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {_CONST['VERSION']}",
+    )
+    parser.add_argument(
         "-q",
         "--quiet",
         action="store_false",
         dest="verbose",
         help="don't print status messages to stdout",
     )
-    parser.add_option("-v", "--verbose", action="count", dest="verbose", help="Increase verbosity")
-    parser.add_option(
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=1,
+        dest="verbose",
+        help="Increase verbosity",
+    )
+    parser.add_argument(
         "--catalog",
         default=_CONST["CSV"],
         action="store",
-        type="string",
+        type=Path,
         dest="catalog",
-        help="Override dataset cataloque path/file (default:%default)",
+        help="Override dataset cataloque path/file (default:%(default)s)",
     )
 
-    group = OptionGroup(parser, "Release options", "Select release dataset")
-    group.add_option(
+    group = parser.add_argument_group("Release options", "Select release dataset")
+    group.add_argument(
         "-R",
         "--revision",
-        type="string",
+        type=str,
+        choices=_CONST["RELEASE"],
         metavar="REV",
-        action="append",
+        action="store",
         dest="tag",
-        help="revision REV",
+        help="revision(s) REV",
     )
-    group.add_option(
-        "-S",
-        "--status",
-        type="int",
-        metavar="YEAR",
-        action="append",
-        dest="status",
-        help=SUPPRESS_HELP,
-    )
-    group.add_option(
+    group.add_argument(
         "-Y",
         "--year",
-        type="int",
+        type=int,
+        choices=_CONST["METYEAR"],
         metavar="YEAR",
-        action="append",
+        action="store",
         dest="year",
         help="Meteorological/run YEAR",
     )
-    parser.add_option_group(group)
 
-    group = OptionGroup(parser, "Dataset options", "Partial release dataset")
-    group.add_option(
+    group = parser.add_argument_group("Dataset options", "Partial release dataset")
+    group.add_argument(
         "-m",
         "--meteo",
         const="meteo",
@@ -131,15 +136,16 @@ def parse_arguments(args):
         dest="data",
         help="get meteorology input",
     )
-    group.add_option(
+    group.add_argument(
         "--met-domain",
+        type=str,
+        choices=["EMEP", "EECCA", "EMEP01", "MACC14", "EMEP0302"],
         default=None,
         action="store",
-        type="string",
         dest="domain",
         help="get only DOMAIN meteorology",
     )
-    group.add_option(
+    group.add_argument(
         "-i",
         "--input",
         const="input",
@@ -147,7 +153,7 @@ def parse_arguments(args):
         dest="data",
         help="get other input",
     )
-    group.add_option(
+    group.add_argument(
         "-o",
         "--output",
         const="output",
@@ -155,7 +161,7 @@ def parse_arguments(args):
         dest="data",
         help="get model benchmark",
     )
-    group.add_option(
+    group.add_argument(
         "-s",
         "--source",
         const="source",
@@ -163,7 +169,7 @@ def parse_arguments(args):
         dest="data",
         help="get source code for benchmark",
     )
-    group.add_option(
+    group.add_argument(
         "-d",
         "--docs",
         const="docs",
@@ -171,57 +177,60 @@ def parse_arguments(args):
         dest="data",
         help="get corresponding user guide",
     )
-    group.add_option(
+    group.add_argument(
         "--extras",
         action="store_true",
         dest="extras",
         help="also get the extras, if any",
     )
-    parser.add_option_group(group)
 
-    group = OptionGroup(parser, "Download options", "")
-    group.add_option(
+    group = parser.add_argument_group("Download options")
+    group.add_argument(
         "--yes",
         default=True,
         action="store_false",
         dest="ask",
         help="Don't ask before start downloading/unpacking",
     )
-    group.add_option(
+    group.add_argument(
         "--outpath",
+        default=_CONST["DATADIR"],
         action="store",
-        type="string",
+        type=Path,
         dest="outpath",
         help="Override output (dataset) directory",
     )
-    group.add_option(
+    group.add_argument(
         "--tmppath",
+        default=_CONST["TMPDIR"],
         action="store",
-        type="string",
+        type=Path,
         dest="tmppath",
         help="Override temporary (download) directory",
     )
-    group.add_option(
+    group.add_argument(
         "--cleanup",
         default=False,
         action="store_true",
         dest="cleanup",
         help="Remove ALL temporary (download) files",
     )
-    parser.add_option_group(group)
 
-    opts, args = parser.parse_args(args)
-    if opts.tag is None and opts.status is None and opts.year is None:
-        opts.tag = [_CONST["RELEASE"][-1]]
-    if opts.data is None:
-        opts.data = ["meteo", "input", "output", "source", "docs"]
-    if opts.extras:
-        opts.data += ["extra"]
-    if opts.outpath:
-        _CONST["DATADIR"] = Path(opts.outpath)
-    if opts.tmppath:
-        _CONST["TMPDIR"] = Path(opts.tmppath)
-    return opts, args
+    args = parser.parse_args(args)
+    if args.tag is None and args.year is None:
+        args.tag = [_CONST["RELEASE"][-1]]
+    if args.data is None:
+        args.data = ["meteo", "input", "output", "source", "docs"]
+    if args.extras:
+        args.data.append("extra")
+    if args.outpath:
+        assert isinstance(args.outpath, Path)
+        _CONST["DATADIR"] = args.outpath
+    if args.tmppath:
+        assert isinstance(args.tmppath, Path)
+        _CONST["TMPDIR"] = args.tmppath
+
+    return args
 
 
 def user_consent(question, ask: bool = True, default: str = "yes"):
@@ -538,9 +547,8 @@ def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
 def main(
     path: Path,
     *,
-    tag: list[str] | None,
-    status: list[str] | None,
-    year: list[str] | None,
+    tag: str | None,
+    year: str | None,
     data: list[str],
     domain: str | None,
     ask: bool,
@@ -550,26 +558,27 @@ def main(
     """Command line function"""
 
     def get_datasets(
-        catalog: Collection[DataSet], attr: str, targets: list[str]
+        catalog: Collection[DataSet], attr: str, target: str | int
     ) -> Iterator[DataSet]:
         """search catalog for tag|status|year DataSet"""
         if verbose > 1:
-            print(f"Searching {attr}(s):{targets}")
+            print(f"Searching {attr}(s):{target}")
 
         for v in catalog:
-            if getattr(v, attr) in targets:
+            if getattr(v, attr) == target:
                 yield v
 
-    def get_downloads(
-        catalog: Collection[DataSet], attr: str, targets: list[str]
-    ) -> Iterator[DataPoint]:
+    def get_downloads(catalog: Collection[DataSet], attr: str, target: str) -> Iterator[DataPoint]:
         """downloads for tag|status|year DataSet"""
         if verbose > 1:
             print(f"Searching datasets:{data}")
 
-        for ds in get_datasets(catalog, attr, targets):
+        for ds in get_datasets(catalog, attr, target):
             for key in data:
-                assert key in ds.dataset, f"no --{attr}={targets} for {ds}"
+                if key not in ds.dataset:
+                    print(f"no {key} in {ds}")
+                    sys.exit(-1)
+
                 # do not try to download 0-size files
                 dataset = (x for x in ds.dataset[key] if x.size > 0)
                 if key == "meteo" and domain is not None:
@@ -588,12 +597,7 @@ def main(
     if tag is not None:
         aux = set(get_downloads(catalog, "tag", tag))
         if not aux:
-            print(f"No datasets found for --tag={tag}")
-        downloads.update(aux)
-    if status is not None:
-        aux = set(get_downloads(catalog, "status", status))
-        if not aux:
-            print(f"No datasets found for --status={status}")
+            print(f"No datasets found for --revision={tag}")
         downloads.update(aux)
     if year is not None:
         aux = set(get_downloads(catalog, "year", year))
@@ -617,11 +621,10 @@ def main(
 
 
 if __name__ == "__main__":
-    opts = parse_arguments(sys.argv[1:] or ["-h"])[0]
+    opts = parse_arguments(sys.argv[1:] or ["--help"])
     main(
         opts.catalog,
         tag=opts.tag,
-        status=opts.status,
         year=opts.year,
         data=opts.data,
         domain=opts.domain,
