@@ -21,52 +21,37 @@ assert sys.version_info >= (3, 8), "This script requires python3.8 or better"
 warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
 
 _CONST = {
-    "VERSION": "0.4.0",  # script version
-    "RELEASE": [  # released model versions
-        "rv3",
-        "v201106",
-        "rv4_0",
-        "rv4_3",
-        "rv4_4",
-        "rv4_5",
-        "rv4_8",
-        "rv4_10",
-        "rv4_15",
-        "rv4_17",
-        "rv4_32",
-        "rv4_33",
-        "rv4_34",
-        "rv4_36",
-        "rv4_45",
-        "5.0",
-        "5.5",
+    # script version
+    "VERSION": "0.4.0",
+
+    # released model versions
+    "RELEASE": [
+        "rv3", "v201106", "rv4_0", "rv4_3", "rv4_4", "rv4_5", "rv4_8", "rv4_10",
+        "rv4_15", "rv4_17", "rv4_32", "rv4_33", "rv4_34", "rv4_36", "rv4_45",
+        "5.0", "5.5",
     ],
-    "METYEAR": [  # released met-years
-        2005,
-        2008,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2017,
-        2018,
-    ],
+
+    # released met-years
+    "METYEAR": [2005, 2008, 2010, 2011, 2012, 2013, 2014, 2015, 2017, 2018],
+
     "THREDDS": "https://projects.met.no/emep/Thredds_Meteo",
     "FTP": "https://projects.met.no/emep",
     "GIT": "https://github.com/metno/emep-ctm/",
     "DOC": "https://emep-ctm.readthedocs.io/",
     "RTD": "https://emep-ctm.readthedocs.io/_/downloads/en",
+
     # list all files from all releases
     "CSV": Path(__file__).with_name("catalog.csv"),
+
     # catalog on the repo
     "RAW": "https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",
+
     # temp path for downloads
     "TMPDIR": Path("./downloads/"),
+
     # base path for datasets
     "DATADIR": Path("."),
-}
+}  # fmt:skip
 
 
 def parse_arguments(args):
