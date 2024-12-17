@@ -17,43 +17,40 @@ from collections.abc import Collection, Iterator
 from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
+from types import SimpleNamespace
 from typing import NamedTuple
 
 assert sys.version_info >= (3, 8), "This script requires python3.8 or better"
 warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
 
-_CONST = {
+DEFAULT = SimpleNamespace(
     # script version
-    "VERSION": "0.4.0",
-
+    version="0.4.0",
     # released model versions
-    "RELEASE": [
-        "rv3", "v201106", "rv4_0", "rv4_3", "rv4_4", "rv4_5", "rv4_8", "rv4_10",
-        "rv4_15", "rv4_17", "rv4_32", "rv4_33", "rv4_34", "rv4_36", "rv4_45",
-        "5.0", "5.5",
-    ],
-
+    releases=(
+        "rv3,v201106,rv4_0,rv4_3,rv4_4,rv4_5,rv4_8,rv4_10,"
+        "rv4_15,rv4_17,rv4_32,rv4_33,rv4_34,rv4_36,rv4_45,"
+        "5.0,5.5,"
+    ),
     # released met-years
-    "METYEAR": [2005, 2008, 2010, 2011, 2012, 2013, 2014, 2015, 2017, 2018],
+    years="2005,2008,2010,2011,2012,2013,2014,2015,2017,2018",
+    # list all files from all releases
+    csv=Path(__file__).with_name("catalog.csv"),
+    # catalog on the repo
+    remote="https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",
+    # temp path for downloads
+    downloads=Path("./downloads/"),
+    # base path for datasets
+    output=Path("."),
+)
 
+_CONST = {
     "THREDDS": "https://projects.met.no/emep/Thredds_Meteo",
     "FTP": "https://projects.met.no/emep",
     "GIT": "https://github.com/metno/emep-ctm/",
     "DOC": "https://emep-ctm.readthedocs.io/",
     "RTD": "https://emep-ctm.readthedocs.io/_/downloads/en",
-
-    # list all files from all releases
-    "CSV": Path(__file__).with_name("catalog.csv"),
-
-    # catalog on the repo
-    "RAW": "https://raw.githubusercontent.com/metno/emep-ctm/tools/catalog.csv",
-
-    # temp path for downloads
-    "TMPDIR": Path("./downloads/"),
-
-    # base path for datasets
-    "DATADIR": Path("."),
-}  # fmt:skip
+}
 
 
 def parse_arguments(args: list[str]) -> argparse.Namespace:
@@ -65,13 +62,13 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
 
         Examples:
 
-        Retrieve release dataset for revision REV ({",".join(_CONST["RELEASE"])})
+        Retrieve release dataset for revision REV ({DEFAULT.releases})
             %(prog)s -R REV
 
         Get Only the source code and user guide for revision REV
             %(prog)s -R REV --source --docs
 
-        Download meteorological input for YEAR ({",".join(str(y) for y in _CONST["METYEAR"])})
+        Download meteorological input for YEAR ({DEFAULT.years})
             %(prog)s -Y YEAR --meteo
         """
     ).strip()
@@ -80,7 +77,7 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
         "-V",
         "--version",
         action="version",
-        version=f"%(prog)s {_CONST['VERSION']}",
+        version=f"%(prog)s {DEFAULT.version}",
     )
     parser.add_argument(
         "-q",
@@ -99,7 +96,7 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--catalog",
-        default=_CONST["CSV"],
+        default=DEFAULT.csv,
         action="store",
         type=Path,
         dest="catalog",
@@ -111,17 +108,17 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
         "-R",
         "--revision",
         type=str,
-        choices=_CONST["RELEASE"],
+        choices=DEFAULT.releases.split(","),
         metavar="REV",
         action="store",
         dest="tag",
-        help="revision(s) REV",
+        help="revision REV",
     )
     group.add_argument(
         "-Y",
         "--year",
         type=int,
-        choices=_CONST["METYEAR"],
+        choices=[int(year) for year in DEFAULT.years.split(",")],
         metavar="YEAR",
         action="store",
         dest="year",
@@ -195,7 +192,6 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
     )
     group.add_argument(
         "--outpath",
-        default=_CONST["DATADIR"],
         action="store",
         type=Path,
         dest="outpath",
@@ -203,7 +199,6 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
     )
     group.add_argument(
         "--tmppath",
-        default=_CONST["TMPDIR"],
         action="store",
         type=Path,
         dest="tmppath",
@@ -219,17 +214,17 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
 
     opts = parser.parse_args(args)
     if opts.tag is None and opts.year is None:
-        opts.tag = _CONST["RELEASE"][-1]
+        opts.tag = DEFAULT.releases.split(",")[-1]
     if opts.data is None:
         opts.data = ["meteo", "input", "output", "source", "docs"]
     if opts.extras:
         opts.data.append("extra")
     if opts.outpath:
         assert isinstance(opts.outpath, Path)
-        _CONST["DATADIR"] = opts.outpath
+        DEFAULT.output = opts.outpath
     if opts.tmppath:
         assert isinstance(opts.tmppath, Path)
-        _CONST["TMPDIR"] = opts.tmppath
+        DEFAULT.downloads = opts.tmppath
 
     return opts
 
@@ -340,7 +335,7 @@ class DataPoint:
         self.md5sum = md5sum  # self.src checksum
 
         # replace keywords
-        kwargs = _CONST
+        kwargs: dict[str, str | int | None] = _CONST.copy()  # type:ignore[assignment]
         kwargs.update(REL=self.release, KEY=self.key, YEAR=self.year, MOD=self.model)
         self.tag = self.tag.format_map(kwargs)
         kwargs.update(TAG=self.tag)
@@ -348,8 +343,8 @@ class DataPoint:
         if isinstance(dst, Path):
             self.dst = dst
         elif not dst:
-            assert isinstance(_CONST["TMPDIR"], Path)
-            self.dst = _CONST["TMPDIR"] / self.tag / Path(self.src).name
+            assert isinstance(DEFAULT.downloads, Path)
+            self.dst = DEFAULT.downloads / self.tag / Path(self.src).name
         else:
             self.dst = Path(dst.format_map(kwargs))
         if not self.dst.name:
@@ -444,7 +439,7 @@ class DataPoint:
                 if total and (n == total or n % 1_048_576 == 0):  # 1M
                     print_progress(n, total, length=50)
 
-    def unpack(self, verbose=True, inspect=False):
+    def unpack(self, verbose: int, inspect: bool = False, output: Path = DEFAULT.output):
         """Unpack download"""
         if not self.check(verbose > 2):
             return
@@ -453,25 +448,26 @@ class DataPoint:
             print(f"Untar    {self}")
             with closing(tarfile.open(self.dst, "r")) as file:
                 if user_consent("  See the contents first?", inspect, "no"):
-                    print(file.list(verbose=(verbose > 1)))
+                    file.list(verbose=verbose > 1)
                     if not user_consent("  Do you wish to proceed?", inspect):
                         print("OK, skipping file")
                         return
 
-                _CONST["DATADIR"].parent.mkdir(parents=True, exist_ok=True)
+                output.parent.mkdir(parents=True, exist_ok=True)
                 try:
-                    file.extractall(_CONST["DATADIR"])
+                    file.extractall(output)
                 except EOFError as error:
                     print(f"  Failed unpack '{self.dst}':\n    {error}.")
                     if not user_consent("    Do you wish to continue?", inspect, "yes"):
                         sys.exit(-1)
 
         elif self.dst.name == "pdf":
-            outfile = _CONST["DATADIR"] / self.key / self.model / "emep-ctm.pdf"
+            assert self.model is not None
+            outfile = output / self.key / self.model / "emep-ctm.pdf"
             outfile.parent.mkdir(parents=True, exist_ok=True)
             self.dst.rename(outfile)
         else:
-            outfile = _CONST["DATADIR"] / self.key / self.dst.name
+            outfile = output / self.key / self.dst.name
             if verbose > 1:
                 print(f"Copy     {outfile}")
             outfile.mkdir(parents=True, exist_ok=True)
@@ -495,7 +491,8 @@ class DataSet(NamedTuple):
     def tag(self) -> str:
         """revision tag"""
         for src in self.source:
-            return src.model
+            if src.model is not None:
+                return src.model
         else:
             raise ValueError("no sources in DataSet")
 
@@ -503,7 +500,8 @@ class DataSet(NamedTuple):
     def year(self) -> int:
         """ "met year"""
         for met in self.meteo:
-            return met.year
+            if met.year is not None:
+                return met.year
         else:
             raise ValueError("no meteo in DataSet")
 
@@ -517,8 +515,7 @@ def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
 
     # download catalog if file not found
     if not filename.is_file():
-        remote: str = _CONST["RAW"]  # type:ignore[assignment]
-        DataPoint(0, "catalog", 0, "", remote, filename).download(verbose)
+        DataPoint(0, "catalog", 0, "", DEFAULT.remote, filename).download(verbose)
 
     # catalog file should be present at this point
     with open(filename) as file:
