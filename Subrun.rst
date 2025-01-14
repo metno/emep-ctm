@@ -1069,15 +1069,12 @@ The full chemistry can be included. This option is under development, and only l
     lf_country%sector_list(1:)=0,1,8,
     lf_country%list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
-    lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
-
+    lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
 
     ! Specify which species or group of species must be outputted
     lf_spec_out(1)%name='O3', !single species
     lf_spec_out(2)%name='NO', !single species
-    lf_spec_out(3)%name='NO2', !single species# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
+    lf_spec_out(3)%name='NO2', !single species
 
     lf_spec_out(4)%name='SIA',!group of species
     lf_spec_out(4)%species(1:)='SO4','NO3_f','NO3_c','NH4_f', !species to include in the group
@@ -1087,42 +1084,33 @@ F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -W
     lf_spec_out(6)%name='PM25_rh50',
     lf_spec_out(6)%species(1:)='NO3_c','PM_WATER','SO4','NO3_f','NH4_f','ASOC_ng1e2','ASOC_ug1', 'ASOC_ug10', 'ASOC_ug1e2', 'ASOC_ug1e3','non_C_ASOA_ng1e2', 'non_C_ASOA_ug1', 'non_C_ASOA_ug10','non_C_ASOA_ug1e2', 'non_C_ASOA_ug1e3',
     lf_spec_out(6)%species_fac(1)=0.202764826447516,
-    lf_spec_out(7)%name='DDEP_OXN',# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
+    lf_spec_out(7)%name='DDEP_OXN',
 
     lf_spec_out(7)%species(1:)='NO2', 'N2O5', 'HONO', 'HNO3', 'HO2NO2', 'SC4H9NO3', 'NALD', 'ISON', 'PAN', 'MPAN', 'NO3_f', 'NO3_c', 'shipNOx',
     lf_spec_out(7)%DryDep=T,
     lf_spec_out(8)%name='WDEP_SOX',
     lf_spec_out(8)%species(1:)='SO2','SO4',
-    lf_spec_out(8)%WetDep=T,# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
+    lf_spec_out(8)%WetDep=T,
 
     lf_spec_out(9)%name='POD1_IAM_DF',
     lf_spec_out(9)%species(1:)='POD',
     lf_spec_out(9)%DryDep=T,
     lf_spec_out(10)%name='pm25',
     lf_spec_out(11)%name='PM_WATER',
-# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
 
     lf_set%MDA8 = T, !special: make AvgMDA8_6month and SOMO35 NB: requires that O3 is outputted too
     
 
 Technical
-=========# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
-
+=========
 
 Time steps
 ----------
 There are three types of timesteps in the model: ``METSTEP``, ``dt_advec`` and ``dtchem``.
-# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
 
 ``METSTEP`` is the time interval between two readings of the meteorological file. It is not set by the user, but uses whatever is used as meteorological input. It must be a divisor of 24 hours. Three hours is standard, but other intervals are used too.
 
-``dt_advec`` is the "time splitting" interval, i.e. the time between two sequences of advection-chemsitry/emissions-deposition. (Note that the name is misleading, the advection can have a smaller internal timestep if it is requird by the Courant number). The value of dt_advec must be an entire fraction of one hour (units seconds). It is determined by the model using the grid resolution. For a grid resolution larger than 61 km it is 1800s, or 1200s if larger than 21km, or 900s if larger than 11km, or 600s if larger than 6km, or 300s if larger than 2km or 100s if smaller than 2km. Those value can be overriden by defining it in ``config_emep.nml``. You can check the value in the standard output ("advection time step (dt_advec) set to: 1200 seconds").# GNU gfortran compiler (tested for version 8.5.0)
-F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O2 -g
+``dt_advec`` is the "time splitting" interval, i.e. the time between two sequences of advection-chemsitry/emissions-deposition. (Note that the name is misleading, the advection can have a smaller internal timestep if it is requird by the Courant number). The value of dt_advec must be an entire fraction of one hour (units seconds). It is determined by the model using the grid resolution. For a grid resolution larger than 61 km it is 1800s, or 1200s if larger than 21km, or 900s if larger than 11km, or 600s if larger than 6km, or 300s if larger than 2km or 100s if smaller than 2km. Those value can be overriden by defining it in ``config_emep.nml``. You can check the value in the standard output ("advection time step (dt_advec) set to: 1200 seconds").
 
 
 The values of ``dtchem`` are the internal Chemistry timesteps. It is variable: usually the first 5 steps last 20 seconds, then followed by 10 larger timesteps, so that the sum of all ``dtchem`` timesteps is exactly equal to ``dt_advec``. They are printed out in standard output. Note that emissions are included as a source in  the Chemistry, and thus have the same timesteps. 
