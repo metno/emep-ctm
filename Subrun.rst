@@ -1075,7 +1075,6 @@ The full chemistry can be included. This option is under development, and only l
     lf_spec_out(1)%name='O3', !single species
     lf_spec_out(2)%name='NO', !single species
     lf_spec_out(3)%name='NO2', !single species
-
     lf_spec_out(4)%name='SIA',!group of species
     lf_spec_out(4)%species(1:)='SO4','NO3_f','NO3_c','NH4_f', !species to include in the group
     lf_spec_out(4)%species_fac(1:)=1.0, 1.0, 1.0, 1.0,        !weights (default 1.0)
@@ -1085,13 +1084,11 @@ The full chemistry can be included. This option is under development, and only l
     lf_spec_out(6)%species(1:)='NO3_c','PM_WATER','SO4','NO3_f','NH4_f','ASOC_ng1e2','ASOC_ug1', 'ASOC_ug10', 'ASOC_ug1e2', 'ASOC_ug1e3','non_C_ASOA_ng1e2', 'non_C_ASOA_ug1', 'non_C_ASOA_ug10','non_C_ASOA_ug1e2', 'non_C_ASOA_ug1e3',
     lf_spec_out(6)%species_fac(1)=0.202764826447516,
     lf_spec_out(7)%name='DDEP_OXN',
-
     lf_spec_out(7)%species(1:)='NO2', 'N2O5', 'HONO', 'HNO3', 'HO2NO2', 'SC4H9NO3', 'NALD', 'ISON', 'PAN', 'MPAN', 'NO3_f', 'NO3_c', 'shipNOx',
     lf_spec_out(7)%DryDep=T,
     lf_spec_out(8)%name='WDEP_SOX',
     lf_spec_out(8)%species(1:)='SO2','SO4',
     lf_spec_out(8)%WetDep=T,
-
     lf_spec_out(9)%name='POD1_IAM_DF',
     lf_spec_out(9)%species(1:)='POD',
     lf_spec_out(9)%DryDep=T,
