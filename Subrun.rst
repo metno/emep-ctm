@@ -557,7 +557,8 @@ included in the config namelist (by default, these flags are therefore not inclu
 to use custom domain settings, using the 'Custom_Config' domain setting re-activates the use of the above USES
 flags in the config namelist (i.e., these are not overwritten with what would be specified through the 'EMEPDOMAIN'
 and 'GenericDOMAIN' flags). Alternatively, one could for example use 'EMEPDOMAIN', while also specifying
-EMEP_DOMAIN_SETUP%PFT_MAPS = T in the config namelist, if the plan is to use PFT maps for European scale modelling.
+EMEP_DOMAIN_SETUP%USES_PFTMAPS = T in the config namelist, if the plan is to use PFT maps for European scale modelling. 
+Additionally, one may specify EMEP_DOMAIN_SETUP%USES_DEGREEDAYS = F to run the simulation without degreedays.
 To avoid confusion as to which domain settings are applied, users are forced to choose either one of the three
 above domain settings. 
 
