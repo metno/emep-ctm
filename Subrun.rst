@@ -193,79 +193,182 @@ will be automatically replaced by the corresponding day of the year (i.e. a numb
 The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```. 
 
 
-Using and combining gridded emissions
--------------------------------------
+.. _`sec-emission-cv-format`:
 
-The gridded emission files are controlled via the ``config_emep.nml``
-file. Each file is assigned as one set of values for ``emis_inputlist``.
-:numref:`emis-config` line 1 includes an ASCII emission file, where the
-keyword ``POLL`` will be replaced by the model by all the
-emitted pollutants (according to the names defined in ``CM_EmisFiles.inc``).
-An additional NetCDF emission is included in line 2.
+Using and combining gridded emissions: Country Variable (CV) format
+-------------------------------------------------------------------
 
-Now all emissions from both ASCII file and NetCDF file will be used. In
-practice some countries might be counted twice. Therefore some new data
-can be included in the ``emis_inputlist``, to specify which countries to
-keep or to avoid. :numref:`emis-config` lines 3--4
-will include only 'NO', 'SE' and 'FI' from the first file (ASCII), and
-take all countries except 'NO', 'SE' and 'FI' from the second file
-(NetCDF).
+The gridded emission files are controlled via the ``config_emep.nml`` file. 
 
-Sets of countries can in principle be defined; for now only the set
-'EUMACC2' is defined.
+In the CV format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
+A source can be any 2D field. It can also be a 3D field, if the third dimension is the sector. The sources are associated to country through a country code or a country code. 
+The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
-.. _`emis-config`:
+The code directory contain a Python script that can create an emission file in this format: ``emissions_TXT2ncCV.py``
+
+The file and sources can be characterized by a set of variables. In general these variable can be set by, and in order of increasing priority:
+  1. Default value
+  2. Global attribute read in the netcdf file
+  3. Variable attribute read in the netcdf file
+  4. Value set for Emis_sourceFiles(i)%XXX in config_emep.nml
+  5. Value set for Emis_sourceFiles(i)%source(s)%XXX in config_emep.nml
+  
+Exceptions to the priority rule are:
+  * maskID cannot be set by attributes in the netcdf file
+  * the file and source 'factor' are on top of each other, not replaced
+  * boolean parameters (like apply_femis), are used as "and" (i.e. if any is false, the result is false) 
+
+List of file attributes (default in parenthesis):
+  - filename (‘NOTSET’) Name of the file (with path)
+  - projection (‘lon lat’) Only three categories ‘lon lat’, 'native' or any other (for example ‘Lambert ‘or ‘Stereographic’ would give the same result).
+    'native' means that emissions are given in the same grid as the model grid and the data is not interpolated (use it if you can).
+  - grid_resolution (an approximate value is computed from the lon and lat, if no value is given).
+    It does not need to be exact (cannot be exact on a sphere anyway!).
+    This grid_resolution steers the interpolation algorithm;
+    A large value will force the code to subdivide each emission gridcell in large number of pieces,
+    that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
+  - periodicity (‘time’) How often the values are updated.
+    Can be ‘yearly’, ‘monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record.
+    The timestamp must correspond to the end of the time period of validity.
+    For ‘yearly’ monthly timefactors are applied, if a sector is defined.
+    For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
+  - factor (1.0) multiplicative factor for all sources in the file
+  - units ('NOTSET') will be used as default for sources units if set.
+  - apply_femis (true) whether to apply the femis reductions to the sources of this file.
+  - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
+  - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
+  - country_ISO ('NOTSET') will be used as default for sources country ISO code (for example ‘FR’ for France) if set.
+  - sector (-1) will be used as default for sources sector if set.
+  - SECTORS_NAME or sectorsName ('GNFR_CAMS') . It must be set to one of the SECTORS%name defined ('GNFR_CAMS' for example).
+  - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
+  - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
+  - country_ISO_incl ('NOTSET') If used, only use emissions from the countries in the list (see example below)
+  - country_ISO_excl ('NOTSET') If used, do not take into account emissions from countries in the list (see example below)
+
+
+List of source attributes:
+  - varname (‘NOTSET’) The name as used in the netcdf file
+  - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc) 
+  - factor (1.0) multiplicative factor. Can be used to change units to model definitions. Comes on top of the file multiplicative factors and possibly other factors.
+  - units (‘mg/m2/h’) Units *after* the factor multiplication. 
+  - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
+  - country_ISO (‘N/A’) the country code, as defined in Country_mod.f90 (for example ‘FR’ for France). ‘N/A’ is a valid code, but it does not correspond to any country.
+  - apply_femis (true) whether to apply the femis reductions to this source.
+  - include_in_local_fractions (true) whether to take this source into account for the local fraction calculations
+  - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
+  - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
+
+If a dimension with name "sector" is found, it is assumed that the third dimension of emission variables represent the sector index.
+
+The idea is that only variables that clearly are required in a specific context need to be set;
+if the value can be inferred from other information, the code should do it.
+Depending of the type of source, not all variables are used.
+
+Note about species: These can be interpreted in one of three categories
+  1. emitted species (nox,sox,pm25 ...) with sector (1...11 (or 13)) (“sector species”)
+  2. individual species (SO2, NO, NO2, ...) with sector. The species MUST be one of the splitted species.
+     These will be treated as one of the “sector species”  from 1. (but not splitted of course).
+     Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2” and NO "as NO2". You can correct the units using the factor attribute.
+  3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified).
+     No timefactors, vertical realease heights or splits are applied.
+     In this case the emissions are summed up in setup_rcemis (not in EmisSet)
+     
+     Example:
+
+.. code-block:: text
+  :caption: Read a field named "emis_tra" from a file "/path/ECLIPSE_V6a_CLE_base_PM25.nc".
+
+  Emis_sourceFiles(1)%filename = '/path/ECLIPSE_V6a_CLE_base_PM25.nc',
+  Emis_sourceFiles(1)%sectorsName = 'GNFR',
+  Emis_sourceFiles(1)%projection = 'lon lat',
+  Emis_sourceFiles(1)%periodicity = 'yearly',  
+  Emis_sourceFiles(1)%source(1)%varname='emis_tra',
+  Emis_sourceFiles(1)%source(1)%species='pm25',
+  Emis_sourceFiles(1)%source(1)%sector=6,
+  Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
+  Emis_sourceFiles(1)%source(1)%units='kg',
+
+If two CV emission files are wished to be combined in a single simulation, for example so that different
+emission scenarios can be applied inside and outside of the EMEP region (UNECE excl. NA), one can use
+the Emis_sourceFiles(1)%country_ISO_excl(1:) and Emis_sourceFiles(1)%country_ISO_incl(1:) options. 
+The below dummy example applies a 2015 baseline scenario inside the EMEP region and 2050 MFR scenario in the rest of the world (ROW),
+based on 0.5 degree emission input data files.
+
+.. code-block:: text
+  :caption: Include or exclude countries from emission input files.
+
+  Emis_sourceFiles(1)%filename = '/path_to_global_0.5deg_2015_baseline.nc',
+  Emis_sourceFiles(2)%filename = '/path_to_global_0.5deg_2050_MFR.nc',
+  Emis_sourceFiles(1)%country_ISO_incl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
+                                               "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
+                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
+                                               "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
+                                               "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
+
+  Emis_sourceFiles(2)%country_ISO_excl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
+                                               "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
+                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
+                                               "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
+                                               "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
+.. code-block:: Fortran
+    :caption: TEST.
+    
+  Why does this not show?
+  Because it is not indented enough!
+
+
+   
+Masks
+-----
+
+Typically you have got fine scale emissions for a small region of interest, a city for instance. You may want to remove that area from the coarse scale emissions, and replace it with your own. The mask allows you to define a specific region (the mask).
+To define which gridcells to include in your local region, you must find a suitable variable that shows the region of interest. It could be for example the PM emissions in your local area. 
+
+A "mask" can be defined for instance with:
 
 .. code-block:: Fortran
-    :caption: Mixed emission configuration example.
+    :caption: Define a cell-fraction mask, example. The mask value represents the fraction of the grid-cell area to be reduced.
 
-    emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
-    emis_inputlist(1)%type = 'GNFR_CAMSsectors',
-    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
-    emis_inputlist(1)%incl(1:) = 'NO','SE','FI',
-    emis_inputlist(2)%excl(1:) = 'NO','SE','FI',
-    emis_inputlist(1)%PollName(1:2) = 'voc','sox',
+    EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
+    EmisMask(1)%type     = 'CELL-FRACTION', ! the mask value is part of the reduction, default
+    EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
+    EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
 
+    ! define species to be read from the emission file separately, as if reading from different files
+    Emis_sourceFiles(1:7)%filename=7*'path/Emis_CAMS_v5_1_with_Ref2_0_1_GNFR_CAMS_01005deg_2018_CAMS2_40_U5.nc',
+    Emis_sourceFiles(1:7)%species='sox','nox','voc','nh3','co','pm25','pmco',
+    ! apply mask to pm25 and pmco emissions
+    Emis_sourceFiles(6:7)%mask_ID =2*'LONDON',
 
-It is also possible to restrict the number of pollutants from each of the files.
-If not all pollutants from ``CM_EmisFiles.inc`` are to be read, one can specify a list of pollutants to be included
-using "PollName". For instance in the example above , the last line specifies that emissions will include only VOC 
-and SOx from the file defined by emis_inputlist(1)%name. 
-If PollName is not specified at all, all pollutants are included (therefore all pollutants 
-from emis_inputlist(2)%name will be included).
-The specified pollutants must already be defined in ``CM_EmisFiles.inc``.
-It is possible to disregard the "lonlat" reductions introduced by ``femis.dat`` for specific emissions. To do this use the "use_lonlat_femis" flag.
-Example: switch off emissions covering one region from ``Emis_GLOB_05.nc`` as specified by femis, and replace the emissions in that data using ``emislist.POLL``. ``use_lonlat_femis = F`` will switch off the reductions, therefore the lonlat coordinate in ``femis.dat`` should match the domain covered by ``emislist.POLL``.
 
 .. code-block:: Fortran
-    :caption: Do not take into account the lines starting with lonlat in femis.dat for ``emis_inputlist(1)%name``.
+    :caption: Define a mask with lower and upper threshold, example
 
-    emis_inputlist(1)%name = '/MyPathToEmissions/emislist.POLL',
-    emis_inputlist(1)%use_lonlat_femis = F,
-    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
+    EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
+    EmisMask(1)%type     = 'THRESHOLD',
+    EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
+    EmisMask(1)%threshold = 1.0E-10, ! the mask is set at any point larger than the threshold
+    EmisMask(1)%threshold_max = 100, ! ... and smaller than the threshold_max value (default 1E60)
+    EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
 
+    
+Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell which are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region). To include for example all values=23, but not 24, set EmisMask(1)%threshold = 22.5 and EmisMask(1)%threshold_max = 23.5
 
-An alternative way of combining overlapping emissions, is to use a "mask" approach.
-This is typically used, when the emissions of one city is known in more details, but one wish to include default regional or global emissions elsewhere.
-The city emissions are used to set the mask, and that mask is then in turn used by the second emission sources to turn off emissions within the city.
+A mask defines only a region. It is not directly related to any pollutant. 
+
+The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set (but the multiplicative factor is always 0.0 for old format emissions). It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
+
+To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER: 
 
 .. code-block:: Fortran
-    :caption: Mixed emission using mask configuration example.
-
-    emis_inputlist(1)%name = '/MyPathToEmissions/emis_local.POLL',
-    emis_inputlist(1)%set_mask = T,
-    emis_inputlist(2)%name = '/MyPathToEmissions/Emis_GLOB_05.nc',
-    emis_inputlist(2)%use_mask = T,
-
-There are some details one should take into account: the order of the "set_mask" and "use_mask" matter.
-The mask should be set before it is used; "before" meaning that the indice of "emis_inputlist" is lower.
-Also yearly emissions are treated before monthly emissions, therefore one should not use monthly emissions to mask yearly emissions.
-The mask is set for a given position if emissions at that point are larger than 1.0e-20.
-If emissions are zero at some point the mask will not be set for that point, and regional emissions will be included there.
-There is only one mask. Several emissions files can set and use the mask.
-
-Masks can also be set from any field, see own section below.
-
+    :caption: Define a set of masks with integers, example
+    
+    EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
+    EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
+    EmisMask(1)%type     = 'NUMBER',
+    EmisMask(1)%ID       = 'specific-mask-name', 
 
 .. _`sec-nesting`:
 
@@ -635,182 +738,10 @@ can be set using:
   NdepFile            = 'DataDir/AnnualNdep_PS50x_EECCA2005_2009.nc',
 
 
-.. _`sec-emission-cv-format`:
-
-Country Variable (CV) format
-----------------------------
-
-In the CV format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
-A source can be any 2D field. It can also be a 3D field, if the third dimension is the sector. The sources are associated to country through a country code or a country code. 
-The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
-
-The code directory contain a Python script that can create an emission file in this format: ``emissions_TXT2ncCV.py``
-
-The file and sources can be characterized by a set of variables. In general these variable can be set by, and in order of increasing priority:
-  1. Default value
-  2. Global attribute read in the netcdf file
-  3. Variable attribute read in the netcdf file
-  4. Value set for Emis_sourceFiles(i)%XXX in config_emep.nml
-  5. Value set for Emis_sourceFiles(i)%source(s)%XXX in config_emep.nml
-  
-Exceptions to the priority rule are:
-  * maskID cannot be set by attributes in the netcdf file
-  * the file and source 'factor' are on top of each other, not replaced
-  * boolean parameters (like apply_femis), are used as "and" (i.e. if any is false, the result is false) 
-
-List of file attributes (default in parenthesis):
-  - filename (‘NOTSET’) Name of the file (with path)
-  - projection (‘lon lat’) Only three categories ‘lon lat’, 'native' or any other (for example ‘Lambert ‘or ‘Stereographic’ would give the same result).
-    'native' means that emissions are given in the same grid as the model grid and the data is not interpolated (use it if you can).
-  - grid_resolution (an approximate value is computed from the lon and lat, if no value is given).
-    It does not need to be exact (cannot be exact on a sphere anyway!).
-    This grid_resolution steers the interpolation algorithm;
-    A large value will force the code to subdivide each emission gridcell in large number of pieces,
-    that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
-  - periodicity (‘time’) How often the values are updated.
-    Can be ‘yearly’, ‘monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record.
-    The timestamp must correspond to the end of the time period of validity.
-    For ‘yearly’ monthly timefactors are applied, if a sector is defined.
-    For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
-  - factor (1.0) multiplicative factor for all sources in the file
-  - units ('NOTSET') will be used as default for sources units if set.
-  - apply_femis (true) whether to apply the femis reductions to the sources of this file.
-  - include_in_local_fractions (true) whether to take sources from this file into account for the local fraction calculations
-  - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
-  - country_ISO ('NOTSET') will be used as default for sources country ISO code (for example ‘FR’ for France) if set.
-  - sector (-1) will be used as default for sources sector if set.
-  - SECTORS_NAME or sectorsName ('GNFR_CAMS') . It must be set to one of the SECTORS%name defined ('GNFR_CAMS' for example).
-  - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
-  - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
-  - country_ISO_incl ('NOTSET') If used, only use emissions from the countries in the list (see example below)
-  - country_ISO_excl ('NOTSET') If used, do not take into account emissions from countries in the list (see example below)
 
 
-List of source attributes:
-  - varname (‘NOTSET’) The name as used in the netcdf file
-  - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc) 
-  - factor (1.0) multiplicative factor. Can be used to change units to model definitions. Comes on top of the file multiplicative factors and possibly other factors.
-  - units (‘mg/m2/h’) Units *after* the factor multiplication. 
-  - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
-  - country_ISO (‘N/A’) the country code, as defined in Country_mod.f90 (for example ‘FR’ for France). ‘N/A’ is a valid code, but it does not correspond to any country.
-  - apply_femis (true) whether to apply the femis reductions to this source.
-  - include_in_local_fractions (true) whether to take this source into account for the local fraction calculations
-  - mask_ID ('NOTSET') the name of the mask, if you want to apply one.
-  - mask_ID_reverse ('NOTSET') the name of the mask, if you want to apply one in the complementary region.
-
-If a dimension with name "sector" is found, it is assumed that the third dimension of emission variables represent the sector idex.
-
-The idea is that only variables that clearly are required in a specific context need to be set;
-if the value can be inferred from other information, the code should do it.
-Depending of the type of source, not all variables are used.
-
-Note about species: These can be interpreted in one of three categories
-  1. emitted species (nox,sox,pm25 ...) with sector (1...11 (or 13)) (“sector species”)
-  2. individual species (SO2, NO, NO2, ...) with sector. The species MUST be one of the splitted species.
-     These will be treated as one of the “sector species”  from 1. (but not splitted of course).
-     Careful with units, it follows the same rules as “sector species”; molecular weight for SO4 for example is considered “as SO2” and NO "as NO2". You can correct the units using the factor attribute.
-  3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified).
-     No timefactors, vertical realease heights or splits are applied.
-     In this case the emissions are summed up in setup_rcemis (not in EmisSet)
-     
-     Example:
 
 
-.. code-block:: text
-  :caption: Read a field named "emis_tra" from a file "/path/ECLIPSE_V6a_CLE_base_PM25.nc".
-
-  Emis_sourceFiles(1)%filename = '/path/ECLIPSE_V6a_CLE_base_PM25.nc',
-  Emis_sourceFiles(1)%sectorsName = 'GNFR',
-  Emis_sourceFiles(1)%projection = 'lon lat',
-  Emis_sourceFiles(1)%periodicity = 'yearly',  
-  Emis_sourceFiles(1)%source(1)%varname='emis_tra',
-  Emis_sourceFiles(1)%source(1)%species='pm25',
-  Emis_sourceFiles(1)%source(1)%sector=6,
-  Emis_sourceFiles(1)%source(1)%factor=1000000.0,!kt->kg
-  Emis_sourceFiles(1)%source(1)%units='kg',
-
-If two CV emission files are wished to be combined in a single simulation, for example so that different
-emission scenarios can be applied inside and outside of the EMEP region (UNECE excl. NA), one can use
-the Emis_sourceFiles(1)%country_ISO_excl(1:) and Emis_sourceFiles(1)%country_ISO_incl(1:) options. 
-The below dummy example applies a 2015 baseline scenario inside the EMEP region and 2050 MFR scenario in the rest of the world (ROW),
-based on 0.5 degree emission input data files.
-
-.. code-block:: text
-  :caption: Include or exclude countries from emission input files.
-
-  Emis_sourceFiles(1)%filename = '/path_to_global_0.5deg_2015_baseline.nc',
-  Emis_sourceFiles(2)%filename = '/path_to_global_0.5deg_2050_MFR.nc',
-
-  Emis_sourceFiles(1)%country_ISO_incl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
-                                               "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
-                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
-                                               "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
-                                               "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
-
-  Emis_sourceFiles(2)%country_ISO_excl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
-                                               "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
-                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
-                                               "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
-                                               "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
-.. code-block:: Fortran
-    :caption: TEST.
-    
-  Why does this not show?
-  Because it is not indented enough!
-
-
-   
-Masks
------
-
-Typically you have got fine scale emissions for a small region of interest, a city for instance. You may want to remove that area from the coarse scale emissions, and replace it with your own. The mask allows you to define a specific region (the mask).
-To define which gridcells to include in your local region, you must find a suitable variable that shows the region of interest. It could be for example the PM emissions in your local area. 
-
-A "mask" can be defined for instance with:
-
-.. code-block:: Fortran
-    :caption: Define a cell-fraction mask, example. The mask value represents the fraction of the grid-cell area to be reduced.
-
-    EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
-    EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
-    EmisMask(1)%type     = 'CELL-FRACTION', ! the mask value is part of the reduction, default
-    EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
-    EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
-
-    ! define species to be read from the emission file separately, as if reading from different files
-    Emis_sourceFiles(1:7)%filename=7*'path/Emis_CAMS_v5_1_with_Ref2_0_1_GNFR_CAMS_01005deg_2018_CAMS2_40_U5.nc',
-    Emis_sourceFiles(1:7)%species='sox','nox','voc','nh3','co','pm25','pmco',
-    ! apply mask to pm25 and pmco emissions
-    Emis_sourceFiles(6:7)%mask_ID =2*'LONDON',
-
-
-.. code-block:: Fortran
-    :caption: Define a mask with lower and upper threshold, example
-
-    EmisMask(1)%filename = '/mypath/myfile.nc', ! name of the netcdf file to read from
-    EmisMask(1)%cdfname  = 'London_PM',  ! name of the variable to read from the file
-    EmisMask(1)%type     = 'THRESHOLD',
-    EmisMask(1)%ID       = 'LONDON',  ! the name you give to that mask
-    EmisMask(1)%threshold = 1.0E-10, ! the mask is set at any point larger than the threshold
-    EmisMask(1)%threshold_max = 100, ! ... and smaller than the threshold_max value (default 1E60)
-    EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
-
-    
-Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell which are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region). To include for example all values=23, but not 24, set EmisMask(1)%threshold = 22.5 and EmisMask(1)%threshold_max = 23.5
-
-A mask defines only a region. It is not directly related to any pollutant. 
-
-The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set (but the multiplicative factor is always 0.0 for old format emissions). It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
-
-To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER: 
-
-.. code-block:: Fortran
-    :caption: Define a set of masks with integers, example
-    
-    EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
-    EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
-    EmisMask(1)%type     = 'NUMBER',
-    EmisMask(1)%ID       = 'specific-mask-name', 
 
 
 
@@ -1064,7 +995,7 @@ The full chemistry can be included. This option is under development, and only l
     lf_set%YEAR = T, !average value for full run in output 
     lf_set%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
     lf_set%full_chem = T, ! to indicate that all species must be included
-    lf_set%EmisDer_all = F, ! reduce voc, sox, nox, nh3 together if T (separately if F)
+    lf_set%Nfullchem_emis = 4, ! can be 1,2 or 4. 1 reduces nox, voc, sox, nh3 together; 2 reduces nox, voc separately; 4 reduces nox, voc, sox, nh3 separately
 
     ! Specify which countries and sectors
     lf_country%sector_list(1:)=0,1,8,
