@@ -895,6 +895,7 @@ If one wants to include many species, sectors and res values, without writing on
 
 The corresponding lf_src values will then be added to the already defined lf_src (3*4*2 = 24 new sources in this example). You can not with this syntax combine different res for different sectors for the same species.
 
+NB: by default, the GNFR sector 6 also includes 16,17,18 and 19; the GNFR sector 1 also includes 14 and 15.
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
 
