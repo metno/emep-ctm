@@ -211,4 +211,12 @@ The cpu cost is high, approximatively 20 times the cost without this option (ind
 Miscellaneous
 -------------
 
+Even if we consider pm25 as "primary", there is some "chemistry" going on: the different pm species are "new" or "age" and will be transformed gradually from new to age. This is taken into account also in the LF for primary particles (the two classes are tracked separately).
+
+'BVOC', 'DMS', 'BC', 'STRATOS', 'INIT' are special "countries".
+
+'ALL' is a predefined group, including all countries.
+
 When using nesting for restart, the local fractions will also be stored if activated. This will only work for "country" style LF, and only if the grid is identical before and after restart.
+
+In order to compare with a brute force method, you can reduce a country emission with 1%. For better agreement use (in both runs): ``ZERO_ORDER_ADVEC = T`` , ``AERO%EQUILIB='MARS'``, ``AERO%EQUILIB_WATER='MARS'``
