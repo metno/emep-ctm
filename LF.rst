@@ -2,7 +2,7 @@
 Local Fractions
 ===============
 
-The Local Fraction method allows to give information about where the pollutants come from. There are two main "branches", tracking of primary particles, and "generalized LF", which also includes chemical transformations between species. The values for the local fractions will be outputted in separate files (file names including  "_LF_"). 
+The Local Fraction method allows to give information about where the pollutants come from. There are two main "branches": tracking of primary particles, and "generalized LF", which also includes chemical transformations between species. The values for the local fractions will be outputted in separate files (file names including  "_LF_"). 
 
 
 
@@ -12,14 +12,14 @@ Local Fractions for primary particles
 
 Primary particles are simplest; we can imagine that pollutants from each source are tracked separately (it is what we do in the code). What is included as a source is defined by the settings in config_emep.nml.
 
-Mainly two types of sources:
+Mainly two types of sources (you can have both type together in the same run):
 
-* grid to grid (aka relative), which considers each individual gridcell separately. To keep the amount of data reasonable, the pollutants are tracked only up to a given distance (10 gridcells in each direction for example). 
-* countries, possibly limited to a specific sector. (SR type runs)
+* grid to grid (aka relative), which considers each individual gridcell separately. To keep the amount of data reasonable, the pollutants are tracked only up to a given distance (10 gridcells in each direction for example). ``lf_src(1)%type='relative'``, default.
+* countries, possibly limited to a specific sector. (SR type runs). Specify ``lf_src(1)%type='country'``
 
-Below an example of grid to grid LF which are the type used by the urban EMEP, uEMEP.
 
-config_emep.nml settings:
+Below an example of grid to grid LF config_emep.nml settings, which is the type used by the urban EMEP, uEMEP.
+
 
 .. code-block:: Fortran
     :caption: Local Fractions flag example
@@ -65,6 +65,10 @@ The corresponding lf_src values will then be added to the already defined lf_src
 NB: by default, the GNFR sector 6 also includes 16,17,18 and 19; the GNFR sector 1 also includes 14 and 15.
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
+
+Tip: if you want to look at the grid-to-grid fields in the netCDF file with ncview; press first on any regular 2- or 3-dimensional field. (otherwise ncview may put your zoom to X100 or so!). Then choose axes lon-lat, then press x_dist or y_dist to set them to zero or small.
+
+"LF_GUI_LF.py" https://github.com/metno/emep-ctm/tree/tools can be used to visualize the grid-to-grid fields.
 
 
 
@@ -202,3 +206,9 @@ The cpu cost is high, approximatively 20 times the cost without this option (ind
     lf_spec_out(11)%name='PM_WATER',
 
     lf_set%MDA8 = T, !special: make AvgMDA8_6month and SOMO35 NB: requires that O3 is outputted too
+
+
+Miscellaneous
+-------------
+
+When using nesting for restart, the local fractions will also be stored if activated. This will only work for "country" style LF, and only if the grid is identical before and after restart.
