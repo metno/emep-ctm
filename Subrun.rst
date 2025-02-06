@@ -847,10 +847,25 @@ Here is an example of how to define a new sector with a new height distribution,
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
 
-Local Fractions (under development)
------------------------------------
+Local Fractions
+---------------
 
-When chosen, the Local Fractions (used by the urban EMEP, uEMEP) will be outputted in separate files.
+The Local Fraction method allows to give information about where the pollutants come from. There are two main "branches", tracking of primary particles, and "generalized LF", which also includes chemical transformations between species. The values for the local fractions will be outputted in separate files (file names including  "_LF_"). 
+
+
+
+
+Local Fractions for primary particles
+-------------------------------------
+
+Primary particles are simplest; we can imagine that pollutants from each source are tracked separately (it is what we do in the code). What is included as a source is defined by the settings in config_emep.nml.
+
+Mainly two types of sources:
+
+* grid to grid (aka relative), which considers each individual gridcell separately. To keep the amount of data reasonable, the pollutants are tracked only up to a given distance (10 gridcells in each direction for example). 
+* countries, possibly limited to a specific sector. (SR type runs)
+
+Below an example of grid to grid LF which are the type used by the urban EMEP, uEMEP.
 
 config_emep.nml settings:
 
@@ -893,28 +908,13 @@ If one wants to include many species, sectors and res values, without writing on
     lf_species(2)%sectors(1:) = 0, 1, 2, 8,
     lf_species(2)%res(1:) = 1, 4,
 
-The corresponding lf_src values will then be added to the already defined lf_src (3*4*2 = 24 new sources in this example). You can not with this syntax combine different res for different sectors for the same species.
+The corresponding lf_src values will then be added to the already defined lf_src (2*4*2 = 16 new sources in this example). You can not with this syntax combine different res for different sectors for the same species.
 
 NB: by default, the GNFR sector 6 also includes 16,17,18 and 19; the GNFR sector 1 also includes 14 and 15.
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
 
-Local Fractions for tracing natural emissions (under development)
----------------------------------------------
-Natural emissions are assumed emitted from surface (in current version). 
-So far only the DMS emissions can be tracked. 
-To include DMS outputs:
 
-.. code-block:: Fortran
-    :caption: Example for DMS output
-
-    lf_src(1)%name = 'DMS',
-    lf_src(1)%dist = 2, !will track over up to 2 gridcells in all directions
-    lf_src(1)%nhour = 1, ! will track separately emissions every 1 hour, and reset every 24 hours
-    lf_set%HOUR_INST = T, ! output instantaneous values every hour
-
-Local Fractions for Source Receptor style runs
-----------------------------------------------
 
 Local fractions can also be used to make traditional Source Receptor (or blame) matrices, in a single run. (the %res flag is then not used)
 
@@ -965,7 +965,7 @@ Instead of defining countries in the emission files, one can define "source regi
     
 If a value is within the min and max range, but does not appear in the mask file, it will not be taken into account (meaning it is ok to specify a range that covers all the masks values, even if some values are not defined on the mask) 
     
- (under development): use mask file with fraction of emissions in each gridcell: 
+use mask file with fraction of emissions in each gridcell: 
 
 .. code-block:: Fortran
     :caption: Local Fractions using mask with fractions of gridcells
@@ -984,10 +984,28 @@ If a value is within the min and max range, but does not appear in the mask file
 
 In this example two masks are defined (those can be used for traditional SR runs too), and only the mask with name "PoUt" is used as a "country" in the LF run.
 
+
+Local Fractions for tracing primary natural emissions (under development)
+-------------------------------------------------------------------------
+Natural emissions are assumed emitted from surface (in current version). 
+So far only the DMS emissions can be tracked. 
+To include DMS outputs:
+
+.. code-block:: Fortran
+    :caption: Example for DMS output
+
+    lf_src(1)%name = 'DMS',
+    lf_src(1)%dist = 2, !will track over up to 2 gridcells in all directions
+    lf_src(1)%nhour = 1, ! will track separately emissions every 1 hour, and reset every 24 hours
+    lf_set%HOUR_INST = T, ! output instantaneous values every hour
+
 Local Fractions for Sensibilities with full chemistry
 -----------------------------------------------------
 
-The full chemistry can be included. This option is under development, and only limited options are available. The cpu cost is high, approximatively 20 times the cost without this option (independently of the number of sources tracked). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``, or overwrite ``CM_Reactions1.inc`` with ``CM_Reactions1_LF.inc`` and ``CM_Reactions2.inc`` with ``CM_Reactions2_LF.inc``. Example of config settings:
+When species from different sources mixes, it is not trivial to define the source of the resulting species. Instead of "fractions" we define sensibilities (or generalized Local Fractions); sensibilities tells how much a species would vary if a given source would change slightly. Mathematically well defined as a derivative of species wrt to emission source. We define the units such that the value of the sensibility gives the change of concentration extrapolated to a 100% emission change. For linear or primary particles this means that the concentration are simply the amount of pollutant coming from that source (i.e. the local fraction multiplied by the base concentration).
+
+
+The cpu cost is high, approximatively 20 times the cost without this option (independently of the number of sources tracked, up to 100 or so sources). To use this option the fortran code must be prepared with the script ``utils/mk.LF_Chem``, or overwrite ``CM_Reactions1.inc`` with ``CM_Reactions1_LF.inc`` and ``CM_Reactions2.inc`` with ``CM_Reactions2_LF.inc``. Example of config settings:
 
 .. code-block:: Fortran
     :caption: Local Fractions Country source receptor type example
