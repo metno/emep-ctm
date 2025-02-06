@@ -14,6 +14,7 @@ The EMEP/MSC-W Model Unofficial User's Guide
     Input.rst
     Output.rst
     Subrun.rst
+    LF.rst
     references.rst
 
 .. commented ..todo::
