@@ -66,6 +66,8 @@ NB: by default, the GNFR sector 6 also includes 16,17,18 and 19; the GNFR sector
 
 Note that the files can be very large if hourly outputs and/or many neighbors are requested.
 
+The local fractions values given are for the lowest level; they are not interpolated to 3 meter using the "cfac" factor. 
+
 Tip: if you want to look at the grid-to-grid fields in the netCDF file with ncview; press first on any regular 2- or 3-dimensional field. (otherwise ncview may put your zoom to X100 or so!). Then choose axes lon-lat, then press x_dist or y_dist to set them to zero or small.
 
 "LF_GUI_LF.py" https://github.com/metno/emep-ctm/tree/tools can be used to visualize the grid-to-grid fields.
@@ -98,6 +100,8 @@ Local fractions can also be used to make traditional Source Receptor (or blame) 
     lf_country%list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
     lf_country%group(1)%name='NORDIC', !any name given to the group (used as output name)
     lf_country%group(1)%list(1:)='NO','DK','SE','FI', ! countries included in the group
+
+The results for country types outputs are interpolated to 3 meter height, using the "cfac" factor.
     
 Instead of defining countries in the emission files, one can define "source regions" in a separate netcdf file. Each region must have an integer value. The values to be included as a source region are then specified by a list or as the minimum and maximum value to include (defining both a list and an intervall is allowed, but only one list and one intervall). The maskfile should be defined too. For example to include masks 2,5,8,12 and all mask between 100 and 357 (included):
 
