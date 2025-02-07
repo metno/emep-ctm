@@ -28,9 +28,7 @@ Below an example of grid to grid LF config_emep.nml settings, which is the type 
     !Local Fractions frequency of output (separate file for each). Can be any of: YEAR, MONTH, DAY, HOUR, HOUR_INST 
     lf_set%YEAR = T, !average value for full run in output
     lf_set%Nvert = 14, !How many vertical level to include in treatment. Should be higher than highest emissions
-
-    !NB: for now lf_src(1)%dist will be used for all sources
-    lf_src(1)%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
+    lf_set%dist = 5,  !how far the neighbors can be in each direction (NB: high cost for large dist)
     
     !Local Fractions pollutants and sectors to include:
     lf_src(1)%species="pm25", ! any of EMIS_File: "sox ", "nox ", "co  ", "voc ", "nh3 ", "pm25", "pmco"
