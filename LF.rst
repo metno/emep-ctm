@@ -202,10 +202,9 @@ The cpu cost is high, approximatively 20 times the cost without this option (ind
     lf_spec_out(8)%species(1:)='SO2','SO4',
     lf_spec_out(8)%WetDep=T,
     lf_spec_out(9)%name='POD1_IAM_DF',
-    lf_spec_out(9)%species(1:)='POD',
-    lf_spec_out(9)%DryDep=T,
-    lf_spec_out(10)%name='pm25',
-    lf_spec_out(11)%name='PM_WATER',
+    lf_spec_out(10)%name='EUAOT40_Crops',
+    lf_spec_out(11)%name='pm25',
+    lf_spec_out(12)%name='PM_WATER',
 
     lf_set%MDA8 = T, !special: make AvgMDA8_6month and SOMO35 NB: requires that O3 is outputted too
 
@@ -214,6 +213,8 @@ Miscellaneous
 -------------
 
 Even if we consider pm25 as "primary", there is some "chemistry" going on: the different pm species are "new" or "age" and will be transformed gradually from new to age. This is taken into account also in the LF for primary particles (the two classes are tracked separately).
+
+For POD and AOT outputs, the name must match one of the output names used in the regular output (not local fraction output). 
 
 'BVOC', 'DMS', 'BC', 'STRATOS', 'INIT' are special "countries".
 
