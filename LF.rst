@@ -207,6 +207,10 @@ The cpu cost is high, approximatively 20 times the cost without this option (ind
     lf_spec_out(12)%name='PM_WATER',
 
     lf_set%MDA8 = T, !special: make AvgMDA8_6month and SOMO35 NB: requires that O3 is outputted too
+    !Note that SOMO35 has a different defintion than in the "base" file output: Mainly in the "base file SOMO35 is computed 
+    !excluding the 8 hours periods that overlap with midnight. Also the "base" output include the 8 hours periods every 20 
+    !minutes (independently of dt_advec!), while every hour is used for the LF output. 
+    !The LF definition of SOMO35 follows similar rules as the more official and detailed MDA8. 
 
 
 Miscellaneous
