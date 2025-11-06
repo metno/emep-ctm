@@ -1,7 +1,7 @@
 ! <MicroMet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -96,7 +96,7 @@ module Micromet_mod
   !--------------------------------------------------------------------
   function AerRes(z1,z2,uStar,Linv,Karman) result (Ra)
 !...
-!   Ref: Garratt, 1994, pp.55-58
+!   Ref: Garratt, 1992, pp.55-58
 !   In:
     real, intent(in) ::   z1     ! lower height (m), equivalent to h-d+1 or h-d+3
     real, intent(in) ::   z2     ! upper height (m), equivalent to z-d
@@ -127,7 +127,7 @@ module Micromet_mod
   !--------------------------------------------------------------------
   function AerResM(z1,z2,uStar,Linv,Karman) result (Ra)
 !...
-!   Ref: Garratt, 1994, pp.55-58
+!   Ref: Garratt, 1992, pp.55-58
 !   In:
     real, intent(in) ::   z1     ! lower height (m), equivalent to h-d+1 or h-d+3
     real, intent(in) ::   z2     ! upper height (m), equivalent to z-d
@@ -154,7 +154,7 @@ module Micromet_mod
   !--------------------------------------------------------------------
   function PsiH(zL) result (stab_h)
     !  PsiH = integral flux-gradient stability function for heat 
-    !  Ref: Garratt, 1994, pp52-54
+    !  Ref: Garratt, 1992, pp52-54
     !  VDHH modified - use van der Hurk + Holtslag?
 
     ! In:
@@ -183,7 +183,7 @@ module Micromet_mod
   function PsiM(zL) result (stab_m)
    !   Out:
    !   PsiM = integral flux-gradient stability function for momentum 
-   !   Ref: Garratt, 1994, pp52-54
+   !   Ref: Garratt, 1992, pp52-54
 
     real, intent(in) ::  zL    ! = surface layer stability parameter, (z-d)/L 
                                ! notation must be preserved         
@@ -270,7 +270,7 @@ end subroutine Launiainen1995
 !--------------------------------------------------------------------
   function Wind_at_h(u_ref, z_ref, zh, d, z0, Linv) result (u_zh)
 !...
-!   Ref: Garratt, 1994, 
+!   Ref: Garratt, 1992, 
 !   In:
     real, intent(in) ::   u_ref  ! windspeed at z_ref
     real, intent(in) ::   z_ref  ! centre of call, ca. 45m (m)

@@ -1,7 +1,7 @@
-! <EcoSystem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <EcoSystem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -73,6 +73,7 @@ contains
 subroutine Init_EcoSystems()
   character(len=TXTLEN_DERIV) :: name
   character(len=TXTLEN_SHORT) :: unit
+  character(len=100) :: errmsg
   integer :: iEco, iLC
   logical, parameter :: T = .true., F = .false. ! shorthands only
 
@@ -107,18 +108,17 @@ subroutine Init_EcoSystems()
   Is_EcoSystem(FOREST,:)  =  LandType(:)%is_BDLF .or. LandType(:)%is_NDLF
   Is_EcoSystem(WATER_D,:) =  LandType(:)%is_water
   Is_EcoSystem(NONFOREST,:) =  .not. Is_EcoSystem(FOREST,:)
+
   do iEco = 1, NDEF_ECOSYSTEMS-LAST_ECO
     Is_EcoSystem(LAST_ECO+iEco,:) = LandDefs(:)%code == DEF_ECOSYSTEMS(LAST_ECO+iEco)
-    if(MasterProc .and. DEBUG%ECOSYSTEMS) then
-      do iLC = 1, 4
-        write(*,"(a,2i3,2a4,L2)") 'ADD LC-ECO', iEco, iLC, LandDefs(iLC)%code,&
-           DEF_ECOSYSTEMS(LAST_ECO+iEco), Is_EcoSystem(LAST_ECO+iEco,iLC)
-       end do
-    end if
   end do
+
   if ( MasterProc .and. DEBUG%ECOSYSTEMS) then
+    write(*,"(a,a3,1x, a12,4a8)") 'ECOSYS', iEco, 'Forest', 'BDLF', 'NDLF', 'NON-For'
     do iEco = 1, NDEF_ECOSYSTEMS
-      write(*,*) 'ECOSYS', iEco, Is_EcoSystem(FOREST,iEco), Is_EcoSystem(BDLF,iEco), Is_EcoSystem(NONFOREST,iEco), Is_EcoSystem(9,iEco)
+      write(*,"(a,i3,1x,a12,4L8)") 'ECOSYS', iEco, DEF_ECOSYSTEMS(iEco), &
+        Is_EcoSystem(FOREST,iEco), Is_EcoSystem(BDLF,iEco),  &
+        Is_EcoSystem(BDLF,iEco), Is_EcoSystem(NONFOREST,iEco) ! , Is_EcoSystem(9,iEco)
     end do
   end if
 

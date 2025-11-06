@@ -1,7 +1,7 @@
-! <DerivedFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <DerivedFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

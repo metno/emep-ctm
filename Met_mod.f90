@@ -1,7 +1,7 @@
-! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Met_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -86,7 +86,7 @@ use Config_module,    only: PASCAL, PT, Pref, METSTEP  &
 use Debug_module,       only: DEBUG
 use Functions_mod,      only: Exner_tab, Exner_nd
 use Functions_mod,      only: T_2_Tpot, StandardAtmos_kPa_2_km 
-use GridValues_mod,     only: glat, xm_i, xm_j, xm2         &
+use GridValues_mod,     only: glat, xm_i, xm_j, xm2, GridArea_m2   &
        ,Poles, sigma_bnd, sigma_mid, xp, yp, fi, GRIDWIDTH_M  &
        ,debug_proc, debug_li, debug_lj, A_mid, B_mid          &
        ,Eta_bnd,Eta_mid,dA,dB,A_mid,B_mid,A_bnd,B_bnd         &
@@ -144,6 +144,7 @@ public :: GetCDF_short
 public :: extendarea  ! returns array which includes neighbours
 public :: Getmeteofield
 public :: landify     ! replaces met variables from mixed sea/land with land
+private:: CalcConvFluxes_wrf
 
 contains
 
@@ -297,6 +298,12 @@ subroutine MeteoRead()
 
   type(date)      ::  next_inptime             ! hfTD,addhours_to_input
   type(timestamp) ::  ts_now                   ! time in timestamp format
+
+  real, save, allocatable, dimension(:,:) :: &
+      sensible_heat_flux, & ! alternative accumulated input
+      latent_heat_flux, &   ! alternative accumulated input
+      surface_stress        ! alternative accumulated input
+  real :: accumulated
 
   real :: nsec                                 ! step in seconds
 
@@ -546,54 +553,134 @@ subroutine MeteoRead()
 
   !treat the cases with alternative names
   do ix=1,Nmetfields
-     if(met(ix)%read_meteo .and. met(ix)%alternative_namefound/='notset')then
-        ndim=met(ix)%dim
-        nrix=min(met(ix)%msize,nr)
-        select case(trim(met(ix)%alternative_namefound))
-        case('air_temperature_ml')
-           !we transform from absolute to potential
-           !note that we could also keep absolute and compute potential on the fly when needed, as both are used
-           if(maxval(ps)<2000.0)then
-              ps_in_hPa = .true.
-           else
-              ps_in_hPa = .false.
-           endif
-           fac=1.0
-           if(ps_in_hPa)fac = PASCAL
-           do k=1,kmax_mid
-              do j=1,ljmax
-                 do i=1,limax
-                    th(i,j,k,nr) = th(i,j,k,nr) * exp(-KAPPA*log((A_mid(k)+B_mid(k)*fac*ps(i,j,nr))*1.e-5))
-                 end do
-              end do
-           end do           
-        case('integral_of_surface_downward_sensible_heat_flux_wrt_time')
-           !add all heat fluxes and change sign.
-           call Getmeteofield(meteoname,'integral_of_surface_downward_latent_heat_evaporation_flux_wrt_time',nrec,ndim,unit,met(ix)%validity,&
-                buff,needed=.true.,found=met(ix)%found)
-           do j=1,ljmax
-              do i=1,limax
-                 met(ix)%field(i,j,1,nrix) = -met(ix)%field(i,j,1,nrix) - buff(i,j)
-              end do
-           end do
-           if(nrix > 1)then
-               ! change from accumulated to instantaneous
-              met(ix)%field(i,j,1,1) = met(ix)%field(i,j,1,2) - met(ix)%field(i,j,1,1)/(3600*METSTEP)
-           end if
-           met(ix)%time_interpolate = .false.
-        case('surface_stress_northward')
-            call Getmeteofield(meteoname,'surface_stress_eastward',nrec,ndim,unit,met(ix)%validity,&
-                buff,needed=.true.,found=met(ix)%found)
-           do j=1,ljmax
-              do i=1,limax
-                 met(ix)%field(i,j,1,nrix) = sqrt(met(ix)%field(i,j,1,nrix)*met(ix)%field(i,j,1,nrix)+&
-                      buff(i,j)*buff(i,j))
-              end do
-           end do          
-        end select
-     end if
-  end do
+    if(.not.met(ix)%read_meteo .or. met(ix)%alternative_namefound=='notset') &
+      continue
 
+    ndim=met(ix)%dim
+    nrix=min(met(ix)%msize,nr)
+    select case(met(ix)%alternative_namefound)
+    case('air_temperature_ml')
+      ! we transform from absolute to potential
+      ! note that we could also keep absolute and compute potential on the fly when needed, as both are used
+      ps_in_hPa = (maxval(ps) < 2000.0)
+      fac=1.0
+      if(ps_in_hPa)fac = PASCAL
+      do k=1,kmax_mid
+        do j=1,ljmax
+            do i=1,limax
+              th(i,j,k,nr) = th(i,j,k,nr) * exp(-KAPPA*log((A_mid(k)+B_mid(k)*fac*ps(i,j,nr))*1.e-5))
+            end do
+        end do
+      end do           
+
+    case('surface_upward_sensible_heat_flux')
+      ! sensible heat flux [W/m2] from 1 NWP field [W s/m2]
+      fh(:,:,nrix) = fh(:,:,nrix)/(3600*METSTEP)
+
+    case('surface_upward_sensible_heat_flux_acc')
+      ! de-accumulate sensible heat flux [W/m2] from 1 NWP field [W s/m2]
+      if(.not.allocated(sensible_heat_flux)) then
+        allocate(sensible_heat_flux(LIMAX,LJMAX))
+        sensible_heat_flux(:,:) = 0.0
+      end if 
+
+      do j=1,ljmax
+        do i=1,limax
+          accumulated = fh(i,j,nrix)/(3600*METSTEP)
+          fh(i,j,nrix) = accumulated - sensible_heat_flux(i,j)
+          sensible_heat_flux(i,j) = accumulated
+        end do
+      end do
+
+    case('surface_upward_latent_heat_flux')
+      ! latent heat flux [W/m2] from 1 NWP field [W s/m2]
+      fl(:,:,nrix) = fl(:,:,nrix)/(3600*METSTEP)
+
+    case('surface_upward_latent_heat_flux_acc')
+      ! de-accumulate latent heat flux [W/m2] from 1 NWP field [W s/m2]
+      if(.not.allocated(sensible_heat_flux)) then
+        allocate(latent_heat_flux(LIMAX,LJMAX))
+        latent_heat_flux(:,:) = 0.0
+      end if 
+
+      do j=1,ljmax
+        do i=1,limax
+          accumulated = fl(i,j,nrix)/(3600*METSTEP)
+          fl(i,j,nrix) = accumulated - latent_heat_flux(i,j)
+          latent_heat_flux(i,j) = accumulated
+        end do
+      end do
+
+    case('surface_upward_latent_heat_evaporation_flux')
+      ! latent heat flux [W/m2] from 2 NWP fields [W s/m2]
+      call Getmeteofield(meteoname,'surface_upward_latent_heat_sublimation_flux',&
+          nrec,ndim,unit,met(ix)%validity,buff,needed=.true.,found=met(ix)%found)
+      fl(:,:,nrix) = (fl(:,:,nrix) + buff(:,:))/(3600*METSTEP)
+
+    case('surface_upward_latent_heat_evaporation_flux_acc')
+      ! de-accumulate latent heat flux [W/m2] from 2 NWP fields [W s/m2]
+      if(.not.allocated(latent_heat_flux)) then
+        allocate(latent_heat_flux(LIMAX,LJMAX))
+        latent_heat_flux(:,:) = 0.0
+      end if 
+
+      call Getmeteofield(meteoname,'surface_upward_latent_heat_sublimation_flux_acc',&
+          nrec,ndim,unit,met(ix)%validity,buff,needed=.true.,found=met(ix)%found)
+      do j=1,ljmax
+        do i=1,limax
+          accumulated = (fl(i,j,nrix) + buff(i,j))/(3600*METSTEP)
+          fl(i,j,nrix) = accumulated - latent_heat_flux(i,j)
+          latent_heat_flux(i,j) = accumulated
+        end do
+      end do
+
+    case('northward_surface_stress')
+      ! surface stress [N/m2] from 2 NWP fields [N s/m2]
+      call Getmeteofield(meteoname,'eastward_surface_stress',&
+          nrec,ndim,unit,met(ix)%validity,buff,needed=.true.,found=met(ix)%found)
+      tau(:,:,nrix) = sqrt((tau(:,:,nrix)/(3600*METSTEP))**2 + (buff(:,:)/(3600*METSTEP))**2)
+
+    case('northward_surface_stress_acc')
+      ! de-accumulate surface stress [N/m2] from 2 NWP fields [N s/m2]
+      if(.not.allocated(surface_stress)) then
+        allocate(surface_stress(LIMAX,LJMAX))
+        surface_stress(:,:) = 0.0
+      end if 
+
+      call Getmeteofield(meteoname,'eastward_surface_stress_acc',&
+          nrec,ndim,unit,met(ix)%validity,buff,needed=.true.,found=met(ix)%found)
+      do j=1,ljmax
+        do i=1,limax
+          accumulated = sqrt((tau(i,j,nrix)/(3600*METSTEP))**2 + (buff(i,j)/(3600*METSTEP))**2)
+          tau(i,j,nrix) = accumulated - surface_stress(i,j)
+          surface_stress(i,j) = accumulated
+        end do
+      end do
+
+    case('northward_surface_momentum_flux')
+      ! surface stress [N/m2] from 2 NWP fields [N s/m2]
+      call Getmeteofield(meteoname,'eastward_surface_momentum_flux',&
+          nrec,ndim,unit,met(ix)%validity,buff,needed=.true.,found=met(ix)%found)
+      tau(:,:,nrix) = sqrt((tau(:,:,nrix)/(3600*METSTEP))**2 + (buff(:,:)/(3600*METSTEP))**2)
+
+    case('northward_surface_momentum_flux_acc')
+      ! de-accumulate surface stress [N/m2] from 2 NWP fields [N s/m2]
+      if(.not.allocated(surface_stress)) then
+        allocate(surface_stress(LIMAX,LJMAX))
+        surface_stress(:,:) = 0.0
+      end if 
+
+      call Getmeteofield(meteoname,'eastward_surface_momentum_flux_acc',&
+          nrec,ndim,unit,met(ix)%validity,buff,needed=.true.,found=met(ix)%found)
+      do j=1,ljmax
+        do i=1,limax
+          accumulated = sqrt((tau(i,j,nrix)/(3600*METSTEP))**2 + (buff(i,j)/(3600*METSTEP))**2)
+          tau(i,j,nrix) = accumulated - surface_stress(i,j)
+          surface_stress(i,j) = accumulated
+        end do
+      end do
+    end select
+  end do
   
   !extend the i or j index to 0
   if (neighbor(EAST) .ne. NOPROC) then
@@ -700,12 +787,6 @@ subroutine MeteoRead()
     else !if (.not. foundcloudwater .and. .not. foundcc3d) then
       call StopAll(dtxt//"Did not cloud water AND did not find 3D cloudcover")
     end if
-  end if
-
-  if (foundcloudwater .and. .not. foundcc3d) then
-    !make crude cloudwater from cc3d
-    if(write_now)write(*,*)dtxt//'WARNING: deriving cloud water from 3D cloud cover (cc3d)'
-    cw_met(:,:,:,nr) = cc3d(:,:,:,nr)/CW2CC !NB:cc3d in fraction units here (0 to 1)
   end if
 
   !    maximum of cloud fractions for layers above a given layer
@@ -1016,6 +1097,8 @@ subroutine MeteoRead()
   surface_precip(:,:) = pr(:,:,KMAX_MID) * 3600 !mm/s -> mm/hr
 
   if(USES%CONVECTION)then
+    if(WRF_MET_CORRECTIONS) call CalcConvFluxes_wrf() ! convert from en/detrainment rates to total fluxes
+
     cnvuf=max(0.0,cnvuf)      !no negative upward fluxes
     cnvuf(:,:,KMAX_BND)=0.0   !no flux through surface
     cnvuf(:,:,1)=0.0          !no flux through top
@@ -3347,5 +3430,72 @@ subroutine read_surf_elevation(ix)
   if(MasterProc.and.DEBUG%MET) call printCDF('Elev_'//src,met(ix)%field(:,:,1,1),'m')
 
 end subroutine read_surf_elevation
+
+subroutine CalcConvFluxes_wrf()
+  !----------------------------------------------------------------------
+  ! Calculates convective fluxes from the WRF entrainment and detrainment rates
+  ! Fluxes are defined on layer boundaries, en/detrainment defined in layer centres
+  ! updraft rates (cnvuf, positive) accumulate from ground up,
+  !    add entrainment (cnvuer, positive) and subtract detrainment (cnvudr, positive)
+  ! downdraft rates (cnvdf, negative) accumulate from top down,
+  !    add entrainment (cnvder, negative) and add detrainment (cnvddr, positive)
+  ! Also requires scaling from kg/s (WRF) to kg/sm2 (EMEP)
+  !----------------------------------------------------------------------
+  implicit none
+
+  ! arguments
+  
+  ! local variables
+  integer :: i,j,k_bnd, k_lay
+  real, parameter :: fMinFluxFactor = 1.E-06
+   
+  ! updraft mass flux: zero through ground surface and top
+  cnvuf(:,:,KMAX_BND) = 0.0
+  cnvuf(:,:,1) = 0.0
+  
+  do k_bnd = KMAX_BND-1, 2, -1
+    k_lay = k_bnd ! relevant layer is below the current boundary, same index
+    do j = 1, ljmax
+      do i = 1, limax    
+        cnvuf(i,j,k_bnd) = cnvuf(i,j,k_bnd+1) + cnvuer(i,j,k_lay) - cnvudr(i,j,k_lay)  
+        ! check for and correct rounding error between top layer en/detrainment
+        ! causing small non-zero updraft flux above main convection layers
+        if(abs(cnvuf(i,j,k_bnd+1)) > fMinFluxFactor ) then
+          if (abs(cnvuf(i,j,k_bnd)/cnvuf(i,j,k_bnd+1)) < fMinFluxFactor) then
+            cnvuf(i,j,k_bnd) = 0.
+          end if
+        end if
+      end do
+    end do
+  end do
+ 
+  ! downdraft mass flux: zero through ground surface and top
+  cnvdf(:,:,KMAX_BND) = 0.0
+  cnvdf(:,:,1) = 0.0
+
+  do k_bnd = 2, KMAX_BND-1, 1
+    k_lay = k_bnd-1 ! relevant layer is above the current boundary
+    do j = 1, ljmax
+      do i = 1, limax
+        cnvdf(i,j,k_bnd) = cnvdf(i,j,k_bnd-1) + cnvder(i,j,k_lay) + cnvddr(i,j,k_lay)
+        ! check for and correct any error below convection region 
+        if(abs(cnvdf(i,j,k_bnd-1)) > fMinFluxFactor) then
+          if(abs(cnvdf(i,j,k_bnd)/cnvdf(i,j,k_bnd-1)) < fMinFluxFactor) then
+            cnvdf(i,j,k_bnd) = 0.
+          end if
+        end if
+      end do
+    end do 
+  end do 
+    
+  ! normalise by grid cell horizontal area
+  do k_bnd = 1, KMAX_BND
+    forall( i=1:limax, j=1:ljmax )
+      cnvuf(i,j,k_bnd) = cnvuf(i,j,k_bnd)/GridArea_m2(i,j)
+      cnvdf(i,j,k_bnd) = cnvdf(i,j,k_bnd)/GridArea_m2(i,j)
+    end forall
+  end do
+
+end subroutine CalcConvFluxes_wrf
 
 end module met_mod

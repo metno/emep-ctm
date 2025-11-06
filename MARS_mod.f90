@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************! 
 !* 
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !* 
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -468,7 +468,7 @@ module MARS_mod
       integer, save :: nMarsErrors = 0 ! tracks solution failures DSMARS
 !-----------------------------------------------------------------------
 !  begin body of subroutine RPMARES
-                                                                         
+      ERRMARK = 0
 !ASO4=FLOOR;ANO3=FLOOR;AH2O=FLOOR;ANH4=FLOOR;GNO3=FLOOR;GNH3=FLOOR 
 !Initialise the output variables
 
@@ -1571,6 +1571,7 @@ if( DEBUG%EQUIB .and. debug_flag ) print "(a,4es10.3)", "MARS NONDEGEN  ",  AA, 
 !not used
 real  AHSO4 ! Aerosol phase in bisulfate in MICROGRAMS/M**3 
 !
+       ERRMARK = 0
 
        ANH4 = NH4
        GNH3 = NH3
@@ -3270,7 +3271,9 @@ real  AHSO4 ! Aerosol phase in bisulfate in MICROGRAMS/M**3
       real::TSO4_HighA,TSO4_LowA,High_Factor,X
 !-----------------------------------------------------------------------
 !  begin body of subroutine RPMARES
-                                                                         
+
+      ERRMARK = 0
+
 !ASO4=FLOOR;ANO3=FLOOR;AH2O=FLOOR;ANH4=FLOOR;GNO3=FLOOR;GNH3=FLOOR 
 !Initialise the output variables
 

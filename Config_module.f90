@@ -1,7 +1,7 @@
-! <Config_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Config_module.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -46,6 +46,7 @@ use OwnDataTypes_mod,      only: typ_ss, lf_sources, Emis_id_type, &
                                  Sector_type, hourly_emis_factor_type,&
                                  TXTLEN_NAME, TXTLEN_FILE, TXTLEN_SHORT,&
                                  TXTLEN_DERIV, Emis_mask_type, lf_country_type,&
+                                 lf_sector_group_type,&
                                  Deriv, typ_s1ind,typ_s5ind,O3cl_t,typ_s3,typ_s4,&
                                  Max_lf_Country_list, Max_lf_Country_groups, Max_lf_sectors, &
                                  poll_type, lf_out_type, Max_lf_spec, Max_lf_sources, &
@@ -123,8 +124,11 @@ CHARACTER(LEN=TXTLEN_NAME), private, save :: LAST_CONFIG_LINE_DEFAULT
 
   type, private :: EmBio_t
     character(len=10) :: GlobBvocMethod = 'GLC-CLM' ! can be MEGAN
-    real :: IsopFac = 1.0                     ! for experiments
-    real :: TerpFac = 1.0                     ! for experiments
+    character(len=10) :: scale_isoLC = 'None'    ! for experiments, can be e.g. DF or AllLC
+    character(len=10) :: scale_mtLC  = 'None'    ! for experiments
+    real :: isoFac = 1.0                     ! for experiments - applied to scale_isoLC
+    real :: mtFac  = 1.0                     ! for experiments - applied to scale_mtLC
+    real :: sqtFac  = 1.0                    ! NOT FUNCTIONING YET
   ! canopy light factor, 1/1.7=0.59, based on Lamb 1993 (cf MEGAN 0.57)
     real :: CLF     = 0.59                    ! canopy factor, leaf vs branch emissions
   end type EmBio_t
@@ -158,6 +162,7 @@ CHARACTER(LEN=TXTLEN_NAME), private, save :: LAST_CONFIG_LINE_DEFAULT
     character(len=TXTLEN_FILE) :: Do3seDefs = 'DataDir/Inputs_DO3SE.csv'  !  DO3SE inputs
     character(len=TXTLEN_FILE) :: mapMed    = 'DataDir/mapMed_5x1.nc'  ! Map of Meditteranean region
     character(len=TXTLEN_FILE) :: desert    = 'DataDir/Olson_2001_DEforEmep.nc'  ! Map of desert from Olson 2001
+    character(len=TXTLEN_SHORT) :: LAIsrc    = 'LPJ-EMEP'    ! source of LAI seasonal variations when PFT_MAPS used
     !character(len=TXTLEN_FILE) :: desert    = 'DataDir/ParajuliZender_SSM_1440x720.nc'  ! Sediment supply map from Parajuli & Zender, 2017
     real ::                       ssmThreshold = 0.2  ! Threshold of SSM used to identify likely dust sources. uncertain.
   end type LandCoverInputs_t
@@ -217,7 +222,6 @@ type, public :: emep_useconfig
     ,EMIS             = .false. &! Uses ESX
     ,DEGREEDAY_FACTORS = .true. &! will not be used if not found or global grid
     ,EMISSTACKS       = .false. &!
-    ,BVOC             = .true.  &!triggers isoprene and terpene emissions
 !    ,RH_RHO_CORR      = .false. &! EXPERIMENTAL, for settling velocity
 !EXP    ,GRAVSET          = .false. &! gravitational settling (EXPERIMENTAL! DO NOT USE YET)
     ,SEASALT          = .true.  &! See also SEASALT_fFrac
@@ -231,6 +235,7 @@ type, public :: emep_useconfig
     ,DUST             = .true.  &! Only EECCA?
     ,NO2_COMPENSATION_PT = .false. & ! allows
     ,SOILNOX          = .true.  &! See SOILNOx_Method below.
+    ,DYNAMIC_SOILNO   = .false.  &! 
     ,OCEAN_DMS        = .true. &!
     ,OCEAN_NH3        = .false. &!
     ,SOILNH3          = .false. &! DUMMY VALUES, DO NOT USE!
@@ -266,7 +271,9 @@ type, public :: emep_useconfig
     ,EFFECTIVE_RESISTANCE = .true. &! Drydep method designed for shallow layer
     ,FUNGAL_SPORES    = .false. & !For including fungal spores (part of PBAP) Prelim. See Ch.7 2024 EMEP report
     ,BACTERIA         = .false. & !For including bacteria (part of PBAP) 
-    ,MARINE_OA        = .false. !For including MarineOA (part of PBAP)  
+    ,MARINE_OA        = .false. & !For including MarineOA (part of PBAP)
+    ,MEAN_MASK_OUTPUT = .false.   !Mean output over (city) mask instead of Derived/LF fields
+  real :: biofac_BVOC = 1.0 !  !JAN2025 TESTING
 !  real :: SURF_AREA_RHLIMITS  = -1  ! Max RH (%) in Gerber eqns. -1 => 100%
   real :: SEASALT_fFrac = 0.3       ! 0 = "< rv4_39", 0.3 = new suggestion
 ! cloud liquid water (vol-H2O/vol-Air) ?
@@ -305,6 +312,7 @@ type, public :: emep_useconfig
 ! Selection of method for Whitecap calculation for Seasalt
   character(len=15) :: WHITECAPS  = 'Callaghan'  ! Norris , Monahan
   character(len=20) :: SOILNOX_METHOD = "NOTSET" ! Needs choice: Total or NoFert or ACP2012EURO (deprecated)
+  character(len=20) :: ACPSOILNOX_METHOD = "NoFert" ! Needs choice: Total or NoFert. Use NoFert for EMEP emis, Total for CAMS-REG
 
 ! Selection of Emissions parameterization for fungal
   character(len=4) :: FUNGAL_METHOD  = 'HS_5'  !HS_3, HS_5, SD, HS, JS (see PBAP module)
@@ -364,6 +372,7 @@ type(lf_set_type), public, save :: lf_set
 type(lf_sources), public, save :: lf_src(Max_lf_sources)
 type(poll_type), public, save :: lf_species(Max_lf_spec)
 type(lf_country_type), public, save :: lf_country
+type(lf_sector_group_type), public, save :: lf_sector_groups(Max_lf_sectors)
 type(lf_out_type), public, save :: lf_spec_out(Max_lf_out)
 
 integer, public, save :: &
@@ -393,7 +402,7 @@ integer, public, save :: &
 
 !ColumnsSource config
 integer,  public, save ::  &
-  NMAX_LOC = 7,   &! Max number of locations on processor/subdomain (increase to 24 for eEMEP)
+  NMAX_LOC = 8,   &! Max number of locations on processor/subdomain (increase to 24 for eEMEP)
   NMAX_EMS = 250   ! Max number of events def per location (increase to 6000 for eEMEP)
 character(len=TXTLEN_FILE),  public, save :: &
   flocdef="columnsource_location.csv",  & ! see locdef
@@ -745,8 +754,8 @@ character(len=99), public, save, dimension(10) :: VEG_2dGS_Params=""
 ! To use external maps of plant functional types we need to
 ! map between EMEP codes and netcdf file codes
 !NOT USED YET.
-type(typ_ss), public, save, dimension(NLANDUSEMAX) :: &
-  PFT_MAPPINGS=typ_ss('-','-')
+!!type(typ_ss), public, save, dimension(NLANDUSEMAX) :: &
+!!  PFT_MAPPINGS=typ_ss('-','-')
 
 real, public, save :: &
   dt_advec = -999.9,   & ! time-step for advection (s), grid resolution dependent
@@ -839,7 +848,7 @@ type(names), public, save :: InputFiles(Size_InputFiles)
 !4) In the routine using the file, add the XXFile under  "use Config_module"
 !5) replace the name you used in the routine with XXFile
 character(len=TXTLEN_FILE), target, save, public :: femisFile = 'DataDir/femis.dat'
-character(len=TXTLEN_FILE), target, save, public :: Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
+character(len=TXTLEN_FILE), target, save, public :: Vertical_levelsFile = 'NOTSET' !NB: set in domain_setup
 character(len=TXTLEN_FILE), target, save, public :: EmisHeightsFile = 'DataDir/EmisHeights.txt'
 character(len=TXTLEN_FILE), target, save, public :: SoilTypesFile = 'DataDir/SoilTypes_IFS.nc'
 character(len=TXTLEN_FILE), target, save, public :: SurfacePressureFile = 'DataDir/SurfacePressure.nc'
@@ -922,6 +931,7 @@ subroutine Config_Constants(iolog)
    ,lf_set & !Local Fractions
    ,lf_species &
    ,lf_country & !Local Fractions countries, and groups
+   ,lf_sector_groups & !Local Fractions sector groups
    ,lf_spec_out & !what to put in output (fullchem only)
    ,INERIS_SNAP1, INERIS_SNAP2 &   ! Used for TFMM time-factors
    ,FREQ_HOURLY           &
@@ -945,7 +955,7 @@ subroutine Config_Constants(iolog)
    ,FLUX_IGNORE           & ! Specify which landcovers don't need FLUX
    ,VEG_2dGS              & ! Allows 2d maps of growing seasons
    ,VEG_2dGS_Params       & ! Allows 2d maps of growing seasons
-   ,PFT_MAPPINGS          & ! Allows use of external LAI maps
+!HICKS   ,PFT_MAPPINGS          & ! Allows use of external LAI maps
    ,NETCDF_DEFLATE_LEVEL,  RUNDOMAIN, DOMAIN_DECOM_MODE &
    ,JUMPOVER29FEB, HOURLYFILE_ending  &
    ,dt_advec              & ! can be set to override dt_advec
@@ -1116,7 +1126,7 @@ subroutine Config_Constants(iolog)
  select case (USES%DOMAIN_SETUP_TYPE)
    case('EMEPDOMAIN')
      domain_setup = EMEP_DOMAIN_SETUP
-     Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
+     if (Vertical_levelsFile == 'NOTSET') Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
      USES%PFT_MAPS           = domain_setup%USES_PFTMAPS 
      USES%CONVECTION         = domain_setup%USES_CONVECTION
      USES%DEGREEDAY_FACTORS  = domain_setup%USES_DEGREEDAYS
@@ -1124,7 +1134,7 @@ subroutine Config_Constants(iolog)
      if ( domain_setup%USES_GLOB_TFACS ) timefacs%Monthly = 'GRIDDED'
    case('GenericDOMAIN')
      domain_setup = GENERIC_DOMAIN_SETUP
-     Vertical_levelsFile = 'DataDir/Vertical_levels19_EC.txt'
+     if (Vertical_levelsFile == 'NOTSET') Vertical_levelsFile = 'DataDir/Vertical_levels19_EC.txt'
      USES%PFT_MAPS           = domain_setup%USES_PFTMAPS 
      USES%CONVECTION         = domain_setup%USES_CONVECTION
      USES%DEGREEDAY_FACTORS  = domain_setup%USES_DEGREEDAYS
@@ -1197,6 +1207,7 @@ subroutine Config_Constants(iolog)
   call associate_File(filename_eta)
 
   OwnInputDir= key2str(OwnInputDir,'DataDir',DataDir)
+  OwnInputDir= key2str(OwnInputDir,'YYYY',startdate(1))
 
   do i = 1, size(Emis_sourceFiles)
      !part of a class cannot be a target (?) must therefore do this separately

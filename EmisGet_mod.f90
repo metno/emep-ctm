@@ -1,7 +1,7 @@
-! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <EmisGet_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -241,8 +241,8 @@ contains
     else
        if(me==0 .and. &
         ( (step_main==1.and.previousspecies/=Emis_source%species) .or. DEBUG%EMISSIONS) ) &
-           write(*,'(a,i4,a10)')dtxt//trim(Emis_source%species)//' read from '//&
-             trim(fname)//', record:',record, 'XNEmisunits:'//trim(Emis_source%units)
+           write(*,'(a,i4,A)')dtxt//trim(Emis_source%species)//' read from '//&
+             trim(fname)//', record:',record,', Emisunits: '//trim(Emis_source%units)
        previousspecies=Emis_source%species
        if(Emis_source%units(1:5) == 'kt/m2'  &
             .or. Emis_source%units(1:6) == 'kt m-2'  &

@@ -1,7 +1,7 @@
-! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <ExternalBICs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -179,13 +179,13 @@ subroutine set_extbic_id(idate)
       EXTERNAL_BC(n)%wanted=.false.
       if(MasterProc) write(*,DEBUG_FMT) dtxt, "unknow variable",&
         trim(EXTERNAL_BC(n)%spcname)
+    else if( dbg )then
+      write(*,*) dtxt//'Found ', EXTERNAL_BC(n)%spcname, EXTERNAL_BC(n)%ixadv
     end if
-    if ( dbg ) write(*,*) dtxt//'Found', EXTERNAL_BC(n)%spcname, EXTERNAL_BC(n)%ixadv
   end do
 
   if(MasterProc) &
     call PrintLog(dtxt//"External BICs set for "//EXTERNAL_BIC_NAME)
-  EXTERNAL_BIC_SET = .true.
   first_call = .false.
 end subroutine set_extbic_id
 subroutine set_extbic_cd(cdate)

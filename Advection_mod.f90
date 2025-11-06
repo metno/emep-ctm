@@ -2,7 +2,7 @@
 !          Chemical transport Model>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -98,7 +98,7 @@
            ,MSG_NORTH2,MSG_EAST2,MSG_SOUTH2,MSG_WEST2
   use PhysicalConstants_mod, only: GRAV,ATWAIR ! gravity
   use LocalFractions_mod, only: lf_adv_x, lf_adv_y, lf_adv_k, lf_adv_k_2nd, lf_diff, lf_conv, LF_SRC_TOTSIZE&
-                                , lf_Nvert, lf, loc_frac_src, loc_frac_src_1d
+                                , lf_Nvert, lf, loc_frac_src, loc_frac_src_1d,lf_fullchem
   use VerticalDiffusion_mod, only: vertdiffn
   use ZchemData_mod,    only: xn_2d ! buffer for vertical column concentrations
 
@@ -306,7 +306,7 @@
           hor_adv0th = .true.
           !vert_adv0th = .true.
           if(me==0)call PrintLog("USING ZERO ORDER ADVECTION")
-          if(me==0)call PrintLog("WARNING Still using second order for vertical advection")
+          if(me==0 .and. lf_fullchem)call PrintLog("WARNING Still using second order for vertical advection")
       endif
     end if
 

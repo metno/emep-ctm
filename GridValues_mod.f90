@@ -1,7 +1,7 @@
-! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <GridValues_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -868,6 +868,20 @@ subroutine Getgridparams(LIMAX,LJMAX,filename,cyclicgrid)
       !WRF  format
       call check(nf90_inq_varid(ncid=ncFileID, name="XLONG", varID=varID))
       call nf90_get_var_extended(ncFileID,varID,lon_ext,0,LIMAX+1,0,LJMAX+1)
+      !sometimes the values have numerical noise. Assume that 3 decimals are correct
+      !AND that the values after fifth are zero:
+      !check first that we are not removing significant parts
+      if(      (nint(1000*lon_ext(1,1))/1000.0-nint(1000*lon_ext(LIMAX,1))/1000.0)-&
+         (LIMAX-1)*(nint(1000*lon_ext(1,1))/1000.0-nint(1000*lon_ext(2,1))/1000.0)>1e-8)then
+         write(*,*)me,'WARNING: cannot correct WRF XLONG',LIMAX-1,lon_ext(1,1),lon_ext(2,1),lon_ext(LIMAX,1)
+      else
+         do j=0,LJMAX+1
+            do i=0,LIMAX+1
+               lon_ext(i,j)=nint(1000*lon_ext(i,j))/1000.0
+            end do
+         end do
+         if(me==0)write(*,*)'WRF rounding XLONG',lon_ext(1,1),lon_ext(2,1),lon_ext(LIMAX,1)
+      end if
       call check(nf90_inq_varid(ncid=ncFileID, name="XLAT", varID=varID))
       call nf90_get_var_extended(ncFileID,varID,lat_ext,0,LIMAX+1,0,LJMAX+1)
     end if

@@ -1,7 +1,7 @@
-! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <emep_Main.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -262,18 +262,18 @@ program emep_Main
   ! over the full run period, often a year, but even just for
   ! a few timesteps if that is all that is run:
 
-  if(wanted_iou(IOU_INST)) &
+  if(wanted_iou(IOU_INST, only_3d=USES%MEAN_MASK_OUTPUT)) &
     call Init_new_netCDF(trim(runlabel1)//'_inst.nc',IOU_INST)
-  if(wanted_iou(IOU_YEAR)) &
+  if(wanted_iou(IOU_YEAR, only_3d=USES%MEAN_MASK_OUTPUT)) &
     call Init_new_netCDF(trim(runlabel1)//'_fullrun.nc',IOU_YEAR)
-  if(wanted_iou(IOU_MON)) &
+  if(wanted_iou(IOU_MON, only_3d=USES%MEAN_MASK_OUTPUT)) &
     call Init_new_netCDF(trim(runlabel1)//'_month.nc',IOU_MON)
-  if(wanted_iou(IOU_DAY)) &
+  if(wanted_iou(IOU_DAY).and..not.USES%MEAN_MASK_OUTPUT) &
     call Init_new_netCDF(trim(runlabel1)//'_day.nc',IOU_DAY)
-  if(wanted_iou(IOU_HOUR)) &
+  if(wanted_iou(IOU_HOUR, only_3d=USES%MEAN_MASK_OUTPUT)) &
     call Init_new_netCDF(trim(runlabel1)//'_hour'//&
     date2string(HOURLYFILE_ending,current_date),IOU_HOUR)
-  if(wanted_iou(IOU_HOUR_INST)) &
+  if(wanted_iou(IOU_HOUR_INST, only_3d=USES%MEAN_MASK_OUTPUT)) &
     call Init_new_netCDF(trim(runlabel1)//'_hourInst'//&
     date2string(HOURLYFILE_ending,current_date),IOU_HOUR_INST)
 

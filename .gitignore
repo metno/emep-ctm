@@ -45,3 +45,6 @@
 ### compiled EMEP/MSC-W model
 Unimod
 emepctm
+
+# IDE linter
+*.i90

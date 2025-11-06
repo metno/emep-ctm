@@ -1,7 +1,7 @@
-! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <DryDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -554,7 +554,7 @@ contains
       L = Sub(iL)    ! ! Assign e.g. Sub(iL)ustar to ustar
 
       if ( dbghh ) then
-         write(6,"(a30,3i3,f6.1,2i4,3f7.3,i4,9f8.3)") adjustl(dtxt//"DVEG: "// &
+         write(6,"(a30,3i3,f6.1,2i5,3f7.3,i4,9f8.3)") adjustl(dtxt//"DVEG: "// &
            LandDefs(iL)%code), nlu,iiL, iL, glat(i,j), L%SGS, L%EGS, &
             L%coverage, L%LAI, L%hveg,daynumber, &
             Grid%sdepth, fSW50(i,j),L%fSW,L%t2C

@@ -1,7 +1,7 @@
-! <OutputChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <OutputChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,7 +26,7 @@
 !*****************************************************************************!
 module OutputChem_mod
 
-use CheckStop_mod,      only: CheckStop
+use CheckStop_mod,     only: CheckStop
 use Config_module,     only: num_lev3d, MasterProc, runlabel1,&
                              FREQ_HOURLY, END_OF_EMEPDAY, METSTEP, &
                              IOU_INST, IOU_YEAR, IOU_MON, IOU_DAY, IOU_HOUR, &
@@ -38,16 +38,19 @@ use Derived_mod,        only: LENOUT2D, nav_2d, num_deriv2d  &
                             ,LENOUT3D, nav_3d, num_deriv3d  &
                             ,wanted_iou, ResetDerived
 use DerivedFields_mod,  only: f_2d, d_2d, f_3d, d_3d
+use EmisDef_mod,        only: NEmisMask, EmisMaskValues
 use GridValues_mod,     only: debug_proc ,debug_li, debug_lj
 use Io_mod,             only: IO_WRTCHEM, IO_TMP, datewrite
-use NetCDF_mod,         only: CloseNetCDF, Out_netCDF, filename_iou, Init_new_netCDF
-use OwnDataTypes_mod,   only: Deriv, print_deriv_type, TXTLEN_FILE
+use MPI_Groups_mod
+use NetCDF_mod,         only: CloseNetCDF, Out_netCDF, filename_iou, Init_new_netCDF, masked_output, closedID
+use OwnDataTypes_mod,   only: Deriv, print_deriv_type, TXTLEN_FILE, TXTLEN_NAME
 use Par_mod,            only: LIMAX, LJMAX, me
+use Io_RunLog_mod,      only: PrintLog
 use SmallUtils_mod,     only: find_duplicates
 use TimeDate_mod,       only: tdif_secs,date,timestamp,make_timestamp,current_date, max_day &! days in month
                              ,daynumber,add2current_date,date
 use TimeDate_ExtraUtil_mod,only: date2string, date_is_reached
-use LocalFractions_mod,          only: lf_out
+use LocalFractions_mod, only: lf_out
 use Units_mod,          only: Init_Units
 
 implicit none
@@ -140,17 +143,16 @@ subroutine Wrtchem(ONLY_HOUR)
     end if
   end if      ! for END_OF_EMEPDAY <= 7
 
-  !we substract one second, so that the day number of midnight is for the day 
-  !which has passed, not the next day
-  newname = trim(runlabel1)//'_hour'//date2string(HOURLYFILE_ending,current_date,-1.0)
-  if(wanted_iou(IOU_HOUR).and.fileName_iou(IOU_HOUR)/=newname)then
-     call Init_new_netCDF(trim(newname),IOU_HOUR)
-  endif
-  newname = trim(runlabel1)//'_hourInst'//date2string(trim(HOURLYFILE_ending),current_date,-1.0)
-  if(wanted_iou(IOU_HOUR_INST).and.fileName_iou(IOU_HOUR_INST)/=trim(newname))then
-     call Init_new_netCDF(trim(newname),IOU_HOUR_INST)
-  endif
-
+  if(wanted_iou(IOU_HOUR, only_3d=USES%MEAN_MASK_OUTPUT))then
+    ! we substract one second so the midnight output is on the "old" file
+    newname = trim(runlabel1)//'_hour'//date2string(HOURLYFILE_ending,current_date,-1.0)
+    if(fileName_iou(IOU_HOUR)/=newname)  call Init_new_netCDF(trim(newname),IOU_HOUR)
+  end if
+  if(wanted_iou(IOU_HOUR_INST, only_3d=USES%MEAN_MASK_OUTPUT))then
+    ! we substract one second so the midnight output is on the "old" file
+    newname = trim(runlabel1)//'_hourInst'//date2string(trim(HOURLYFILE_ending),current_date,-1.0)
+    if(fileName_iou(IOU_HOUR_INST)/=newname) call Init_new_netCDF(trim(newname),IOU_HOUR_INST)
+  end if
 
   !== Instantaneous results output ====
   !   Possible actual array output for specified days and hours
@@ -261,6 +263,10 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
   real    :: scale      ! Scaling factor
   logical :: dbg   
 !---------------------------------------------------------------------
+  if (USES%MEAN_MASK_OUTPUT) then
+    call MeanMaskOut()
+    return
+  end if
 
   dbg =   MasterProc .and. DEBUG%OUTPUTCHEM
   do icmp = 1, dim
@@ -287,6 +293,84 @@ subroutine Output_f2d (iotyp, dim, nav, def, dat, Init_Only)
     end if     ! wanted
   end do       ! component loop
 
+contains
+subroutine MeanMaskOut()
+!---------------------------------------------------------------------
+! Sends mean over masked 2D fields to NetCDF output routines
+!---------------------------------------------------------------------
+  character(len=TXTLEN_FILE) :: filename, runname(1)
+  character(len=TXTLEN_FILE), save :: old_file='NOTSET'
+  logical, save :: first_call=.true., overwrite(IOU_MAX_MAX)=.true.
+  real(kind=4), dimension(NEmisMask) :: values
+  real(kind=4), allocatable, save :: masksum(:)
+!---------------------------------------------------------------------
+  if (Init_Only) return
+
+  if (first_call) then
+    call PrintLog("Mean Masked Output intead of 2D fields", MasterProc)
+    allocate(masksum(NEmisMask))
+    first_call = .false.
+
+    call masked_total(masksum)
+    if(me/=0) deallocate(masksum)
+  end if
+
+  select case (iotyp)
+  case (IOU_INST,IOU_HOUR,IOU_HOUR_INST)
+    filename=trim(runlabel1)//'_mask'//date2string(trim(HOURLYFILE_ending),current_date,-1.0)
+    overwrite(iotyp) = (filename /= old_file) .and. wanted_iou(iotyp)
+    if(overwrite(iotyp)) old_file = filename
+  case (IOU_DAY)
+    filename=trim(runlabel1)//'_mask_day.nc'
+  case (IOU_MON)
+    filename=trim(runlabel1)//'_mask_month.nc'
+  case (IOU_YEAR)
+    filename=trim(runlabel1)//'_mask_full.nc'
+  case default
+    call CheckStop("MeanMasksOut: unknown iotyp")
+  end select
+  runname(1) = trim(runlabel1)
+
+  do icmp = 1, dim
+    if (.not. wanted_iou(iotyp,def(icmp)%iotype)) cycle
+
+    select case(iotyp)
+    case(IOU_INST,IOU_HOUR_INST)
+      call masked_total(values, field=dat(icmp,:,:,IOU_INST))
+      if(me==0) values(:) = values(:)/masksum(:)*def(icmp)%scale
+    case default
+      call masked_total(values, field=dat(icmp,:,:,iotyp))
+      if(me==0) values(:) = values(:)/masksum(:)*def(icmp)%scale/max(1,nav(icmp,iotyp))
+    end select
+
+    call masked_output(iotyp, filename, values, def(icmp)%name, runname, 1, 1, 1, &
+      overwrite=overwrite(iotyp))
+    overwrite(iotyp) = .false.
+  end do
+end subroutine MeanMaskOut
+subroutine masked_total(total, field)
+  real(kind=4),  intent(out) :: total(NEmisMask)
+  real, optional, intent(in) :: field(LIMAX,LJMAX)
+
+  integer :: imask
+
+  if(present(field))then
+    forall(imask=1:NEmisMask) ! EmisMaskValues = 1 outside city, 0 inside
+      total(imask) = sum(field(:,:)*(1.0 - EmisMaskValues(:,:,imask)))
+    end forall
+  else
+    forall(imask=1:NEmisMask) ! EmisMaskValues = 1 outside city, 0 inside
+      total(imask) = sum(1.0 - EmisMaskValues(:,:,imask))
+    end forall
+  end if
+
+  ! add together totals from each processor (only me=0 get results)
+  if(me==0)then
+    call MPI_REDUCE(MPI_IN_PLACE,total,NEmisMask,MPI_REAL,MPI_SUM,0,MPI_COMM_CALC,IERROR)
+  else
+    call MPI_REDUCE(total,total,NEmisMask,MPI_REAL,MPI_SUM,0,MPI_COMM_CALC,IERROR)
+  end if
+end subroutine masked_total
 end subroutine Output_f2d
 
 subroutine Output_f3d (iotyp, dim, nav, def, dat, Init_Only)
@@ -304,7 +388,6 @@ subroutine Output_f3d (iotyp, dim, nav, def, dat, Init_Only)
   integer :: my_iotyp,icmp ! output type,component index
   real    :: scale      ! Scaling factor
 !---------------------------------------------------------------------
-
   do icmp = 1, dim
     if ( wanted_iou(iotyp,def(icmp)%iotype) ) then
       my_iotyp=iotyp

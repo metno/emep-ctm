@@ -1,7 +1,7 @@
-! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Aqueous_n_WetDep_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -988,8 +988,7 @@ subroutine WetDeposition(i,j,debug_flag)
         iadv = WDmapping(icalc)%advspecs(is)
         itot = iadv+NSPEC_SHL
 
-    ! For semivolatile species only the particle fraction is deposited
-    !RB: This assumption needs to be revised. The semi-volatile organics are
+    ! RB: The semi-volatile organics are
     ! likely highly soluble and should wet deposit also in the gas phase
         if(itot>=FIRST_SEMIVOL .and. itot<=LAST_SEMIVOL) then
           loss = xn_2d(itot,k) * ( Fpart(itot,k)*( 1.0 - lossfacPMf(k) ) &

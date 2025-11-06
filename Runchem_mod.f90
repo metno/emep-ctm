@@ -1,7 +1,7 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -62,7 +62,7 @@ module RunChem_mod
   use CloudJ_mod,        only: setup_phot_cloudj, write_jvals
   use GridValues_mod,    only: debug_proc, debug_li, debug_lj, i_fdom, j_fdom
   use Io_Progs_mod,      only: datewrite
-  use LocalFractions_mod,only: lf_chem,lf_aero_pre,lf_aero_pos,lf
+  use LocalFractions_mod,only: lf_chem
   use MassBudget_mod,    only: emis_massbudget_1d
   use OrganicAerosol_mod,only: ORGANIC_AEROSOLS, OrganicAerosol, &
                               Init_OrganicAerosol, & 
@@ -281,6 +281,9 @@ subroutine runchem()
 
       !  Alternating Dry Deposition and Equilibrium chemistry
       !  Check that one and only one eq is chosen
+      !TODO: remove the switch: it does not make sense. It means that every
+      ! second iteration the drydep uses chemicals  out of equilibrium.
+      ! Could rather call aero both before and after drydep?
       if(mod(step_main,2)/=0) then
         call AerosolEquilib(i,j,debug_flag)        
         call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")

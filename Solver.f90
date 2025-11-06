@@ -1,7 +1,7 @@
-! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Solver.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -131,8 +131,6 @@ contains
                         coeff1,coeff2,cc ! coefficients for variable timestep
     ! Test of precision
     real(kind=dp) :: pi = 4.0*atan(1.0_dp)
-
-    real, parameter :: eps1 =  0.999
 
 !======================================================
 
@@ -286,7 +284,7 @@ contains
        !*************************************
 
        if (USES%LocalFractions ) then
-          call lf_chem_emis_deriv(i,j,k, xn_2d(1,k), xnew, eps1)
+          call lf_chem_emis_deriv(i,j,k, xn_2d(1,k), xnew)
           call lf_chem_pos(i,j,k)
        end if
 

@@ -8,7 +8,7 @@
 ### Minimalistic script for run the Unified EMEP model
 
 # working directory
-cd ~/work/EMEP_MSC-W_model.v5.5.OpenSource/Base
+cd ~/work/EMEP_MSC-W_model.v5.6.OpenSource/Base
 
 # run the model
 #mpiexec ../code/emepctm # or

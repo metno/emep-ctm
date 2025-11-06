@@ -1,7 +1,7 @@
-! <DustProd_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <DustProd_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -47,7 +47,7 @@
 ! areas. Ann. Geophysicae, 17,149-157.
 
  use Biogenics_mod,      only: EmisNat, EMIS_BioNat
- use CheckStop_mod,      only: CheckStop
+ use CheckStop_mod,      only: CheckStop, StopAll
  use Config_module,      only : KMAX_MID, KMAX_BND, dt_advec, METSTEP, &
                                 LandCoverInputs, NPROC, MasterProc, USES
  use Debug_module,       only: DEBUG  ! %DUST
@@ -384,13 +384,12 @@
 
            if(MasterProc) write(6,*)dtxt//'***  Call for init_dust  ***   '
 
-           call init_dust
+           call init_dust()
 
            kg2molecDU = 1.0e-3 * AVOG / species(ipoll)%molwt
 
         end if
-        !if(DEBUG_DUST.and.MasterProc) write(*,'(a,i4,2L2,i4)') "DUSTI ",&
-        if(MasterProc) write(*,'(a,i4,2L2,2i4)') dtxt//"I ",&
+        if(MasterProc) write(*,'(a,i4,2L2,2i4)') dtxt//"FIRST ",&
            ipoll, dust_found, debug_proc, inat_DUf, inat_DUc
 
         my_first_call = .false.
@@ -430,14 +429,7 @@
     return
   end if
 
-  !DS moved here, but not needed now. water_fraction used for maybeDusty
-  !if ( water_fraction(i,j)  > 0.99) then ! skip dust calcs
-  !    if(dbg) call datewrite(dtxt//" Skip SEA! ", &
-  !      (/ i_fdom(i), j_fdom(j) /), (/ fc(i,j), water_fraction(i,j) /) )
-  !    return
-  !end if
-
-  !DS moved here.  Check if dry or wet. If wet, return
+  !   Check if dry or wet. If wet, return
   !/.. Crude assumption: dust generation if Pr < 2.4 mm per day (surpace_prec[mm/h])
   NO_PRECIP:  if (surface_precip(i,j) < 0.1) then
 
@@ -445,7 +437,7 @@
      if(dbg) write(6,'(a30,3i5,es12.3)')dtxt//'>> NO RAIN >>', &
          i_fdom(i), j_fdom(j), dry_period(i,j),surface_precip(i,j)
 
-  else !DS MOVE CHECK HERE
+  else
     if( dbg ) write(6,'(a30,3i5,es12.3)') dtxt//'>> RAINING >>', &
         dry_period(i,j),surface_precip(i,j)
     dry_period(i,j) = 0
@@ -462,7 +454,6 @@
   if(dbg)  write(6,'(a30,f10.4)')dtxt//'>> DRY period>>',&
            dry_period(i,j)*dt_advec/3600.0
 
-  !DS moved FROST test here:
   !/.. No dust production when soil is frozen, or covered by snow,
   !/.. or wet (crude approximation by surface Rh)
 
@@ -488,13 +479,40 @@
 
    !/.. Dust production from arables (crops outside the growing period)
    if ( LandType(lu)%is_crop) then  
-     if (daynumber <  LandCover(i,j)%SGS(ilu) .or.   &
-         daynumber >  LandCover(i,j)%EGS(ilu) )      &
+
+     if ( LandCoverInputs%LAIsrc(1:7) == 'ECOSG-E' ) then! either ECOSG-ENORM or ECOSG-ELAI
+        if ( LandCover(i,j)%LAI(ilu) < 0.1 )  arable = .true.  ! Assume bare soil now
+     else
+       if (daynumber <  LandCover(i,j)%SGS(ilu) .or.   &
+           daynumber >  LandCover(i,j)%EGS(ilu) )      &
              arable = .true.
-     if ( dbg) write(*,*) dtxt//'Crops? ', ilu, lu, daynumber,&
-         LandCover(i,j)%EGS(ilu), LandCover(i,j)%EGS(ilu)
+     end if
+     if ( dbg) write(*,"(a30,5i5,f8.3,L2)") dtxt//'Bare crops? '// &
+      trim(LandCoverInputs%LAIsrc(1:7)), ilu, lu, daynumber, &
+      LandCover(i,j)%SGS(ilu), LandCover(i,j)%EGS(ilu), LandCover(i,j)%LAI(ilu), arable
    end if
 
+   if ( dbg) write(*,"(a30,5i5,f8.3)") dtxt//'CHECK ECOS? '// &
+      trim(LandCoverInputs%LAIsrc(1:7)), ilu, lu, daynumber, &
+      LandCover(i,j)%SGS(ilu), LandCover(i,j)%EGS(ilu), LandCover(i,j)%LAI(ilu) 
+
+   !/.. Dust erosion from Crops (Arable) and Desert (Mediterr.Scrubs lu==11 ???)
+   !/.. Creates problems on e.g. Greenland, as Bare land is included in Desert
+
+   !DS DUST: if (arable .or. LandType(lu)%is_desert) then
+   if (.not.arable .and. .not.LandType(lu)%is_desert) then
+     if (dbg) write(*,*) dtxt//'LC not dusty', lu, cover, arable
+     continue
+   end if
+
+   if( dbg ) write(6,'(a,i5,f10.3,L2)')   &
+                         dtxt//' -----> Landuse', lu, cover, arable
+
+   flx_hrz_slt = 0.0
+
+!//  Sandblasting coefficient  Alfa [1/m] = Flux_vert/Flux_horiz
+!--------------------------------------------------------------
+!   Dust production is EXTREMELY sensitive to this parameter, which changes 
    !/.. Dust erosion from Crops (Arable) and Desert (Mediterr.Scrubs lu==11 ???)
    !/.. Creates problems on e.g. Greenland, as Bare land is included in Desert
 

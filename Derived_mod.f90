@@ -1,7 +1,7 @@
-! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Derived_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -76,7 +76,7 @@ use Config_module,     only: &
   ! output types corresponding to instantaneous,year,month,day
   ,IOU_INST,IOU_YEAR,IOU_MON,IOU_DAY,IOU_HOUR,IOU_HOUR_INST,IOU_KEY &
   ,MasterProc, SOURCE_RECEPTOR, AOD_WANTED &
-  ,USES, lf_src, startdate,enddate,&
+  ,USES, lf_src, lf_set, startdate,enddate,&
   HourlyEmisOut, DailyEmisOut, SecEmisOutWanted, spinup_enddate, &
   OutputMisc, WDEP_WANTED, O3_ix
 
@@ -99,7 +99,8 @@ use MetFields_mod,     only: roa,Kz_m2s,th,zen, ustar_nwp, u_ref, hmix,&
                             ws_10m, rh2m, z_bnd, z_mid, u_mid,v_mid,ps, t2_nwp, &
                             cc3dmax, & ! SEI
                             dTleafHd, dTleafRn, & ! TLEAF
-                            SoilWater_deep, SoilWater_uppr ,invL_nwp
+                            SoilWater_deep, SoilWater_uppr ,invL_nwp, PARdbh, PARdif, fCloud
+use Radiation_mod,     only: Wm2_uE
 use MosaicOutputs_mod,     only: nMosaic, MosaicOutput
 use My_Derived_mod, only : &
     wanted_deriv2d, wanted_deriv3d, & ! names of wanted derived fields
@@ -210,8 +211,8 @@ subroutine Init_Derived()
   allocate(D2_O3_DAY( LIMAX, LJMAX, NTDAY))
   D2_O3_DAY = 0.0
 
-  if (USES%LocalFractions .and. (lf_src(1)%HOUR .or. lf_src(1)%HOUR_INST)) HourlyEmisOut = .true.
-  if (USES%LocalFractions .and. lf_src(1)%DAY) DailyEmisOut = .true.
+  if (USES%LocalFractions .and. (lf_set%HOUR .or. lf_set%HOUR_INST)) HourlyEmisOut = .true.
+  if (USES%LocalFractions .and. lf_set%DAY) DailyEmisOut = .true.
 
   if(dbg0) write(*,*) dtxt//"INIT STUFF"
   call Init_My_Deriv()  !-> wanted_deriv2d, wanted_deriv3d
@@ -969,19 +970,32 @@ Is3D = .true.
     (iou,IOU_KEY(iou),iou_list(iou),iou=IOU_MIN,IOU_MAX)
 end subroutine Define_Derived
 !=========================================================================
-function wanted_iou(iou,iotype,only_iou) result(wanted)
+function wanted_iou(iou,iotype,only_iou,only_3d) result(wanted)
   integer, intent(in)                 :: iou
   character(len=*),intent(in),optional:: iotype
   integer         ,intent(in),optional:: only_iou
+  logical         ,intent(in),optional:: only_3d
   logical                             :: wanted
   wanted=(iou>=IOU_MIN).and.(iou<=IOU_MAX)  ! in range ov valid IOUs?
-  if(wanted)wanted=iou_list(iou)       ! any output requires iou?
+  if(wanted) wanted=iou_list(iou)           ! any output requires iou?
   if(wanted.and.present(iotype))then
     wanted=(index(iotype,IOU_KEY(iou))>0)   ! iotype contains IOU_KEY(iou)?
   end if
   if(wanted.and.present(only_iou))then
     wanted=(iou==only_iou)                  ! is only_iou?
   end if
+  if(wanted.and.present(only_3d))then
+    if(only_3d) call wanted_3d()
+  end if
+contains
+subroutine wanted_3d()
+  wanted=(num_deriv3d>0)
+  if(.not.wanted) return ! no 3D output
+  do i=1,num_deriv3d ! check all 3D defs
+    wanted=(index(f_3d(i)%iotype,IOU_KEY(iou))>0)
+    if(wanted) return ! found one
+  end do
+end subroutine wanted_3d
 end function wanted_iou
 !=========================================================================
 subroutine Derived(dt,End_of_Day,ONLY_IOU)
@@ -1030,7 +1044,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   character(len=*), parameter :: dtxt='Deriv:'
   real pp, qsat
   real, save, allocatable :: D8M(:,:,:,:), D8Max(:,:,:), hourM(:,:,:),D8_26Max(:,:,:)
-
+  real, save, allocatable :: MDA1_hour(:,:,:)
   logical, save :: make_MaxD8M_nth = .false.
   integer , save :: i_MaxD8M_26th = 0 !index in f_2d
   integer , save :: i_MaxD8M_1st = 0 !index in f_2d
@@ -1159,7 +1173,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
                  d_2d( n, i,j,IOU_INST) = 0.0 ! UNDEF_R
               end forall
            end if
-        end select
+        end select !subclass
      end if
       
     ! The following can be deleted once testing of MET2D is finished...
@@ -1191,6 +1205,11 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = rh2m(i,j,1)
     end forall
+    case ( "fCloud" )
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = fCloud(i,j)
+    end forall
+    if ( dbgP ) call write_debug(n,ind, "fCloud")
 
     case ( "SurfAreaPMF_um2cm3" )
       forall ( i=1:limax, j=1:ljmax )
@@ -1289,6 +1308,13 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     case ( "pH_surface" ) ! surface pH from AerosolCalls
       forall ( i=1:limax, j=1:ljmax )
         d_2d( n, i,j,IOU_INST) = pH(i,j)
+      end forall
+
+    case ( "PAR" ) ! PAR above canopy, through horizontal
+      forall ( i=1:limax, j=1:ljmax )
+        ! Wm2_uE converts from W/m^2 to umol/m^2/s (see Radiation_mod);
+        ! 1e-6 converts from umol to mol.
+        d_2d( n, i,j,IOU_INST) = ( PARdbh(i,j)+PARdif(i,j) ) * Wm2_uE * 1e-6
       end forall
 
     case ( "SNratio" )
@@ -1776,6 +1802,39 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         if(f_2d(n)%avg) nav_2d(n,IOU_YEAR) = nav_2d(n,IOU_YEAR) + 1
         !NB overwritten anyway D2_O3_DAY = 0.
       end if
+
+    case( "MDA1_O3" )
+       if(first_call)then
+          allocate(MDA1_hour(LIMAX,LJMAX,2)) ! hour Mean, last index 1 is last hour, 2 is max over day since midnight
+          MDA1_hour = 0.0
+          f_2d(n)%index = O3_ix - NSPEC_SHL
+       end if
+       ii = f_2d(n)%index
+       do j = 1,ljmax
+          do i = 1,limax
+             MDA1_hour(i,j,1) = MDA1_hour(i,j,1) + xn_adv(ii,i,j,KMAX_MID) * cfac(ii,i,j) * density(i,j) * 1.0e9 * species_adv(ii)%molwt/ATWAIR
+          end do
+       end do
+       if (current_date%seconds == 0 .and. .not. first_call) then
+          timefrac = dt_advec/3600.0 ! inverse of number of timesteps in an hour
+          do j = 1,ljmax
+             do i = 1,limax
+                ! note that we can not max directly into  d_2d(n,:,:,IOU_DAY)
+                ! because d_2d(n,:,:,IOU_DAY) is reset at end-of-emep-day and not midnight
+                MDA1_hour(i,j,2) = max(MDA1_hour(i,j,2),MDA1_hour(i,j,1)*timefrac)
+                MDA1_hour(i,j,1) = 0.0
+             end do
+          end do          
+          !Monthly and yearly ARE averaged over days at midnight
+          if(current_date%hour == 0)then
+             d_2d(n,:,:,IOU_DAY) = MDA1_hour(:,:,2)
+             d_2d(n,:,:,IOU_MON )  = d_2d(n,:,:,IOU_MON )  + d_2d(n,:,:,IOU_DAY)
+             nav_2d(n,IOU_MON) = nav_2d(n,IOU_MON) + 1
+             d_2d(n,:,:,IOU_YEAR ) = d_2d(n,:,:,IOU_YEAR ) + d_2d(n,:,:,IOU_DAY)
+             nav_2d(n,IOU_YEAR) = nav_2d(n,IOU_YEAR) + 1
+             MDA1_hour(:,:,2) = 0.0
+          end if
+       end if
 
     case( "MaxD8M_26th", "MaxD8M_19th", "MaxD8M_1st", "MaxD8M_2nd", "MaxD8M_3rd", "MaxD8M_4th")
       ! do nothing, it is taken care of by "MaxD8M" case
@@ -2334,7 +2393,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       d_2d(n,:,:,IOU_HOUR) = d_2d(n,:,:,IOU_YEAR)
       if(mod(current_date%hour,6)==0)&  ! reset buffer
         d_2d(n,:,:,IOU_YEAR)=0.0
-    case("MAXADV","MAXSHL","SOMO")
+    case("MAXADV","MAXSHL","SOMO","MDA1_O3")
     !  MAXADV and MAXSHL and SOMO needn't be summed here.
     !  These d_2d ( MAXADV, MAXSHL, SOMO) are set elsewhere
     case default

@@ -1,7 +1,7 @@
-! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -33,7 +33,7 @@ module LandDefs_mod
  use Debug_module,  only:  DEBUG   ! -> DEBUG%LANDDEFS
  use Io_mod, only : IO_TMP, open_file, ios, Read_Headers, read_line
  use KeyValueTypes, only :  KeyVal
- use LandPFT_mod,  only : PFT_CODES
+ use LandPFT_mod,  only : N_PFTS, PFT_CODES, MapPFT_Init
  use SmallUtils_mod, only : find_index, trims
   implicit none
   private
@@ -79,7 +79,7 @@ end interface Check_LandCoverPresent
      character(len=30) :: name
      character(len=30) :: code
      character(len=3) :: type   ! Ecocystem type, see headers
-     character(len=5) :: LPJtype   ! Simplified LPJ assignment
+     character(len=10) :: laiVar   ! maps to e.g. LPJ or ECOSG PFTs
      real    ::  hveg_max
      real    ::  Albedo
      integer ::  eNH4         ! Possible source of NHx
@@ -106,7 +106,6 @@ end interface Check_LandCoverPresent
   type(land_input), private :: LandInput
 
   type, public :: land_type
-     logical :: has_lpj ! if LPJ LAI/BVOC data to be used
      integer :: pft    ! for assignment to equivalent PFT
      logical :: is_forest
      logical :: is_NDLF
@@ -174,6 +173,10 @@ contains
 
       dbg = ( DEBUG%LANDDEFS .and. MasterProc ) 
 
+      ! First, get PFT_CODES
+      call MapPFT_Init()
+      if ( dbg ) write(*,*) dtxt//"PFT_CODES? ",  PFT_CODES(1:N_PFTS)
+
       do n = 1, size(wanted_codes)
          wanted_found(n) = .false.
       end do
@@ -232,7 +235,8 @@ contains
            !############################
             LandDefs(n) = LandInput
             wanted_found(n) = .true.
-            if(MasterProc) write(*,"(a,2i3,2a20)") dtxt//'MATCH',nn, n, LandInput%code, wanted_codes(n)
+            if(MasterProc) write(*,"(a,2i3,1x,2a20)") dtxt//'MATCHA:',nn, n, &
+                    LandInput%code, wanted_codes(n)
             nn = nn + 1
            !############################
 
@@ -244,7 +248,7 @@ contains
 
             if ( dbg ) then
                  write(*,"(a)") trim(txtinput)
-                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") dtxt//"MATCH :=> ", &
+                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") dtxt//"MATCHB :=> ", &
                   n,nn, ncodes, trim(LandInput%name), trim(LandInput%code),&
                     LandDefs(n)%SGS50,LandDefs(n)%EGS50, &
                     LandDefs(n)%LAImax, LandDefs(n)%Emtp
@@ -252,7 +256,9 @@ contains
             call CheckStop(  LandInput%code, wanted_codes(n), &
                                            dtxt//"MATCHING CODES")
 
-            LandType(n)%is_water  =  LandInput%code == "W" 
+            LandType(n)%is_water  =  LandInput%code == "W" &
+                                .or. LandInput%code == "W_Oce"  &
+                                .or. LandInput%code == "W_Inl"
             LandType(n)%is_ice    =  LandInput%code == "ICE" 
             !is_iam is now set in Landuse_mod.
             !LandType(n)%is_iam    =  LandInput%code(1:4) == "IAM_" &
@@ -264,17 +270,16 @@ contains
                 (  LandDefs(n)%hveg_max > 4.0 .and. &    !  Simpler definition 
                    LandDefs(n)%LAImax > 0.5           )  ! Excludes Urban
 
-            LandType(n)%has_lpj   = ( LandInput%type /= "NOLPJ" )
+            LandType(n)%pft = find_index( LandDefs(n)%laiVar, PFT_CODES)
 
-            LandType(n)%pft = find_index( LandDefs(n)%LPJtype, PFT_CODES)
-
-            if ( dbg ) write(unit=*,fmt='(a,i3,a,i5)') dtxt//"PFT? ", n,&
-                  trim(  wanted_codes(n) ), LandType(n)%pft
+            if ( dbg ) write(unit=*,fmt='(a,i3,a20,2a9,i5,L2)') dtxt//"isPFT? ", n,&
+                  trim(  wanted_codes(n) ), trim(LandInput%type), &
+                  trim( LandDefs(n)%laiVar ), LandType(n)%pft
 
            !is_BDLF, is_NDLF used mainly for BVOC and soil-NO. Not essential
            ! for IAM-type landcover
-            LandType(n)%is_NDLF = ( LandInput%type == "ECF"  )
-            LandType(n)%is_BDLF = ( LandInput%type == "EDF"  )
+            LandType(n)%is_NDLF = ( LandInput%type == "ENF"  )
+            LandType(n)%is_BDLF = ( LandInput%type == "EBF"  )
             LandType(n)%is_crop  = ( LandInput%type == "ECR"  )
             LandType(n)%is_seminat  = ( LandInput%type == "SNL"  )
             LandType(n)%is_bulk   =  LandInput%type == "BLK"
@@ -284,8 +289,13 @@ contains
             if( LandInput%code(1:2) == "GR" ) iLC_grass =  n ! for eg clover
        end do
        if ( MasterProc ) then 
-             close(unit=IO_TMP)
-             write(*,*) dtxt//"DONE NN,NCODES = ", nn, ncodes
+          close(unit=IO_TMP)
+          write(*,*) dtxt//"DONE NN,NCODES = ", nn, ncodes
+          ! Safety checks (old Inputs had ECF, EDF, not ENF, EBF):
+          call CheckStop(all(LandType(:)%is_NDLF .eqv. .false. ),&
+                    dtxt//'No NDLF found! Check Inputs_LandDefs.csv')
+          call CheckStop(all(LandType(:)%is_BDLF .eqv. .false. ),&
+                    dtxt//'No BDLF found! Check Inputs_LandDefs.csv')
        end if
 
        if ( nn /= ncodes ) then

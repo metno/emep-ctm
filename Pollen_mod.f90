@@ -1,7 +1,7 @@
-! <Pollen_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Pollen_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -39,7 +39,8 @@ use CheckStop_mod,         only: CheckStop,CheckNC
 use ChemDims_mod,          only: NSPEC_SHL
 use ChemSpecs_mod,         only: species_adv
 use Chemfields_mod,        only: xn_adv    ! emep model concs.
-use Debug_module,             only: DEBUG
+use Config_module,         only: USES
+use Debug_module,          only: DEBUG
 use DerivedFields_mod,     only: f_2d,d_2d ! D2D houtly (debug) output
 use GasParticleCoeffs_mod, only: DDdefs
 use Functions_mod,         only: heaviside
@@ -47,6 +48,7 @@ use GridValues_mod ,       only: glon, glat, debug_proc, debug_li, debug_lj
 use Io_mod,                only: IO_NML
 use Io_RunLog_mod,         only: PrintLog
 use Landuse_mod,           only: LandCover
+use LocalFractions_mod,    only: lf_rcemis_nat
 use LocalVariables_mod,    only: Grid
 use MetFields_mod,         only: surface_precip, ws_10m ,rh2m,t2_nwp,&
                                 foundws10_met,foundprecip,pr,u_ref,z_bnd,z_mid
@@ -54,11 +56,9 @@ use MicroMet_mod,          only: Wind_at_h
 use Config_module,         only: KMAX_MID, DataDir, &
                                  METSTEP, MasterProc, IOU_INST, RUNDOMAIN, &
                                  dt=>dt_advec, GRID_NAME=>GRID,&
-                                 outdate=>NEST_OUTDATE,OUTDATE_NDUMP=>NEST_OUTDATE_NDUMP,&
                                  out_DOMAIN=>NEST_out_DOMAIN,&
                                  MODE_READ=>NEST_MODE_READ,&
-                                 template_read_IC=>NEST_template_read_3D,&
-                                 template_write_IC=>NEST_template_write
+                                 NEST_template_read_3D,NEST_template_write,NEST_template_dump
 use MPI_Groups_mod,        only: MPI_INTEGER,MPI_LOGICAL,MPI_COMM_CALC,&
                                 MasterPE,IERROR
 use NetCDF_mod,            only: ReadField_CDF,Out_netCDF,GetCDF_modelgrid,&
@@ -80,7 +80,7 @@ use MPI_Groups_mod,        only: MasterPE,IERROR,MPI_COMM_WORLD,MPI_COMM_CALC,&
 !-------------------------------------
 implicit none
 private
-public:: pollen_flux,pollen_dump,pollen_read
+public:: pollen_flux,pollen_dump
 
 !** 1) Public (saved) Variables from module:
 
@@ -185,8 +185,6 @@ subroutine Config_Pollen()
   ! check consistency between Pollen_const_mod and species_adv definitions
   call pollen_check()
 
-  template_read =template_read_IC   ! by default read/write
-  template_write=template_write_IC  ! to Next IC/restart file
   rewind(IO_NML)
   read(IO_NML,NML=Pollen_config,iostat=ios)
   call CheckStop(ios,"NML=Pollen_config")
@@ -194,6 +192,12 @@ subroutine Config_Pollen()
     write(*,*) "NAMELIST IS "
     write(*,NML=Pollen_config)
   end if
+  if(any([template_read == NEST_template_read_3D, &
+          template_read == NEST_template_dump,    &
+          template_write == NEST_template_write,  &
+          template_write == NEST_template_dump])) &
+    call CheckStop(MasterProc,&
+      "Pollen template_read/write should different than NEST_template_read_3D/write/dump")
 
   ! expand DataDir, YYYY and GRID keywords
   birch_frac_nc  = key2str(birch_frac_nc ,'DataDir',DataDir)
@@ -665,6 +669,9 @@ subroutine pollen_flux(i,j,debug_flag)
     rcemis (itot(g),KMAX_MID) = rcpoll*n2m(g) ! [mol/cm3/s]
     AreaPOLL(i,j,g)           = rcpoll*3600   ! [grains/m2/h]
 
+    !NB: lf_rcemis_nat requires units of g/cm3/s
+    if (USES%LocalFractions) call lf_rcemis_nat(itot(g), rcemis(itot(g),KMAX_MID)*species(itot(g))%molwt, i, j)
+    
     if(debug_ij) write(*,'(a,3(1x,I3),3(1x,es10.3))')&
       POLLEN_GROUP(g),me,i,j,rcemis(itot(g),KMAX_MID),R(i,j,g),AreaPOLL(i,j,g)
   end do
@@ -1194,8 +1201,6 @@ subroutine pollen_dump()
   real,allocatable, dimension(:,:,:) :: data ! Data arrays
 
   if(.not.checkdates(daynumber,"pollen")) return
-  if(.not.compare_date(OUTDATE_NDUMP,current_date,&
-                       outdate(:OUTDATE_NDUMP),wildcard=-1))return
   call CheckStop(allocated(R).NEQV.allocated(heatsum),&
     "Pollen: rest/heatsum allocated error")
   if(.not.(allocated(R).and.allocated(heatsum))) return
@@ -1213,8 +1218,8 @@ subroutine pollen_dump()
   ncfileID=-1 ! must be <0 as initial value
   do i=1,2                          ! do first one loop to define the fields,
     create_var=(i==1)               ! without writing them (for performance purposes),
-    if(all([create_var,fexist,.not.overwrite,&  ! if the file does not exists already
-       template_write/=template_write_IC]))cycle! and pollen has its own restart file
+    if(all([create_var,fexist,.not.overwrite]))&  ! if the file does not exists already
+      cycle
     overwrite=overwrite.and.create_var
 
     do g=1,size(POLLEN_GROUP)

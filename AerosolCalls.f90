@@ -1,7 +1,7 @@
-! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <AerosolCalls.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -49,7 +49,7 @@ module AerosolCalls
  use EmisDef_mod,           only: KEMISTOP
  use EQSAM4clim_ml,        only :  EQSAM4clim
 ! use EQSAM_v03d_mod,        only: eqsam_v03d
- use LocalFractions_mod,    only: lf_aero_pre,lf_aero_pos,lf_Nvert,lf_fullchem
+ use LocalFractions_mod,    only: lf_sia_pre,lf_sia_pos,lf_Nvert,lf_fullchem, Nsia_deriv
  use MARS_mod,              only: rpmares, rpmares_2900, DO_RPMARES_new
  use PhysicalConstants_mod, only: AVOG
  use SmallUtils_mod,        only: find_index
@@ -225,9 +225,9 @@ contains
          
       do k = KCHEMTOP,KMAX_MID 
         niter = 1
-        if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+        if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = Nsia_deriv
         do lf_iter=1, niter !only used for LocalFractions, otherwise just one "iteration"
-        call lf_aero_pre(i,j,k,lf_iter) !only used for LocalFractions
+        call lf_sia_pre(i,j,k,lf_iter) !only used for LocalFractions
  
         ! isorropia only for when T > 250 K and P > 200 hPa (CMAQ and GEOS-Chem; Shannon Capps discussion)
         if (pp(k) > 20000.0 .and. temp(k) > 250.0) then 
@@ -308,7 +308,6 @@ contains
           xn_2d(NH3_ix ,k) = max( gas(1), CONMIN ) * molesm3_to_Ncm3
           xn_2d(HNO3_ix,k) = max( gas(2), CONMIN ) * molesm3_to_Ncm3
           !xn_2d(HCl,k) = gas(3) * molesm3_to_Ncm3
-  
           ! aerosol outputs are in moles/m3(air)
           xn_2d(NH4_f_ix,k) = max( wt(3) - gas(1), CONMIN ) * molesm3_to_Ncm3
           
@@ -323,8 +322,25 @@ contains
           !tmpno3 = wt(4) * molesm3_to_Ncm3  ! NOV22  wt4=nitrate
           !xn_2d(NO3_f_ix,k ) = tmpno3 - xn_2d(HNO3_ix,k)
           !NOV22 - get some v.small neg., so use max below. Test properly later.
-          xn_2d(NO3_f_ix,k ) = max( wt(4) - gas(2), CONMIN )  * molesm3_to_Ncm3 
-  
+          xn_2d(NO3_f_ix,k ) = max( wt(4) - gas(2), CONMIN )  * molesm3_to_Ncm3
+         
+          !PW: ensure N conservation
+          !xn_2d(NH3_ix ,k) = max( min(gas(1),wt(3)), CONMIN ) * molesm3_to_Ncm3
+          !xn_2d(NH4_f_ix ,k) = max( wt(3) * molesm3_to_Ncm3 - xn_2d(NH3_ix ,k), CONMIN * molesm3_to_Ncm3 ) 
+          !xn_2d(HNO3_ix,k) = max( min(gas(2),wt(4)), CONMIN ) * molesm3_to_Ncm3
+          !xn_2d(NO3_f_ix,k ) = max( wt(4) * molesm3_to_Ncm3 - xn_2d(HNO3_ix,k), CONMIN * molesm3_to_Ncm3)
+
+          !test N conservation:
+          !if(abs(xn_2d(NH3_ix ,k)+xn_2d(NH4_f_ix ,k)- tmpnhx) >1)then
+          !   write(*,*)lf_iter,me,i,j,k,'RDN not conserved! ',xn_2d(NH3_ix ,k)+xn_2d(NH4_f_ix ,k), tmpnhx
+          !   stop
+          !end if
+          !if(abs(xn_2d(HNO3_ix ,k)+xn_2d(NO3_f_ix ,k)- tmpno3) >1)then
+          !   write(*,*)lf_iter,me,i,j,k,'OXN not conserved! ',xn_2d(HNO3_ix ,k)+xn_2d(NO3_f_ix ,k), tmpnhx
+          !   stop
+          !end if
+ 
+
     !      H2O_eqsam(i,j,KCHEMTOP:KMAX_MID) = max(0., aH2Oout(KCHEMTOP:KMAX_MID) )
           
           if (k == KMAX_MID ) then
@@ -334,7 +350,7 @@ contains
   
             ! aerosol water (ug/m**3) -- 18.01528 MW H2O
             PM25_water_rh50(i,j) =  max( 0., aerliq(8) * MWH2O * 1e6 )
-            call lf_aero_pos(i,j,k,lf_iter,2,0)
+            call lf_sia_pos(i,j,k,lf_iter,2,0)
           end if 
   
           !if ( xn_2d(NO3_f_ix,k )  < 0.0 .or.  xn_2d(NH4_f_ix,k) < 0.0 ) then
@@ -355,7 +371,7 @@ contains
   
        endif ! > 200 hPa and > 250 K
 
-       call lf_aero_pos(i,j,k,lf_iter,0,0)
+       call lf_sia_pos(i,j,k,lf_iter,0,0)
        end do ! lf_iter
     
       end do ! k = KCHEMTOP, KMAX_MID
@@ -391,9 +407,9 @@ contains
 
   do k = KCHEMTOP, KMAX_MID
       niter = 1
-      if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+      if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = Nsia_deriv
       do iter=1,niter !only used for LocalFractions
-      call lf_aero_pre(i,j,k,iter) !only used for LocalFractions
+      call lf_sia_pre(i,j,k,iter) !only used for LocalFractions
 !//.... molec/cm3 -> ug/m3
 ! Use FLOOR2 = 1.0e-8 molec/cm3 for input. Too many problems
       so4in  = max(FLOOR2, xn_2d(SO4_ix,k)) * species(SO4_ix)%molwt  *coef
@@ -433,7 +449,7 @@ contains
       xn_2d(NH3_ix,k)   = max (FLOOR, gNH3out / (species(NH3_ix)%molwt  *coef) )
       xn_2d(NO3_f_ix,k) = max (FLOOR, aNO3out / (species(NO3_f_ix)%molwt  *coef) )
       xn_2d(NH4_f_ix,k) = max (FLOOR, aNH4out / (species(NH4_f_ix)%molwt  *coef) )
-      call lf_aero_pos(i,j,k,iter,0,ERRMARK)
+      call lf_sia_pos(i,j,k,iter,0,ERRMARK)
       end do
    end do  ! K-levels
 
@@ -725,9 +741,9 @@ contains
     tmpr(:)  = 293.15
     k = KMAX_MID
       niter = 1
-      if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
+      if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = Nsia_deriv
       do iter=1,niter !only used for LocalFractions
-      call lf_aero_pre(i,j,k,iter) !only used for LocalFractions
+      call lf_sia_pre(i,j,k,iter) !only used for LocalFractions
 !//.... molec/cm3 -> ug/m3
       so4in  = xn_2d(SO4_ix,k) * species(SO4_ix)%molwt  *coef *cfac(SO4_ix-NSPEC_SHL,i,j) 
       hno3in = xn_2d(HNO3_ix,k)* species(HNO3_ix)%molwt *coef *cfac(HNO3_ix-NSPEC_SHL,i,j)
@@ -751,7 +767,8 @@ contains
   !--------------------------------------------------------------------------
 
       PM25_water_rh50 (i,j) = max (0., aH2Oout )
-      call lf_aero_pos(i,j,k,iter,1,ERRMARK)
+
+      call lf_sia_pos(i,j,k,iter,1,ERRMARK)
       end do
 
       if (AERO%ORGANIC_WATER) then

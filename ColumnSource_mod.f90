@@ -1,7 +1,7 @@
-! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <ColumnSource_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -511,7 +511,7 @@ subroutine setRate()
       end if
       if(dems%spc<1.and.any(dems%name(1:3)==EXPAND_SCENARIO_NAME))then ! Expand variable name
         dems%name=trim(locdef(v)%id)//trim(dems%name(4:)) ! e.g. ASH_F --> V1702A02B_F
-        dems%spc=find_index(dems%name,species(:)%name)    ! Specie (total)
+        dems%spc=find_index(dems%name,species(:)%name,any_case=.true.) ! Specie (total)
         if(DEBUG%COLSRC)&
           write(*,MSG_FMT)'Erup.Default',me,'Expand',&
             dems%spc,trim(dems%name)
@@ -609,7 +609,7 @@ function getErup(line) result(def)
   edef=(iloc<1).and.any(locdef(:nloc)%etype==words(1))      ! Vent Default
   if(iloc>0.and.any(words(2)(1:3)==EXPAND_SCENARIO_NAME))&  ! Expand variable name
     words(2)=trim(words(1))//trim(words(2)(4:)) ! e.g. ASH_F --> V1702A02B_F
-  ispc=find_index(words(2),species(:)%name)     ! Specie (total)
+  ispc=find_index(words(2),species(:)%name,any_case=.true.) ! Specie (total)
   igrp=find_index(words(2),chemgroups(:)%name)  ! Group  (total)
   select case (words(3))        ! base
   case("MLEV","model")          ! Explicit model level

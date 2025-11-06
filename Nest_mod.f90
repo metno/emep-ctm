@@ -1,7 +1,7 @@
-! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Nest_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -71,13 +71,8 @@ use ExternalBICs_mod,     only: set_extbic, icbc, ICBC_FMT,&
 use CheckStop_mod,           only: CheckStop,check=>CheckNC
 use Chemfields_mod,          only: xn_adv    ! emep model concs.
 use ChemDims_mod,            only: NSPEC_ADV, NSPEC_SHL
+use ChemGroups_mod,          only: chemgroups
 use ChemSpecs_mod,           only: species_adv
-use GridValues_mod,          only: A_mid,B_mid, glon, glat, i_fdom, j_fdom, &
-     RestrictDomain, Read_KMAX
-use Io_mod,                  only: open_file,IO_TMP
-use Io_RunLog_mod,           only: PrintLog
-use InterpolationRoutines_mod,  only : grid2grid_coeff,point2grid_coeff
-use MetFields_mod,           only: roa
 use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
      OwnInputDir, GRID,&
      IOU_INST,RUNDOMAIN,USES,&
@@ -87,10 +82,16 @@ use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
      NEST_native_grid_3D,NEST_native_grid_BC,NEST_omit_zero_write,NEST_out_DOMAIN,&
      NEST_MET_inner,NEST_RUNDOMAIN_inner,&
      NEST_WRITE_SPC,NEST_WRITE_GRP,NEST_OUTDATE_NDUMP,NEST_outdate,OUTDATE_NDUMP_MAX,&
-     EXTERNAL_BIC_NAME, TOP_BC, filename_eta
-use Debug_module,           only: DEBUG ! %NEST,DEBUG_ICBC=>DEBUG_NEST_ICBC
+     EXTERNAL_BIC_NAME, TOP_BC, filename_eta, lf_set
+use Debug_module,            only: DEBUG ! %NEST,DEBUG_ICBC=>DEBUG_NEST_ICBC
+use GridValues_mod,          only: A_mid,B_mid, glon, glat, i_fdom, j_fdom, &
+     RestrictDomain, Read_KMAX
+use Io_mod,                  only: open_file,IO_TMP
+use Io_RunLog_mod,           only: PrintLog
+use InterpolationRoutines_mod, only : grid2grid_coeff,point2grid_coeff
+use MetFields_mod,           only: roa
 use MPI_Groups_mod  
-use netcdf,                 only: nf90_open,nf90_write,nf90_close,nf90_inq_dimid,&
+use netcdf,                  only: nf90_open,nf90_write,nf90_close,nf90_inq_dimid,&
                                   nf90_inquire,nf90_inquire_dimension,nf90_inq_varid,&
                                   nf90_inquire_variable,nf90_get_var,nf90_get_att,&
                                   nf90_put_att,nf90_noerr,nf90_nowrite,nf90_global
@@ -99,12 +100,13 @@ use netcdf_mod,              only: Out_netCDF,&
 use OwnDataTypes_mod,        only: Deriv, TXTLEN_SHORT, TXTLEN_FILE
 use Par_mod,                 only: me,li0,li1,lj0,lj1,limax,ljmax,GIMAX,GJMAX,gi0,gj0,gi1,gj1
 use Pollen_const_mod,        only: pollen_check
+use Pollen_mod,              only: pollen_dump
+use LocalFractions_mod,      only: lf_saveall
+use SmallUtils_mod,          only: find_index,key2str,to_upper
 use TimeDate_mod,            only: date,current_date,nmdays
 use TimeDate_ExtraUtil_mod,  only: date2nctime,nctime2date,nctime2string,&
                                   date2string,date2file,compare_date
 use Units_mod,               only: Units_Scale
-use SmallUtils_mod,          only: find_index,key2str,to_upper
-use ChemGroups_mod,          only: chemgroups
 implicit none
 
 
@@ -127,6 +129,7 @@ character(len=TXTLEN_FILE),private, save ::  &
   filename_dump   = 'template_dump'     ! 
 
 
+character(len=TXTLEN_FILE),private ::  filename
 
 real(kind=8), parameter :: &
   halfsecond=0.5/(24.0*3600.0)! used to avoid rounding errors
@@ -312,6 +315,7 @@ subroutine readxn(indate)
     n=adv_bc(bc)%ixadv
     if(DEBUG%NEST_ICBC.and.MasterProc) write(*,"(2(A,1X),I0,'-->',I0)") &
       'NestICBC: Nesting component',trim(adv_bc(bc)%varname),bc,n
+
     forall (i=iw:iw, k=1:KMAX_BC, j=1:ljmax, i>=1) &
       xn_adv(n,i,j,k)=W1*xn_adv_bndw(n,j,k,1)+W2*xn_adv_bndw(n,j,k,2)
     forall (i=ie:ie, k=1:KMAX_BC, j=1:ljmax, i<=limax) &
@@ -337,12 +341,12 @@ subroutine wrtxn(indate, End_of_run)
   type(Deriv) :: def1 ! definition of fields
   integer :: n,i,j,k,iotyp,ndim,kmax,ncfileID
   real :: scale
-  logical :: fexist, wanted, wanted_out, overwrite
-  logical, save :: first_call=.true.
+  logical :: fexist, overwrite
+  logical, save :: first_call=.true., wanted_adv(NSPEC_ADV)=.true.
 
   call Config_Nest()
 
-  if(NEST_OUTDATE_NDUMP>0)call Dump(indate)
+  if(is_nest_dump_date().and..not.End_of_run) call write_dump() ! if End_of_run write_dump has already been called
 
   if(NEST_MODE_SAVE=='NONE')return
 
@@ -394,81 +398,19 @@ subroutine wrtxn(indate, End_of_run)
 
 ! Limit output, e.g. for NMC statistics (3DVar and restriction to inner grid BC)
   if(first_call)then
-    call init_icbc(cdate=indate)
-    if(any([NEST_WRITE_GRP,NEST_WRITE_SPC]/=""))then
-      adv_ic(:)%wanted=.false.
-      do n=1,size(NEST_WRITE_GRP)
-        if(NEST_WRITE_GRP(n)=="")cycle
-        i=find_index(NEST_WRITE_GRP(n),chemgroups(:)%name)
-        if(i>0)then
-          where(chemgroups(i)%specs>NSPEC_SHL) &
-            adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.true.
-        elseif(MasterProc)then
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-           "Warning (wrtxn)", &
-           "Wanted group",trim(NEST_WRITE_GRP(n)),"was not found", &
-           "Can not be written to file:",trim(filename_write),""
-        end if
-      end do
-      do n=1,size(NEST_WRITE_SPC)
-        if(NEST_WRITE_SPC(n)=="")cycle
-        i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
-        if(i>0)then
-          adv_ic(i)%wanted=.true.
-        elseif((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)then
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-           "Warning (wrtxn)", &
-           "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
-           "Can not be written to file:",trim(filename_write),""
-        end if
-      end do
-    elseif(USES%POLLEN)then
-      ! POLLEN group members are written to pollen restart/dump file
-      call pollen_check(igrp=i)
-      if(i>0)then
-        where(chemgroups(i)%specs>NSPEC_SHL) &
-          adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.false.
-        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-           "Warning (wrtxn)", &
-           "Group","POLLEN","is written to pollen restart/dump file", &
-           "Will not be written to file:",trim(filename_write),""
-      end if
-    end if
-    do n=1,NSPEC_ADV
-      if(.not.adv_ic(n)%wanted)then
-        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-            "Nest(wrtxn) DEBUG_ICBC",&
-            "Variable",trim(species_adv(n)%name),"is not wanted as IC",&
-            "Will not be written to file:",trim(filename_write),""
-      elseif(NEST_omit_zero_write)then !  further reduce output
-        wanted=any(xn_adv(n,:,:,:)/=0.0)
-        CALL MPI_ALLREDUCE(wanted,wanted_out,1,MPI_LOGICAL,MPI_LOR,&
-                           MPI_COMM_CALC,IERROR)
-        adv_ic(n)%wanted=wanted_out
-        if(.not.adv_ic(n)%wanted.and.&
-          (DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-            "Nest(wrtxn) DEBUG_ICBC",&
-            "Variable",trim(species_adv(n)%name),"was found constant=0.0",&
-            "Will not be written to file:",trim(filename_write),""
-      end if
-    end do
-
+    call init_wanted_adv(filename_write,debug=mydebug)
     if(NEST_MET_inner /= "NOTSET")then
        ! find region that is really needed, i.e. boundaries of inner grid
        !find lon and lat of inner grid restricted to BC 
        call init_mask_restrict(NEST_MET_inner,NEST_RUNDOMAIN_inner)
     endif
-
   end if
 
   !do first one loop to define the fields, without writing them (for performance purposes)
   ncfileID=-1 ! must be <0 as initial value
   if(.not.fexist.or.overwrite)then
     do n=1,NSPEC_ADV
-      if(.not.adv_ic(n)%wanted)cycle
+      if(.not.wanted_adv(n))cycle
       def1%name=species_adv(n)%name   ! written
 !!    data=xn_adv(n,:,:,:)
       call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
@@ -479,7 +421,7 @@ subroutine wrtxn(indate, End_of_run)
   end if
 
   do n=1,NSPEC_ADV
-    if(.not.adv_ic(n)%wanted)cycle
+    if(.not.wanted_adv(n))cycle
     def1%name=species_adv(n)%name     ! written
     if(MASK_SET)then
        do k=1,KMAX_MID
@@ -509,24 +451,93 @@ subroutine wrtxn(indate, End_of_run)
 
   if(MasterProc)call check(nf90_close(ncFileID))
 
-end subroutine wrtxn
+contains
+subroutine init_wanted_adv(file_name, debug)
+  character(len=*),intent(in) :: file_name
+  logical,intent(in) :: debug
+  character(len=*), parameter :: fmt="(A,':',2(/2X,A,1X,'''',A,'''',:,1X,A,'.'))"
+  logical :: non_zero(NSPEC_ADV)=.true.
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
-subroutine Dump(indate)
-  type(date), intent(in) :: indate
-  real :: data(LIMAX,LJMAX,KMAX_MID) ! Data array
+  wanted_adv(:)=.true.
 
-  type(Deriv) :: def1 ! definition of fields
-  integer :: n,i,j,k,iotyp,ndim,kmax,ncfileID
-  real :: scale
-  logical :: fexist, wanted, wanted_out, overwrite
-  logical, save :: first_call=.true.
+  if(any([NEST_WRITE_GRP,NEST_WRITE_SPC]/=""))then
+    wanted_adv(:)=.false.
+    do n=1,size(NEST_WRITE_GRP)
+      if(NEST_WRITE_GRP(n)=="")cycle
+      i=find_index(NEST_WRITE_GRP(n),chemgroups(:)%name)
+      if(i>0)then
+        where(chemgroups(i)%specs>NSPEC_SHL) &
+          wanted_adv(chemgroups(i)%specs-NSPEC_SHL)=.true.
+      elseif(MasterProc)then
+        write(*,fmt) "Warning (wrtxn)", &
+          "Wanted group",trim(NEST_WRITE_GRP(n)),"was not found", &
+          "Can not be written to",trim(file_name)
+      end if
+    end do
+    do n=1,size(NEST_WRITE_SPC)
+      if(NEST_WRITE_SPC(n)=="")cycle
+      i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
+      if(i>0)then
+        wanted_adv(i)=.true.
+      elseif(MasterProc)then
+        write(*,fmt) "Warning (wrtxn)", &
+          "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
+          "Can not be written to",trim(file_name)
+      end if
+    end do
+  elseif(USES%POLLEN)then
+    ! POLLEN group members are written to pollen restart/dump file
+    call pollen_check(igrp=i)
+    if(i>0)then
+      where(chemgroups(i)%specs>NSPEC_SHL) &
+        wanted_adv(chemgroups(i)%specs-NSPEC_SHL)=.false.
+      if(debug)&
+        write(*,fmt) "Warning (wrtxn)", &
+          "Group","POLLEN","is written to pollen restart/dump file", &
+          "Will not be written to",trim(file_name)
+    end if
+  end if
 
-  if(.not.compare_date(NEST_OUTDATE_NDUMP,indate,NEST_outdate(:NEST_OUTDATE_NDUMP),&
-                         wildcard=-1))return
-  if(MasterProc)write(*,*)date2string("Nest dump at YYYY-MM-DD hh:mm:ss",indate)
+  if(NEST_omit_zero_write)then
+    forall(n=1:NSPEC_ADV, wanted_adv(n)) wanted_adv(n)=any(xn_adv(n,:,:,:)/=0.0)
+    CALL MPI_ALLREDUCE(wanted_adv,non_zero,NSPEC_ADV,MPI_LOGICAL,MPI_LOR,MPI_COMM_CALC,IERROR)
+    forall(n=1:NSPEC_ADV, wanted_adv(n)) wanted_adv(n)=non_zero(n)
+  end if
+  if(debug)then
+    do n=1,NSPEC_ADV
+      if(wanted_adv(n).and.non_zero(n)) cycle
+      if(.not.non_zero(n))then
+        write(*,fmt) "Nest(wrtxn) DEBUG_NEST",&
+          "Variable",trim(species_adv(n)%name),"was found constant=0.0",&
+          "Will not be written to file:",trim(file_name)
+      else
+          write(*,fmt) "Nest(wrtxn) DEBUG_NEST",&
+            "Variable",trim(species_adv(n)%name),"is not wanted",&
+            "Will not be written to file:",trim(file_name)
+      end if
+    end do
+  end if
+end subroutine init_wanted_adv
+function is_nest_dump_date() result(is_dump)
+  logical :: is_dump
 
-  overwrite = first_call !always overwrite old files, then append
+  if(NEST_OUTDATE_NDUMP<=0)then 
+    is_dump = .false.
+  else
+    is_dump = compare_date(NEST_OUTDATE_NDUMP,indate,NEST_outdate(:NEST_OUTDATE_NDUMP),&
+                         wildcard=-1)
+  end if
+end function is_nest_dump_date
+subroutine write_dump()
+  character(len=len(filename_dump)), save :: oldname = 'NOTSET'
+
+  if(.not.is_nest_dump_date()) return
+  if(MasterProc) write(*,*)date2string("Nest dump at YYYY-MM-DD hh:mm:ss",indate)
+  if(USES%POLLEN) call pollen_dump()
+  if(USES%LocalFractions.and.lf_set%Nestsave)then
+    filename_dump=date2string(lf_set%filename_write,current_date,mode='YMDH')
+    call lf_saveall(trim(filename_dump))
+  end if
 
   iotyp=IOU_INST
   ndim=3 !3-dimensional
@@ -542,100 +553,36 @@ subroutine Dump(indate)
 
 ! Update filenames according to date following templates defined on config nml
 ! e.g. set template_dump="EMEP_IC_MMDD.nc" on namelist for different names each month and Day
-  filename_write=date2string(NEST_template_dump,indate,mode='YMDH',debug=mydebug)
-
-! Limit output, e.g. for NMC statistics (3DVar and restriction to inner grid BC)
-  if(first_call)then
-    call init_icbc(cdate=indate)
-    if(any([NEST_WRITE_GRP,NEST_WRITE_SPC]/=""))then
-      adv_ic(:)%wanted=.false.
-      do n=1,size(NEST_WRITE_GRP)
-        if(NEST_WRITE_GRP(n)=="")cycle
-        i=find_index(NEST_WRITE_GRP(n),chemgroups(:)%name)
-        if(i>0)then
-          where(chemgroups(i)%specs>NSPEC_SHL) &
-            adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.true.
-        elseif(MasterProc)then
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-           "Warning (wrtxn)", &
-           "Wanted group",trim(NEST_WRITE_GRP(n)),"was not found", &
-           "Can not be written to file:",trim(filename_write),""
-        end if
-      end do
-      do n=1,size(NEST_WRITE_SPC)
-        if(NEST_WRITE_SPC(n)=="")cycle
-        i=find_index(NEST_WRITE_SPC(n),species_adv(:)%name)
-        if(i>0)then
-          adv_ic(i)%wanted=.true.
-        elseif((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)then
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-           "Warning (wrtxn)", &
-           "Wanted specie",trim(NEST_WRITE_SPC(n)),"was not found", &
-           "Can not be written to file:",trim(filename_write),""
-        end if
-      end do
-    elseif(USES%POLLEN)then
-      ! POLLEN group members are written to pollen restart/dump file
-      call pollen_check(igrp=i)
-      if(i>0)then
-        where(chemgroups(i)%specs>NSPEC_SHL) &
-          adv_ic(chemgroups(i)%specs-NSPEC_SHL)%wanted=.false.
-        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-           "Warning (wrtxn)", &
-           "Group","POLLEN","is written to pollen restart/dump file", &
-           "Will not be written to file:",trim(filename_write),""
-      end if
-    end if
-    do n=1,NSPEC_ADV
-      if(.not.adv_ic(n)%wanted)then
-        if((DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-            "Nest(wrtxn) DEBUG_ICBC",&
-            "Variable",trim(species_adv(n)%name),"is not wanted as IC",&
-            "Will not be written to file:",trim(filename_write),""
-      elseif(NEST_omit_zero_write)then !  further reduce output
-        wanted=any(xn_adv(n,:,:,:)/=0.0)
-        CALL MPI_ALLREDUCE(wanted,wanted_out,1,MPI_LOGICAL,MPI_LOR,&
-                           MPI_COMM_CALC,IERROR)
-        adv_ic(n)%wanted=wanted_out
-        if(.not.adv_ic(n)%wanted.and.&
-          (DEBUG%NEST.or.DEBUG%NEST_ICBC).and.MasterProc)&
-          write(*,"(A,':',/2(2X,A,1X,'''',A,'''',1X,A,'.'))")&
-            "Nest(wrtxn) DEBUG_ICBC",&
-            "Variable",trim(species_adv(n)%name),"was found constant=0.0",&
-            "Will not be written to file:",trim(filename_write),""
-      end if
-    end do
-
-  end if
+  filename_dump=date2string(NEST_template_dump,indate,mode='YMDH',debug=mydebug)
+  overwrite=filename_dump /= oldname  ! always overwrite old files
+  if(oldname == 'NOTSET') call init_wanted_adv(filename_dump,debug=mydebug)
+  oldname=filename_dump
 
   !do first one loop to define the fields, without writing them (for performance purposes)
   ncfileID=-1 ! must be <0 as initial value
   do n=1,NSPEC_ADV
-     if(.not.adv_ic(n)%wanted)cycle
+     if(.not.wanted_adv(n))cycle
      def1%name=species_adv(n)%name   ! written
      !!    data=xn_adv(n,:,:,:)
      call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
           out_DOMAIN=NEST_out_DOMAIN,create_var_only=.true.,overwrite=overwrite,&
-          fileName_given=trim(fileName_write),ncFileID_given=ncFileID)
+          fileName_given=trim(filename_dump),ncFileID_given=ncFileID)
       overwrite=.false.
   end do
 
   do n=1,NSPEC_ADV
-    if(.not.adv_ic(n)%wanted)cycle
+    if(.not.wanted_adv(n))cycle
     def1%name=species_adv(n)%name     ! written
     data=xn_adv(n,:,:,:)
     call Out_netCDF(iotyp,def1,ndim,kmax,data,scale,CDFtype=CDFtype,&
          out_DOMAIN=NEST_out_DOMAIN,create_var_only=.false.,&
-         fileName_given=trim(fileName_write),ncFileID_given=ncFileID)
+         fileName_given=trim(filename_dump),ncFileID_given=ncFileID)
   end do
 
-  first_call=.false.
 
   if(MasterProc)call check(nf90_close(ncFileID))
-
-end subroutine Dump
+end subroutine write_dump
+end subroutine wrtxn
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
 subroutine init_icbc(idate,cdate,ndays,nsecs)
@@ -700,7 +647,7 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
   if(MasterProc)then
     do n = 1,size(adv_ic%varname)
       if(.not.adv_ic(n)%found)then
-        if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
+        if(NEST_MODE_READ/='NONE'.or.NEST_OUTDATE_NDUMP>0)&
              call PrintLog(dtxt//"WARNING: IC variable '"//trim(adv_ic(n)%varname)//"' not found")
       elseif(DEBUG%NEST.or.DEBUG%NEST_ICBC)then
         write(*,*) dtxt//" filled adv_ic "//trim(adv_ic(n)%varname)
@@ -708,7 +655,7 @@ subroutine init_icbc(idate,cdate,ndays,nsecs)
     end do
     do n = 1,size(adv_bc%varname)
       if(.not.adv_bc(n)%found)then
-        if(.not.NEST_MODE_READ=='NONE'.or.NEST_OUTDATE_NDUMP>0)&
+        if(NEST_MODE_READ/='NONE'.or.NEST_OUTDATE_NDUMP>0)&
         call PrintLog(dtxt//"WARNING: BC variable '"//trim(adv_bc(n)%varname)//"' not found")
       elseif(DEBUG%NEST.or.DEBUG%NEST_ICBC)then
         write(*,*) dtxt//" filled adv_bc "//trim(adv_bc(n)%varname)
@@ -1656,6 +1603,16 @@ subroutine read_newdata_LATERAL(ndays_indate)
                             +WeightData(i,j,k1_ext(kt))*weight_k1(kt)&
                             +WeightData(i,j,k2_ext(kt))*weight_k2(kt)
     end if
+    if (allocated(xn_adv_bndw)) &
+      call checkStop(any(xn_adv_bndw(n,:,:,2) < 0.0),'Negative nested west BC')
+    if (allocated(xn_adv_bnde)) &
+      call checkStop(any(xn_adv_bnde(n,:,:,2) < 0.0),'Negative nested east BC')
+    if (allocated(xn_adv_bnds)) &
+      call checkStop(any(xn_adv_bnds(n,:,:,2) < 0.0),'Negative nested south BC')
+    if (allocated(xn_adv_bndn)) &
+      call checkStop(any(xn_adv_bndn(n,:,:,2) < 0.0),'Negative nested north BC')
+    if (allocated(xn_adv_bndt)) &
+      call checkStop(any(xn_adv_bndt(n,:,:,2) < 0.0),'Negative nested top BC')
   end do DO_BC
 
   if(first_call)then
@@ -1673,8 +1630,10 @@ subroutine read_newdata_LATERAL(ndays_indate)
     integer, intent(in)::i,j,k
     real:: wsum
     wsum=dot_product(Weight(:,i,j),[&
-      data(IIij(1,i,j),JJij(1,i,j),k),data(IIij(2,i,j),JJij(2,i,j),k),&
-      data(IIij(3,i,j),JJij(3,i,j),k),data(IIij(4,i,j),JJij(4,i,j),k)])
+      max(data(IIij(1,i,j),JJij(1,i,j),k),0.0),&
+      max(data(IIij(2,i,j),JJij(2,i,j),k),0.0),&
+      max(data(IIij(3,i,j),JJij(3,i,j),k),0.0),&
+      max(data(IIij(4,i,j),JJij(4,i,j),k),0.0)])
   end function WeightData
   subroutine store_old_bc !store the old values in 1
     if(allocated(xn_adv_bndw)) xn_adv_bndw(:,:,:,1)=xn_adv_bndw(:,:,:,2)

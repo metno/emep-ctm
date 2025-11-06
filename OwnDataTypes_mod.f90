@@ -1,7 +1,7 @@
-! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <OwnDataTypes_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -42,7 +42,7 @@ public :: print_Deriv_type
 public :: print_Asc2D
 public :: print_Sector_type
 integer, public, parameter :: &
-  TXTLEN_DERIV = 34, &
+  TXTLEN_DERIV = 44, &
   TXTLEN_SHORT = 28, &
   TXTLEN_IND   =  6, &
   TXTLEN_NAME =  64, & !for performance, should be a multiple of 8
@@ -336,7 +336,7 @@ end type emis_in
 
 !==================
 ! Local Fractions parameters
-integer, public, parameter :: Max_lf_sources = 1000 !max number of sources to track. (Countries are grouped as one source per sector and pollutant)
+integer, public, parameter :: Max_lf_sources = 1000 !max number of sources to track.
 integer, public, parameter :: Max_lf_Country_list = 1000 ! max number of countries for each lf pollutant
 integer, public, parameter :: Max_lf_Country_groups = 30
 integer, public, parameter :: Max_lf_sectors = 50
@@ -351,6 +351,9 @@ end type poll_type
 
 type, public :: lf_set_type
   !general
+  character(len=TXTLEN_FILE) :: filename_writeatend = 'LF_saveatendDDMMYYYY.nc'
+  character(len=TXTLEN_FILE) :: filename_write = 'LF_saveDDMMYYYY.nc'
+  character(len=TXTLEN_FILE) :: filename_read = 'LF_saveDDMMYYYY.nc'
   integer :: Nvert = 14 ! vertical extend of the tracking/local window
   integer :: Nvertout = 1 ! number of vertical level to output (non fullchem only)
   logical :: YEAR =.true.! Output frequency
@@ -359,24 +362,26 @@ type, public :: lf_set_type
   logical :: DAY =.false.
   logical :: HOUR =.false.
   logical :: HOUR_INST =.false.
-  logical :: CityMasks =.false.
   integer, dimension(4) :: DOMAIN = -1 ! DOMAIN which will be outputted
   !for fullchem settings
+  integer :: dist = -1
   logical :: full_chem =.false.
-  logical :: EmisDer_all =.false. ! reduce voc, sox, nox, nh3 together
+  logical :: relative =.false. ! compute also grid to grid values 
+  integer :: Nfullchem_emis = -1 ! number of emission types to track: 1 {nox+voc+nh3+sox}, 2 {nox,voc}, 4 {nox,voc,nh3,sox} 
+  logical :: EmisDer_all =.false. ! reduce voc, sox, nox, nh3 together. Overwritten if Nfullchem_emis is set
   logical :: MDA8 = .false. ! if MDA8 and SOMO35 are to be outputed (if full_chem)
   logical :: restart =.false.
-  logical :: save =.false.
+  logical :: Nestsave =.true. !if nesting and LF are used, save also lf values each time Nest is saving 3D
+  logical :: saveatend =.false.
 end type lf_set_type
-
 
 
 type, public :: lf_sources
   character(len=TXTLEN_NAME) :: species = 'NOTSET' !pollutants to include
-  character(len=TXTLEN_NAME) :: type = 'relative' !Qualitatively different type of sources: "coarse", "relative", "country"
+  character(len=TXTLEN_NAME) :: type = 'relative' !Qualitatively different type of sources: "relative", "country"
   character(len=TXTLEN_NAME) :: name = 'NOTSET' ! name as it appears in output. Only for "relative" type
-  integer :: dist = -1 ! window dimension, if defined
-  integer :: res = 1  ! half size of the single source square (square size is 2*res+1 x 2*res+1 )
+  integer :: dist = -1 ! window dimension, if defined (window size is 2*dist+1 x 2*dist+1 )
+  integer :: res = 1  ! half size of the single source square (square size is 2*res x 2*res )
   integer :: Nvert = 7 ! vertical extend of the tracking/local rwindow
   integer :: sector = 0 ! sector for this source. Zero is sum of all sectors
   integer :: poll = 1 !index of pollutant. One poll for all sources related to that poll (set by model)
@@ -415,6 +420,7 @@ type, public :: lf_out_type
   integer                   :: ix(30) = -1 ! internal index in loc_frac_drydep
   logical                   :: DryDep
   logical                   :: WetDep
+  logical                   :: relative = .false.
 end type lf_out_type
 
 integer, parameter, public :: MAX_lf_country_group_size = 50 !max 50 countries in each group
@@ -423,6 +429,13 @@ type, public :: lf_country_group_type
    character(len=10), dimension(MAX_lf_country_group_size):: list = 'NOTSET' ! list of countries inside the group
    integer, dimension(MAX_lf_country_group_size):: ix = -1 ! index of the country as defined in Country_ml (set by model)
 end type lf_country_group_type
+
+integer, parameter, public :: MAX_lf_sector_group_size = 30 !max 30 sectors in each group
+type, public :: lf_sector_group_type
+   character(len=TXTLEN_NAME) :: name = 'NOTSET' !the overall name of the sector group (for example 'Low')
+   integer :: nsec = 0 ! number of valid sectors defined in this group (set by model)
+   integer :: list(MAX_lf_sector_group_size) = -1! list of sectors inside the group
+end type lf_sector_group_type
 
 type, public :: lf_country_type
    integer :: mask_val_min = 1

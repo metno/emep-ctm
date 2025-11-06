@@ -1,7 +1,7 @@
-! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Landuse_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -56,7 +56,7 @@ use OwnDataTypes_mod, only: TXTLEN_SHORT
 use Par_mod,         only: LIMAX, LJMAX, &
                           limax, ljmax, me
 use SmallUtils_mod,  only: wordsplit, find_index, NOT_FOUND, WriteArray, trims
-use TimeDate_mod,    only: effectivdaynumber, nydays, current_date
+use TimeDate_mod,    only: effectivdaynumber, nydays, current_date, print_date
 
 use netcdf
 use NetCDF_mod, only  : ReadField_CDF,check,printCDF
@@ -144,7 +144,7 @@ contains
     character(len=*), parameter :: dtxt='InitLanduse:'
     !=====================================
 
-    GlobRun = USES%DOMAIN_SETUP_TYPE == "GLOB" ! for IAM choices
+    GlobRun = USES%DOMAIN_SETUP_TYPE == "GenericDOMAIN" ! for IAM choices
     dbg0    = MasterProc .and. DEBUG%LANDUSE>0
     dbgProc = debug_proc .and. DEBUG%LANDUSE>0
 
@@ -728,6 +728,7 @@ contains
     if(DEBUG%LANDUSE>0) then
       do iam = 1, nExtraFluxVegs
         lu = iam_xLC(iam)
+        if(MasterProc) write(*,"(a,2i3,a,3i5)") 'DBGIAMLU', iam, lu, trim(Land_codes(lu)), shape(landuse_in)
         call printCDF('EXTRA_FLUXVEG_'//trim(Land_codes(lu)), &
                                              landuse_in(:,:,lu),"frac")
       end do
@@ -801,7 +802,7 @@ contains
     integer, save :: old_month = -1
     integer, save :: old_daynumber = -1
     logical, save :: my_first_call = .true.
-    real :: hveg, lat_factor
+    real :: hveg, lat_factor, tmp_lai
     real :: xSAIadd
     integer :: pft
     logical :: dbgij, debug_sgs
@@ -832,11 +833,13 @@ contains
     end if ! my_first_call
    !======================================================================
 
+    if(MasterProc .and. (DEBUG%LANDUSE>0.or.my_first_call)) &
+      write(*,*)dtxt//"AA day, pfts? ", daynumber, old_daynumber, USES%PFT_MAPS, GlobRun
+
     if ( daynumber == old_daynumber ) then
         my_first_call = .false.
         return
     end if
-    old_daynumber = daynumber
 
     if(MasterProc .and. (DEBUG%LANDUSE>0.or.my_first_call)) &
          write(*,*)dtxt//" day, pfts? ", daynumber, USES%PFT_MAPS, GlobRun
@@ -848,10 +851,11 @@ contains
    !PFTs, or from the "older" DO3SE inputs file
 
     if ( USES%PFT_MAPS ) then !- Check for LPJ-derived data -
-         if (MasterProc) write(*,*) dtxt//"New PFTMAPS ", month, old_month
-         if ( month /= old_month ) then
-           call MapPFT_LAI( month )
-           old_month = month
+         if (MasterProc) write(*,*) dtxt//"New PFTMAPS ", month, old_month, daynumber, old_daynumber
+         !if ( month /= old_month ) then
+         if ( daynumber /= old_daynumber ) then
+           call MapPFT_LAI() !  month, daynumber )
+!           old_month = month
          end if
     end if
 
@@ -876,8 +880,8 @@ contains
         dbgij = ( dbgProc .and. i == debug_li .and. j == debug_lj )
 
         if ( dbgij ) then
-           write(*,"(a,i3,9i6)") dtxt//" debug DATE ", &
-              LandCover(i,j)%ncodes, daynumber, current_date
+           write(*,"(a,i3,i6)") dtxt//" debug DATE "//print_date(), &
+              LandCover(i,j)%ncodes, daynumber
         end if
 
         do ilu= 1, LandCover(i,j)%ncodes
@@ -885,7 +889,8 @@ contains
           pft     = LandType(lu)%pft
           dnam    = dtxt//trim(LandDefs(lu)%name)
 
-          if ( dbgij ) write(*, *) trim(dnam)//" lu pft", lu, pft,&
+          if ( dbgij ) write(*, "(a30,4i5,2L2)") &
+            trim(adjustl(dnam))//" ilu-loop", lu, pft,&
              LandCover(i,j)%ncodes, daynumber, &
               LandType(lu)%is_bulk, LandType(lu)%is_forest
 
@@ -916,11 +921,18 @@ contains
                      LandCover(i,j)%EGS(ilu), LandDefs(lu)%ELAIlen)
           end if
 
-          LandCover(i,j)%fphen(ilu) = fPhenology( lu ,effectivdaynumber &
+          ! the ECOSG-based landcover simply uses 10-daily LAI, not
+          ! SGS. For now we assume fPhen = 1 in this case.
+
+          if (LandCoverInputs%LAIsrc(1:7) == 'ECOSG-E' ) then
+            LandCover(i,j)%fphen(ilu) = 1.0
+          else
+            LandCover(i,j)%fphen(ilu) = fPhenology( lu ,effectivdaynumber &
                 ,LandCover(i,j)%SGS(ilu), LandCover(i,j)%EGS(ilu) ,dbgij )
+          end if
 
           if ( dbgij ) then
-             write(*,"(a,3i4,4f8.3,L3)")trim(dnam)//" CHECK_VEG ",&
+             write(*,"(a36,3i4,4f8.3,L3)")adjustl(trim(dnam))//" CHECK_VEGA:",&
                 effectivdaynumber, LandCover(i,j)%SGS(ilu), &
                 LandCover(i,j)%EGS(ilu), LandDefs(lu)%LAImin, &
                 LandDefs(lu)%LAImax, LandCover(i,j)%LAI(ilu), &
@@ -928,33 +940,32 @@ contains
           end if
 
           if ( USES%PFT_MAPS ) then
-            if ( DEBUG%PFT_MAPS > 0 .and. dbgij ) then
-              if ( pft > 0 ) then
-                write(*,"(a,i4,i6,2f8.3)") trim(dnam)//" PFTS COMP? ", &
-                          daynumber, pft, LandCover(i,j)%LAI(ilu), &
-                           pft_lai(i,j, pft)*LandDefs(lu)%LAImax
-              else
-                write(*,"(2a,i4,i6,2f8.3)") trim(dnam)//" PFTS COMP? ", &
-                    daynumber, pft, LandCover(i,j)%LAI(ilu), -1.0
-              end if
-            end if
 
+            tmp_lai = -999 ! for printout
             if ( pft > 0 ) then !PFT OVERWRITE!
               LandCover(i,j)%LAI(ilu)= pft_lai(i,j, pft)*LandDefs(lu)%LAImax
-              if(dbgij) write(*,"(a,2i4,5f8.3)")dtxt//' CHECK_LAI', lu, pft, &
-                      pft_lai(i,j, pft),LandDefs(lu)%LAImax
-                    LandCover(i,j)%fphen(ilu)= 1.0  ! Skip fphen if using PFT
-                    LandCover(i,j)%SGS(ilu)=  -999  ! Marker, since not used
-                    LandCover(i,j)%EGS(ilu)=  -999  ! Marker, since not used
-              end if
-              if (debug_sgs  )write(*,*) "ESGS in PFTMAPS"
+              LandCover(i,j)%fphen(ilu)= 1.0  ! Skip fphen if using PFT
+              LandCover(i,j)%SGS(ilu)=  -999  ! Marker, since not used
+              LandCover(i,j)%EGS(ilu)=  -999  ! Marker, since not used
+              tmp_lai = pft_lai(i,j, pft)
+              !if ( LandCover(i,j)%LAI(ilu) > 15.0 ) then
+              !   print "(a,f8.2,4i5,f8.2)", dtxt//'TOO BIG', LandCover(i,j)%LAI(ilu), lu, pft, &
+              !           i_fdom(i), j_fdom(j), pft_lai(i,j, pft)
+              !   call StopAll('TOO BIG')
+              !end if
             end if
 
+            if ( DEBUG%PFT_MAPS > 0 .and. dbgij ) then
+                write(*,"(a32,3i6,3f10.3)") trim(adjustl(dnam))//" PFTS COMP? ", &
+                  daynumber, lu, pft, tmp_lai, &
+                  LandCover(i,j)%LAI(ilu), LandDefs(lu)%LAImax
+            end if ! DEBUG%
+          end if ! USES%PFT_MAPS
 
-            hveg = LandDefs(lu)%hveg_max   ! defaults
-            xSAIadd = 0.0
+          hveg = LandDefs(lu)%hveg_max   ! defaults
+          xSAIadd = 0.0
 
-            if (  LandType(lu)%is_crop ) then
+          if (  LandType(lu)%is_crop ) then
 
               ! Note that IAM crops have SLAIlen=0, so are immediately
               ! given LAI=3.5, SAI=5.
@@ -1002,11 +1013,8 @@ contains
 
 
             if( debug_sgs .or. dbgij  ) then
-              write(*, "(a20,i4,2f7.1,3i5,f8.2)") trim(dnam)//":ESGS:",&
+              write(*,"(a36,i4,2f7.1,4i5,5f8.3)")adjustl(trim(dnam))//":CHECK_VEGB:",&
                 lu, glat(i,j), glon(i,j), daynumber, effectivdaynumber, &
-                Landcover(i,j)%SGS(ilu), Landcover(i,j)%LAI(ilu)
-              write(*,"(a,3i4,5f8.3)")trim(dnam)//":CHECK_VEGB:",&
-                 effectivdaynumber, &
                  LandCover(i,j)%SGS(ilu), LandCover(i,j)%EGS(ilu),  &
                  LandDefs(lu)%LAImin, LandDefs(lu)%LAImax,&
                  LandCover(i,j)%LAI(ilu), LandCover(i,j)%fphen(ilu)
@@ -1015,7 +1023,8 @@ contains
        end do ! j
     end do ! i
 
-    my_first_call   = .false.
+    my_first_call = .false.
+    old_daynumber = daynumber
 
 ! --- print out for debug cell
     if ( DEBUG%LANDUSE>0.and.debug_proc ) then

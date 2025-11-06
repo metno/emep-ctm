@@ -1,7 +1,7 @@
-! <Biogenics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Biogenics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -79,7 +79,6 @@ module Biogenics_mod
   use Io_RunLog_mod,      only: PrintLog
   use KeyValueTypes,      only: KeyVal,KeyValue
   use LandDefs_mod,       only: LandType, LandDefs
-  use LandPFT_mod,        only: MapPFT_LAI, pft_lai
   use Landuse_mod,        only: LandCover
   use LocalFractions_mod, only: lf_rcemis_nat, makeBVOC, makeBVOC, ix_BVOC
   use LocalVariables_mod, only: Grid  ! -> izen, DeltaZ
@@ -92,7 +91,7 @@ module Biogenics_mod
   use PhysicalConstants_mod,  only:  AVOG, GRAV, PI
   use Radiation_mod,      only: PARfrac, Wm2_uE
   use SmallUtils_mod,     only: find_index
-  use TimeDate_mod,       only: current_date, daynumber
+  use TimeDate_mod,       only: current_date, daynumber, print_date
   use ZchemData_mod,      only: rcemis, rcbio
   implicit none
   private
@@ -373,20 +372,26 @@ module Biogenics_mod
   !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
    subroutine MergedBVOC()
 
-      integer :: i, j, nlu, iL, iiL, gLC1
+      integer :: i, j, nlu, iL, iiL, gLC1, ibvoc, iEmis
       integer :: pft
       character(len=15) :: merge_case
       real :: biso, bmt    !  Just for printout
       logical :: use_local, debug_flag
       character(len=*),parameter :: dtxt='BioModMerge:'
+      logical, save :: my_first_call = .true.
+      real, allocatable, dimension(:,:,:,:) :: sumemis
 
 
-      if ( DEBUG%BIO .and. debug_proc ) then
-         write(*,*) dtxt//" Start"
-         i= debug_li; j= debug_lj
-         nlu= LandCover(i,j)%ncodes
-         write(*,*) dtxt//'MEGAN  stuff:', me, debug_proc, debug_li, debug_lj
-         write(*,*) dtxt//'MEGAN  codes:', nlu, LandCover(i,j)%codes(1:nlu)
+      if ( DEBUG%BIO ) then
+         allocate(sumemis(4,LIMAX,LJMAX,3))
+         sumemis = 0.0
+         if ( debug_proc ) then
+           write(*,*) dtxt//" Start"
+           i= debug_li; j= debug_lj
+           nlu= LandCover(i,j)%ncodes
+           write(*,*) dtxt//'MEGAN  stuff:', me, debug_proc, debug_li, debug_lj
+           write(*,*) dtxt//'MEGAN  codes:', nlu, LandCover(i,j)%codes(1:nlu)
+        end if
       end if
 
       do i = 1, limax
@@ -399,8 +404,8 @@ module Biogenics_mod
 
         LULOOP: do iiL= 1, nlu
 
-            iL      = LandCover(i,j)%codes(iiL)
-            pft     = LandType(iL)%pft
+           iL      = LandCover(i,j)%codes(iiL)
+           pft     = LandType(iL)%pft
 
            gLC1 = -1
            !.. some MEGAN pre-code removed here
@@ -431,6 +436,30 @@ module Biogenics_mod
                 if( debug_flag )  merge_case = 'OutsideLCC'
            end if
 
+           !OCT2025: add scaling and move fraction calculation here:
+           if ( iL <= last_bvoc_LC ) then
+             if ( LandDefs(iL)%code == EmBio%scale_isoLC .or. EmBio%scale_isoLC == "AllLC" ) then
+               bvocEF(i,j,iL,BIO_ISOP) = EmBio%isoFac * bvocEF(i,j,iL,BIO_ISOP)
+               if( DEBUG%BIO .and. debug_flag ) write(*,*) dtxt//'BVOC scaleISO, LC:'//EmBio%scale_isoLC
+             end if
+             if ( LandDefs(iL)%code == EmBio%scale_mtLC .or. EmBio%scale_mtLC == "AllLC" )  then
+               bvocEF(i,j,iL,BIO_MTL) = EmBio%mtFac * bvocEF(i,j,iL,BIO_MTL)
+               bvocEF(i,j,iL,BIO_MTP) = EmBio%mtFac * bvocEF(i,j,iL,BIO_MTP)
+               if( DEBUG%BIO .and. debug_flag ) write(*,*) dtxt//'BVOC scaleMT, LC:'//EmBio%scale_mtLC
+             end if
+
+             !scale with LC fraction to get emissions per m2(grid)
+             do ibvoc = BIO_ISOP, BIO_MTL
+                bvocEF(i,j,iL,ibvoc) = bvocEF(i,j,iL,ibvoc) * LandCover(i,j)%fraction(iiL)
+             end do
+           end if
+
+          if ( DEBUG%BIO .and. iL <= 4 ) then ! otherwise use defaults
+             sumemis(iL,i,j,BIO_ISOP) = sumemis(iL,i,j,BIO_ISOP) + bvocEF(i,j,iL,BIO_ISOP)
+             sumemis(iL,i,j,BIO_MTL)  = sumemis(iL,i,j,BIO_MTL)  + bvocEF(i,j,iL,BIO_MTL)
+             sumemis(iL,i,j,BIO_MTP)  = sumemis(iL,i,j,BIO_MTP)  + bvocEF(i,j,iL,BIO_MTP)
+           end if
+
 
            if( DEBUG%BIO .and. debug_flag ) then
 
@@ -438,11 +467,11 @@ module Biogenics_mod
               bmt  = 0.0
               if ( iL <= last_bvoc_LC ) then
                 biso   = bvocEF(i, j,iL, BIO_ISOP) 
-                bmt    = bvocEF(i,j,iL,BIO_MTL)+bvocEF(i,j,iL,BIO_MTL)
+                bmt    = bvocEF(i,j,iL,BIO_MTL)+bvocEF(i,j,iL,BIO_MTP)
               end if
-              write(*,"(a24,2i4,2L2,f9.4,9f10.3)") &
+              write(*,"(a24,2i4,a12,2L2,f9.4,9f10.3)") &
                 dtxt // trim(merge_case), &
-                  iL, pft,  use_local, HaveLocalEF(iL),  &
+                  iL, pft, trim(LandDefs(iL)%code), use_local, HaveLocalEF(iL),  &
                    LandCover(i,j)%fraction(iiL), biso, bmt,&
                     LandDefs(iL)%Eiso, LandDefs(iL)%Emtp, LandDefs(iL)%Emtl
            end if 
@@ -450,6 +479,18 @@ module Biogenics_mod
       end do !j
       end do !i
 
+
+      if ( my_first_call  ) then ! print out 1st day
+         if ( DEBUG%BIO ) then
+           do iL = 1, 12
+              call printCDF("BIO-ISO-GridEF-"//trim(LandDefs(iL)%code), &
+                      bvocEF(:,:,iL,BIO_ISOP), "ug/m2/h" )
+              call printCDF("BIO-MT-GridEF-"//trim(LandDefs(iL)%code), &
+                      bvocEF(:,:,iL,BIO_MTP)+bvocEF(:,:,iL,BIO_MTP), "ug/m2/h" )
+           end do
+         end if
+     end if 
+     my_first_call = .false.
    end subroutine MergedBVOC
  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -466,7 +507,7 @@ module Biogenics_mod
       real, allocatable, dimension(:,:,:) ::  workarray
       character(len=*), parameter :: dtxt='BioModSetDaily:' 
 
-      if( MasterProc .and. DEBUG%BIO ) write(*,"(a,3i5)") dtxt//"start ", &
+      if( MasterProc .and. DEBUG%BIO ) write(*,"(a,3i5)") dtxt//"start "//print_date(), &
             daynumber, last_daynumber, last_bvoc_LC
 
       if ( daynumber == last_daynumber ) return
@@ -476,8 +517,14 @@ module Biogenics_mod
            allocate(  workarray(last_bvoc_LC,LIMAX,LJMAX), stat=alloc_err )
            call CheckStop( alloc_err , dtxt//"workarray alloc failed"  )
            workarray = 0.0
+           if( MasterProc .and. DEBUG%BIO ) write(*,"(a,3i5)") dtxt//"INIT "//print_date(), last_bvoc_LC
+!           if ( i_fdom(1) <= 189 .and. i_fdom(limax) <= 189 )  then
+             write(*,"(a,L2,9i5)") dtxt//"MEDBG ",debug_proc, me, &
+                    DEBUG%IJ(1), DEBUG%IJ(2), i_fdom(1), i_fdom(limax), j_fdom(1), j_fdom(ljmax)
+!           end if
       end if
 
+      if( debug_proc .and. DEBUG%BIO ) write(*,"(a,4i7)") dtxt//"DBGL "//print_date(), debug_li, debug_lj, limax, ljmax
       do i = 1, limax
       do j = 1, ljmax
 
@@ -486,10 +533,13 @@ module Biogenics_mod
         day_embvoc(i,j,:) = 0.0
         mydebug = ( DEBUG%BIO .and. debug_proc .and.  &
                    debug_li == i .and. debug_lj == j )
+        if( i_fdom(i)==DEBUG%IJ(1) .and. j_fdom(j)==DEBUG%IJ(2) ) write(*,*) dtxt//'NOW debug',me
+        if(mydebug)write(*,"(a,4i5)") dtxt//"TOP", nlu
 
         LULOOP: do iiL= 1, nlu
 
             iL      = LandCover(i,j)%codes(iiL)
+            if(mydebug)write(*,"(a,4i5)") dtxt//"iiL", iiL, iL, last_bvoc_LC, nlu
 
             if ( iL >  last_bvoc_LC ) cycle
 
@@ -502,12 +552,14 @@ module Biogenics_mod
                 LAIfac = LandCover(i,j)%LAI(iiL)/LandDefs(IL)%LAImax
                 LAIfac= min(LAIfac, 1.0)
               end if
-              LAIfac = LAIfac * LandCover(i,j)%fraction(iiL)
+              LAIfac = LAIfac !OCT2025 * LandCover(i,j)%fraction(iiL)
+            if(mydebug)write(*,"(a,2i5,3es12.3)") dtxt//"LAI", iiL, iL,  LandCover(i,j)%LAI(iiL), LandDefs(IL)%LAImax, LAIfac
               
 
               do ibvoc = 1, size(BVOC_USED) 
                 day_embvoc(i,j,ibvoc) = day_embvoc(i,j,ibvoc) + &
                    LAIfac * max(1.0e-10,bvocEF(i,j,iL,ibvoc))
+                if(mydebug)write(*,"(a,i5,3es12.3)") dtxt//"BVOC", ibvoc,  bvocEF(i,j,iL,ibvoc), day_embvoc(i,j,ibvoc)
               end do
 
               if ( mydebug ) then
@@ -524,10 +576,15 @@ module Biogenics_mod
               if( DEBUG%BIO .and. my_first_call ) &
                  workarray(iL,i,j) = workarray(iL,i,j) + &
                     bvocEF(i, j,iL, BIO_ISOP) * & 
-                    LandDEfs(iL)%LAImax*LandCover(i,j)%fraction(iiL)
+                    LandDEfs(iL)%LAImax  !OCT2025 *LandCover(i,j)%fraction(iiL)
         end do LULOOP
       end do ! ij
       end do
+
+      ! Now, apply any scaling from config:
+      ! ===================================================
+       day_embvoc  = day_embvoc * USES%biofac_BVOC
+      ! ===================================================
 
        if ( my_first_call  ) then ! print out 1st day
          if ( DEBUG%BIO ) then
@@ -630,6 +687,12 @@ module Biogenics_mod
   it2m = min(it2m,40)
 
   !ASSUME C5H8 FOR NOW if ( ibn_C5H8 > 0 ) then
+  if ( USES%biofac_BVOC < 1.0e-6) then
+     rcbio(NATBIO%C5H8,KG)    = 0.0
+     EmisNat(NATBIO%C5H8,i,j) = 0.0
+     rcbio(NATBIO%TERP,KG)    = 0.0
+     EmisNat(NATBIO%TERP,i,j) = 0.0
+  else ! JAN2025 USING BVOC
     if ( Grid%izen <= 90) then ! Isoprene in daytime only:
 
      ! Light effects from Guenther G93. Need uE:
@@ -640,13 +703,13 @@ module Biogenics_mod
 
      ! E in ug/m2/h
 
-       E_ISOP = day_embvoc(i,j,BIO_ISOP)*canopy_ecf(BIO_ISOP,it2m) * cL &
-                  * EmBio%IsopFac
+       E_ISOP = day_embvoc(i,j,BIO_ISOP)*canopy_ecf(BIO_ISOP,it2m) * cL !OCT2025 &
+                  !OCT2025 * EmBio%IsopFac
        if ( dbg ) write(*,*)'DBGITB',  Grid%dTleaf, it2m, canopy_ecf(BIO_ISOP,it2m), cL, E_ISOP
 
       ! Add light-dependent terpenes to pool-only
       if(BIO_TERP > 0) E_MTL = &
-             day_embvoc(i,j,BIO_MTL)*canopy_ecf(ECF_TERP,it2m)*cL * EmBio%TerpFac
+             day_embvoc(i,j,BIO_MTL)*canopy_ecf(ECF_TERP,it2m)*cL !OCT2025 * EmBio%TerpFac
 
      !  molecules/cm3/s
      ! And we scale EmisNat to get units kg/m2 consistent with
@@ -666,9 +729,10 @@ module Biogenics_mod
   end if ! daytime
 
  ! add pool-only terpenes rate;
-  E_MTP = day_embvoc(i,j,BIO_MTP)*canopy_ecf(ECF_TERP,it2m) * EmBio%TerpFac
+  E_MTP = day_embvoc(i,j,BIO_MTP)*canopy_ecf(ECF_TERP,it2m) !OCT2025 * EmBio%TerpFac
   rcbio(NATBIO%TERP,KG)    = (E_MTL+E_MTP) * biofac_TERP/Grid%DeltaZ
   EmisNat(NATBIO%TERP,i,j) = (E_MTL+E_MTP) * 1.0e-9/3600.0
+  end if ! JAN2025 USING BVOC
 
   if ( USES%SOILNOX ) then
     if ( USES%SOILNOX_METHOD == 'ACP2012EURO' ) then
@@ -736,6 +800,7 @@ module Biogenics_mod
   ! ACP2012EuroSoilNOx uses methods from the 2012
   ! EMEP documentation paper, Simpson et al, doi:10.5194/acp-12-7825-2012
   ! Is only used when USES%SOILNOX_METHOD == 'ACP2012EURO'
+
    subroutine Set_ACP2012EuroSoilNOx()
       integer :: i, j, nLC, iLC, LC
       logical :: my_first_call = .true.
@@ -807,7 +872,8 @@ module Biogenics_mod
                     enox = enox + f*ftn* 50.0
                     !enh3 = enh3 + f * ftn  *20.0 !mg/m2/h approx from US report 1 ng/m2/s
 
-                 else if ( LandType(LC)%is_crop    ) then ! emissions in 1st 70 days
+                 else if ( LandType(LC)%is_crop .and. &  ! emissions in 1st 70 days
+                            USES%ACPSOILNOX_METHOD == "Total" ) then
 
                     bmin = Landcover(i,j)%SGS(iLC) -30 ! !st March LandCover(i,j)%SGS(iLC) - 30 
                     bmax = Landcover(i,j)%SGS(iLC) +30 ! End April  LandCover(i,j)%SGS(iLC) + 40 

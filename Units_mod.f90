@@ -1,7 +1,7 @@
-! <Units_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Units_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -159,7 +159,7 @@ subroutine Init_Units(update)
 
  do i=1,size(unit_map)
    select case (unit_map(i)%utxt)
-    case("ug","mg","uBq","uBqh","mBq","ugm2","mass_ratio")
+    case("ug","mg","uBq","uBqh","mBq","ugm2","kgm2","mass_ratio")
       uconv_spec = species_adv%molwt
     case("ugC","mgC","ppbC")
       uconv_spec = species_adv%carbons
@@ -170,11 +170,14 @@ subroutine Init_Units(update)
     case("Gm3","Gm2")
       uconv_spec = species_adv%molwt
       call pollen_check(uconv_adv=uconv_spec)
+    case("mix_ratio","ppb","ppbh","mm","mcm2","e15mcm2")
+      uconv_spec = 1
 !   case("ext")
 !     uconv_spec = species_adv%molwt*species_adv%ExtC
 !     uconv_spec = species_adv%molwt*Qm_grp(NSPEC_ADV,[1..NSPEC_ADV]+NSPEC_SHL,rh,...)
     case default
-      uconv_spec = 1.0
+      ! don't allow unknown units, might lead to wrong results
+      call CheckStop(.True.,"Undefined units-conversion for unit: "//unit_map(i)%utxt)
    end select
    unit_map(i)%uconv(1:)=unit_map(i)%uconv(0)*uconv_spec
  end do

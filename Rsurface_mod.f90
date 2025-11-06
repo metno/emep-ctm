@@ -1,7 +1,7 @@
-! <Rsurface_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Rsurface_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -390,6 +390,14 @@ contains
 
       Rsur(icmp) = 1.0/( Gsto(icmp) + Gns(icmp)  )
 
+      if ( Rsur(icmp)<1.0e-12) then
+        print "(a,a10,es12.3,4i5,2f7.3,2es12.3,5L2)", &
+         dtxt//" NEGRSUR ", trim(LandDefs(iL)%name), Rsur(icmp), &
+         nddep, icmp, L%SGS, L%EGS, L%LAI, L%SAI, &
+         Gsto(icmp), Gns(icmp),  L%is_forest, L%is_water, L%is_veg, canopy, leafy_canopy
+         call StopAll("NEGRSUR")
+      end if
+      !call CheckStop(Rsur(icmp)<1.0e-6,"NEGRSUR")
       if ( dbg ) write(*,"(a,i3,L2,99g10.2)")  &
         dtxt//" Rsur(i):"//trim(DDspec(icmp)%name)//' '//&
            trim(LandDefs(iL)%name), icmp, L%is_crop,&

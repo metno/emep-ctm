@@ -1,7 +1,7 @@
-! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <PhyChem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -75,8 +75,7 @@ use Nest_mod,          only: readxn, wrtxn
 use OutputChem_mod,    only: WrtChem
 use OwnDataTypes_mod, only: TXTLEN_FILE
 use Par_mod,           only: me, LIMAX, LJMAX
-use PhysicalConstants_mod, only : ATWAIR 
-use Pollen_mod,        only: pollen_dump,pollen_read
+use PhysicalConstants_mod, only : ATWAIR
 use Radiation_mod,     only: SolarSetup,       &! sets up radn params
                             ZenithAngle,      &! gets zenith angle
                             WeissNormanPAR,   &! WN17=WeissNorman radn
@@ -166,9 +165,11 @@ subroutine phyche()
         O3_end_date(4) = O3_end_date(4) + 3 !We assume 3-hourly values (ok if > 24!)
      end if
      
-     if(DEBUG%PHYCHEM .and. MasterProc)write(*,*)'Updating top O3 with record ',&
+     if(DEBUG%PHYCHEM .and. MasterProc) then
+       write(*,*)'Updating top O3 with record ',&
           O3record,", file ",trim(fileName_O3_Top_current)
-     if(DEBUG%PHYCHEM .and. MasterProc)write(*,*)'valid until time ',O3_end_date(1),O3_end_date(2),O3_end_date(3),O3_end_date(4),O3_end_date(5)
+       write(*,*)'valid until time ',O3_end_date(1),O3_end_date(2),O3_end_date(3),O3_end_date(4),O3_end_date(5)
+     end if
 
      kstart=3!NB: must be the level corresponding to model top! Hardcoded for now
      call  ReadField_CDF(trim(fileName_O3_Top_current),'O3',xn_adv(O3_ix-NSPEC_SHL,:,:,1),&
@@ -180,7 +181,6 @@ subroutine phyche()
   call Code_timer(tim_before)
   call readxn(current_date) !Read xn_adv from earlier runs
 
-  if(USES%POLLEN) call pollen_read ()
   call Add_2timing(15,tim_after,tim_before,"nest: Read")
 
   ! analysis enabled?
@@ -217,7 +217,7 @@ subroutine phyche()
   call ZenithAngle(thour, glat, glon, zen, coszen )
 
   if(DEBUG%PHYCHEM.and.debug_proc)&
-    write(*,*) "PhyChem ZenRad ", current_date%day, current_date%hour, &
+    write(*,"(a,2i4,3f7.3,9es12.3)") "PhyChem ZenRad ", current_date%day, current_date%hour, &
         thour, glon(debug_li,debug_lj),glat(debug_li,debug_lj), &
         zen(debug_li,debug_lj),coszen(debug_li,debug_lj)
 
@@ -227,8 +227,8 @@ subroutine phyche()
   if ( DEBUG%STOFLUX .and. debug_proc ) then
    call datewrite(dtxt//"SEI ", [me], [ &
      thour, zen(debug_li,debug_lj),coszen(debug_li,debug_lj),&
-     cc3dmax(debug_li,debug_lj,KMAX_MID) ],&
-     afmt='(TXTDATE,a,i4,2f9.3,2es12.3)')
+     cc3dmax(debug_li,debug_lj,KMAX_MID), fCloud(debug_li,debug_lj), &
+     PARdbh(debug_li,debug_lj)], afmt='(TXTDATE,a,i4,2f9.3,4es12.3)')
   end if
 
   !================
@@ -337,7 +337,6 @@ subroutine phyche()
     call Add_2timing(T_3DVAR,tim_after,tim_before)
   end if
   call wrtxn(current_date,.false.) !Write xn_adv for future nesting
-  if(USES%POLLEN) call pollen_dump()
   call Add_2timing(14,tim_after,tim_before,"nest: Write")
 
   End_of_Day=(current_date%seconds==0).and.(current_date%hour==END_OF_EMEPDAY)

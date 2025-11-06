@@ -1,7 +1,7 @@
-! <Country_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <Country_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -510,6 +510,18 @@ module Country_mod
    integer, public :: IC_LONDON
    integer, public :: IC_STOCKHOLM
    integer, public :: IC_GENEVA
+
+  !IIASA SR 2021-2022 and 2025 sea regions
+  integer,  public :: IC_ATLO_i12m
+  integer,  public :: IC_ATLO_o12m
+  integer,  public :: IC_BALS_i12m
+  integer,  public :: IC_BALS_o12m
+  integer,  public :: IC_BLAS_i12m
+  integer,  public :: IC_BLAS_o12m
+  integer,  public :: IC_MEDS_i12m
+  integer,  public :: IC_MEDS_o12m
+  integer,  public :: IC_NORS_i12m
+  integer,  public :: IC_NORS_o12m
 
 contains
 
@@ -1654,6 +1666,39 @@ contains
       ix = ix + 1
       IC_PSG = ix
       Country(IC_PSG) = cc("PSG", '-', 507, T, 507, 507, -100, "Persian Gulf")
+
+! IIASA SR 2021-2022 and 2025 sea regions
+ix=ix+1 
+IC_BALS_i12m=ix
+Country(IC_BALS_i12m) = cc("BALS_i12m" ,'-', 510 ,T, 30,  30,  1, "Baltic Sea within 12 miles" )
+ix=ix+1 
+IC_BALS_o12m=ix
+Country(IC_BALS_o12m) = cc("BALS_o12m" ,'-', 511 ,T, 30,  30,  1, "Baltic Sea outside 12 miles" )
+ix=ix+1 
+IC_NORS_i12m=ix
+Country(IC_NORS_i12m) = cc("NORS_i12m" ,'-', 512 ,T, 31,  31,  1, "North Sea within 12 miles" )
+ix=ix+1 
+IC_NORS_o12m=ix
+Country(IC_NORS_o12m) = cc("NORS_o12m" ,'-', 513 ,T, 31,  31,  1, "North Sea outside 12 miles" )
+ix=ix+1 
+IC_ATLO_i12m=ix
+Country(IC_ATLO_i12m) = cc("ATLO_i12m" ,'-', 514 ,T, 32,  32,  -100, "NE Atlantic Ocean within 12 miles" )
+ix=ix+1 
+IC_ATLO_o12m=ix
+Country(IC_ATLO_o12m) = cc("ATLO_o12m" ,'-', 515 ,T, 32,  32,  -100, "NE Atlantic Ocean outside 12 miles" )
+ix=ix+1 
+IC_MEDS_i12m=ix
+Country(IC_MEDS_i12m) = cc("MEDS_i12m" ,'-', 516 ,T, 33,  33,  1, "Mediterranean Sea within 12 miles" )
+ix=ix+1
+IC_MEDS_o12m=ix
+Country(IC_MEDS_o12m) = cc("MEDS_o12m" ,'-', 517 ,T, 33,  33,  1, "Mediterranean Sea outside 12 miles" )
+ix=ix+1 
+IC_BLAS_i12m=ix
+Country(IC_BLAS_i12m) = cc("BLAS_i12m" ,'-', 518 ,T, 34,  34,  2  , "Black Sea within 12 miles" )
+ix=ix+1 
+IC_BLAS_o12m=ix
+Country(IC_BLAS_o12m) = cc("BLAS_o12m" ,'-', 519 ,T, 34,  34,  2  , "Black Sea outside 12 miles" )
+      
 
       NLAND = ix !actual number of countries defined
 

@@ -1,7 +1,7 @@
-! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <MetFields_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -159,6 +159,13 @@ module MetFields_mod
   real,target,public, save,allocatable, dimension(:,:,:) :: &
         cnvuf   & ! convective_updraft_flux (kg/s/m2)
        ,cnvdf    ! convective_downdraft_flux (kg/s/m2)
+  ! convective updraft and downdraft en/detrainment fluxes - used only by wrf
+  ! met, requires WRF run with kf_edrates namelist flag
+  real,target,public, save,allocatable, dimension(:,:,:) :: &
+        cnvuer   & ! convective updraft entrainment rate, UER_KF (kg/s)
+       ,cnvudr   & ! convective updraft detrainment rate, UDR_KF (kg/s)
+       ,cnvddr   & ! convective downdraft detrainment rate, DDR_KF (kg/s)       
+       ,cnvder     ! convective downdraft entrainment rate, DER_KF (kg/s)
 
 
  ! We don't need to calculate u,v for RiB, Kz for all layer in future maybe
@@ -167,10 +174,6 @@ module MetFields_mod
   real,target,public, save,allocatable, dimension(:,:,:) :: &
         u_mid   & ! wind u-compnent, m/s (real, not projected)
        ,v_mid     ! wind v-compnent, m/s
-  
-
- real,target,public,save,allocatable, dimension(:,:,:) :: &
-       tau        ! surf. stress  N/m^2
 
 ! Surface fields, interpolated:
  real,target,public, save,allocatable, dimension(:,:,:) :: &
@@ -178,13 +181,15 @@ module MetFields_mod
        ,t2_nwp    & ! Temp 2 m   deg. K
 !      ,tsurf_nwp & ! skin temp deg K
        ,pbl_nwp   & ! Planetary boundary layer height (m)
-       ,fh        & ! surf.flux.sens.heat W/m^2
+       ,fh        & ! sensible heat flux W/m^2
        ,fl        & ! latent heat flux W/m^2
-!       ,tau       & ! surf. stress  N/m^2
+       ,tau       & ! surface stress  N/m^2
   ! These fields only available for EMEP/PARLAM from 2002 on
        ,rh2m            & !  RH at 2m
        ,SoilWater_uppr  & !  Shallow  (Upper 7.2cm in PARLAM)
        ,SoilWater_deep  & !  Deep (Next 6x7cm in PARLAM), converted to relative value 
+       ,SoilWC  & !  'soil_water_content'
+       ,SoilTempL1  & ! 'soil_temperature_level1'
        ,sdepth          & !  Snowdepth, m
        ,ice_nwp         & ! QUERY why real?
        ,sst       &  ! SST Sea Surface Temprature- ONLY from 2002 in PARLAM
@@ -274,6 +279,8 @@ module MetFields_mod
     ,foundcloudicewater= .false.& !false if no ice cloudwater found
     ,foundSMI1= .true.& ! false if no Soil Moisture Index level 1 (shallow)
     ,foundSMI3= .true.& ! false if no Soil Moisture Index level 3 (deep)
+    ,foundSoilWaterContent= .true.& ! false if no 'soil_water_content'
+    ,foundSoilTemp= .true.& ! false if 'soil_temperature_level1'
     ,foundrain= .false.& ! false if no rain found or used
     ,foundirainnc= .false. &! false if no irainnc found or used
     ,foundirainc= .false. &! false if no irainc found or used
@@ -283,10 +290,13 @@ module MetFields_mod
 
 ! specific indices of met
   integer, public, save   :: ix_u_xmj,ix_v_xmi, ix_q, ix_th, ix_cc3d, ix_pr, &
-      ix_cw_met, ix_ciw_met, ix_cnvuf, ix_cnvdf, ix_Kz_met, ix_roa, ix_SigmaKz, ix_EtaKz,&
+      ix_cw_met, ix_ciw_met, ix_cnvuf, ix_cnvdf, &
+      ix_cnvuer, ix_cnvudr, ix_cnvddr, ix_cnvder, &
+      ix_Kz_met, ix_roa, ix_SigmaKz, ix_EtaKz,&
       ix_Etadot, ix_cc3dmax, ix_Kz_m2s, ix_u_mid, ix_v_mid, ix_ps, &
       ix_t2_nwp, ix_rh2m, ix_fh, ix_fl, ix_tau, ix_ustar_nwp, ix_sst, &
-      ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_ice_nwp, &
+      ix_SoilWater_uppr, ix_SoilWater_deep, ix_sdepth, ix_SoilTempL1, &
+      ix_SoilWC, ix_ice_nwp, &
       ix_ws_10m, ix_u10, ix_v10,&
       ix_surface_precip, ix_uw, ix_ue, ix_vs, ix_vn, ix_convective_precip, &
       ix_rain,ix_irainc,ix_irainnc, ix_elev, ix_invL, ix_pblnwp, ix_buff3D 
@@ -760,7 +770,8 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  met(ix)%alternative_name(1) = 'integral_of_surface_downward_sensible_heat_flux_wrt_time'
+  met(ix)%alternative_name(1) = 'surface_upward_sensible_heat_flux'
+  met(ix)%alternative_name(2) = 'surface_upward_sensible_heat_flux_acc'
   allocate(fh(LIMAX,LJMAX,NMET))
   fh=0.0
   met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => fh
@@ -776,7 +787,10 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .true.
   met(ix)%found            = .false.
-  met(ix)%alternative_name(1) = 'integral_of_surface_downward_latent_heat_evaporation_flux_wrt_time'
+  met(ix)%alternative_name(1) = 'surface_upward_latent_heat_flux'
+  met(ix)%alternative_name(2) = 'surface_upward_latent_heat_flux_acc'
+  met(ix)%alternative_name(3) = 'surface_upward_latent_heat_evaporation_flux'
+  met(ix)%alternative_name(4) = 'surface_upward_latent_heat_evaporation_flux_acc'
   allocate(fl(LIMAX,LJMAX,NMET))
   fl=0.0
   met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => fl
@@ -792,7 +806,10 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%read_meteo       = .true.
   met(ix)%needed           = .false.
   met(ix)%found            => foundtau
-  met(ix)%alternative_name(1) = 'surface_stress_northward'
+  met(ix)%alternative_name(1) = 'northward_surface_stress'
+  met(ix)%alternative_name(2) = 'northward_surface_stress_acc'
+  met(ix)%alternative_name(3) = 'northward_surface_momentum_flux'
+  met(ix)%alternative_name(4) = 'northward_surface_momentum_flux_acc'
   allocate(tau(LIMAX,LJMAX,NMET))
   tau=0.0
   met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => tau
@@ -844,6 +861,37 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%zsize = 1
   met(ix)%msize = NMET
   ix_SoilWater_uppr=ix
+
+  ix=ix+1
+  met(ix)%name             = 'soil_water_content'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = USES%DYNAMIC_SOILNO
+  met(ix)%read_meteo       = USES%DYNAMIC_SOILNO
+  met(ix)%needed           = USES%DYNAMIC_SOILNO
+  met(ix)%found            => foundSoilWaterContent
+  allocate(SoilWC(LIMAX,LJMAX,NMET))
+  SoilWC = 0.0
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => SoilWC
+  met(ix)%zsize = 1
+  met(ix)%msize = NMET
+  ix_SoilWC = ix
+
+  ix=ix+1
+  met(ix)%name             = 'soil_temperature_level1'
+  met(ix)%dim              = 2
+  met(ix)%frequency        = 3
+  met(ix)%time_interpolate = USES%DYNAMIC_SOILNO
+  met(ix)%read_meteo       = USES%DYNAMIC_SOILNO
+  met(ix)%needed           = USES%DYNAMIC_SOILNO
+  met(ix)%found            => foundSoilTemp
+  met(ix)%alternative_name(1) = 'temperature_2m'
+  allocate(SoilTempL1(LIMAX,LJMAX,NMET))
+  SoilTempL1 = 0.0
+  met(ix)%field(1:LIMAX,1:LJMAX,1:1,1:NMET)  => SoilTempL1
+  met(ix)%zsize = 1
+  met(ix)%msize = NMET
+  ix_SoilTempL1 = ix
 
   ix=ix+1
   met(ix)%name             = 'SMI3'
@@ -1132,6 +1180,72 @@ if(USES%WRF_MET_NAMES)then
   met(ix)%zsize = KMAX_MID
   met(ix)%msize = 1
   ix_rain=ix
+
+  if (USES%CONVECTION) then
+     ! switch off reading for cnvuf, cnvdf
+     met(ix_cnvuf)%read_meteo     = .false.
+     met(ix_cnvdf)%read_meteo     = .false.
+     
+     ! Convective up-/down-draft en/detrainment rates, used to recalculate cnvuf and cnvdf 
+     ix=ix+1
+     met(ix)%name             = 'UER_KF' ! updraft entrainment rate (positive)
+     met(ix)%dim              = 3
+     met(ix)%frequency        = 3
+     met(ix)%time_interpolate = .false.
+     met(ix)%read_meteo       = .true.
+     met(ix)%needed           = .true.
+     met(ix)%found            = .false.
+     allocate(cnvuer(LIMAX,LJMAX,KMAX_MID))
+     cnvuer=0.0
+     met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cnvuer
+     met(ix)%zsize = KMAX_MID
+     met(ix)%msize = 1
+     ix_cnvuer=ix
+     ix=ix+1
+     met(ix)%name             = 'UDR_KF' ! updraft detrainment rate (positive)
+     met(ix)%dim              = 3
+     met(ix)%frequency        = 3
+     met(ix)%time_interpolate = .false.
+     met(ix)%read_meteo       = .true.
+     met(ix)%needed           = .true.
+     met(ix)%found            = .false.
+     allocate(cnvudr(LIMAX,LJMAX,KMAX_MID))
+     cnvudr=0.0
+     met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cnvudr
+     met(ix)%zsize = KMAX_MID
+     met(ix)%msize = 1
+     ix_cnvudr=ix
+ 
+     ix=ix+1
+     met(ix)%name             = 'DER_KF' ! downdraft entrainment rate (negative)
+     met(ix)%dim              = 3
+     met(ix)%frequency        = 3
+     met(ix)%time_interpolate = .false.
+     met(ix)%read_meteo       = .true.
+     met(ix)%needed           = .true.
+     met(ix)%found            = .false.
+     allocate(cnvder(LIMAX,LJMAX,KMAX_MID))
+     cnvder=0.0
+     met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cnvder
+     met(ix)%zsize = KMAX_MID
+     met(ix)%msize = 1
+     ix_cnvder=ix
+ 
+     ix=ix+1
+     met(ix)%name             = 'DDR_KF' ! downdraft detrainment rate (negative)
+     met(ix)%dim              = 3
+     met(ix)%frequency        = 3
+     met(ix)%time_interpolate = .false.
+     met(ix)%read_meteo       = .true.
+     met(ix)%needed           = .true.
+     met(ix)%found            = .false.
+     allocate(cnvddr(LIMAX,LJMAX,KMAX_MID))
+     cnvddr=0.0
+     met(ix)%field(1:LIMAX,1:LJMAX,1:KMAX_MID,1:1)  => cnvddr
+     met(ix)%zsize = KMAX_MID
+     met(ix)%msize = 1
+     ix_cnvddr=ix
+   end if ! convection en/detrainment rate variables
 
 !2D
 !Use I_RAINNC and I_RAINC to make 2D precip 

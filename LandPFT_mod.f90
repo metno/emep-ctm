@@ -1,7 +1,7 @@
-! <LandPFT_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <LandPFT_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -26,19 +26,24 @@
 !*****************************************************************************!
 !> <LandPFT_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
 !! *************************************************************************!
-!! Reads LAI maps from Global LPJ-GUESS model
-!! Data provided by Guy Schurgers & Almut Arneth (Lund University)
-!! and normalised to LAI factors for EMEP usage (DS)
+!! Reads LAI maps from sources specified by LandCoverInputs%LAIsrc=
+!!   1. LPJ-EMEP  from LPJ-GUESS model - data provided by Guy Schurgers & Almut Arneth (Lund University)
+!! or
+!!   2. ECOSG-ENORM from ECOCLIMMAP SG with EMEP adjustments
+!! with both normalised to LAI factors for EMEP usage (DS)
 
 module LandPFT_mod
 
 use CheckStop_mod,   only: CheckStop, StopAll
-use Config_module,   only: MasterProc, PFT_MAPPINGS,GLOBAL_LAInBVOCFile
+!HICKS use Config_module,   only: MasterProc, PFT_MAPPINGS,GLOBAL_LAInBVOCFile
+use Config_module,   only: MasterProc, GLOBAL_LAInBVOCFile
+use Config_module,   only: LandCoverInputs ! for LAIsrc    = 'LPJ-EMEP' or 'ECOSG-ENORM' or ECOSG-ELAI
 use Debug_module,    only:  DEBUG   ! -> DEBUG%PFT_MAPS
 use GridValues_mod,  only: debug_proc, debug_li, debug_lj, glon, glat
 use NetCDF_mod,      only: ReadField_CDF
 use Par_mod,         only: LIMAX, LJMAX, me
 use SmallUtils_mod,  only: find_index, NOT_FOUND, WriteArray, trims
+use TimeDate_mod,    only: current_date, print_date  ! HICKS
 
 implicit none
 private
@@ -46,6 +51,7 @@ private
 
 !/- subroutines:
 
+  public :: MapPFT_Init
   public :: MapPFT_LAI
   public :: MapPFT_BVOC
 
@@ -54,9 +60,12 @@ private
 
  ! PFTs available from smoothed LPJ fields
 
-  integer, public, parameter :: N_PFTS = 6
-  character(len=5),public, parameter, dimension(N_PFTS) :: PFT_CODES = &
-        (/ "CF   ", "DF   ", "NF   ", "BF   ", "C3PFT", "C4PFT" /)
+  integer, public, save :: N_PFTS 
+  character(len=15),public, save, dimension(10) :: PFT_CODES 
+
+  !integer, public, parameter :: N_PFTS = 6
+  !character(len=5),public, parameter, dimension(N_PFTS) :: PFT_CODES = &
+  !      (/ "CF   ", "DF   ", "NF   ", "BF   ", "C3PFT", "C4PFT" /)
 
    ! Variables available:
 
@@ -70,7 +79,33 @@ private
 contains
 
  !==========================================================================
- subroutine MapPFT_LAI(month)
+ subroutine MapPFT_Init()
+
+    logical :: dbgProc
+    character(len=20) :: varname, lai_src
+
+    dbgProc = ( DEBUG%PFT_MAPS > 0 .and. MasterProc )
+    lai_src = LandCoverInputs%LAIsrc
+
+    if ( lai_src == 'LPJ-EMEP' ) then
+      n_pfts = 6
+      PFT_CODES(1:n_pfts) = &
+         [ "CF   ", "DF   ", "NF   ", "BF   ", "C3PFT", "C4PFT" ]
+
+    else if ( lai_src(1:7) == 'ECOSG-E' ) then! either ECOSG-ENORM or ECOSG-ELAI
+      n_pfts = 6
+      !note: gfortran requires that all elements in PFT_CODES have the same number 
+      !      of characters
+      PFT_CODES(1:n_pfts) = &
+         [ "BrDeTr  ", "NeDeTr  ", "Crops_C3", "Crops_C4", "Crops   ", "LowVeg  " ]
+    else
+      call StopAll('LAIsrc not set!'  // lai_src )
+    end if
+    if (dbgProc) write(*,*) 'MapPFT_Init PFTs:',PFT_CODES(1:n_pfts)
+
+ end subroutine MapPFT_Init
+
+ subroutine MapPFT_LAI()! month,day)
 
 !.....................................................................
 !**    DESCRIPTION:
@@ -81,36 +116,78 @@ contains
 !    Normed_LAIv is relative LAI, with max value 1.0
 
 
-    integer, intent(in) :: month
+    !integer, intent(in) :: month,day
 
     real    :: lpj(LIMAX,LJMAX)  ! Emissions read from file
     logical,save :: my_first_call = .true.
-    integer :: pft
-    character(len=20) :: varname
+    logical :: update_needed, dbgProc
+    integer :: pft, month, day, iday10
+    integer, save :: nrecord = 0, old_nrecord=-99
+    character(len=20) :: varname, lai_src
+    character(len=*), parameter :: dtxt='MapPFT_LAI:'
 
-!PFT return ! JAN31TEST. This code needs to be  completed still *****
-     if ( my_first_call ) then
-         allocate ( pft_lai(LIMAX,LJMAX,N_PFTS) )
-         my_first_call = .false.
+!     if ( my_first_call ) then
+! LATER:  allocate ( pft_lai(LIMAX,LJMAX,N_PFTS) )
+!         my_first_call = .false.
 !call Test_LocalBVOC()
-!call GetMEGAN_BVOC()
+!call GetMEGAN_BVOC() This code needs to be  completed still *****
+!     end if
 
-     end if
+    dbgProc = ( DEBUG%PFT_MAPS > 0 .and. MasterProc )
+    lai_src = LandCoverInputs%LAIsrc
+
+    update_needed = .false.
+    if ( lai_src == 'LPJ-EMEP' ) then
+
+      nrecord = current_date%month
+
+    else if ( lai_src(1:7) == 'ECOSG-E' ) then
+     ! have new data on 5, 15 and 25th of each month, so 3 per month
+     ! use 0-9,10-19,20...
+      month = current_date%month
+      iday10   = current_date%day/10
+      iday10   = min(2,iday10)  ! Avoids new record for 30th, 31st of month
+      nrecord = (month-1)*3 + iday10 + 1
+    else
+      call StopAll('LAIsrc not set!'  // lai_src )
+    end if
+
+    if ( my_first_call ) then
+       allocate ( pft_lai(LIMAX,LJMAX,n_pfts) )
+       my_first_call = .false.
+    end if
+
+    if ( old_nrecord /= nrecord ) then
+      update_needed = .true.
+      old_nrecord = nrecord
+    end if 
+    if(dbgProc) write(*,"(a,i5,L2)") 'inpftB '//print_date(), nrecord, update_needed
 
     ! Get LAI data:
+
+     if ( .not. update_needed ) then
+       if( dbgProc ) write(*,*) trim(dtxt//lai_src), print_date()
+       return
+     end if
 
      do pft =1, N_PFTS
            varname = trims( "Normed_" // LAI_VAR // PFT_CODES(pft) )
 
+           if ( dbgProc ) write(*,"(a,3i5,L2)") 'pftGET'// trim(varname), &
+                    me, nrecord, DEBUG%PFT_MAPS, debug_proc
+           if (nrecord > 36 .or. nrecord < 1 ) then
+               print "(a,i5,L2)", dtxt//'XXinpftB '//print_date(), nrecord, update_needed, month, day
+               call StopAll('NREC')
+           end if
            call ReadField_CDF(GLOBAL_LAInBVOCFile,varname,&
-              lpj,month,interpol='zero_order',needed=.true.,debug_flag=.false.)
+              lpj,nrecord,interpol='zero_order',needed=.true.,debug_flag=.true.)
 
            pft_lai(:,:,pft ) = lpj(:,:)
-           if( DEBUG%PFT_MAPS.gt.0 .and. debug_proc ) then
-             write(*,"(a20,2i3,3f8.3)") "PFT_DEBUG "//trim(varname), &
-                 month, pft, &
-                 glon(debug_li, debug_lj), glat(debug_li, debug_lj), &
-                 lpj(debug_li, debug_lj)
+           if( dbgProc ) then 
+             write(*,"(a20,i3,3f8.3)") dtxt//"PFT_DEBUG "//print_date()//&
+                 trim(varname), pft, maxval(lpj)
+                 !glon(debug_li, debug_lj), glat(debug_li, debug_lj), &
+                 !lpj(debug_li, debug_lj)
            end if
 
      end do ! pft

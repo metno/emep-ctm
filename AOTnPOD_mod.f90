@@ -1,7 +1,7 @@
-! <AOTnPOD_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <AOTnPOD_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -77,11 +77,10 @@ contains
  !=========================================================================
  ! Calc_AOTx called from MosaicOutputs, at end of DryDep calculation.
  ! after deploss
-  subroutine Calc_AOTx(iO3cl,iLC, aot )
+  subroutine Calc_AOTx(iO3cl,iLC, aot, O3)
     integer, intent(in) :: iO3cl,iLC
-    real, intent(out)    :: aot
+    real, intent(out)    :: aot, o3
 
-    real    :: o3
     integer :: i,j, mm,hh
     real :: X
     logical :: dbg, is_MM, is_EU,  inGS
@@ -230,11 +229,11 @@ contains
 !=========================================================================
 !Calc_POD called from DryDep -> Add_MosaicOutput,  after deploss
 
-  subroutine Calc_POD(iO3cl,iLC, pod, debug_flag, debug_txt )
+  subroutine Calc_POD(iO3cl,iLC, pod, O3_out, debug_flag, debug_txt )
     logical, intent(in) :: debug_flag
     character(len=*), intent(in), optional :: debug_txt
     integer, intent(in) :: iO3cl,iLC
-    real, intent(out)   :: pod
+    real, intent(out)   :: pod, O3_out
     character(len=*),parameter :: dtxt='CalcPOD:'
     character(len=10):: txt
     character(len=20) :: txtdate
@@ -284,8 +283,9 @@ contains
 
    ! Add fluxes if Y exceeded:
 
-     pod  = max(L%FstO3 - Y,0.0) * do3se(iLC)%PODscale
-
+    pod  = max(L%FstO3 - Y,0.0) * do3se(iLC)%PODscale
+    O3_out = L%FstO3 * do3se(iLC)%PODscale ! for use in Local Fractions
+     
     if ( dbg ) then
        !write(txt,"(a,L1)") "Rel", VEGO3_OUTPUTS(iO3cl)%RelSGS
        !txt= "Rel"

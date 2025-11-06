@@ -1,7 +1,7 @@
-! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.5>
+! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2024 met.no
+!*  Copyright (C) 2007-2025 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -43,7 +43,7 @@ use GridValues_mod,    only: debug_proc, i_fdom, j_fdom
 use Io_Progs_mod,      only: datewrite
 use LandDefs_mod,      only: LandDefs, LandType, Check_LandCoverPresent ! e.g. "CF"
 use Landuse_mod,       only: LandCover ! for POD
-use LocalFractions_mod,only: lf_POD
+use LocalFractions_mod,only: lf_PODnAOT
 use LocalVariables_mod,only: Grid,SubDat, L
 use MetFields_mod
 use OwnDataTypes_mod,  only: Deriv, print_deriv_type, typ_s5ind, typ_s1ind, typ_s3,&
@@ -363,7 +363,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
 
   ! Variables added for ecosystem dep
   real, dimension(NDEF_ECOSYSTEMS) :: invEcoFrac, EcoFrac
-  real :: Fflux, Gs, Gns
+  real :: Fflux, Gs, Gns, O3
   logical :: dbg, dbghh
 
   cdep = -99                      ! set on first_vgr_call
@@ -383,7 +383,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
     if(EcoFrac(n)>1.0e-39) invEcoFrac(n)=1.0/EcoFrac(n)
   end do
 
-  !  Query - crops, outisde g.s. ????
+  !  Query - crops, outside g.s. ????
   if(first_call) then  ! need to find indices
 
     idepO3 = find_index('O3',DDspec(:)%name,any_case=.true.)
@@ -485,19 +485,20 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
 
     case("POD")         ! Fluxes, PODY (was AFstY)
       n =  MosaicOutput(imc)%Index !Index in VEGO3_OUPUTS
-      call Calc_POD( n, iLC, output, debug_flag)
+      call Calc_POD( n, iLC, output, O3, debug_flag)
       
-      if(USES%LocalFractions) call lf_POD(i,j,VEGO3_OUTPUTS(n)%name,output)
+      if(USES%LocalFractions) call lf_PODnAOT(i,j,VEGO3_OUTPUTS(n)%name,output, O3)
 
       if(dbg) &
         write(*,"(2a,2g12.4)") dtxt//"MYPOD ", trim(txtdate), output, Sub(iLC)%FstO3
-
 
     case("AOT")         ! AOTX
       n =  MosaicOutput(imc)%Index !Index in VEGO3_OUPUTS
       if(dbg.and. Sub(iLC)%cano3_ppb> 40.0) &
         write(*,*) dtxt//" preAOT", n,iLC, Sub(iLC)%cano3_ppb
-      call Calc_AOTx(n,iLC,output)
+      call Calc_AOTx(n,iLC,output, O3)
+
+      if(USES%LocalFractions) call lf_PODnAOT(i,j,VEGO3_OUTPUTS(n)%name,output, O3)
 
     case("VG","Rs","Rns","Gns") ! could we use RG_LABELS?
       cdep = itot2Calc(nadv+NSPEC_SHL)  ! e.g. IXADV_O3 to calc index
