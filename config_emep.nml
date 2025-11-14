@@ -2,7 +2,7 @@
   GRID      = 'EMEP0302',
   iyr_trend = 2018,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2024',
+  runlabel2 = 'Opensource_Setup_2025',
   startdate = 2018,01,01,00,
   enddate   = 2018,12,31,24,
 !------------------------------
@@ -75,8 +75,9 @@
 !   USES%SOILNOX_METHOD = 'NoFert' for EMEP/CEIP, ECLIPSE v6, HTAPv3
   USES%SOILNOX_METHOD = 'NoFert',
 !------------------------------
-  USES%SEASALT          = T,
+! For open-source the user has to download aircraft data: see https://emep-ctm.readthedocs.io/en/latest/Input.html
   USES%AIRCRAFT_EMIS    = F,
+  USES%SEASALT          = T,
   USES%LIGHTNING_EMIS   = T,
   USES%DUST             = T,
 
@@ -96,6 +97,7 @@
   femsdef='DataDir/columnsource_emission.csv_2023',
 
 !-------- ForestFire emissions
+! For open-source the user has to download forest-fire data: see https://emep-ctm.readthedocs.io/en/latest/Input.html
   USES%FOREST_FIRES = F,
   BBMAP = 'FINN', ! FINN, GFAS or GFED
   FINN_PATTERN = 'DataDir/FINN_ForestFireEmis_YYYY.nc',
@@ -128,6 +130,9 @@
   USE_EXTERNAL_BIC  = F,
   EXTERNAL_BIC_NAME = 'DUMMY',
 !------------------------------
+! Note. When outputting semivolatile organic compounds, ug units
+! give the total concentration (gas+particle). ug_PM units
+! give the particile phase. And ugC gives carbon in either version.
 OutputConcs=
   'HMIX'                ,'m'   ,'2d','HMIX'     ,'MISC' ,'YM',
   'T2m'                 ,'degC','2d','T2m'      ,'MISC' ,'YMD',
