@@ -20,17 +20,17 @@ from textwrap import dedent
 from types import SimpleNamespace
 from typing import NamedTuple
 
-assert sys.version_info >= (3, 8), "This script requires python3.8 or better"
+assert sys.version_info >= (3, 10), "This script requires python3.10 or better"
 warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
 
 DEFAULT = SimpleNamespace(
     # script version
-    version="0.4.0",
+    version="0.5.0",
     # released model versions
     releases=(
         "rv3,v201106,rv4_0,rv4_3,rv4_4,rv4_5,rv4_8,rv4_10,"
         "rv4_15,rv4_17,rv4_32,rv4_33,rv4_34,rv4_36,rv4_45,"
-        "5.0,5.5,"
+        "5.0,5.5,5.6"
     ),
     # released met-years
     years="2005,2008,2010,2011,2012,2013,2014,2015,2017,2018",
