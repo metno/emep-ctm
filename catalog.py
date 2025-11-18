@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import logging
 import shutil
 import sys
 import tarfile
@@ -73,27 +74,27 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
         """
     ).strip()
     parser = argparse.ArgumentParser(usage=usage)
-    parser.add_argument(
-        "-V",
-        "--version",
-        action="version",
-        version=f"%(prog)s {DEFAULT.version}",
-    )
-    parser.add_argument(
+    parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {DEFAULT.version}")
+
+    verbosity = parser.add_mutually_exclusive_group()
+    verbosity.add_argument(
         "-q",
         "--quiet",
-        action="store_false",
-        dest="verbose",
-        help="don't print status messages to stdout",
+        action="store_const",
+        dest="log_level",
+        const=logging.ERROR,
+        help="hide info messages",
     )
-    parser.add_argument(
+    verbosity.add_argument(
         "-v",
         "--verbose",
-        action="count",
-        default=1,
-        dest="verbose",
-        help="Increase verbosity",
+        action="store_const",
+        dest="log_level",
+        const=logging.DEBUG,
+        help="show debug messages",
     )
+    parser.set_defaults(log_level=logging.INFO)
+
     parser.add_argument(
         "--catalog",
         default=DEFAULT.csv,
@@ -213,6 +214,8 @@ def parse_arguments(args: list[str]) -> argparse.Namespace:
     )
 
     opts = parser.parse_args(args)
+    logging.basicConfig(level=opts.log_level, format="%(message)s")
+
     if opts.tag is None and opts.year is None:
         opts.tag = DEFAULT.releases.split(",")[-1]
     if opts.data is None:
@@ -237,7 +240,7 @@ def user_consent(question, ask: bool = True, default: str = "yes"):
     try:
         question = qq[default.lower()] % question
     except KeyError:
-        print(f"Unsupported option: user_consent(..,default='{default}')")
+        logging.error(f"Unsupported option: user_consent(..,default='{default}')")
 
     # valid answers
     answer = {"y": True, "yes": True, "n": False, "no": False}
@@ -373,12 +376,11 @@ class DataPoint:
     def file_size(self) -> str:
         return file_size(self.size)
 
-    def cleanup(self, verbose=True):
+    def cleanup(self):
         """Remove (raw) downloads"""
         if not self.dst.is_file():
             return
-        if verbose:
-            print(f"Cleanup  {self}")
+        logging.info(f"Cleanup  {self}")
 
         try:
             self.dst.unlink()
@@ -392,43 +394,41 @@ class DataPoint:
             else:
                 raise error
 
-    def check(self, verbose=True, cleanup=False):
+    def check(self, *, cleanup: bool = False, quiet: bool = False):
         """Check download against md5sum"""
         if not self.dst.is_file():
             return False
-        if verbose:
-            print(f"Check    {self}")
+        if not quiet:
+            logging.info(f"Check    {self}")
 
         if self.md5sum != hashlib.md5(self.dst.read_bytes()).hexdigest():
-            if verbose:
-                print(f"  md5 /= {self.md5sum}")
+            logging.info(f"  md5 /= {self.md5sum}")
             if cleanup:  # remove broken file
-                self.cleanup(verbose)
+                self.cleanup()
             return False
         return True
 
-    def download(self, verbose=True):
+    def download(self):
         """derived from http://stackoverflow.com/a/22776/2576368"""
         from urllib.request import HTTPError, urlopen
 
         # check if file exists/md5sum, remove file if fail md5sum
-        if self.check(verbose > 2, cleanup=True):
+        if self.check(cleanup=True, quiet=True):
             return
 
-        if verbose:
-            print(f"Download {self}")
+        logging.info(f"Download {self}")
 
         try:
             url = urlopen(self.src)
-        except HTTPError:
-            print(f"Could not download {self.src}")
+        except HTTPError as e:
+            logging.debug(e)
+            logging.error(f"Could not download {self.src}")
             sys.exit(-1)
 
         self.dst.parent.mkdir(parents=True, exist_ok=True)
         with url, self.dst.open("wb") as file:
             block = 1_024 * 8  #   8K
             big_file = self.size > 1_048_576 * 128  # 128M
-            total = self.size if verbose and big_file else 0
             n = 0
             while True:
                 buff = url.read(block)
@@ -436,28 +436,28 @@ class DataPoint:
                     break
                 file.write(buff)
                 n += len(buff)
-                if total and (n == total or n % 1_048_576 == 0):  # 1M
-                    print_progress(n, total, length=50)
+                if big_file and (n == self.size or n % 1_048_576 == 0):  # 1M
+                    print_progress(n, self.size, length=50)
 
-    def unpack(self, verbose: int, inspect: bool = False, output: Path = DEFAULT.output):
+    def unpack(self, inspect: bool = False, output: Path = DEFAULT.output):
         """Unpack download"""
-        if not self.check(verbose > 2):
+        if not self.check():
             return
 
         if tarfile.is_tarfile(self.dst):
-            print(f"Untar    {self}")
+            logging.info(f"Untar    {self}")
             with closing(tarfile.open(self.dst, "r")) as file:
                 if user_consent("  See the contents first?", inspect, "no"):
-                    file.list(verbose=verbose > 1)
+                    file.list(verbose=logging.getLogger().level <= logging.INFO)
                     if not user_consent("  Do you wish to proceed?", inspect):
-                        print("OK, skipping file")
+                        logging.info("OK, skipping file")
                         return
 
                 output.parent.mkdir(parents=True, exist_ok=True)
                 try:
                     file.extractall(output)
                 except EOFError as error:
-                    print(f"  Failed unpack '{self.dst}':\n    {error}.")
+                    logging.error(f"  Failed unpack '{self.dst}':\n    {error}.")
                     if not user_consent("    Do you wish to continue?", inspect, "yes"):
                         sys.exit(-1)
 
@@ -468,8 +468,7 @@ class DataPoint:
             self.dst.rename(outfile)
         else:
             outfile = output / self.key / self.dst.name
-            if verbose > 1:
-                print(f"Copy     {outfile}")
+            logging.info(f"Copy     {outfile}")
             outfile.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.dst, outfile)
 
@@ -509,13 +508,13 @@ class DataSet(NamedTuple):
         return f"{self.tag:>8} (release:{self.release}, meteo:{self.year})"
 
 
-def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
+def read_catalog(filename: Path) -> Iterator[DataSet]:
     """releases read from catalog csv-file"""
     from csv import reader
 
     # download catalog if file not found
     if not filename.is_file():
-        DataPoint(0, "catalog", 0, "", DEFAULT.remote, filename).download(verbose)
+        DataPoint(0, "catalog", 0, "", DEFAULT.remote, filename).download()
 
     # catalog file should be present at this point
     with open(filename) as file:
@@ -523,23 +522,20 @@ def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
         next(csv)  # skip header
         catalog: list[DataPoint] = []  # list all src files (1 file per row)
 
-        if verbose > 2:
-            print(f"Reading {filename}")
+        logging.debug(f"Reading {filename}")
         for row in csv:
             if not row or not any(row):
                 continue  # skip empty lines
             try:
                 catalog.append(DataPoint(*row))
-                if verbose > 2:
-                    print(f"  {catalog[-1]}")
+                logging.debug(f"  {catalog[-1]}")
             except Exception:
-                print(f"Failed to parse ({filename}): {row}", DataPoint(*row), sep="\n")
+                logging.error(f"Failed to parse ({filename}): {row}")
+                logging.error(DataPoint(*row))
                 raise
-        if verbose > 1:
-            print(f"{filename} read(srcs:{len(catalog)})")
+        logging.debug(f"{filename} read(srcs:{len(catalog)})")
 
-    if verbose > 1:
-        print(f"Indexing {filename}")
+    logging.debug(f"Indexing {filename}")
 
     dataset: defaultdict[str, set[DataPoint]]
     for rel in {c.release for c in catalog}:
@@ -557,8 +553,7 @@ def read_catalog(filename: Path, verbose: int = 1) -> Iterator[DataSet]:
             docs=dataset["docs"],
             extra=dataset["extra"],
         )
-        if verbose > 2:
-            print(f"  {ds}")
+        logging.debug(f"  {ds}")
         yield ds
 
 
@@ -571,7 +566,6 @@ def main(
     domain: str | None,
     ask: bool,
     cleanup: bool,
-    verbose: int,
 ) -> None:
     """Command line function"""
     if not set(data).issubset(DataSet._fields):
@@ -581,8 +575,7 @@ def main(
         catalog: Collection[DataSet], attr: str, target: str | int
     ) -> Iterator[DataSet]:
         """search catalog for tag|status|year DataSet"""
-        if verbose > 1:
-            print(f"Searching {attr}(s):{target}")
+        logging.debug(f"Searching {attr}(s):{target}")
 
         for v in catalog:
             if getattr(v, attr) == target:
@@ -590,8 +583,7 @@ def main(
 
     def get_downloads(catalog: Collection[DataSet], attr: str, target: str) -> Iterator[DataPoint]:
         """downloads for tag|status|year DataSet"""
-        if verbose > 1:
-            print(f"Searching datasets:{data}")
+        logging.debug(f"Searching datasets:{data}")
 
         for ds in get_datasets(catalog, attr, target):
             for key in data:
@@ -604,36 +596,36 @@ def main(
                 for x in dataset:
                     yield x
                     total += x.size
-                if verbose and total:
-                    print(f"Queue download: {file_size(total):>6} {key:>6} {ds.tag}")
+                if total:
+                    logging.info(f"Queue download: {file_size(total):>6} {key:>6} {ds.tag}")
 
     # list files to download
-    catalog = tuple(read_catalog(path, verbose))
+    catalog = tuple(read_catalog(path))
     downloads: set[DataPoint] = set()  # files to download
     if tag is not None:
         aux = set(get_downloads(catalog, "tag", tag))
         if not aux:
-            print(f"No datasets found for --revision={tag}")
+            logging.warning(f"No datasets found for --revision={tag}")
         downloads.update(aux)
     if year is not None:
         aux = set(get_downloads(catalog, "year", year))
         if not aux:
-            print(f"No datasets found for --year={year}")
+            logging.warning(f"No datasets found for --year={year}")
         downloads.update(aux)
 
     # list file_sizes to download
     total = file_size(sum(x.size for x in downloads))
-    print(f"Queue download: {total:>6} Total")
+    logging.info(f"Queue download: {total:>6} Total")
     if not user_consent("Do you wish to proceed?", ask):
-        print("OK, bye")
+        logging.info("OK, bye")
         sys.exit(0)
 
     # download files
     for x in downloads:
-        x.download(verbose)
-        x.unpack(verbose, ask)
+        x.download()
+        x.unpack(ask)
         if cleanup:
-            x.cleanup(verbose)
+            x.cleanup()
 
 
 if __name__ == "__main__":
@@ -646,5 +638,4 @@ if __name__ == "__main__":
         domain=opts.domain,
         ask=opts.ask,
         cleanup=opts.cleanup,
-        verbose=opts.verbose,
     )
