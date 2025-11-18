@@ -705,7 +705,7 @@ release,dataSet,met/statusYear,domain/modelVersion,dataSource,dataDestination,di
 202412,source,2024,5.5,{GIT}/archive/{MOD}.tar.gz,,1140448,c8346ccbba815415166c0321ac94f871
 202412,docs,,5.5,{RTD}/ug5_5/pdf/,,440998,fba518275fb4c61a0fee6713b087d668
 202412,input,2018,5.5,{FTP}/{REL}/input_data/other_input_files.tar.bz2,,2454318590,51b04d324b82ddac6938115ae661782b
-202412,output,2018,5.5,{FTP}/{REL}/model_results_v5_5_2015/Base_model_v5_5_results_EECCA.tar.bz2,,11453305238,00de2f57c0a5b6e8235266dc546325a9
+202412,output,2018,5.5,{FTP}/{REL}/model_results_v5_5_2018/Base_model_v5_5_results_EMEP0302.tar.bz2,,11453305238,00de2f57c0a5b6e8235266dc546325a9
 202412,meteo,2018,EMEP0302,{FTP}/meteo/{YEAR}/{MOD}/meteo201801.tar.bz2,,11190526791,7772a9416c24b526bb1076f305ed8598
 202412,meteo,2018,EMEP0302,{FTP}/meteo/{YEAR}/{MOD}/meteo201802.tar.bz2,,10106284310,c1c6bdfd4d21b89c28149aa2863a3fe6
 202412,meteo,2018,EMEP0302,{FTP}/meteo/{YEAR}/{MOD}/meteo201803.tar.bz2,,11228359481,98333741f21b982e4e435cbb921835b7
