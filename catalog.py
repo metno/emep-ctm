@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import logging
 import shutil
+import subprocess
 import sys
 import tarfile
 import warnings
@@ -259,31 +260,6 @@ def user_consent(question, ask: bool = True, default: str = "yes"):
             return answer[data]
 
 
-# Print iterations progress
-# http://stackoverflow.com/a/34325723/2576368
-def print_progress(
-    iteration, total: int, prefix: str = "", suffix: str = "", decimals: int = 2, length: int = 100
-):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : number of decimals in percent complete (Int)
-        length   - Optional  : character length of bar (Int)
-    """
-    filled = int(round(length * iteration / float(total)))
-    percents = round(100.00 * (iteration / float(total)), decimals)
-    progress = "█" * filled + "-" * (length - filled)
-    sys.stdout.write(f"\r{prefix} |{progress}| {percents}% {suffix}")
-    sys.stdout.flush()
-    if iteration == total:
-        sys.stdout.write("\n")
-        sys.stdout.flush()
-
-
 def file_size(value: float):
     """
     Human readable file size (K/M/G/T bytes)
@@ -350,7 +326,9 @@ class DataPoint:
             self.dst = DEFAULT.downloads / self.tag / Path(self.src).name
         else:
             self.dst = Path(dst.format_map(kwargs))
-        if not self.dst.name:
+        if self.dst.name == "pdf":
+            self.dst = self.dst.with_name("emep-ctm.pdf")
+        if not self.dst.suffix and self.dst.name != "README":
             self.dst /= Path(self.src).name
 
     def __str__(self) -> str:
@@ -398,46 +376,44 @@ class DataPoint:
         """Check download against md5sum"""
         if not self.dst.is_file():
             return False
+
         if not quiet:
             logging.info(f"Check    {self}")
+
+        if self.dst.stat().st_size == 0:
+            logging.info("  empty file")
+            if cleanup:  # remove empty file
+                self.cleanup()
+            return False
 
         if self.md5sum != hashlib.md5(self.dst.read_bytes()).hexdigest():
             logging.info(f"  md5 /= {self.md5sum}")
             if cleanup:  # remove broken file
                 self.cleanup()
             return False
+
         return True
 
     def download(self):
-        """derived from http://stackoverflow.com/a/22776/2576368"""
-        from urllib.request import HTTPError, urlopen
-
         # check if file exists/md5sum, remove file if fail md5sum
         if self.check(cleanup=True, quiet=True):
             return
 
         logging.info(f"Download {self}")
-
-        try:
-            url = urlopen(self.src)
-        except HTTPError as e:
-            logging.debug(e)
-            logging.error(f"Could not download {self.src}")
-            sys.exit(-1)
+        quiet = self.size < 1_048_576 * 128  # 128M
+        quiet |= logging.getLogger().level > logging.INFO
 
         self.dst.parent.mkdir(parents=True, exist_ok=True)
-        with url, self.dst.open("wb") as file:
-            block = 1_024 * 8  #   8K
-            big_file = self.size > 1_048_576 * 128  # 128M
-            n = 0
-            while True:
-                buff = url.read(block)
-                if not buff:
-                    break
-                file.write(buff)
-                n += len(buff)
-                if big_file and (n == self.size or n % 1_048_576 == 0):  # 1M
-                    print_progress(n, self.size, length=50)
+        if quiet:
+            cmd = f"curl -sLo {self.dst} {self.src}"
+        else:
+            cmd = f"curl -#Lo {self.dst} {self.src}"
+        try:
+            logging.debug(cmd)
+            subprocess.check_call(cmd.split())
+        except subprocess.CalledProcessError:
+            logging.error(f"Could not download {self.src}")
+            sys.exit(-1)
 
     def unpack(self, inspect: bool = False, output: Path = DEFAULT.output):
         """Unpack download"""
@@ -446,14 +422,15 @@ class DataPoint:
 
         if tarfile.is_tarfile(self.dst):
             logging.info(f"Untar    {self}")
+            logging.debug(f"{output = }")
+            output.parent.mkdir(parents=True, exist_ok=True)
             with closing(tarfile.open(self.dst, "r")) as file:
                 if user_consent("  See the contents first?", inspect, "no"):
                     file.list(verbose=logging.getLogger().level <= logging.INFO)
                     if not user_consent("  Do you wish to proceed?", inspect):
-                        logging.info("OK, skipping file")
+                        logging.info("OK, skipping files")
                         return
 
-                output.parent.mkdir(parents=True, exist_ok=True)
                 try:
                     file.extractall(output)
                 except EOFError as error:
@@ -461,15 +438,11 @@ class DataPoint:
                     if not user_consent("    Do you wish to continue?", inspect, "yes"):
                         sys.exit(-1)
 
-        elif self.dst.name == "pdf":
-            assert self.model is not None
-            outfile = output / self.key / self.model / "emep-ctm.pdf"
-            outfile.parent.mkdir(parents=True, exist_ok=True)
-            self.dst.rename(outfile)
         else:
             outfile = output / self.key / self.dst.name
-            logging.info(f"Copy     {outfile}")
-            outfile.mkdir(parents=True, exist_ok=True)
+            logging.info(f"Copy     {self}")
+            logging.debug(f"{outfile = }")
+            outfile.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(self.dst, outfile)
 
 
