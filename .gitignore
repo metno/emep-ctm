@@ -2,5 +2,6 @@
 *.dvi
 *.log
 *.out
+*.i90
 *build/
 .vscode/

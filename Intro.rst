@@ -2,7 +2,7 @@ Welcome to EMEP
 ================
 
 This guide gives a brief documentation of the EMEP/MSC-W model version
-rv5.5. It is intended primarily as a guide on how to run the model, and
+rv5.6. It is intended primarily as a guide on how to run the model, and
 to help users wishing to understand or change the model in terms of
 domains, outputs, chemistry, etc.
 
@@ -98,11 +98,11 @@ Model code
 ----------
 
 
-The latest release Open Source of the EMEP/MSC-W model is `version 5.5`__.
+The latest release Open Source of the EMEP/MSC-W model is `version 5.6`__.
 This and previous releases can be found on the `releases section`__
 of the EMEP/MSC-W Open Source `github page`__.
 
-.. __: https://github.com/metno/emep-ctm/releases/tag/5.5
+.. __: https://github.com/metno/emep-ctm/releases/tag/5.6
 .. __: https://github.com/metno/emep-ctm/releases
 .. __: https://github.com/metno/emep-ctm
 
@@ -120,8 +120,8 @@ the release page, the preferred retrieval method is via the `catalog tool`_ as f
     # make it executable and run it
     chmod +x catalog.py
 
-    # download the source code for 5.5 release
-    catalog.py -R 5.5 --source
+    # download the source code for 5.6 release
+    catalog.py -R 5.6 --source
 
 
 The model source code, makefiles, and a copy of the license file
