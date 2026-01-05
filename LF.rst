@@ -45,7 +45,7 @@ Below an example of grid to grid LF config_emep.nml settings, which is the type 
     
     ! lf_set%DOMAIN = 370, 420, 270, 320, !which domain to include in output. Will save disk, but not CPU to reduce.
 
-The %res flag defines the size of the source region. By default %res=1, and it gives the contributions from a single gridcell to a single grid cell. If for example %res=2, the source region will be a 2x2 = 4 grid cell region, and the lf values at a gridcell gives the contribution from those 4 grid cells in one number. The idea is that this allows to get contributions from more distant regions, without increasing the computational cost.
+The %res flag defines the size of the source region. By default %res=1, and it gives the contributions from a single gridcell to a single grid cell. If for example %res=2, the source regions will be non overlapping 2x2 = 4 grid cell regions, and the lf values at a gridcell gives the agggregated contribution from on of those 4 grid cells as one number. The idea is that this allows to get contributions from more distant regions, without increasing the computational cost.
 
 If one wants to include many species, sectors and res values, without writing one entry per source, one can use the following syntax:
 
