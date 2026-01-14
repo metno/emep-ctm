@@ -500,9 +500,11 @@ it will only be used to define the projection parameters of the inner grid (i.e.
     [...]
       NEST_MET_inner = 'inner_domain/wrfout_d03_2015-01-01_00:00:00',
       NEST_RUNDOMAIN_inner = 12, 136, 100, 300,
+      NEST_thick_inner = 3, 
     &end
         
 You cannot use the implicit dates ("YYYY" etc.); you must put explicit numbers. 
+Nest_thick_inner gives the minimum thickness of the non-zero region. default is 1.
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
 The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
 
