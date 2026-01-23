@@ -155,8 +155,23 @@ To include DMS outputs:
 
     lf_src(1)%name = 'DMS',
     lf_src(1)%dist = 2, !will track over up to 2 gridcells in all directions
-    lf_src(1)%nhour = 1, ! will track separately emissions every 1 hour, and reset every 24 hours
     lf_set%HOUR_INST = T, ! output instantaneous values every hour
+
+Local Fractions for time tagged emissions (under development)
+-------------------------------------------------------------
+Distinguishes pollutants emitted at different time
+So far only for "relative" and hourlyInst 
+
+.. code-block:: Fortran
+    :caption: Example for nh3 3D output
+
+    lf_src(1)%name = 'nh3',
+    lf_src(1)%dist = 2, !will track over up to 2 gridcells in all directions
+    lf_src(1)%nhour = 1, ! will track separately emissions every 1 hour
+    lf_src(1)%nnhour = 6, ! number of distinct nhour periods to track
+    lf_set%relative_out_Int2 = T, ! output local fractions in type short (2 bytes)
+    lf_set%HOUR_INST = T, ! output instantaneous values every hour
+    lf_set%Nvertout = 14, !output 14 levels
 
 Local Fractions for Sensibilities with full chemistry
 -----------------------------------------------------
