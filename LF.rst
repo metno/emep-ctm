@@ -228,6 +228,22 @@ The cpu cost is high, approximatively 20 times the cost without this option (ind
     !minutes (independently of dt_advec!), while every hour is used for the LF output. 
     !The LF definition of SOMO35 follows similar rules as the more official and detailed MDA8. 
 
+Restart
+-------
+Local fraction values can be saved for use as initial conditions in another run.
+
+.. code-block:: Fortran
+    :caption: Syntax for save and restart
+
+    lf_set%saveatend = T, !will put all lf in SEPARATE binary files for each MPI process 
+    lf_set%filename_write = 'lf_savefile', !filename used to save the lf, but will add suffix .NNNN where NNN is the MPI process number
+    lf_set%restart = T, !will use the files created by restart for initializing lf
+    lf_set%filename_read = 'lf_savefile',  !filename defined in an earlier run as lf_set%filename_write
+    lf_set%full_chem = T, ! to indicate that all species must be included
+    lf_set%Nfullchem_emis = 4, ! can be 1,2 or 4. 1 reduces nox, voc, sox, nh3 together; 2 reduces nox, voc separately; 4 reduces nox, voc, sox, nh3 separately
+
+Note that the restart must be done with exactly the same domain and number of MPI processes. lf_set%saveall_cdf=T can be used to get a single NetCDF format file, but that is much slower.
+
 
 Miscellaneous
 -------------
