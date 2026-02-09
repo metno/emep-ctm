@@ -775,6 +775,8 @@ Negative values means netcdf3 format.
 
 ``USES%SKIP_INCOMPLETE_OUTPUT`` : if T, will skip daily/montly/fullrun output for runs under 1/28/181 days.
 
+``ZERO_ORDER_ADVEC``: if T, will use basic zero order advection, instead of the default 4th order Bott's scheme.
+
 .. _`sec-emission-own-sectors`:
 
 Defining own sectors
