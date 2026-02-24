@@ -551,6 +551,84 @@ is defined in the ``ExternalBICs_bc`` namelist.
     &end
 
 
+By default, boundary conditions are defined by BoundaryConditions at the beginning of the month.
+On first call, at the beginning of the run, BoundaryConditions sets the initial conditions.
+
+The Nest module modifies initial and/or boundary conditions for a nested run.
+Initial conditions are always assumed to come from a previous EMEP run.
+Boundary conditions from a different model can be used as long as a variable mapping is provided.
+
+config_emep.nml shows how to use the Nest module to override the boundary conditions from BoundaryConditions
+for sea salt and windblown with monthly values from a 5 year climatology from a previous EMEP model run.
+This has been used on previous Status run and it is kept here so it is not forgotten...
+The boundary condition replacement is disabled by this line
+  NEST_MODE_READ = 'NONE',        ! NONE=do nothing
+
+If you only want initial condition, use one of the following
+  NEST_MODE_READ = 'START',        ! at the start of run
+or
+  NEST_MODE_READ = 'RESTART',      ! at the start of run, without overwriting BC
+and
+  NEST_template_read_3D = '...',
+to read all fields from NEST_template_read_3D to the corresponding advected variables from the closest time record to current_date.
+
+There is no variable mapping for initial condition, as a nested run is assumed to start from a previous EMEP run.
+The matching between initial condition fields and advected variables is case insensitive.
+
+For initial and hourly boundary conditions
+  NEST_MODE_READ = 'NHOUR',        ! every NHOURREADand
+! NEST_NHOURREAD = 1,              ! hours between reads. Fraction of 24
+and
+  NEST_template_read_3D = '...',
+  NEST_template_read_BC = '...',
+
+Initial conditions are treated as described before.
+Without further configuration (or USE_EXTERNAL_BIC=F)
+the boundary conditions are assumed to come from a previous EMEP run:
+all fields from NEST_template_read_BC to the corresponding advected variables from the closest time record to current_date.
+
+When NEST_template_read_3D resolves to an non-existing file, there is nothing to read and
+the initial conditions will say as defined by BoundaryConditions at the beginning of the run.
+When NEST_template_read_BCresolves to an non-existing file, there is nothing to read and
+the boundary conditions stay as defined by BoundaryConditions at the beginning of the month.
+
+For initial and boundary conditions from a climatology, such as BCs_SeaSaltDust_rv4_17aEmChem16a_2012-16.nc
+  NEST_MODE_READ = 'MONTH',
+and
+  NEST_template_read_3D = '...', # 1 or 12 time records
+  NEST_template_read_BC = '...', # 12 time records
+only the month of the time variable is used to determine the record to read
+
+BCs_SeaSaltDust_rv4_17aEmChem16a_2012-16.nc has 4 fields records that are matched as follows:
+- DUST_WB_C --> Dust_wb_f
+- DUST_WB_F --> Dust_wb_c
+- SEASALT_C --> SeaSalt_f
+- SEASALT_F --> SeaSalt_c
+
+The following lines provide an explicit mapping between fields in NEST_template_read_BC
+and advected model variables. It has no effect on the initial conditions.
+
+  USE_EXTERNAL_BIC  = T,
+  EXTERNAL_BIC_NAME    = 'EMEP_Clim',
+  EXTERNAL_BIC_VERSION = 'EMEP_Clim',
+...
+&end
+&ExternalBICs_bc
+! BC from GLOBAL05 2012-2016
+  description='EMEP_Clim','EMEP_Clim',4,  ! name,version,size
+  ! emep,external,frac,wanted,found,IXADV,
+  map_bc=
+    'Dust_wb_f'      ,'DUST_WB_F'    ,1.0,T,F,-1,
+    'Dust_wb_c'      ,'DUST_WB_C'    ,1.0,T,F,-1,
+    'SeaSalt_f'      ,'SEASALT_F'    ,1.0,T,F,-1,
+    'SeaSalt_c'      ,'SEASALT_C'    ,1.0,T,F,-1,
+&end
+
+It is possible define multiple mappings with multiple ExternalBICs_bc but only one will be used.
+The first ExternalBICs_bc where description%name/description%version matches EXTERNAL_BIC_NAME/EXTERNAL_BIC_VERSION will be used.
+If no match is found the run sill stop.
+
+
 Vertical coordinate
 ___________________
 
