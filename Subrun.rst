@@ -596,22 +596,30 @@ For initial and boundary conditions from a climatology, such as BCs_SeaSaltDust_
   NEST_MODE_READ = 'MONTH',
 and
   NEST_template_read_3D = '...', # 1 or 12 time records
+
   NEST_template_read_BC = '...', # 12 time records
 only the month of the time variable is used to determine the record to read
 
 BCs_SeaSaltDust_rv4_17aEmChem16a_2012-16.nc has 4 fields records that are matched as follows:
 - DUST_WB_C --> Dust_wb_f
+
 - DUST_WB_F --> Dust_wb_c
+
 - SEASALT_C --> SeaSalt_f
+
 - SEASALT_F --> SeaSalt_c
 
 The following lines provide an explicit mapping between fields in NEST_template_read_BC
 and advected model variables. It has no effect on the initial conditions.
 
   USE_EXTERNAL_BIC  = T,
+
   EXTERNAL_BIC_NAME    = 'EMEP_Clim',
+
   EXTERNAL_BIC_VERSION = 'EMEP_Clim',
+
 ...
+
 &end
 
 &ExternalBICs_bc
