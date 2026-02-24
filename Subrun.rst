@@ -613,6 +613,7 @@ and advected model variables. It has no effect on the initial conditions.
   EXTERNAL_BIC_VERSION = 'EMEP_Clim',
 ...
 &end
+
 &ExternalBICs_bc
 ! BC from GLOBAL05 2012-2016
   description='EMEP_Clim','EMEP_Clim',4,  ! name,version,size
