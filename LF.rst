@@ -167,7 +167,7 @@ So far only for "relative" and hourlyInst
 
     lf_src(1)%name = 'nh3',
     lf_src(1)%dist = 2, !will track over up to 2 gridcells in all directions
-    lf_src(1)%nhour = 1, ! will track separately emissions every 1 hour
+    lf_src(1)%nhour = 1, ! length of the emission periods to track separately (every 1 hour here)
     lf_src(1)%nnhour = 6, ! number of distinct nhour periods to track
     lf_set%relative_out_Int2 = T, ! output local fractions in type short (2 bytes)
     lf_set%HOUR_INST = T, ! output instantaneous values every hour
