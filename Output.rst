@@ -194,6 +194,12 @@ Totals per country and sectors (all), can be obtained in the log with:
 
 To get emissions partitioned into splitted compounds (up to 18), the value ``EmisSplit_OUT=T`` must be set in ``config_emep.nml``
 
+Single species sector specific emissions can be obtained with for example:
+
+.. code-block:: fortran
+
+    'BENZENE_GNFR_C','SpecSecEmis','BENZENE','-','mg/m2',3, -99, T , 1.0e6,     F, 'YM',
+
 
 Add your own fields
 -------------------
