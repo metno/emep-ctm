@@ -1,8 +1,7 @@
-! <Advection_mod.f90 - A component of the EMEP MSC-W Eulerian
-!          Chemical transport Model>
+! <Advection_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2025 met.no
+!*  Copyright (C) 2007-2026 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,7 +24,7 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-                    Module Advection_mod
+Module Advection_mod
 
 !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 ! DESCRIPTION

@@ -1,7 +1,7 @@
-! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
+! <Runchem_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2025 met.no
+!*  Copyright (C) 2007-2026 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -44,7 +44,9 @@ module RunChem_mod
   use PBAP_mod,          only: set_PBAPs
   use CellMet_mod,       only: Get_CellMet, z0_out_ix, invL_out_ix
   use CheckStop_mod,     only: CheckStop, StopAll
-  use Chemfields_mod,    only: xn_adv    ! For DEBUG 
+  use Chemfields_mod,    only: xn_adv, &
+                               cf_gammaN2O5f, cf_gammaN2O5c, cf_rateN2O5f, cf_rateN2O5c, &
+                               gammaN2O5f, gammaN2O5c, rateN2O5f, rateN2O5c, yn2o5, yieldN2O5
   use Chemsolver_mod,    only: chemistry
   use ChemDims_mod,      only: NSPEC_SHL, NSPEC_TOT 
   use ChemRates_mod,    only:  setChemrates ! rct, NRCT
@@ -63,7 +65,7 @@ module RunChem_mod
   use GridValues_mod,    only: debug_proc, debug_li, debug_lj, i_fdom, j_fdom
   use Io_Progs_mod,      only: datewrite
   use LocalFractions_mod,only: lf_chem
-  use MassBudget_mod,    only: emis_massbudget_1d
+  use MassBudget_mod,    only: emis_massbudget_1d, chem_massbudget_1d
   use OrganicAerosol_mod,only: ORGANIC_AEROSOLS, OrganicAerosol, &
                               Init_OrganicAerosol, & 
                               Reset_OrganicAerosol, & 

@@ -1,8 +1,7 @@
-! <SoilWater_mod.f90 - A component of the EMEP MSC-W Eulerian
-!          Chemical transport Model>
+! <SoilWater_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2010-2011 met.no
+!*  Copyright (C) 2007-2026 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute

@@ -1,8 +1,7 @@
-! <EmisDef_mod.f90 - A component of the EMEP MSC-W Eulerian
-!          Chemical transport Model>
+! <EmisDef_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2025 met.no
+!*  Copyright (C) 2007-2026 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -25,15 +24,8 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!_____________________________________________________________________________
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
+module EmisDef_mod
 
-                         module EmisDef_mod
-
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!_____________________________________________________________________________
 use ChemDims_mod,     only : NEMIS_File
 use OwnDataTypes_mod, only : TXTLEN_NAME,TXTLEN_FILE, Emis_id_type, &
                              EmisFile_id_type, Emis_mask_type, &
@@ -302,9 +294,4 @@ integer, public, save :: KEMISTOP ! not defined yet= KMAX_MID - nemis_kprofile +
   logical, public, save :: foundYearlySectorEmissions = .false.
   logical, public, save :: foundMonthlySectorEmissions = .false.
 
-! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-                     end module EmisDef_mod
-! MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD MOD  MOD MOD MOD MOD MOD MOD MOD
-! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-!_____________________________________________________________________________
+end module EmisDef_mod

@@ -1,4 +1,4 @@
-! <BLPhysics_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.8>
+! <BLPhysics_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
 !*  Copyright (C) 2007-2026 met.no

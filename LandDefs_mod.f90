@@ -1,7 +1,7 @@
-! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
+! <LandDefs_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2025 met.no
+!*  Copyright (C) 2007-2026 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -24,9 +24,6 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!><LandDefs_mod.f90 - A component of the EMEP MSC-W  Chemical transport Model>
-!*****************************************************************************! 
-
 module LandDefs_mod
  use CheckStop_mod, only : CheckStop, StopAll
  use Config_module, only : NLANDUSEMAX, MasterProc
