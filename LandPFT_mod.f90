@@ -24,8 +24,6 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-!> <LandPFT_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
-!! *************************************************************************!
 !! Reads LAI maps from sources specified by LandCoverInputs%LAIsrc=
 !!   1. LPJ-EMEP  from LPJ-GUESS model - data provided by Guy Schurgers & Almut Arneth (Lund University)
 !! or

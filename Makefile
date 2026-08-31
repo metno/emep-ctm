@@ -21,13 +21,13 @@ F90 = mpif90
 
 # GNU gfortran compiler (tested for version 8.5.0)
 F90FLAGS = -fdefault-real-8  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O3 -g
-# GNU gfortran compiler (tested for version 12.2.0 and 11.3.0)
+# GNU gfortran compiler (tested for version 13.3.0, 12.2.0 and 11.3.0)
 F90FLAGS = -fdefault-real-8 -fallow-argument-mismatch  -ffixed-line-length-none -ffree-line-length-none -Wno-error=line-truncation -O3 -g
 #DEBUG flag
 #F90FLAGS += -Wall -fbacktrace -fbounds-check -fimplicit-none -pedantic
 
-# Intel ifort compiler (comment out if gfortran used)
-F90FLAGS = -g -r8 -IPF_fp_relaxed -assume noold_maxminloc -O2 -march=core-avx2
+# Intel ifort compiler (uncomment for ifort compiler)
+#F90FLAGS = -g -r8 -IPF_fp_relaxed -assume noold_maxminloc -O2 -march=core-avx2
 
 ###################################################
 

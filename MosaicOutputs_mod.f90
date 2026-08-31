@@ -24,8 +24,6 @@
 !*    You should have received a copy of the GNU General Public License
 !*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 !*****************************************************************************!
-! <MosaicOutputs_mod.f90 - A component of the EMEP MSC-W Chemical transport Model>
-!*****************************************************************************!
 module MosaicOutputs_mod
 use AOTx_mod,          only: Calc_AOTx, Calc_POD, VEGO3_OUTPUTS
 use CheckStop_mod,     only: CheckStop

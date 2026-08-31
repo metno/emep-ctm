@@ -1,7 +1,7 @@
-! <SOA_mod.f90 - A component of the EMEP MSC-W Chemical transport Model, version v5.6>
+! <SOA_mod.f90 - A component of the EMEP MSC-W Chemical Transport Model, version v5.8>
 !*****************************************************************************!
 !*
-!*  Copyright (C) 2007-2025 met.no
+!*  Copyright (C) 2007-2026 met.no
 !*
 !*  Contact information:
 !*  Norwegian Meteorological Institute
@@ -29,7 +29,7 @@ module OrganicAerosol_mod
   ! Calculates the amount of condensible species in the gas and aerosol phases. 
   !
   ! References:
-  !   B2012: Bergström, R. et al., Atmos. Chem. Physics, 2012, 12, 8499-8527
+  !   B2012: Bergstrï¿½m, R. et al., Atmos. Chem. Physics, 2012, 12, 8499-8527
   !   S2012: Simpson, D. et al., Atmos. Chem. Physics, 2012, 12, 7825-7865 
   !   S2007: Simpson, D. et al., JGR, 2007, 
   !
@@ -50,7 +50,7 @@ module OrganicAerosol_mod
   !-----------------------------------------------------------------------------
   !
   ! Dave Simpson, August 2001 -- 2019
-  ! Robert Bergström     2010 -- 2019
+  ! Robert Bergstrï¿½m     2010 -- 2019
   ! 
   !--------------------------------------------------------------------------
 
