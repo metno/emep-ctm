@@ -78,14 +78,4 @@ type(dep_t), public, dimension(NWETDEP_ADV), save :: CM_WDepMap = (/ &
 , dep_t("remPPM_c_nonRes", "PMc       ", -999.0 ) &
 , dep_t("remPPM_c_Res", "PMc       ", -999.0 ) &
 , dep_t("SQT_SOA_NV", "PMf       ", -999.0 ) &
-, dep_t("POLLEN_BIRCH", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_OLIVE", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_ALDER", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_RWEED", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_GRASS", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_MUGWORT1", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_MUGWORT2", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_MUGWORT3", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_MUGWORT4", "POLLw     ", -999.0 ) &
-, dep_t("POLLEN_MUGWORT5", "POLLw     ", -999.0 ) &
 /)

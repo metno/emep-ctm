@@ -48,14 +48,4 @@ character(len=15), save, dimension(NEMIS_Specs), public :: EMIS_Specs = (/ &
 , "REMPPM25_NONRES" &
 , "REMPPM_C_RES   " &
 , "REMPPM_C_NONRES" &
-, "POLLEN_BIRCH   " &
-, "POLLEN_OLIVE   " &
-, "POLLEN_ALDER   " &
-, "POLLEN_RWEED   " &
-, "POLLEN_GRASS   " &
-, "POLLEN_MUGWORT1" &
-, "POLLEN_MUGWORT2" &
-, "POLLEN_MUGWORT3" &
-, "POLLEN_MUGWORT4" &
-, "POLLEN_MUGWORT5" &
 /)

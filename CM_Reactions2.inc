@@ -1,4 +1,3 @@
-
 !-> ASOC_ug1e3
 
   P = YCOXY(3)* 1.36e-11 * xnew(OXYL) * xnew(OH)  &
@@ -155,121 +154,31 @@
 
 !-> NO3_f
 
-  ! P = 0.0
+  P = YN2O5HYD(3)* rct(97,k) * xnew(N2O5)
   
   ! L = 0.0
   
-  ! Nothing to do for NO3_f! xnew(NO3_f) = max(0.0, xold(NO3_f))
+  xnew(NO3_f) = xold(NO3_f) + dt2 * P
 
 
 !-> NO3_c
 
-  P = rct(99,k) * xnew(HNO3)  &
+  P = YN2O5HYD(4)* rct(97,k) * xnew(N2O5)  &
+    + rct(99,k) * xnew(HNO3)  &
     + rct(100,k) * xnew(HNO3)
   
   ! L = 0.0
   
   xnew(NO3_c) = xold(NO3_c) + dt2 * P
 
-
-!-> POLLEN_BIRCH
-
-  P = rcemis(POLLEN_BIRCH,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_BIRCH) = xold(POLLEN_BIRCH) + dt2 * P
-
-
-!-> POLLEN_OLIVE
-
-  P = rcemis(POLLEN_OLIVE,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_OLIVE) = xold(POLLEN_OLIVE) + dt2 * P
-
-
-!-> POLLEN_ALDER
-
-  P = rcemis(POLLEN_ALDER,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_ALDER) = xold(POLLEN_ALDER) + dt2 * P
-
-
-!-> POLLEN_RWEED
-
-  P = rcemis(POLLEN_RWEED,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_RWEED) = xold(POLLEN_RWEED) + dt2 * P
-
-
-!-> POLLEN_GRASS
-
-  P = rcemis(POLLEN_GRASS,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_GRASS) = xold(POLLEN_GRASS) + dt2 * P
-
-
-!-> POLLEN_MUGWORT1
-
-  P = rcemis(POLLEN_MUGWORT1,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_MUGWORT1) = xold(POLLEN_MUGWORT1) + dt2 * P
-
-
-!-> POLLEN_MUGWORT2
-
-  P = rcemis(POLLEN_MUGWORT2,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_MUGWORT2) = xold(POLLEN_MUGWORT2) + dt2 * P
-
-
-!-> POLLEN_MUGWORT3
-
-  P = rcemis(POLLEN_MUGWORT3,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_MUGWORT3) = xold(POLLEN_MUGWORT3) + dt2 * P
-
-
-!-> POLLEN_MUGWORT4
-
-  P = rcemis(POLLEN_MUGWORT4,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_MUGWORT4) = xold(POLLEN_MUGWORT4) + dt2 * P
-
-
-!-> POLLEN_MUGWORT5
-
-  P = rcemis(POLLEN_MUGWORT5,k)
-  
-  ! L = 0.0
-  
-  xnew(POLLEN_MUGWORT5) = xold(POLLEN_MUGWORT5) + dt2 * P
-
 if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
-
 !-> ASOC_ug1e3
 
-  P_lf(1:Nd) = YCOXY(3)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YCBENZ(3)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YCTOL(3)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YCALK(3)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YCOLE(3)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)
+  P_lf(1:Nd) = YCOXY_lf(1:Nd,3)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YCBENZ_lf(1:Nd,3)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YCTOL_lf(1:Nd,3)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YCALK_lf(1:Nd,3)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YCOLE_lf(1:Nd,3)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)
   
   L_lf(1:Nd) = rct(83,k) * xnew_lf(1:Nd,OH)
   
@@ -278,11 +187,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> ASOC_ug1e2
 
-  P_lf(1:Nd) = YCOXY(2)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YCBENZ(2)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YCTOL(2)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YCALK(2)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YCOLE(2)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
+  P_lf(1:Nd) = YCOXY_lf(1:Nd,2)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YCBENZ_lf(1:Nd,2)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YCTOL_lf(1:Nd,2)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YCALK_lf(1:Nd,2)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YCOLE_lf(1:Nd,2)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
     + rct(83,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ASOC_ug1e3)
   
   L_lf(1:Nd) = rct(82,k) * xnew_lf(1:Nd,OH)
@@ -292,11 +201,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> ASOC_ug10
 
-  P_lf(1:Nd) = YCOXY(1)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YCBENZ(1)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YCTOL(1)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YCALK(1)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YCOLE(1)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
+  P_lf(1:Nd) = YCOXY_lf(1:Nd,1)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YCBENZ_lf(1:Nd,1)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YCTOL_lf(1:Nd,1)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YCALK_lf(1:Nd,1)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YCOLE_lf(1:Nd,1)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
     + rct(82,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ASOC_ug1e2)
   
   L_lf(1:Nd) = rct(81,k) * xnew_lf(1:Nd,OH)
@@ -306,11 +215,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> ASOC_ug1
 
-  P_lf(1:Nd) = YCOXY(0)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YCBENZ(0)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YCTOL(0)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YCALK(0)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YCOLE(0)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
+  P_lf(1:Nd) = YCOXY_lf(1:Nd,0)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YCBENZ_lf(1:Nd,0)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YCTOL_lf(1:Nd,0)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YCALK_lf(1:Nd,0)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YCOLE_lf(1:Nd,0)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
     + rct(81,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ASOC_ug10)
   
   L_lf(1:Nd) = rct(80,k) * xnew_lf(1:Nd,OH)
@@ -329,11 +238,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> non_C_ASOA_ug1e3
 
-  P_lf(1:Nd) = YNOXY(3)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YNBENZ(3)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YNTOL(3)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YNALK(3)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YNOLE(3)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)
+  P_lf(1:Nd) = YNOXY_lf(1:Nd,3)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YNBENZ_lf(1:Nd,3)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YNTOL_lf(1:Nd,3)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YNALK_lf(1:Nd,3)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YNOLE_lf(1:Nd,3)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)
   
   L_lf(1:Nd) = rct(87,k) * xnew_lf(1:Nd,OH)
   
@@ -342,11 +251,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> non_C_ASOA_ug1e2
 
-  P_lf(1:Nd) = YNOXY(2)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YNBENZ(2)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YNTOL(2)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YNALK(2)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YNOLE(2)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
+  P_lf(1:Nd) = YNOXY_lf(1:Nd,2)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YNBENZ_lf(1:Nd,2)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YNTOL_lf(1:Nd,2)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YNALK_lf(1:Nd,2)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YNOLE_lf(1:Nd,2)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
     + 0.9* rct(83,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ASOC_ug1e3)  &
     + 1.075* rct(87,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,non_C_ASOA_ug1e3)
   
@@ -357,11 +266,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> non_C_ASOA_ug10
 
-  P_lf(1:Nd) = YNOXY(1)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YNBENZ(1)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YNTOL(1)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YNALK(1)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YNOLE(1)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
+  P_lf(1:Nd) = YNOXY_lf(1:Nd,1)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YNBENZ_lf(1:Nd,1)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YNTOL_lf(1:Nd,1)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YNALK_lf(1:Nd,1)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YNOLE_lf(1:Nd,1)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
     + 0.9* rct(82,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ASOC_ug1e2)  &
     + 1.075* rct(86,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,non_C_ASOA_ug1e2)
   
@@ -372,11 +281,11 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
 !-> non_C_ASOA_ug1
 
-  P_lf(1:Nd) = YNOXY(0)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
-    + YNBENZ(0)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
-    + YNTOL(0)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
-    + YNALK(0)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
-    + YNOLE(0)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
+  P_lf(1:Nd) = YNOXY_lf(1:Nd,0)* 1.36e-11 * xnew_lf(1:Nd,OXYL) * xnew_lf(1:Nd,OH)  &
+    + YNBENZ_lf(1:Nd,0)* rct(56,k) * xnew_lf(1:Nd,BENZENE) * xnew_lf(1:Nd,OH)  &
+    + YNTOL_lf(1:Nd,0)* rct(57,k) * xnew_lf(1:Nd,TOLUENE) * xnew_lf(1:Nd,OH)  &
+    + YNALK_lf(1:Nd,0)* rct(46,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,NC4H10)  &
+    + YNOLE_lf(1:Nd,0)* rct(52,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,C3H6)  &
     + 0.9* rct(81,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ASOC_ug10)  &
     + 1.075* rct(85,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,non_C_ASOA_ug10)
   
@@ -399,9 +308,9 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
 
   P_lf(1:Nd) = rcemis(SO4,k)  &
     + rct(96,k)*fgasso2_lf(1:Nd,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,SO2)  &
-    + AQRCK_LF(1:ND,ICLRC1,K) * xnew_lf(1:Nd,SO2) * xnew_lf(1:Nd,H2O2)  &
-    + AQRCK_LF(1:ND,ICLRC2,K) * xnew_lf(1:Nd,SO2) * xnew_lf(1:Nd,O3)  &
-    + AQRCK_LF(1:ND,ICLRC3,K) * xnew_lf(1:Nd,SO2)
+    + AQRCK_LF(1:Nd,ICLRC1,K) * xnew_lf(1:Nd,SO2) * xnew_lf(1:Nd,H2O2)  &
+    + AQRCK_LF(1:Nd,ICLRC2,K) * xnew_lf(1:Nd,SO2) * xnew_lf(1:Nd,O3)  &
+    + AQRCK_LF(1:Nd,ICLRC3,K) * xnew_lf(1:Nd,SO2)
   
   ! L_lf(1:Nd) = 0.0
   
@@ -423,16 +332,17 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
 
 !-> NO3_f
 
-  ! P_lf(1:Nd) = 0.0
+  P_lf(1:Nd) = YN2O5HYD(3)* (rct(97,k)  * (1.0 + rctB_lf(1:Nd))) * xnew_lf(1:Nd,N2O5)
   
   ! L_lf(1:Nd) = 0.0
   
-  ! Nothing to do for NO3_f! xnew_lf(1:Nd,NO3_f) = max(0.0, xold_lf(1:Nd,NO3_f))
+  xnew_lf(1:Nd,NO3_f) = xold_lf(1:Nd,NO3_f) +  dt2 * P_lf(1:Nd)
 
 
 !-> NO3_c
 
-  P_lf(1:Nd) = rct(99,k) * xnew_lf(1:Nd,HNO3)  &
+  P_lf(1:Nd) = YN2O5HYD(4)* (rct(97,k)  * (1.0 + rctB_lf(1:Nd))) * xnew_lf(1:Nd,N2O5)  &
+    + rct(99,k) * xnew_lf(1:Nd,HNO3)  &
     + rct(100,k) * xnew_lf(1:Nd,HNO3)
   
   ! L_lf(1:Nd) = 0.0
@@ -889,7 +799,7 @@ endif
 
   P = rcemis(EC_F_RES_NEW,k)
   
-  L = rct(102,k)
+  L = rct(103,k)
   
   xnew(EC_f_Res_new) = (xold(EC_f_Res_new) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -897,7 +807,7 @@ endif
 !-> EC_f_Res_age
 
   P = rcemis(EC_F_RES_AGE,k)  &
-    + rct(102,k) * xnew(EC_f_Res_new)
+    + rct(103,k) * xnew(EC_f_Res_new)
   
   ! L = 0.0
   
@@ -917,7 +827,7 @@ endif
 
   P = rcemis(EC_F_NONRES_NEW,k)
   
-  L = rct(102,k)
+  L = rct(103,k)
   
   xnew(EC_f_nonRes_new) = (xold(EC_f_nonRes_new) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -925,7 +835,7 @@ endif
 !-> EC_f_nonRes_age
 
   P = rcemis(EC_F_NONRES_AGE,k)  &
-    + rct(102,k) * xnew(EC_f_nonRes_new)
+    + rct(103,k) * xnew(EC_f_nonRes_new)
   
   ! L = 0.0
   

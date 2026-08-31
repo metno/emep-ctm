@@ -65,7 +65,8 @@
     + rcphot(IDMEK,k) * xnew(MEKO2H)  &
     + rcphot(IDCH3O2H,k) * xnew(MACROOH)  &
     + rcphot(IDCH3O2H,k) * xnew(OXYO2H)  &
-    + rcphot(IDCH3O2H,k) * xnew(ISRO2H)
+    + rcphot(IDCH3O2H,k) * xnew(ISRO2H)  &
+    + rct(102,k) * xnew(OH) * xnew(ClNO2)
   
   L = rct(5,k) * xnew(HO2)  &
     + rct(6,k) * xnew(H2O2)  &
@@ -122,6 +123,7 @@
     + rct(75,k) * xnew(APINENE)  &
     + rct(77,k) * xnew(TERPOOH)  &
     + rct(96,k) * xnew(SO2)  &
+    + rct(102,k) * xnew(ClNO2)  &
     + rct(20,k) * xnew(shipNOx)
   
   xnew(OH) = (xold(OH) + dt2 * P) / (1.0 + dt2 * L)
@@ -530,7 +532,9 @@
     + rcphot(IDCH3CHO,k) * xnew(NALD)  &
     + rcphot(IDMEK,k) *0.78 * xnew(SC4H9NO3)  &
     + rcphot(IDMEK,k) *0.78 * xnew(ISON)  &
-    + rcemis(NO2,k)
+    + rcemis(NO2,k)  &
+    + rcphot(IDClNO2,k) * xnew(ClNO2)  &
+    + rct(102,k) * xnew(OH) * xnew(ClNO2)
   
   L = rct(12,k) * xnew(O3)  &
     + rct(17,k) * xnew(NO3)  &
@@ -609,8 +613,7 @@
   
   L = rct(6,k) * xnew(OH)  &
     + rcphot(IDH2O2,k)  &
-    + AQRCK(ICLRC1,K) * xnew(SO2) !A24 &
-!A24    + 1.0e-5
+    + AQRCK(ICLRC1,K) * xnew(SO2)
   
   xnew(H2O2) = (xold(H2O2) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -630,7 +633,7 @@
   P = rct(20,k) * xnew(NO2) * xnew(OH)  &
     + rct(36,k) * xnew(HCHO) * xnew(NO3)  &
     + rct(41,k) * xnew(CH3CHO) * xnew(NO3)  &
-    + 2* rct(97,k) * xnew(N2O5)  &
+    + YN2O5HYD(1)* rct(97,k) * xnew(N2O5)  &
     + rct(98,k) * xnew(NO3)  &
     + rct(20,k) * xnew(shipNOx) * xnew(OH)  &
     + 3.2e-5 * xnew(shipNOx)
@@ -1002,8 +1005,7 @@
   P = 0.9* rct(32,k) * xnew(CH3O2) * xnew(HO2)
   
   L = rct(34,k) * xnew(OH)  &
-    + rcphot(IDCH3O2H,k) !A24 &
-!A24    + 1.0e-5
+    + rcphot(IDCH3O2H,k)
   
   xnew(CH3OOH) = (xold(CH3OOH) + dt2 * P) / (1.0 + dt2 * L)
 
@@ -1211,6 +1213,16 @@
   xnew(SO2) = (xold(SO2) + dt2 * P) / (1.0 + dt2 * L)
 
 
+!-> ClNO2
+
+  P = YN2O5HYD(2)* rct(97,k) * xnew(N2O5)
+  
+  L = rcphot(IDClNO2,k)  &
+    + rct(102,k) * xnew(OH)
+  
+  xnew(ClNO2) = (xold(ClNO2) + dt2 * P) / (1.0 + dt2 * L)
+
+
 !-> shipNOx
 
   P = rcemis(SHIPNOX,k)
@@ -1219,6 +1231,7 @@
     + 3.2e-5
   
   xnew(shipNOx) = (xold(shipNOx) + dt2 * P) / (1.0 + dt2 * L)
+
 
 
 if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
@@ -1289,7 +1302,8 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
     + rcphot(IDMEK,k) * xnew_lf(1:Nd,MEKO2H)  &
     + rcphot(IDCH3O2H,k) * xnew_lf(1:Nd,MACROOH)  &
     + rcphot(IDCH3O2H,k) * xnew_lf(1:Nd,OXYO2H)  &
-    + rcphot(IDCH3O2H,k) * xnew_lf(1:Nd,ISRO2H)
+    + rcphot(IDCH3O2H,k) * xnew_lf(1:Nd,ISRO2H)  &
+    + rct(102,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ClNO2)
   
   L_lf(1:Nd) = rct(5,k) * xnew_lf(1:Nd,HO2)  &
     + rct(6,k) * xnew_lf(1:Nd,H2O2)  &
@@ -1346,6 +1360,7 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
     + rct(75,k) * xnew_lf(1:Nd,APINENE)  &
     + rct(77,k) * xnew_lf(1:Nd,TERPOOH)  &
     + rct(96,k)*fgasso2_lf(1:Nd,k) * xnew_lf(1:Nd,SO2)  &
+    + rct(102,k) * xnew_lf(1:Nd,ClNO2)  &
     + rct(20,k) * xnew_lf(1:Nd,shipNOx)
   
   xnew_lf(1:Nd,OH) = (xold_lf(1:Nd,OH) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
@@ -1445,8 +1460,8 @@ if (lf_fullchem .and. k > KMAX_MID-lf_Nvert) then
   
   !-> HO2 cont.
     L_lf(1:Nd) = L_lf(1:Nd) +   rct(76,k) * xnew_lf(1:Nd,TERPO2)  &
-    + AQRCK_LF(1:ND,ICLHO2H2O2,K)  &
-    + rct(101,k)
+    + AQRCK_LF(1:Nd,ICLHO2H2O2,K)  &
+    + (rct(101,k) * (1.0 + rctA_lf(1:Nd)))
   
   xnew_lf(1:Nd,HO2) = (xold_lf(1:Nd,HO2) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
@@ -1669,7 +1684,7 @@ end do
     + rct(78,k) * xnew_lf(1:Nd,APINENE)  &
     + rcphot(IDO3_O1D,k)  &
     + rcphot(IDO3_O3P,k)  &
-    + AQRCK_LF(1:ND,ICLRC2,K) * xnew_lf(1:Nd,SO2)
+    + AQRCK_LF(1:Nd,ICLRC2,K) * xnew_lf(1:Nd,SO2)
   
   xnew_lf(1:Nd,O3) = (xold_lf(1:Nd,O3) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
@@ -1758,7 +1773,9 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
     + rcphot(IDCH3CHO,k) * xnew_lf(1:Nd,NALD)  &
     + rcphot(IDMEK,k) *0.78 * xnew_lf(1:Nd,SC4H9NO3)  &
     + rcphot(IDMEK,k) *0.78 * xnew_lf(1:Nd,ISON)  &
-    + rcemis(NO2,k)
+    + rcemis(NO2,k)  &
+    + rcphot(IDClNO2,k) * xnew_lf(1:Nd,ClNO2)  &
+    + rct(102,k) * xnew_lf(1:Nd,OH) * xnew_lf(1:Nd,ClNO2)
   
   L_lf(1:Nd) = rct(12,k) * xnew_lf(1:Nd,O3)  &
     + rct(17,k) * xnew_lf(1:Nd,NO3)  &
@@ -1803,7 +1820,7 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
     + rcphot(IDNO3,k)
   
   !-> NO3 cont.
-    L_lf(1:Nd) = L_lf(1:Nd) +   rct(98,k)
+    L_lf(1:Nd) = L_lf(1:Nd) +   (rct(98,k)  * (1.0 + rctA_lf(1:Nd)))
   
   xnew_lf(1:Nd,NO3) = (xold_lf(1:Nd,NO3) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
@@ -1813,7 +1830,7 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
   P_lf(1:Nd) = rct(18,k) * xnew_lf(1:Nd,NO2) * xnew_lf(1:Nd,NO3)
   
   L_lf(1:Nd) = rct(19,k)  &
-    + rct(97,k)
+    + (rct(97,k)  * (1.0 + rctB_lf(1:Nd)))
   
   xnew_lf(1:Nd,N2O5) = (xold_lf(1:Nd,N2O5) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
@@ -1834,13 +1851,12 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
     + 0.1575* rct(51,k) * xnew_lf(1:Nd,C2H4) * xnew_lf(1:Nd,O3)  &
     + 0.169* rct(53,k) * xnew_lf(1:Nd,C3H6) * xnew_lf(1:Nd,O3)  &
     + 0.09* rct(65,k) * xnew_lf(1:Nd,C5H8) * xnew_lf(1:Nd,O3)  &
-    + 0.5* AQRCK_LF(1:ND,ICLHO2H2O2,K) * xnew_lf(1:Nd,HO2)  &
-    + 0.5* rct(101,k) * xnew_lf(1:Nd,HO2)
+    + 0.5* AQRCK_LF(1:Nd,ICLHO2H2O2,K) * xnew_lf(1:Nd,HO2)  &
+    + 0.5* (rct(101,k) * (1.0 + rctA_lf(1:Nd))) * xnew_lf(1:Nd,HO2)
   
   L_lf(1:Nd) = rct(6,k) * xnew_lf(1:Nd,OH)  &
     + rcphot(IDH2O2,k)  &
-    + AQRCK_LF(1:ND,ICLRC1,K) * xnew_lf(1:Nd,SO2) !A24 &
-!A24    + 1.0e-5
+    + AQRCK_LF(1:Nd,ICLRC1,K) * xnew_lf(1:Nd,SO2)
   
   xnew_lf(1:Nd,H2O2) = (xold_lf(1:Nd,H2O2) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
@@ -1860,8 +1876,8 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
   P_lf(1:Nd) = rct(20,k) * xnew_lf(1:Nd,NO2) * xnew_lf(1:Nd,OH)  &
     + rct(36,k) * xnew_lf(1:Nd,HCHO) * xnew_lf(1:Nd,NO3)  &
     + rct(41,k) * xnew_lf(1:Nd,CH3CHO) * xnew_lf(1:Nd,NO3)  &
-    + 2* rct(97,k) * xnew_lf(1:Nd,N2O5)  &
-    + rct(98,k) * xnew_lf(1:Nd,NO3)  &
+    + YN2O5HYD(1)* (rct(97,k)  * (1.0 + rctB_lf(1:Nd))) * xnew_lf(1:Nd,N2O5)  &
+    + (rct(98,k)  * (1.0 + rctA_lf(1:Nd))) * xnew_lf(1:Nd,NO3)  &
     + rct(20,k) * xnew_lf(1:Nd,shipNOx) * xnew_lf(1:Nd,OH)  &
     + 3.2e-5 * xnew_lf(1:Nd,shipNOx)
   
@@ -2262,8 +2278,7 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
   P_lf(1:Nd) = 0.9* rct(32,k) * xnew_lf(1:Nd,CH3O2) * xnew_lf(1:Nd,HO2)
   
   L_lf(1:Nd) = rct(34,k) * xnew_lf(1:Nd,OH)  &
-    + rcphot(IDCH3O2H,k) !A24 &
-!A24    + 1.0e-5
+    + rcphot(IDCH3O2H,k)
   
   xnew_lf(1:Nd,CH3OOH) = (xold_lf(1:Nd,CH3OOH) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
@@ -2466,13 +2481,23 @@ P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivem
   P_lf(1:Nd) = rcemis(SO2,k)
   
   L_lf(1:Nd) = rct(96,k)*fgasso2_lf(1:Nd,k) * xnew_lf(1:Nd,OH)  &
-    + AQRCK_LF(1:ND,ICLRC1,K) * xnew_lf(1:Nd,H2O2)  &
-    + AQRCK_LF(1:ND,ICLRC2,K) * xnew_lf(1:Nd,O3)  &
-    + AQRCK_LF(1:ND,ICLRC3,K)
+    + AQRCK_LF(1:Nd,ICLRC1,K) * xnew_lf(1:Nd,H2O2)  &
+    + AQRCK_LF(1:Nd,ICLRC2,K) * xnew_lf(1:Nd,O3)  &
+    + AQRCK_LF(1:Nd,ICLRC3,K)
   
 P_lf(NSPEC_deriv_lf+1:Nd) = P_lf(NSPEC_deriv_lf+1:Nd) + rcemis_lf(1:N_lf_derivemis,SO2) 
 
   xnew_lf(1:Nd,SO2) = (xold_lf(1:Nd,SO2) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
+
+
+!-> ClNO2
+
+  P_lf(1:Nd) = YN2O5HYD(2)* (rct(97,k)  * (1.0 + rctB_lf(1:Nd))) * xnew_lf(1:Nd,N2O5)
+  
+  L_lf(1:Nd) = rcphot(IDClNO2,k)  &
+    + rct(102,k) * xnew_lf(1:Nd,OH)
+  
+  xnew_lf(1:Nd,ClNO2) = (xold_lf(1:Nd,ClNO2) +  dt2 * P_lf(1:Nd)) / (1.0 + dt2 * L_lf(1:Nd))
 
 
 !-> shipNOx
