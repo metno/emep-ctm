@@ -120,7 +120,7 @@ module Country_mod
    integer, public ::  IC_TR   ! Turkey
    integer, public ::  IC_SU   ! Former USSE
    integer, public ::  IC_GB   ! United Kingdom
-   integer, public :: IC_VUL   ! Vulcanoes
+   integer, public :: IC_VOL   ! Volcanoes
    integer, public :: IC_REM   ! Remaining Areas
    integer, public :: IC_BAS   ! The Baltic Sea
    integer, public :: IC_NOS   ! The North Sea
@@ -644,8 +644,8 @@ contains
       IC_GB = ix
       Country(IC_GB) = cc("GB ", 'UNKI', 27, F, 27, 27, 0, "United Kingdom                ")
       ix = ix + 1
-      IC_VUL = ix
-      Country(IC_VUL) = cc("VUL", '-', 28, F, 28, 28, 1, "Volcanoes                     ")
+      IC_VOL = ix
+      Country(IC_VOL) = cc("VOL", '-', 28, F, 28, 28, 1, "Volcanoes                     ")
       ix = ix + 1
       IC_REM = ix
       Country(IC_REM) = cc("REM", '-', 29, F, 29, 29, 1, "Remaining land areas          ")

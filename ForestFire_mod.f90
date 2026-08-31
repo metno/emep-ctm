@@ -83,7 +83,7 @@ use ChemDims_mod ,         only: NSPEC_TOT, NSPEC_SHL
 use ChemSpecs_mod
 use Config_module,         only: MasterProc, DataDir, KMAX_MID, USES, &
                                 IOU_INST,BBMODE,BBverbose,persistence,&
-                                fire_year,&
+                                fire_year,FF_FAC,&
                                 cmxBiomassBurning_FINN, &
                                 cmxBiomassBurning_GFASv1, &
                                 BBneed_file,BBneed_date,BBneed_poll,&
@@ -93,13 +93,14 @@ use GridValues_mod,        only: i_fdom, j_fdom, debug_li, debug_lj, &
                                 debug_proc,xm2,GRIDWIDTH_M, A_bnd,B_bnd
 use Io_mod,                only: datewrite, IO_NML, IO_TMP, open_file, ios
 use Io_RunLog_mod,         only: PrintLog
+use LocalFractions_mod,    only: makeFFE_lf,lf_Nvert,rcemis_lf_nat_3D,ix_nat_FFE
 use MetFields_mod,         only: z_mid, z_bnd, hmix
 use netcdf,                only: nf90_open, nf90_nowrite, nf90_close
 use NetCDF_mod,            only: ReadTimeCDF,ReadField_CDF,Out_netCDF,Real4,&
                                 closedID
 use NumberConstants,       only: UNDEF_I, UNDEF_R
 use OwnDataTypes_mod,      only: Deriv, TXTLEN_SHORT, TXTLEN_FILE
-use Par_mod,               only: LIMAX, LJMAX, me,limax,ljmax
+use Par_mod,               only: LIMAX, LJMAX, me, limax, ljmax
 use PhysicalConstants_mod, only: AVOG
 use SmallUtils_mod,        only: find_index, key2str
 ! No. days per year, date-type:
@@ -545,6 +546,11 @@ subroutine Fire_Emis(daynumber)
          if(ndn>1) fac=fac/ndn                         ! total-->avg.
          if(fac/=1.0) forall(j=1:ljmax,i=1:limax) rdemis(i,j)=rdemis(i,j)*fac
        end select
+
+       if (FF_FAC/=1.0) then
+          !scaling for SR FF scenario runs
+         forall(j=1:ljmax,i=1:limax) rdemis(i,j) = rdemis(i,j) * FF_FAC
+       end if
    
       ! Assign . units should be [kg/m2/s] here 
        forall(j=1:ljmax,i=1:limax) &
@@ -730,7 +736,7 @@ subroutine Fire_rcemis(i,j)
   integer ::  N_LEVELS  ! = 9 for standard 20 model levels
 
   character(len=*), parameter :: dtxt = 'BB:rcemis'
-  real    :: origrc, fac, dP, P0
+  real    :: origrc, fac, dP, P0, BBemis
   logical :: debug_flag
 
   P0 = 101325.0
@@ -790,11 +796,22 @@ subroutine Fire_rcemis(i,j)
 
     ! distribute vertically:
     !dP=total "thickness"
-    dP = A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1) - (A_bnd(KEMISFIRE)+P0*B_bnd(KEMISFIRE))    
-    do k = KEMISFIRE, KMAX_MID
-      rcemis(iem,k) = rcemis(iem,k) + BiomassBurningEmis(n,i,j)*invDeltaZfac(k)*fac&
-           *(A_bnd(k+1)+P0*B_bnd(k+1) - (A_bnd(k)+P0*B_bnd(k)))/dP!scale with layer thickness
+    dP = A_bnd(KMAX_MID+1)+P0*B_bnd(KMAX_MID+1) - (A_bnd(KEMISFIRE)+P0*B_bnd(KEMISFIRE))
 
+    do k = KEMISFIRE, KMAX_MID
+
+      BBemis = BiomassBurningEmis(n,i,j)*invDeltaZfac(k)*fac&
+           *(A_bnd(k+1)+P0*B_bnd(k+1) - (A_bnd(k)+P0*B_bnd(k)))/dP!scale with layer thickness
+      rcemis(iem,k) = rcemis(iem,k) + BBemis
+      
+      if (makeFFE_lf) then
+         if (k < KMAX_MID-lf_Nvert+1) then
+            write(*,*)'WARNING LF: cannot include Forest Fire emissions for level ', k 
+         else
+            rcemis_lf_nat_3D(iem,k,ix_nat_FFE) = rcemis_lf_nat_3D(iem,k,ix_nat_FFE) + BBemis
+         end if
+      end if
+      
      ! nb :::: ONLY FOR CO!
       Emis_CO_Profile(i,j,k) = BiomassBurningEmis(n,i,j)*invDeltaZfac(k)*fac&
            *(A_bnd(k+1)+P0*B_bnd(k+1) - (A_bnd(k)+P0*B_bnd(k)))/dP

@@ -50,7 +50,7 @@ use Config_module,only: MasterProc, KMAX_MID, nmax, step_main,END_OF_EMEPDAY &
                            ,JUMPOVER29FEB&
                            ,IOU_HOUR, IOU_HOUR_INST, IOU_YEAR&
                            ,fileName_O3_Top,FREQ_SITE, FREQ_SONDE&
-                           , O3_ix,SO2_ix,NH3_ix
+                           , O3_ix,SO2_ix,NH3_ix,SOILNOX
 use DA_mod,            only: DEBUG_DA_1STEP
 use DA_3DVar_mod,      only: main_3dvar, T_3DVAR
 use Debug_module,      only: DEBUG, DebugCell  ! -> DEBUG%GRIDVALUES
@@ -64,7 +64,7 @@ use Gravset_mod,       only: gravset
 use GridValues_mod,    only: debug_proc,debug_li,debug_lj,&
                             glon,glat,projection,i_local,j_local,i_fdom,j_fdom
 use Io_Progs_mod,       only: datewrite
-
+use LocalFractions_mod, only: lf_clock
 use MetFields_mod,     only: ps,roa,z_bnd,z_mid,cc3dmax, &
                             PARdbh, PARdif, fCloud, & !WN17, PAR in W/m2
                             zen,coszen
@@ -124,7 +124,7 @@ subroutine phyche()
   thour = real(current_date%hour) + current_date%seconds/3600.0
 
   if ( DEBUG%STOFLUX .and. debug_proc .and. first_call ) then
-   write(*,'(a,3i4,2f10.4)')dtxt//"SEIij ", me,debug_li,debug_lj,& 
+   write(*,'(a,3i4,2f10.4)')dtxt//"SEIij ", me,debug_li,debug_lj,&
      glon(debug_li,debug_lj),glat(debug_li,debug_lj)
   end if
 
@@ -148,7 +148,7 @@ subroutine phyche()
         !we redefine the file to be read and where to start
         !should account for:
         !   a) the first record (time 0:0 first of January) may be missing
-        !   b) we may start a new year after 31 Dec midnight 
+        !   b) we may start a new year after 31 Dec midnight
         fileName_O3_Top_current = key2str(fileName_O3_Top,'YYYY',current_date%year)
         if(MasterProc)then
            write(*,*)dtxt//'Reading 3 hourly O3 at top from :'
@@ -164,7 +164,7 @@ subroutine phyche()
         O3record = O3record + 1 !next record
         O3_end_date(4) = O3_end_date(4) + 3 !We assume 3-hourly values (ok if > 24!)
      end if
-     
+
      if(DEBUG%PHYCHEM .and. MasterProc) then
        write(*,*)'Updating top O3 with record ',&
           O3record,", file ",trim(fileName_O3_Top_current)
@@ -175,7 +175,7 @@ subroutine phyche()
      call  ReadField_CDF(trim(fileName_O3_Top_current),'O3',xn_adv(O3_ix-NSPEC_SHL,:,:,1),&
           nstart=O3record,kstart=kstart,kend=kstart,&
           interpol='zero_order',debug_flag=.false.)
-   
+
   endif
 
   call Code_timer(tim_before)
@@ -209,6 +209,7 @@ subroutine phyche()
   d_2d(:,:,:,IOU_INST) = 0.0
   ! ========================
 
+  if(USES%LocalFractions) call lf_clock
 
   !===================================
 
@@ -264,7 +265,7 @@ subroutine phyche()
   !===================================
   call Set_SoilWater()
   !===================================
-  if(USES%SOILNOX_METHOD=="ACP2012EURO") &
+  if(SOILNOX%TYPE=="ACP2012EURO") &
      call Set_ACP2012EuroSoilNOx()!hourly, deprecated
 
   !===================================

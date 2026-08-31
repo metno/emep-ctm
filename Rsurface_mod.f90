@@ -406,9 +406,9 @@ contains
   end do GASLOOP
 
 
-  if ( dbg ) write(*,"(a,a10,i4,2f7.3,5L2)") &
+  if ( dbg ) write(*,"(a,a10,i4,2f7.3,5L2,f8.4)") &
     dtxt//" nGas iL, LAI, SAI, LOGIS ", trim(LandDefs(iL)%name), nddep, L%LAI,&
-       L%SAI, L%is_forest, L%is_water, L%is_veg, canopy, leafy_canopy
+       L%SAI, L%is_forest, L%is_water, L%is_veg, canopy, leafy_canopy, L%g_sto
  end subroutine Rsurface
 
 !--------------------------------------------------------------------

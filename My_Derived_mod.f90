@@ -67,14 +67,16 @@ use Config_module,     only: MasterProc, SOURCE_RECEPTOR, & !
                             startdate, out_startdate, spinup_enddate,&
                             num_lev3d,lev3d, &! 3D levels on 3D output
                             SecEmisOutWanted,EmisSplit_OUT, AOD_WANTED,&
-                            OutputMisc,OutputConcs,OutputVegO3,&
-                            DDEP_ECOS, DDEP_WANTED, WDEP_WANTED,SDEP_WANTED,&
+                            OutputMisc,OutputConcs,OutputVegO3, &
+                            DDEP_WANTED, WDEP_WANTED,SDEP_WANTED,&
+                             DDEP_ECOS, MAX_NUM_DDEP_ECOS,&
                             NewMosaic, MOSAIC_METCONCS, MET_LCS, Mosaic_timefmt,&
                             fullrun_DOMAIN,month_DOMAIN,day_DOMAIN,&
                             hour_DOMAIN, &
                             lev3d_from_surface,&
                             MAX_NUM_DERIV2D,OutputVegO3, nOutputVegO3
 use Debug_module,      only: DEBUG ! => DEBUG_MY_DERIVED
+use EcoSystem_mod,     only: nEcoSysOutputs, ECOSYSTEM_OUTPUTS
 use EmisDef_mod,       only: NSECTORS, SECTORS, EMIS_FILE
 use EmisGet_mod,       only: nrcemis, iqrc2itot
 use GridValues_mod,    only: RestrictDomain
@@ -86,7 +88,7 @@ use MosaicOutputs_mod, only: nMosaic, MAX_MOSAIC_OUTPUTS, MosaicOutput, & !
 
 use OwnDataTypes_mod,only: Deriv, TXTLEN_DERIV, TXTLEN_SHORT,&
                           typ_s3, typ_s4, typ_s5ind, typ_s1ind
-use Par_mod,         only: limax,ljmax        ! => used x, y area
+use Par_mod,         only: me,limax,ljmax        ! => used x, y area
 use SmallUtils_mod,  only: AddArray,LenArray,NOT_SET_STRING,WriteArray,find_index
 implicit none
 private
@@ -131,8 +133,6 @@ integer, public, save :: nOutputWdep   = 0
 ! Direct setting of derived fields:
 integer, save, public :: nOutputMisc = 0
 
-
-
 character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
   D2_SR = [character(len=TXTLEN_DERIV):: &
     ! all array members will have len=TXTLEN_DERIV
@@ -144,31 +144,19 @@ character(len=TXTLEN_DERIV), public, parameter, dimension(4) :: &
 !============ Extra parameters for model evaluation: ===================!
 !character(len=TXTLEN_DERIV), public, parameter, dimension(13) :: &
 !Nov2022 Qing - adjust numbers here (from +2 to +16?)
-character(len=TXTLEN_DERIV), public, parameter, dimension(7+16) :: &
+!character(len=TXTLEN_DERIV), public, parameter, dimension(7+16) :: &
+character(len=TXTLEN_DERIV), public, parameter, dimension(7) :: &
   D2_EXTRA = [character(len=TXTLEN_DERIV):: &
     ! all array members will have len=TXTLEN_DERIV
     "Area_Grid_km2","Area_NeedleLeaf_Frac","Area_BroadLeaf_Frac",&
-    "Area_Forest_Frac", &
-    "Area_nonForest_Frac", &
-    "Area_Seminat_Frac","Area_Crops_Frac", &
-!Nov2022 Qing - add LCs here
-    "Area_CF_Frac", &
-    "Area_DF_Frac", &
-    "Area_NF_Frac", &
-    "Area_BF_Frac", &
-    "Area_TC_Frac", &
-    "Area_MC_Frac", &
-    "Area_RC_Frac", &
-    "Area_SNL_Frac", &
-    "Area_GR_Frac", &
-    "Area_MS_Frac", &
-    "Area_WE_Frac", &
-    "Area_TU_Frac", &
-    "Area_DE_Frac", &
-    "Area_W_Frac", &
-    "Area_ICE_Frac", &
-    "Area_U_Frac" &
-     ]
+    "Area_Forest_Frac", "Area_nonForest_Frac", &
+    "Area_Seminat_Frac","Area_Crops_Frac" &
+  ]
+integer, private :: iEco
+character(len=TXTLEN_DERIV), public, save, dimension(MAX_NUM_DDEP_ECOS) :: &
+  D2_LC_EXTRA = "NOTSET"
+
+  
 !   "SoilWater_deep","SoilWater_uppr,&! See SMI_deep above
 !   "AreaPOLL"]                       ! Future usage. Should change name too
 
@@ -360,7 +348,8 @@ subroutine Init_My_Deriv()
 
  if(EmisSplit_OUT)then
     do i=1,max(18,nrcemis)
-      tag_name(1) = "EmisSplit_mgm2_"//trim(species(iqrc2itot(i))%name)
+       if(me==0)write(*,*)trim(species(iqrc2itot(i))%name),' Split index: ',i
+       tag_name(1) = "EmisSplit_mgm2_"//trim(species(iqrc2itot(i))%name)
       call AddArray(tag_name(1:1), wanted_deriv2d, NOT_SET_STRING, errmsg)
     end do
  end if
@@ -369,8 +358,18 @@ subroutine Init_My_Deriv()
   call AddArray( D2_SR,  wanted_deriv2d, NOT_SET_STRING, errmsg)
   call CheckStop( errmsg, errmsg // "D2_SR too long" )
   if(.not.SOURCE_RECEPTOR) then !may want extra?
-    call AddArray( D2_EXTRA, wanted_deriv2d, NOT_SET_STRING, errmsg)
-    call CheckStop( errmsg, errmsg // "D2_EXTRA too long" )
+    !call AddArray( D2_EXTRA, wanted_deriv2d, NOT_SET_STRING, errmsg)
+    !call CheckStop( errmsg, errmsg // "D2_EXTRA too long" )
+    do i = 1, nEcoSysOutputs
+      if (index(ECOSYSTEM_OUTPUTS(i),'Grid')> 0 ) then
+        D2_LC_EXTRA(i) = "Area_"// trim(ECOSYSTEM_OUTPUTS(i)) //"_km2"
+      else
+        D2_LC_EXTRA(i) = "Area_"// trim(ECOSYSTEM_OUTPUTS(i)) //"_Frac"
+      end if
+      if(MasterProc) write(*,*) 'D2LC', i, trim(D2_LC_EXTRA(i))
+    end do
+    call AddArray( D2_LC_EXTRA(1:nEcoSysOutputs), wanted_deriv2d, NOT_SET_STRING, errmsg)
+    call CheckStop( errmsg, errmsg // "D2_LC_EXTRA too long" )
   end if
 
 !------------- Depositions to ecosystems --------------------------------
@@ -386,7 +385,6 @@ subroutine Init_My_Deriv()
 
   do n = 1, nOutputVegO3
     VEGO3_OUTPUTS(n) = OutputVegO3(n)
-    !if(dbg0)  write(*,*) "VEGO3 NUMS ", n, trim(OutputVegO3(n)%name) 
   end do
   if(dbg0) call WriteArray(VEGO3_OUTPUTS(:)%name,nOutputVegO3,&
                                    dtxt//" VEGO3 OUTPUTS:")

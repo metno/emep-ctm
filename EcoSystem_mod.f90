@@ -26,10 +26,11 @@
 !*****************************************************************************!
 module EcoSystem_mod
 
-use Config_module ,   only: MasterProc, NLANDUSEMAX, IOU_YEAR, IOU_KEY
+use Config_module ,   only: MasterProc, NLANDUSEMAX, IOU_YEAR,&
+                            IOU_KEY, LandCoverInputs, MAX_NUM_DDEP_ECOS
 use Debug_module,     only: DEBUG ! =>DEBUG_ECOSYSTEMS
 use LandDefs_mod,     only: LandType, LandDefs
-use OwnDataTypes_mod, only: Deriv, print_deriv_type, TXTLEN_DERIV, TXTLEN_SHORT
+use OwnDataTypes_mod, only: Deriv, print_deriv_type, TXTLEN_DERIV, TXTLEN_SHORT, typ_s1ind
 use Par_mod,          only: LIMAX, LJMAX
 
 implicit none
@@ -56,17 +57,22 @@ integer, public, parameter :: FULL_LCGRID=0
 ! since CCE want to have deposition to the watershed, which means 
 ! the grid in practice.
 
-! Nov2022 - adding Tålegrenser LC. Qing - continue from here - same order as in Inputs_LandDefs !
-integer, public, parameter :: NDEF_ECOSYSTEMS = LAST_ECO + 16 ! first 16 LC
-character(len=TXTLEN_SHORT),public,dimension(NDEF_ECOSYSTEMS),parameter :: &
-  DEF_ECOSYSTEMS = [character(len=TXTLEN_SHORT):: &
-    "Grid","NeedleLeaf","BroadLeaf","Crops","Seminat","Forest","Water_D","nonForest", &
-     "CF", "DF", "NF", "BF", "TC", "MC", "RC", "SNL", "GR", "MS", "WE", &
-     "TU", "DE", "W", "ICE", "U"]  
+type(Deriv),public,dimension(:),allocatable, save:: DepEcoSystem  ! N ECOSYSTEM_OUTPUTS
+logical,    public,dimension(:,:),allocatable, save:: Is_EcoSystem  ! N ECOSYSTEM_OUTPUTS, NLANDUSEMAX
+real,       public,dimension(:,:,:),allocatable, save:: EcoSystemFrac
 
-type(Deriv),public,dimension(NDEF_ECOSYSTEMS)            ,save:: DepEcoSystem
-logical,    public,dimension(NDEF_ECOSYSTEMS,NLANDUSEMAX),save:: Is_EcoSystem
-real,       public,dimension(:,:,:),allocatable          ,save:: EcoSystemFrac
+
+! integer, public, parameter :: MAX_NUM_DDEP_ECOS = 30  ! Outputs for Grid, Conif, etc.
+ integer, public, save :: nEcoSysOutputs = 0
+ integer :: i
+ character(len=TXTLEN_SHORT),public,dimension(MAX_NUM_DDEP_ECOS),save :: &
+  ECOSYSTEM_OUTPUTS  = [character(len=TXTLEN_SHORT):: &
+    "Grid","NeedleLeaf","BroadLeaf","Crops","Seminat","Forest","Water_D", &
+    "nonForest", ('NOTSET', i=9, MAX_NUM_DDEP_ECOS) ]
+! Depositions
+!  type(typ_s1ind), public, save, dimension(MAX_NUM_DDEP_ECOS) :: &
+!  DDEP_ECOS = typ_s1ind("-",'-') ! e.g. "Grid","YMD",
+
 
 contains
  !<---------------------------------------------------------------------------
@@ -76,23 +82,35 @@ subroutine Init_EcoSystems()
   character(len=100) :: errmsg
   integer :: iEco, iLC
   logical, parameter :: T = .true., F = .false. ! shorthands only
+  character(len=*), parameter:: dtxt='IniEcoS:'
 
-  allocate(EcoSystemFrac(NDEF_ECOSYSTEMS,LIMAX,LJMAX))
+  do iEco = 9, size(ECOSYSTEM_OUTPUTS)  ! 1 to 8 are Grid etc, defined above
+    ECOSYSTEM_OUTPUTS(iEco) = LandCoverInputs%PFTs(iEco-8)
+    if(MasterProc) write(*,*) dtxt//'EcoOUT:', iEco, trim(ECOSYSTEM_OUTPUTS(iEco))
+    if (ECOSYSTEM_OUTPUTS(iEco) == 'NOTSET') exit
+    nEcoSysOutputs = iEco 
+  end do
+  if(MasterProc) write(*,*) dtxt//"END", nEcoSysOutputs, ECOSYSTEM_OUTPUTS(nEcoSysOutputs)
+
+  allocate( EcoSystemFrac(nEcoSysOutputs,LIMAX,LJMAX))
+  allocate( DepEcoSystem(nEcoSysOutputs) )
+  allocate( Is_EcoSystem(nEcoSysOutputs,NLANDUSEMAX)  )
+
   if(MasterProc) write(*,*) "Defining ecosystems: ",&
-    (trim(DEF_ECOSYSTEMS(iEco))," ",iEco = 1, NDEF_ECOSYSTEMS)
+    (trim(ECOSYSTEM_OUTPUTS(iEco))," ",iEco = 1, nEcoSysOutputs)
 
-  do iEco = 1, NDEF_ECOSYSTEMS
-    name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_Frac"
+  do iEco = 1, nEcoSysOutputs
+    name = "Area_"//trim(ECOSYSTEM_OUTPUTS(iEco))//"_Frac"
     unit = "Fraction"
     if(iEco==FULL_ECOGRID) then
-      name = "Area_"//trim(DEF_ECOSYSTEMS(iEco))//"_km2"
+      name = "Area_"//trim(ECOSYSTEM_OUTPUTS(iEco))//"_km2"
       unit = "km2"
     end if
 
     ! Deriv(name, class,    subc,  txt,           unit
     ! Deriv index, f2d, dt_scale, scale, avg? Inst Yr Mn Day
     DepEcoSystem(iEco) = Deriv(  &
-      trim(name), "EcoFrac", "Area",trim(DEF_ECOSYSTEMS(iEco)) , trim(unit), &
+      trim(name), "EcoFrac", "Area",trim(ECOSYSTEM_OUTPUTS(iEco)) , trim(unit), &
       iEco, -99, F, 1.0, F, IOU_KEY(IOU_YEAR) )
 
     if(DEBUG%ECOSYSTEMS .and. MasterProc) &
@@ -109,14 +127,15 @@ subroutine Init_EcoSystems()
   Is_EcoSystem(WATER_D,:) =  LandType(:)%is_water
   Is_EcoSystem(NONFOREST,:) =  .not. Is_EcoSystem(FOREST,:)
 
-  do iEco = 1, NDEF_ECOSYSTEMS-LAST_ECO
-    Is_EcoSystem(LAST_ECO+iEco,:) = LandDefs(:)%code == DEF_ECOSYSTEMS(LAST_ECO+iEco)
+  do iEco = 1, nEcoSysOutputs-LAST_ECO
+    Is_EcoSystem(LAST_ECO+iEco,:) = &
+             (LandDefs(:)%code == ECOSYSTEM_OUTPUTS(LAST_ECO+iEco))
   end do
 
   if ( MasterProc .and. DEBUG%ECOSYSTEMS) then
-    write(*,"(a,a3,1x, a12,4a8)") 'ECOSYS', iEco, 'Forest', 'BDLF', 'NDLF', 'NON-For'
-    do iEco = 1, NDEF_ECOSYSTEMS
-      write(*,"(a,i3,1x,a12,4L8)") 'ECOSYS', iEco, DEF_ECOSYSTEMS(iEco), &
+    write(*,"(a,a4,1x, a12,4a8)") 'ECOSYS  iEco', 'LC', 'Forest', 'BDLF', 'NDLF', 'NON-For'
+    do iEco = 1, nEcoSysOutputs
+      write(*,"(a,i3,1x,a12,4L8)") 'ECOSYS', iEco, ECOSYSTEM_OUTPUTS(iEco), &
         Is_EcoSystem(FOREST,iEco), Is_EcoSystem(BDLF,iEco),  &
         Is_EcoSystem(BDLF,iEco), Is_EcoSystem(NONFOREST,iEco) ! , Is_EcoSystem(9,iEco)
     end do

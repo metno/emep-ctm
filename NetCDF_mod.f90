@@ -134,6 +134,7 @@ public :: make_gridresolution
 public :: create_country_emission_file
 public :: output_country_emissions
 public :: masked_output
+public :: write_CDF_attribute
 
 private :: CreatenetCDFfile
 private :: createnewvariable
@@ -162,7 +163,7 @@ subroutine Out_CDF_sondes(fileName,SpecName,NSpec,Values,NLevels,g_ps,debug_flag
 
 
   debug_1D=DEBUG%NETCDF
-  
+
   if(present(debug_flag))debug_1D = debug_flag .or. debug_1D
 
   if(MasterProc)then
@@ -623,7 +624,7 @@ subroutine CreatenetCDFfile(fileName,GIMAXcdf,GJMAXcdf,IBEGcdf,JBEGcdf,&
   character (len=*), parameter :: vert_coord='atmosphere_hybrid_sigma_pressure_coordinate'
 
   real ::Buff2D(MAXLIMAX,MAXLJMAX,2)
-  
+
   ! fileName: Name of the new created file
   ! nf90_clobber: protect existing datasets
   ! ncFileID: netcdf ID
@@ -1013,7 +1014,11 @@ function define_var(vname,xtype,dimIDs) result(varID)
     call check(nf90_def_var(ncFileID,vname,xtype,dimIDs,varID),"def:"//trim(vname))
     call check(nf90_put_att(ncFileID,varID,"standard_name","atmosphere_hybrid_sigma_pressure_coordinate"))
     call check(nf90_put_att(ncFileID,varID,"long_name", "hybrid level at layer midpoints (A/P0+B)"))
-    call check(nf90_put_att(ncFileID,varID,"positive", "down"))
+    if (levels_from_top) then
+       call check(nf90_put_att(ncFileID,varID,"positive", "down"))
+    else
+       call check(nf90_put_att(ncFileID,varID,"positive", "up"))
+    end if
     call check(nf90_put_att(ncFileID,varID,"formula_terms","ap: hyam b: hybm ps: PS p0: P0"))
   case("ilev")
     call check(nf90_def_var(ncFileID,vname,xtype,dimIDs,varID),"def:"//trim(vname))
@@ -1186,6 +1191,8 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
   real(kind=4),   allocatable,dimension(:,:,:) :: R4data3D
   real(kind=4),   allocatable,dimension(:,:,:,:,:) :: R4data5D
   integer(kind=4),allocatable,dimension(:,:,:) :: Idata3D
+  integer(kind=2),allocatable,dimension(:) :: Int2Dim5
+  integer(kind=2),allocatable,dimension(:,:,:,:,:) :: Int2Dim5_5
   integer :: OUTtype !local version of CDFtype
   integer :: iotyp_new, size5D
   integer :: iDimID,jDimID,kDimID,timeVarID
@@ -1199,7 +1206,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
   integer, save :: countwrite = 0 !to count the number of writes without closing file
   integer, parameter :: MAXcountwrite = 200
   integer, save :: previous_ncFileID = closedID - 1
-  
+
   domain=RUNDOMAIN!default domain (in fulldomain coordinates)
 !fullrun, Monthly, Daily and hourly domains may be predefined
   select case(iotyp)
@@ -1228,7 +1235,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      if(MasterProc) write(*,*) i1,i2,j1,j2,kmax
      return
   end if
-  
+
  !make variable name
   write(varname,fmt='(A)')trim(def1%name)
   if(DEBUG%NETCDF.and.MasterProc) write(*,*)'Out_NetCDF: START ',trim(varname)
@@ -1439,7 +1446,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
               dimSizes=dimSizes,dimNames=dimNames)
     end if
   end if!MasterProc
-  
+
   if(create_var_only_local)then
     ! Don't write the data
     ! For performance: need to create all variables before writing data
@@ -1462,9 +1469,9 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
         extradim = extradim*dimSizes(n)
      end do
   endif
-  if(extradim>1 .and. (OUTtype/=Real4 .or. ndim/=5))write(*,*)extradim,OUTtype,ndim
-  call CheckStop(extradim>1 .and. (OUTtype/=Real4 .or. ndim/=5), "extradim case not implemented")
-  
+  if(extradim>1 .and. ((OUTtype/=Real4 .and. OUTtype/=Int2) .or. ndim/=5))write(*,*)extradim,OUTtype,ndim
+  call CheckStop(extradim>1 .and. ((OUTtype/=Real4 .and. OUTtype/=Int2) .or. ndim/=5), "extradim case not implemented")
+
   if(ndim-2>0)countvec(ndim-2)=i2-i1+1
   if(ndim-1>0)countvec(ndim-1)=j2-j1+1
   countvec(ndim)=kmax
@@ -1472,7 +1479,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
   ijk=0
   allocate(buff(MAXLIMAX*MAXLJMAX*kmax*extradim))
   allocate(buff4(MAXLIMAX*MAXLJMAX*kmax*extradim))
-  
+
   do k=1,kmax
      do j = 1,tljmax(me)
         do i = 1,tlimax(me)
@@ -1495,21 +1502,26 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
            size5D=0 !to show it should not be used
      end if
   end if
-  !we have two different methods to send data between MPI processes
+  !we have two different methods to send data between MPI processes.
+  !If ndim=5, and the arrays become very large, we write one subdomain at a time to file (useMPI_Gather = .false.)
   useMPI_Gather = .true. !use MPI_Gather
-  if ((ndim==5 .and. size5D==0) .or. OUTtype == Real8) useMPI_Gather = .false.! use MPI_Send 
-  
+  if ((ndim==5 .and. size5D==0) .or. OUTtype == Real8) useMPI_Gather = .false.! use MPI_Send
+
   if(MasterProc)then
-     
+
+     !for the Int2 case, we treat everything as Real, until just before writing to file (only MasterProc writes to file).
+     if(ndim==5 .and. OUTtype == Int2 .and. .not.useMPI_Gather)allocate(Int2Dim5(MAXLIMAX*MAXLJMAX*kmax*extradim)) !write one subdomain at a time
+     if(ndim==5 .and. OUTtype == Int2 .and. useMPI_Gather) allocate(Int2Dim5_5(dimSizes(1),dimSizes(2),GIMAX,GJMAX,kmax)) !put everything in one big array
+
      ndate(1:4) = [current_date%year,current_date%month,&
           current_date%day ,current_date%hour]
-     
+
      ! get variable id
      call check(nf90_inq_varid(ncFileID,varname,VarID))
      ! find the number of records already written
      call check(nf90_get_att(ncFileID,VarID,"numberofrecords",nrecords))
      if(DEBUG%NETCDF) print *,'number of dataset saved: ',nrecords
-     
+
      ! test if new record is needed
      if(present(ik).and.nrecords>0)then
         ! The new record may already exist
@@ -1527,7 +1539,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      if(DEBUG%NETCDF) print *,'writing on dataset: ',nrecords
      startvec(ndim+1) = nrecords
      countvec(ndim+1) = 1
-     
+
      if (ndim<5) then
         !write own data in global array
         select case(OUTtype)
@@ -1573,7 +1585,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      else
         if (useMPI_Gather) then ! less than 2GB
            allocate(R4data5D(dimSizes(1),dimSizes(2),GIMAX,GJMAX,kmax))
-        end if
+       end if
      end if
      tmpi=0.0
      tio=0.0
@@ -1591,7 +1603,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
              outCDFtag, MPI_COMM_CALC, MPISTATUS, IERROR)
         tmpi = tmpi + MPI_WTIME()-t1
         if(ndim==5 .and. .not.useMPI_Gather)then
-           ! write one buffer at a time to save memory              
+           ! write one buffer at a time to save memory
            startvec(1)=1
            startvec(2)=1
            startvec(3)=max(1,tgi0(d)-i1+1)
@@ -1606,30 +1618,61 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
            countvec(5)=kmax
            if (countvec(3)>0 .and. countvec(4)>0) then
               t1=MPI_WTIME()
-              call check(nf90_put_var(ncFileID,VarID,buff,&
-                   start=startvec(1:ndim+1),count=countvec(1:ndim+1)))
+              if(OutType==Int2)then
+                 do i = 1,MAXLIMAX*MAXLJMAX*kmax*extradim
+                    Int2Dim5(i)=nint(buff(i))
+                 end do
+                 call check(nf90_put_var(ncFileID,VarID,Int2Dim5,&
+                      start=startvec(1:ndim+1),count=countvec(1:ndim+1)))
+
+              else
+                 call check(nf90_put_var(ncFileID,VarID,buff,&
+                      start=startvec(1:ndim+1),count=countvec(1:ndim+1)))
+              end if
               tio = tio + MPI_WTIME()-t1
            end if
 
         else
-           
+           !put everything in one big array
            if(ndim>3 .and. ndim/= 5)then
               write(*,*)'ndim >3 and not=5 not implemented'
               stop
            end if
-           
+
            ! copy data to global buffer
            select case(OUTtype)
            case(Int1,Int2,Int4)
-              ijk=0
-              do k=1,kmax
-                 do j = tgj0(d),tgj0(d)+tljmax(d)-1
-                    do i = tgi0(d),tgi0(d)+tlimax(d)-1
-                       ijk=ijk+1
-                       Idata3D(i,j,k)=Largebuff(ijk,d)
+              if(ndim == 5)then
+                 if(OUTtype /= Int2) then
+                    write(*,*)'ndim = 5 and Int1 or Int4 not implemented'
+                    stop
+                 end if
+                 ijk=0
+                 do k=1,kmax
+                    do j = tgj0(d),tgj0(d)+tljmax(d)-1
+                       do i = tgi0(d),tgi0(d)+tlimax(d)-1
+                          do dy = 1,dimSizes(2)
+                             do dx = 1,dimSizes(1)
+                                ijk=ijk+1
+                                !NB: -32767 is fillvalue and should not be used to store zero.
+                                Int2Dim5_5(dx,dy,i,j,k)=max(-32766,min(32767,nint(Largebuff(ijk,d))))
+                             end do
+                          end do
+                       end do
                     end do
                  end do
-              end do
+
+              else
+                 ijk=0
+                 do k=1,kmax
+                    do j = tgj0(d),tgj0(d)+tljmax(d)-1
+                       do i = tgi0(d),tgi0(d)+tlimax(d)-1
+                          ijk=ijk+1
+                          Idata3D(i,j,k)=Largebuff(ijk,d)
+                       end do
+                    end do
+                 end do
+              end if
            case(Real4)
               if (ndim <=3 ) then
                  ijk=0
@@ -1681,11 +1724,11 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
              outCDFtag, MPI_COMM_CALC, IERROR)
      end if
   end if
-  
+
   deallocate(buff)
   deallocate(buff4)
   if(allocated(Largebuff))deallocate(Largebuff)
-  
+
   if(MasterProc)then
      t1=MPI_WTIME()
      ! append new values
@@ -1700,6 +1743,13 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
               call check(nf90_put_var(ncFileID,VarID,Idata3D(i1:i2,j1:j2,1:kmax),&
                    start=(/1,1,1,nrecords/)))
            end if
+        else if(ndim==5.and.OUTtype==Int2)then
+
+           if(useMPI_Gather) then
+              call check(nf90_put_var(ncFileID,VarID,Int2Dim5_5(1:dimSizes(1),&
+                   1:dimSizes(2),i1:i2,j1:j2,1:kmax),start=(/1,1,1,1,1,nrecords/)),&
+                   "5D int put failed "//trim(varname))
+           end if
         else if(ndim==2)then
            call check(nf90_put_var(ncFileID, VarID,Idata3D(i1:i2,j1:j2,1),&
                 start=(/1,1,nrecords/)))
@@ -1707,7 +1757,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
            call check(nf90_put_var(ncFileID, VarID,Idata3D(i1:i2,j1:j2,1:kmax),&
                 start=startvec(1:ndim+1),count=countvec(1:ndim+1)))
         end if
-        
+
      case(Real4)           ! type Real4
         if(ndim==5)then
            if(useMPI_Gather) call check(nf90_put_var(ncFileID,VarID,R4data5D(1:dimSizes(1),&
@@ -1725,9 +1775,9 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
            call check(nf90_put_var(ncFileID,VarID,R4data3D(i1:i2,j1:j2,1),&
                 start=(/1,1,nrecords/)))
         else
-           stop                      
+           stop
         end if
-        
+
      case(Real8)           ! type Real8
         if(ndim==3)then
            if(present(ik))then
@@ -1749,7 +1799,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      tio = tio + MPI_WTIME()-t1
   end if !MasterProc
 
-  
+
   if(MasterProc)then
      if (ndim<5) then
         select case(OUTtype)
@@ -1766,7 +1816,7 @@ subroutine Out_netCDF(iotyp,def1,ndim,kmax,dat,scale,CDFtype,dimSizes,dimNames,o
      end if
      if (size5D > 0) deallocate(R4data5D, stat=alloc_err)
      if (DEBUG%NETCDF .and. ndim == 5) write(*,*)'TIME mpi ',tmpi,' time IO ',tio,trim(varname)
-          
+
      call check(nf90_get_att(ncFileID,nf90_global,"lastmodified_hour",lastmodified_hour0 ))
      call check(nf90_get_att(ncFileID,nf90_global,"created_hour",created_hour))
      call Date_And_Time(date=lastmodified_date,time=lastmodified_hour)
@@ -1883,8 +1933,8 @@ subroutine  createnewvariable(ncFileID,varname,ndim,ndate,def1,OUTtype,chunksize
      case(2)
         call check(nf90_def_var(ncFileID,varname,OUTtypeCDF,&
              [iDimID,jDimID,timeDimID]       ,varID),"def2d:"//trim(varname))
-     case(0)        
-        call check(nf90_def_var(ncFileID,varname,OUTtypeCDF,varID),"def2d:"//trim(varname))        
+     case(0)
+        call check(nf90_def_var(ncFileID,varname,OUTtypeCDF,varID),"def2d:"//trim(varname))
         call check(nf90_enddef(ncFileID))
         call check(nf90_put_var(ncFileID,varID,def1%scale))
         return
@@ -2898,7 +2948,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 
   xtype_lon=NF90_FLOAT !default
   xtype_lat=NF90_FLOAT !default
-  
+
   data_projection = 'Unknown'
   if( present(known_projection) ) data_projection = trim(known_projection)
   if( data_projection /= 'Unknown' ) then
@@ -2955,7 +3005,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      if(present(use_lon_name)) used_lon_name=trim(use_lon_name)
      if ( mydebug ) write(*,*) 'ReadCDF using lon name',trim(used_lon_name)
      if ( mydebug ) write(*,*) 'ReadCDF using lat name',trim(used_lat_name)
-     
+
      if(trim(data_projection)=="lon lat")then
         call check(nf90_get_var(ncFileID, lonVarID, Rlon), 'Getting Rlon')
         call check(nf90_get_var(ncFileID, latVarID, Rlat), 'Getting Rlat')
@@ -2990,7 +3040,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
 !        end do
 !     end do
   end if
-  
+
   if(xtype_lon==NF90_INT.or.xtype_lon==NF90_SHORT.or.xtype_lon==NF90_BYTE)then
      !scale data if it is packed
      scalefactors(1) = 1.0 !default
@@ -4032,7 +4082,7 @@ subroutine ReadField_CDF(fileName,varname,Rvar,nstart,kstart,kend,interpol, &
      call check(nf90_get_var(ncFileID, VarID, Ivalues,start=(/1,1/),count=(/dims(1),dims(2)/)))
      dRlon = xUTM(2) - xUTM(1)
      dRlat = yUTM(2) - yUTM(1)
-     do j=1,  ljmax      
+     do j=1,  ljmax
         do i=1,limax
            ijk = i+(j-1)*limax
            call lb2UTM(glon(i,j), glat(i,j), UTMEasting, UTMNorthing, UTMZone)
@@ -4491,7 +4541,7 @@ end subroutine ReadField_CDF
      if(mydebug) write(*,*) 'ReadCDF variable exists: ',trim(varname)
      is_CAMS=.false.
      if (trim(varname)=='avi') is_CAMS=.true.
-  else     
+  else
      if(fileneeded)then
         print *, 'variable does not exist: ',trim(varname)
         call CheckStop(fileneeded, "ReadField_CDF : variable needed but not found")
@@ -4504,7 +4554,7 @@ end subroutine ReadField_CDF
      end if
   end if
   if(zero_below3000ft .and. MasterProc) write(*,*)' Aircraft emissions: will set emissions to zero in first 1.5 levels'
-  
+
   data3D=.true.
 
   !Check first that variable has data covering the relevant part of the grid:
@@ -4547,7 +4597,7 @@ end subroutine ReadField_CDF
        exit
      end if
   end do
-  
+
   allocate(Rlon(dims(1)), stat=alloc_err)
   allocate(Rlat(dims(2)), stat=alloc_err)
 
@@ -4556,7 +4606,7 @@ end subroutine ReadField_CDF
 
   status = nf90_inq_varid(ncid = ncFileID, name = 'FL', varID = levVarID)
   if(status /= nf90_noerr) then
-     status = nf90_inq_varid(ncid = ncFileID, name = 'level', varID = levVarID)    
+     status = nf90_inq_varid(ncid = ncFileID, name = 'level', varID = levVarID)
      call CheckStop(status /= nf90_noerr,'did not find number of vertical levels in '//trim(fileName))
   endif
   call check(nf90_Inquire_Variable(ncid = ncFileID,  varID = levVarID, dimIDs=dimidlev))
@@ -4667,7 +4717,7 @@ end subroutine ReadField_CDF
            Rvalues(igjgk)=0.5*Rvalues(igjgk)
         end do
      endif
-     
+
      if(interpol_used=='conservative'.or.interpol_used=='mass_conservative')then
         !conserves integral (almost, does not take into account local differences in mapping factor)
         !takes weighted average over gridcells covered by model gridcell
@@ -4870,7 +4920,7 @@ if(DEBUG%NETCDF) write(*,*) dtxt//'HEREB:'//trim(varname), NTime_Read, find_reco
      do startrecord = 1,ntimes !in case find_record, loop over one record at a time
 
      call check(nf90_get_var(ncFileID, VarID, times, start = (/startrecord/),&
-       count=(/NTime_Read/)), errmsg=dtxt//" StartCheck: "//trim(fileName) ) 
+       count=(/NTime_Read/)), errmsg=dtxt//" StartCheck: "//trim(fileName) )
 
 if(DEBUG%NETCDF) write(*,*) dtxt//'HEREtimeA:',VarID,trim(fileName)
      call check(nf90_get_att(ncFileID, VarID, "units", timeunit  ),errmsg=dtxt//'TIMEUNIT'//timeunit)
@@ -5660,6 +5710,31 @@ end subroutine vertical_interpolate
 
 end subroutine create_country_emission_file
 
+
+subroutine write_CDF_attribute(varName, attName, ncFileID, attValue, attText)
+  !write "float" (real*4) attribute in existing variables
+  !or string attribute (attText)
+  character(len=*),intent(in) :: varName, attName
+  character(len=*),intent(in), optional :: attText
+  real,intent(in) , optional :: attValue
+  integer, intent(in) :: ncFileID
+  integer ::VarID, status
+  if (me /= 0) return
+
+  status=nf90_inq_varid(ncFileID,varName,VarID)
+  if (status/=nf90_noerr) then
+     write(*,*)trim(varname),' not found'
+     return
+  end if
+  if (present(attValue)) then
+     call check(nf90_put_att(ncFileID,varID,trim(attName),attValue))
+  end if
+  if (present(attText)) then
+     call check(nf90_put_att(ncFileID,varID,trim(attName),attText))
+  end if
+  
+end subroutine write_CDF_attribute
+
 subroutine masked_output(iotyp, filename, values, varname, runname, Nrun, Nruntot, Runstart, overwrite)
   ! mean over all defined masks
   integer, intent(in) :: iotyp, Nrun, Nruntot, Runstart
@@ -5743,7 +5818,7 @@ function current_time_record(fileID) result(len_time)
 end function current_time_record
 function newVarID(fileID) result(varID)
   integer :: fileID,varID
-  
+
   integer :: maskDimID,runDimID,timeDimID
 
   if (nf90_inq_varid(fileID,varname,varID)==nf90_noerr) &

@@ -180,12 +180,18 @@ subroutine runchem()
 
       call checkChemRates(i,j,debug_flag) 
 
+      yieldN2O5(i,j,:)     = yn2o5(:)
+      cf_gammaN2O5f(i,j,:) = gammaN2O5f(:)
+      cf_gammaN2O5c(i,j,:) = gammaN2O5c(:)
+      cf_rateN2O5f(i,j,:) = rateN2O5f(:)
+      cf_rateN2O5c(i,j,:) = rateN2O5c(:)
+
       call setup_bio(i,j)   ! Adds bio/nat to rcemis
 
       if (USES%FUNGAL_SPORES .or. USES%BACTERIA .or. USES%MARINE_OA) &
           call set_PBAPs(i,j) !Adds PBAPs to rcemis
 
-      call emis_massbudget_1d(i,j)   ! Adds bio/nat to rcemis
+      call emis_massbudget_1d(i,j)  ! Adds bio/nat to emis budget
 
       if(USES%PHOTOLYSIS) then
         if(USES%HRLYCLOUDJ) then
@@ -281,33 +287,17 @@ subroutine runchem()
 
       call Add_2timing(29,tim_after,tim_before,"Runchem:chemistry")
 
-      !  Alternating Dry Deposition and Equilibrium chemistry
-      !  Check that one and only one eq is chosen
-      !TODO: remove the switch: it does not make sense. It means that every
-      ! second iteration the drydep uses chemicals  out of equilibrium.
-      ! Could rather call aero both before and after drydep?
-      if(mod(step_main,2)/=0) then
-        call AerosolEquilib(i,j,debug_flag)        
-        call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
-        if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
-        !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
-        !if(AERO%EQUILIB=='MARS' ) call My_MARS(debug_flag)
-        !if(AERO%EQUILIB=='EQSAM') call My_EQSAM(debug_flag) 
-        call DryDep(i,j)
-        call Add_2timing(31,tim_after,tim_before,"Runchem:DryDep")
-        if(DEBUG%RUNCHEM) call check_negs(i,j,'E')
-      else !do drydep first, then eq
-        call DryDep(i,j)
-        call Add_2timing(31,tim_after,tim_before,"Runchem:DryDep")
-        if(DEBUG%RUNCHEM) call check_negs(i,j,'F')
-        call AerosolEquilib(i,j,debug_flag)
-        call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
-        if(DEBUG%RUNCHEM) call check_negs(i,j,'G')
-        !if(AERO%EQUILIB=='EMEP' ) call ammonium() 
-        !if(AERO%EQUILIB=='MARS' ) call My_MARS(debug_flag)
-        !if(AERO%EQUILIB=='EQSAM') call My_EQSAM(debug_flag) 
-      end if
-      !????????????????????????????????????????????????????
+      call AerosolEquilib(i,j,.false.,debug_flag)        
+      call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
+
+      call chem_massbudget_1d(i,j)  ! save changes due to chemistry and AerosolEquilib
+
+      if(DEBUG%RUNCHEM) call check_negs(i,j,'D')
+      call DryDep(i,j)
+      call Add_2timing(31,tim_after,tim_before,"Runchem:DryDep")
+      call AerosolEquilib(i,j,.true.,debug_flag) !set surface species in equilibrium again
+      call Add_2timing(30,tim_after,tim_before,"Runchem:AerosolEquilib")
+      if(DEBUG%RUNCHEM) call check_negs(i,j,'E')
 
       if(prclouds_present) then
         call WetDeposition(i,j,debug_flag)

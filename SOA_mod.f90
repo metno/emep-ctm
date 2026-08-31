@@ -29,7 +29,7 @@ module OrganicAerosol_mod
   ! Calculates the amount of condensible species in the gas and aerosol phases. 
   !
   ! References:
-  !   B2012: Bergstrï¿½m, R. et al., Atmos. Chem. Physics, 2012, 12, 8499-8527
+  !   B2012: Bergström, R. et al., Atmos. Chem. Physics, 2012, 12, 8499-8527
   !   S2012: Simpson, D. et al., Atmos. Chem. Physics, 2012, 12, 7825-7865 
   !   S2007: Simpson, D. et al., JGR, 2007, 
   !
@@ -50,7 +50,7 @@ module OrganicAerosol_mod
   !-----------------------------------------------------------------------------
   !
   ! Dave Simpson, August 2001 -- 2019
-  ! Robert Bergstrï¿½m     2010 -- 2019
+  ! Robert Bergström     2010 -- 2019
   ! 
   !--------------------------------------------------------------------------
 
@@ -64,12 +64,13 @@ module OrganicAerosol_mod
 
    use ChemGroups_mod  !XSOA , only :    &
 
-   use Config_module,  only: PT, Pref, CHEMTMIN, CHEMTMAX, &
+   use Config_module,  only: PT, Pref, CHEMTMIN, CHEMTMAX, USES,&
                              MasterProc,  & ! DebugCell, &
                              K2 => KMAX_MID, K1 => KCHEMTOP
    use Debug_module,   only: DebugCell, DEBUG  ! -> DEBUG%SOA
    use Functions_mod,  only: StandardAtmos_kPa_2_km !ds for use in Hz scaling
    use GridValues_mod, only: A_mid,B_mid, debug_proc, debug_li, debug_lj
+   use LocalFractions_mod, only: lf_fullchem, NSOA, lf_SOA_pre, lf_SOA_pos, lf_Nvert
    use Par_mod,        only: LIDIM => LIMAX, LJDIM => LJMAX, me
    use PhysicalConstants_mod, only : AVOG, RGAS_J 
    use ZchemData_mod,  only: itemp, xn => xn_2d, Fgas, Fpart
@@ -334,10 +335,10 @@ module OrganicAerosol_mod
    character(len=*), parameter :: dtxt = 'RunOrgAer:'
    logical  :: dbg0, dbg1 
 
-   integer :: is,  k, iter, ispec   ! loop variables 
+   integer :: is,  k, iter, ispec, lf_iter  ! loop variables 
    real :: Ksoa
    real :: tmpSum
-   integer :: nmonth, nday, nhour, seconds
+   integer :: nmonth, nday, nhour, seconds, nlf_iter
    character(len=99) :: sfmt
 
    nmonth = current_date%month
@@ -393,39 +394,42 @@ module OrganicAerosol_mod
 
   ! ============ SOA species now, iteration needed ===================
 
-  do iter = 1, NITER
+  do k = K1,K2
 
+  nlf_iter = 1
+  if(USES%LocalFractions .and. lf_fullchem .and. k>=K2-lf_Nvert+1) nlf_iter = Nsoa+1
+  do lf_iter=1, nlf_iter !only used for LocalFractions, otherwise just one "iteration"
+     call lf_SOA_pre(i_pos,j_pos,k,COA(k),lf_iter) !only used for LocalFractions
+     
+     do iter = 1, NITER
 
       ! Fgas = G/(G+A) = 1/(1+K.COA)
       ! K = tabRTpL/(mw*gamma)
 
        do ispec = S1, S2
 
-          Fpart(ispec,:) = COA(:)/( COA(:)+tabCiStar(ispec,itemp(:)) )
+          Fpart(ispec,k) = COA(k)/( COA(k)+tabCiStar(ispec,itemp(k)) )
 
-          ug_semivol(ispec,:) = molcc2ugm3 * xn(ispec,:)*species(ispec)%molwt &
-                         * Fpart(ispec,:)
+          ug_semivol(ispec,k) = molcc2ugm3 * xn(ispec,k)*species(ispec)%molwt &
+                         * Fpart(ispec,k)
           tmpSum = tmpSum  + ug_semivol(ispec,K2)
 
-          if( dbg1) write(unit=*,fmt="(i1, 2a,f7.1,20es12.3)") iter, " ABSOM: ",&
+          if( dbg1 .and.k==K2) write(unit=*,fmt="(i1, 2a,f7.1,20es12.3)") iter, " ABSOM: ",&
       species(ispec)%name, species(ispec)%molwt,COA(K2), ug_semivol(ispec,K2), tmpSum
 
        end do ! ispec
-
+       
      ! New estimate of COA  (in ug/m3) and avg_mw (g/mole):
      ! (nb. xn in molecules/cm3)
      ! (nb. BGND_OA is in xn(itot_bgnd))
 
-       do k = K1,K2
+       COA(k) = sum( ug_semivol(:,k) ) + sum( ug_nonvol(:,k) )
 
-         COA(k) = sum( ug_semivol(:,k) ) + sum( ug_nonvol(:,k) )
-
-       end do  !k
      ! ====================================================================
 
-      if( dbg1 ) then
+      if( dbg1 .and. k==K2 .and. lf_iter==1 ) then
 
-         if( iter == NITER .and. seconds == 0 ) then
+         if( iter == NITER .and. seconds == 0) then
            sfmt= "(a4,i3,1x,a15,3es10.2,a4,es10.3,f13.4)"
 
            write(unit=6,fmt="(a,i2,a,3i3,i4)") "Iteration ", Niter, &
@@ -456,6 +460,11 @@ module OrganicAerosol_mod
 
    end do ! ITER
 
+   call lf_SOA_pos(i_pos,j_pos,k,Fpart(S1,k),COA(k),lf_iter)
+   end do ! lf_iter
+
+end do  !k
+
  ! The above iteration has now given new values to: 
  !
  ! 1) COA(1:K2)
@@ -470,7 +479,7 @@ module OrganicAerosol_mod
 
   ! Set Fgas for later chemistry, and eset 3-D fields
 
-  ! S1 > 0 if SOA used:
+! S1 > 0 if SOA used:
    Fgas(S1:S2,:)               = 1.0 - Fpart(S1:S2,:)
    Grid_COA(i_pos,j_pos,:)     = COA(:)
    Fgas3d(S1:S2,i_pos,j_pos,:) = Fgas(S1:S2,:) 

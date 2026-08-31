@@ -93,9 +93,8 @@ contains
 
      Sub(:)%FstO3 = 0.0
 
-    ! resets whole grid at local night
-    
-    if ( Grid%Zen < 90.0 ) then
+    ! resets whole grid at local night    
+    if ( Grid%Zen > 90.0 ) then
         SumVPD(i,j,:)        = 0.0    ! For Critical VPD stuff, wheat
         old_gsun(i,j,:)      = 1.0e99 ! "     "
     end if

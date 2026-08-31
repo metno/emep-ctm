@@ -72,7 +72,6 @@ module CoDep_mod
    real, private, save, dimension(0:100)   :: tab_exp_rh  ! For eqn (8.16)
    real, private, save, dimension(0:NTAB) :: &
            tab_acidity_fac,                &
-           tab_F2,&                            ! For emepctm eqn (8.16)
            tab_F4, &                           ! for Rns_NH3
            tab_F3                              !For Rns SO2 
 
@@ -142,13 +141,13 @@ contains
 
 
     a_SN  = min(MAX_SN,so2nh3ratio)
-
-    ia_SN = nint( NTAB * a_SN/MAX_SN )   ! Spread values from 0-3 to 0:100
+    
+    ia_SN = nint( NTAB * a_SN/MAX_SN )   ! Spread values from 0-3 to 0:100! PW not used anymore
 
 
    ! Cap a_SN_24hr at 3
    a_SN_24hr  = min(MAX_SN,so2nh3ratio24hr) 
-   ia_SN_24hr = nint( NTAB * a_SN_24hr/MAX_SN )
+   ia_SN_24hr = nint( NTAB * a_SN_24hr/MAX_SN )! PW not used anymore
 
 
    IRH   = max( 1,  int( 100.0 * frh ) )
@@ -167,8 +166,9 @@ contains
     if (Ts_C >0 ) then    ! Use "rh" - now in fraction 0..1.0
 
           !F1 = 10.0 * log10(Ts_C+2.0) * exp(100.0*(1.0-frh)/7.0)
-           F1 = 10.0 * log10(Ts_C+2.0) * tab_exp_rh(IRH)
-           F2 = tab_F2( ia_SN  )
+          F1 = 10.0 * log10(Ts_C+2.0) * tab_exp_rh(IRH)
+
+          F2 = 10.0**( (-1.1099 * a_SN)+1.6769 ) !PW: continuous (and faster?)
 
            Rns_NH3 = BETA * F1 * F2
            Rns_NH3 = min( 200.0, Rns_NH3)  ! After discussion with Ron
@@ -177,7 +177,8 @@ contains
         ! New Formulation (article to be submitted)
         ! Rns_SO2_dry = 11.84  * exp(1.1*so2nh3ratio24hr) * ( frh**(-1.67) )
 
-           F3 = tab_F3 (ia_SN_24hr) !11.84  * exp(1.1*so2nh3ratio24hr)
+           !F3 = tab_F3 (ia_SN_24hr) !11.84  * exp(1.1*so2nh3ratio24hr)
+           F3 = 11.84  * exp(1.1*a_SN_24hr)
            F4 = tab_F4(IRH)      !frh**(-1.67)
            Rns_SO2 = F3 * F4
 
@@ -228,9 +229,8 @@ contains
      do ia_SN = 0, NTAB
        a_SN =  ia_SN * MAX_SN /real(NTAB)
        tab_acidity_fac( ia_SN )  = exp( -(2.0- a_SN) )
-       tab_F2 (ia_SN)            = 10.0**( (-1.1099 * a_SN)+1.6769 )
        if(MY_DEBUG.and. MasterProc ) write(6,*) "TABIA ", ia_SN, a_SN, &
-              tab_acidity_fac( ia_SN ), tab_F2(ia_SN)
+              tab_acidity_fac( ia_SN )
      end do
 
      do ia_SN_24hr = 0, NTAB

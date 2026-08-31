@@ -35,7 +35,7 @@ use Config_module,     only: NPROC, MasterProc,USES,step_main,&
                              IIFULLDOM,JJFULLDOM, &
                              SplitSpecialsFile,SplitDefaultFile,EmisHeightsFile,femisFile,&
                              startdate
-use Country_mod,       only: NLAND, IC_NAT, IC_VUL, IC_NOA, Country, &
+use Country_mod,       only: NLAND, IC_NAT, IC_VOL, IC_NOA, Country, &
                              ! NMR-NH3 specific variables (hb NH3Emis)
                              IC_NMR,IC_DUMMY, MAXNLAND
 use Debug_module,      only: DEBUG
@@ -920,7 +920,7 @@ READEMIS: do   ! ************* Loop over emislist files *******************
                  j  <=  0 .or. j  >  LJMAX .or.   &
                  ic <=  0 .or. ic >  NLAND .or.   &
                  ic == IC_NAT              .or.   &  ! Excludes DMS
-                 (ic == IC_VUL .and. VOLCANOES_LL) )&! Excludes Volcanoes
+                 (ic == IC_VOL .and. VOLCANOES_LL) )&! Excludes Volcanoes
                                                      ! from gridSOx. Read from
                                                      ! VolcanoesLL.dat instead
              cycle READEMIS

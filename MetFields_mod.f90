@@ -26,7 +26,7 @@
 !*****************************************************************************!
 module MetFields_mod
 
-  use Config_module,  only : USES,NPROC, PBL, meteo, startdate, TopoFile
+  use Config_module,  only : USES,NPROC, PBL, meteo, startdate, TopoFile, SOILNOX
   use MPI_Groups_mod     , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, MPI_INTEGER, MPI_LOGICAL, &
                                  MPI_COMM_CALC, MPI_COMM_WORLD, MPI_COMM_SUB, MPISTATUS, &
                                  IERROR, ME_MPI, NPROC_MPI, largeLIMAX,largeLJMAX, share, share_logical
@@ -245,8 +245,8 @@ module MetFields_mod
     fSW50  &! fSW= f(relative extractable water) =  (sw-swmin)/(swFC-swmin), for
    ,fSW40  &! for limits of 50, 40 and 90%
    ,fSW90  &! for IAM_SNL_MED
-   ,dTleafRn & ! TESTING Tleaf - Tair
-   ,dTleafHd  ! TESTING Tleaf - Tair
+   ,dTleaf & ! TESTING Tleaf - Tair
+   ,Tleaf  ! TESTING Tleaf - Tair
 
   real,target, public, dimension(:,:), save,allocatable  ::&
          xwf  ! extension of water fraction, save after 1st call
@@ -866,9 +866,9 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%name             = 'soil_water_content'
   met(ix)%dim              = 2
   met(ix)%frequency        = 3
-  met(ix)%time_interpolate = USES%DYNAMIC_SOILNO
-  met(ix)%read_meteo       = USES%DYNAMIC_SOILNO
-  met(ix)%needed           = USES%DYNAMIC_SOILNO
+  met(ix)%time_interpolate = SOILNOX%IS_DYNAMIC
+  met(ix)%read_meteo       = SOILNOX%IS_DYNAMIC
+  met(ix)%needed           = SOILNOX%IS_DYNAMIC
   met(ix)%found            => foundSoilWaterContent
   allocate(SoilWC(LIMAX,LJMAX,NMET))
   SoilWC = 0.0
@@ -881,9 +881,9 @@ subroutine Alloc_MetFields(LIMAX,LJMAX,KMAX_MID,KMAX_BND,NMET)
   met(ix)%name             = 'soil_temperature_level1'
   met(ix)%dim              = 2
   met(ix)%frequency        = 3
-  met(ix)%time_interpolate = USES%DYNAMIC_SOILNO
-  met(ix)%read_meteo       = USES%DYNAMIC_SOILNO
-  met(ix)%needed           = USES%DYNAMIC_SOILNO
+  met(ix)%time_interpolate = SOILNOX%IS_DYNAMIC
+  met(ix)%read_meteo       = SOILNOX%IS_DYNAMIC
+  met(ix)%needed           = SOILNOX%IS_DYNAMIC
   met(ix)%found            => foundSoilTemp
   met(ix)%alternative_name(1) = 'temperature_2m'
   allocate(SoilTempL1(LIMAX,LJMAX,NMET))
@@ -1340,14 +1340,12 @@ Nmetfields=ix
     fSW40 = 1.0
     fSW50 = 1.0
     fSW90 = 1.0
-    !if ( USES%TLEAF_FROM_HD ) then
-      allocate(dTleafHd(LIMAX,LJMAX))
-      dTleafHd = 0.0
-    !end if
-    !if ( USES%TLEAF_FROM_RN ) then
-      allocate(dTleafRn(LIMAX,LJMAX))
-      dTleafRn = 0.0
-    !end if
+    if ( USES%TLEAF_IBM ) then
+      allocate(dTleaf(LIMAX,LJMAX))
+      Tleaf = 0.0    
+      allocate(Tleaf(LIMAX,LJMAX))
+      dTleaf = 0.0      
+    end if
     allocate(zen(LIMAX, LJMAX))
     allocate(coszen(LIMAX, LJMAX))
     coszen=0.0

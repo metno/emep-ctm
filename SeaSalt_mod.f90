@@ -147,7 +147,7 @@
 
     ! For EmisNat, need kg/m2/h from molec/cm3/s
     moleccm3s_2_kgm2h =   Grid%DeltaZ * 1.0e6 * 3600.0  &! /cm3/s > /m2/hr
-                          /AVOG * 1.0e-6  ! kg  after *MW
+                          /AVOG * 1.0e-3  ! kg  after *MW
     my_first_call = .false.
 
   end if !  my_first_call
@@ -213,8 +213,9 @@
          if (u10 <= 2.62)   &
           whitecap   = 1.0e-10
       case ( 'Callaghan')
+         if (u10 <= 3.71) then
           whitecap   = 1.0e-10
-         if (u10 > 3.71 .and. u10 <= 10.18) then    !(11.25)
+         else if (u10 > 3.71 .and. u10 <= 10.18) then    !(11.25)
           whitecap   = 3.18e-5 * (u10 - 3.70)**3 
          elseif (u10 <= 23.09) then
           whitecap   = 4.82e-6 * (u10 + 1.98)**3 

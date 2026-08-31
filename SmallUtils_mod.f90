@@ -48,6 +48,8 @@ module SmallUtils_mod
   public :: find_indices !< Finds indices of arrays of items in list 
   public :: find_duplicates !< checks if an array of strings contains duplicates
   public :: trims        !> removes all blanks from string
+  public :: lefty        !> Produces padded string to aid left aligned text
+  public :: pad          !> Produces padded string to aid left aligned text
   public :: str_replace  !> replaces string
   public :: blank_replace !> replaces ' ' in string 
   public :: basename     !> gets e.g. abc from /home/someone/Work/abc
@@ -394,6 +396,25 @@ end function find_duplicates
   end do
 
  end function trims
+!=======================================================================
+! for LH padding, https://fortran-lang.discourse.group/t/left-justification-of-strings/345
+ function lefty(str)  result(padded)
+  character(len=*), intent(in) :: str
+  character(len=len(str)+60) :: padded
+  character (len=80), parameter :: PADDING=repeat(' ',80)
+
+  padded = trim(adjustl(str)) // PADDING
+
+ end function lefty
+!=======================================================================
+! for LH padding, https://fortran-lang.discourse.group/t/left-justification-of-strings/345
+ function pad(str,w)  result(padded)
+  character(len=*), intent(in) :: str
+  integer, intent(in) :: w
+  character(len=max(w,len(trim(str)))) :: padded !  do not truncate
+  padded = str
+
+ end function pad
 !============================================================================
  function blank_replace(str_orig,rep)  result(new)
   ! replaces blansḱs with "rep"lacement character. Typically '_'

@@ -743,9 +743,9 @@ subroutine MeteoRead()
   if(first_call)then
      if(maxval(ps)<2000.0)then
         ps_in_hPa = .true.
-        if(write_now)write(*,*)dtxt//'Asuming surface pressure in hPa'
+        if(write_now)write(*,*)dtxt//'Assuming surface pressure in hPa'
       else
-        if(write_now)write(*,*)dtxt//'Asuming surface pressure in Pa'
+        if(write_now)write(*,*)dtxt//'Assuming surface pressure in Pa'
         ps_in_hPa = .false.
      endif
   endif
@@ -1690,11 +1690,11 @@ subroutine metfieldint
 
   if (mod(step_main,nmax) > 0) then
     div = 1./real(nmax-(mod(step_main,nmax)-1))
-    do ix=1,Nmetfields
-      if(met(ix)%time_interpolate)then
+    do ix=1, Nmetfields
+      if (met(ix)%time_interpolate) then
         !if(DEBUG%MET) print *, 'METINTERP ',me,trim(met(ix)%name)
         !if(DEBUG%MET) print *, 'METSIZE   ',me,size(met(ix)%field,dim=4)
-
+        
         if(me==0.and.DEBUG%MET)&
           write(*,*)'interpolating in time ',ix,met(ix)%name
 
@@ -2006,7 +2006,7 @@ subroutine BLPhysics()
       elseif ( PBL%HmixMethod == "NWP" ) then ! NWPHMIX
         do i=1,limax
           do j=1,ljmax
-             pzpbl(i,j) = pbl_nwp(i,j,1)
+             pzpbl(i,j) = pbl_nwp(i,j,nr)
           end do
         end do
         if ( DEBUG%MET .and. debug_proc) call datewrite(dtxt//"NWP HMIX: ", &
@@ -3425,10 +3425,11 @@ subroutine read_surf_elevation(ix)
      src = 'Topo'
   endif
   !if(MasterProc.and.DEBUG%MET) write(*,*) 'Elev:'//src,maxval(met(ix)%field(:,:,1,1))
-  if(MasterProc.and.DEBUG%MET) write(*,*) 'Elev_'//trim(TopoFile),met(ix)%needed,met(ix)%found
-  if(MasterProc.and.DEBUG%MET) write(*,*) 'Elev_'//src,maxval(met(ix)%field(:,:,1,1))
-  if(MasterProc.and.DEBUG%MET) call printCDF('Elev_'//src,met(ix)%field(:,:,1,1),'m')
-
+  if(DEBUG%MET) then
+     if( MasterProc) write(*,*) 'Elev_'//trim(TopoFile),met(ix)%needed,met(ix)%found
+     if( MasterProc) write(*,*) 'Elev_'//src,maxval(met(ix)%field(:,:,1,1))
+     call printCDF('Elev_'//src,met(ix)%field(:,:,1,1),'m')
+  end if
 end subroutine read_surf_elevation
 
 subroutine CalcConvFluxes_wrf()

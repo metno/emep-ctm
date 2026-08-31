@@ -34,11 +34,11 @@ use ChemDims_mod,     only: NSPEC_ADV, NSPEC_SHL
 use ChemSpecs_mod,    only: species_adv
 use Chemfields_mod,   only: xn_adv        ! advected species
 use Config_module,    only: KMAX_MID,KCHEMTOP,& ! Start and upper k for 1d fields
-                              MasterProc,       & ! Master processor
-                              dt_advec,         & ! time-step
-                              PT,               & ! Pressure at top
-                              USES, DMS,&
-                              EXTENDEDMASSBUDGET
+                            MasterProc,       & ! Master processor
+                            dt_advec,         & ! time-step
+                            PT,               & ! Pressure at top
+                            USES, DMS,&
+                            EXTENDEDMASSBUDGET, NATBIO, C5H8_ix, APINENE_ix
 use Debug_module,     only: DEBUG ! %MASS
 use EmisDef_mod,      only: O_NH3, O_DMS
 use GridValues_mod,   only: xmd, &  
@@ -53,12 +53,12 @@ use MPI_Groups_mod !   , only : MPI_BYTE, MPI_DOUBLE_PRECISION, MPI_REAL8, &
                   !            MPI_MIN, MPI_MAX, MPI_SUM, MPI_IN_PLACE, &
                   !            MPI_COMM_CALC, MPI_COMM_WORLD, MPISTATUS,&
                   ! IERROR, ME_MPI, NPROC_MPI
-use Par_mod,          only: &
+use Par_mod,          only: me,&
   li0,li1,& ! First/Last local index in long. when outer boundary is excluded
   lj0,lj1   ! First/Last local index in lat.  when outer boundary is excluded
 use PhysicalConstants_mod,only: GRAV,ATWAIR! Mol. weight of air(Jones,1992)
-use SmallUtils_mod,   only: find_index
-use ZchemData_mod,    only: M, rcemis ! Air concentrations , emissions
+use SmallUtils_mod, only: find_index
+use ZchemData_mod,  only: xn_2d,M,rcemis,rcbio!Air concentrations, emissions
 implicit none
 private
 
@@ -77,7 +77,8 @@ real, public, save, dimension(NSPEC_ADV) ::   &
   fluxout_top = 0.0,  & !  mass out across top
   totddep  = 0.0,  & !  total dry dep
   totwdep  = 0.0,  & !  total wet dep
-  totem    = 0.0     !  total emissions
+  totem    = 0.0,  & !  total emissions
+  totchem  = 0.0     !  total changes due to chemistry
 
 real, public, save, dimension(NSPEC_ADV) ::  &
   amax = -2.0,  &  ! maximum concentration in field -2
@@ -86,6 +87,7 @@ real, public, save, dimension(NSPEC_ADV) ::  &
 public :: Init_massbudget
 public :: massbudget
 public :: emis_massbudget_1d
+public :: chem_massbudget_1d
 !public :: DryDep_Budget
 
 contains
@@ -144,12 +146,46 @@ subroutine emis_massbudget_1d(i,j)
           ps(i,j,1),scaling_k/))
 
     do iadv = 1, NSPEC_ADV
-      itot = iadv + NSPEC_SHL
-      totem(iadv) = totem(iadv) + rcemis( itot, k ) * scaling_k
+       itot = iadv + NSPEC_SHL
+       totem(iadv) = totem(iadv) + rcemis( itot, k ) * scaling_k
     end do
+    !add rcbio contributions (note that only k=kmax_mid can be non-zero)
+    if (C5H8_ix > 0) then
+       totem(C5H8_ix-NSPEC_SHL) = totem(C5H8_ix-NSPEC_SHL) + rcbio(NATBIO%C5H8, k) * scaling_k
+    end if
+    if (APINENE_ix > 0) then
+       totem(APINENE_ix-NSPEC_SHL) = totem(APINENE_ix-NSPEC_SHL) + rcbio(NATBIO%TERP, k) * scaling_k
+    end if
+    
   end do ! k loop
-
+  
+  
 end subroutine emis_massbudget_1d
+!xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+subroutine chem_massbudget_1d(i,j)
+  integer, intent(in) :: i,j    ! coordinates of column
+  integer    :: k, iadv, itot   ! loop variables
+  real :: scaling, scaling_k
+
+  !Mass Budget calculations
+  ! Adding up the changes from chemical reactions, without emissions in each timestep
+  !we use xn_adv as reference for previous value and xn_2d for updated concentrations
+  
+  !Do not include values on outer frame
+  if(i<li0.or.i>li1.or.j<lj0.or.j>lj1)return
+
+  scaling = xmd(i,j)* gridwidth_m*gridwidth_m / GRAV !without dt_advec
+
+  do k = KCHEMTOP,KMAX_MID
+    scaling_k = scaling * (dA(k) + dB(k)*ps(i,j,1))/M(k)    
+    !M(k) is molecules air/cm3
+    do iadv = 1, NSPEC_ADV
+       totchem(iadv) = totchem(iadv) + (xn_2d(NSPEC_SHL+iadv,k)-xn_adv(iadv,i,j,k)*M(k)) * scaling_k
+    end do    
+  end do ! k loop
+  !NB: we can not take out the emissions here because totem are already accumulated
+ 
+end subroutine chem_massbudget_1d
 !----------------------------------------------------------------------------
 subroutine massbudget()
 ! sums over all sulphur and nitrogen, so is model independant.
@@ -179,12 +215,14 @@ subroutine massbudget()
     sum_mass,           & ! total mass of species
     frac_mass,          & ! mass budget frac. (should=1) for groups of species
     gfluxin,gfluxout,   & ! flux in  and out
-    gtotem,             & ! total emission
+    gtotem,gtotchem,    & ! total emission and chem changes
     gtotddep, gtotwdep, & ! total dry and wet deposition
     natoms                ! number of S, N or C atoms
 
   real :: totdiv,helsum,fac,o3_fac,wgt_fac
 
+  !we want totchem without emissions:
+  totchem(:)   = totchem(:) - totem(:)
 
   fac=GRIDWIDTH_M*GRIDWIDTH_M/GRAV
 
@@ -195,6 +233,7 @@ subroutine massbudget()
   gfluxin(:)    = fluxin(:)+fluxin_top(:)
   gfluxout(:)   = fluxout(:)+fluxout_top(:)
   gtotem(:)     = totem(:)
+  gtotchem(:)   = totchem(:)
   gtotddep(:)   = totddep(:)
   gtotwdep(:)   = totwdep(:)
   sumk(:,:)     = 0.0
@@ -231,6 +270,8 @@ subroutine massbudget()
   CALL MPI_ALLREDUCE(MPI_IN_PLACE, fluxout , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
   CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotem , NSPEC_ADV, &
+    MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
+  CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotchem , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
   CALL MPI_ALLREDUCE(MPI_IN_PLACE, gtotddep , NSPEC_ADV, &
     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
@@ -378,7 +419,7 @@ subroutine massbudget()
      write(iomb,'(a)') ' # Mass Budget. Units are kg with MW used here. ADJUST! if needed' 
      write(iomb,'(a3,1x,a20,a7,99a12)') '#n', 'Spec       ', &
        'usedMW', 'emis', 'ddep', 'wdep', 'init', 'sum_mass', &
-       'fluxout', 'fluxin', 'frac_mass'
+       'fluxout', 'fluxin', 'frac_mass', 'chem'
 
      do n=1,NSPEC_ADV
         wgt_fac=species_adv(n)%molwt/ATWAIR
@@ -394,10 +435,10 @@ subroutine massbudget()
                sumini(n)*wgt_fac, sum_mass(n)*wgt_fac, gfluxout(n)*wgt_fac, &
                  gfluxin(n)*wgt_fac, frac_mass(n)
              write(*,*)
-             write(*,"(a3,6a12)") "n ", "species", "totddep", "totwdep", "totem"
+             write(*,"(a3,6a12)") "n ", "species", "totddep", "totwdep", "totem", "totchem"
              write(*,"(i3,1x,a11,5es12.4)") n, species_adv(n)%name, &
                 gtotddep(n)*wgt_fac*ATWAIR, gtotwdep(n)*wgt_fac*ATWAIR, &
-                gtotem(n)*wgt_fac
+                gtotem(n)*wgt_fac,gtotchem(n)*wgt_fac
              write(*,*)
              write(*,*)'++++++++++++++++++++++++++++++++++++++++++++++++'
         end if ! EXTENDED
@@ -406,7 +447,7 @@ subroutine massbudget()
           species_adv(n)%molwt, &  ! REMEMBER. Sometimes a dummy value, e.g. 1.0
           gtotem(n)*wgt_fac, gtotddep(n)*wgt_fac*ATWAIR, &
           gtotwdep(n)*wgt_fac*ATWAIR, sumini(n)*wgt_fac, sum_mass(n)*wgt_fac,&
-          gfluxout(n)*wgt_fac, gfluxin(n)*wgt_fac, frac_mass(n)
+          gfluxout(n)*wgt_fac, gfluxin(n)*wgt_fac, frac_mass(n),gtotchem(n)*wgt_fac
 
      end do
      close(iomb)

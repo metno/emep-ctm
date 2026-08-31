@@ -92,6 +92,25 @@ CHARACTER(LEN=TXTLEN_NAME), private, save :: LAST_CONFIG_LINE_DEFAULT
   end type DMS_t
   type(DMS_t), public, save :: DMS = DMS_t()
 
+  type, private :: SNOx_t
+    character(len=20) :: METHOD = "NOTSET" ! Needs choice: Total or NoFert (deprecated)
+    character(len=20) :: TYPE   = "CLIM"   ! Needs choice: CLIM or ANNUAL or ACP2012, or maybe one day dynamic
+    real :: factor = 1.0 
+    logical :: IS_DYNAMIC = .false.        ! Set true for online (not implemented yet!)
+
+   ! If using SOILNOX_METHOD=ACP2012 Soil NOx method (Europe only, deprecated)
+   ! The Euro soil NO emissions are based upon average Nr-deposition calculated
+   !  for the 2000s, as given in the AnnualNdep.nc files. For future years a
+   !  new AnnualNdep.nc could be pre-calculated. A simpler but approximate
+   !  way is to scale with some other factor, e.g. the ratio of emissions over
+   !  some area (EMEP, or EU) in year YYYY divided by year 2005 values.
+   ! Remember, soil-NO emissions are *very* uncertain.
+
+    real :: ACP2012_DEPSCALE = 1.0 !
+
+  end type SNOx_t
+  type(SNOx_t), public, save :: SOILNOX = SNOx_t()
+
 
   type, private :: PBL_t
     ! Zi minimum value now generally calculated as z_mid(19), but we
@@ -156,17 +175,26 @@ CHARACTER(LEN=TXTLEN_NAME), private, save :: LAST_CONFIG_LINE_DEFAULT
   character(len=100), save, public :: YieldModifications = 'VBS-T10' ! Default for EmChem16mt
 
 
+  integer, public, parameter ::   MAX_NUM_LANDCOVER_PFTs = 30
   type, private :: LandCoverInputs_t
+   ! system? EmLC17 uses "old" EMEP system as documented in Report 1/2017
+   ! EmLC26 will use new land-cover.
+    character(len=TXTLEN_SHORT) :: system = 'EmLC17'  
     character(len=TXTLEN_FILE), dimension(2) :: MapFile = 'NOTSET'  ! Usually PS European + global
     character(len=TXTLEN_FILE) :: LandDefs = 'DataDir/Inputs_LandDefs.csv'   !  LAI, h, etc (was Inputs_LandDefs
     character(len=TXTLEN_FILE) :: Do3seDefs = 'DataDir/Inputs_DO3SE.csv'  !  DO3SE inputs
     character(len=TXTLEN_FILE) :: mapMed    = 'DataDir/mapMed_5x1.nc'  ! Map of Meditteranean region
     character(len=TXTLEN_FILE) :: desert    = 'DataDir/Olson_2001_DEforEmep.nc'  ! Map of desert from Olson 2001
     character(len=TXTLEN_SHORT) :: LAIsrc    = 'LPJ-EMEP'    ! source of LAI seasonal variations when PFT_MAPS used
-    !character(len=TXTLEN_FILE) :: desert    = 'DataDir/ParajuliZender_SSM_1440x720.nc'  ! Sediment supply map from Parajuli & Zender, 2017
+    character(len=TXTLEN_FILE) :: htMap    = 'NOTSET'   ! Map of forest heights, testing
     real ::                       ssmThreshold = 0.2  ! Threshold of SSM used to identify likely dust sources. uncertain.
+    !character(len=TXTLEN_FILE) :: desert    = 'DataDir/ParajuliZender_SSM_1440x720.nc'  ! Sediment supply map from Parajuli & Zender, 2017
+    ! With EmLC17 system, PFTs = CF; DF etc. With LC19 we have NEF, BDF, etc
+    integer :: nLC_PFTs = 0
+    character(len=TXTLEN_SHORT), dimension(MAX_NUM_LANDCOVER_PFTs) :: PFTs  = 'NOTSET'
   end type LandCoverInputs_t
   type(LandCoverInputs_t),target, public, save :: LandCoverInputs=LandCoverInputs_t()
+
 
 
 ! Namelist controlled:
@@ -177,7 +205,7 @@ logical, private, parameter :: F = .false., T = .true.
 
 type, public :: timeFacs_t
   integer :: MonthlySmoothFac = 100   ! <100 smooths MonthlyFacs across months
-  logical :: Day_of_Year = .false.    ! overrides Monthly and Daily if used 
+  logical :: Day_of_Year = .false.    ! overrides Monthly and Daily if used
   character(len=20) :: MonthlyNH3  = 'NOTSET'    ! can be 'LOTOS'
   character(len=TXTLEN_SHORT) :: &
     Monthly = 'CAMS_TEMPO_CLIM'  & ! or GRIDDED
@@ -191,9 +219,9 @@ character(len=TXTLEN_FILE), target, save, public :: DayofYearFacFile = './DayofY
 character(len=*), parameter,private :: TFACSDIR='DataDir/Timefactors/CAMS_TEMPO/'
 character(len=TXTLEN_FILE), target, save, public :: &
   GriddedMonthlyFacFile = TFACSDIR//'CAMS_TEMPO_GLOB4emep_v2024-1.nc' &
- ,MonthlyFacFile = TFACSDIR//'cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL' &
- ,DailyFacFile   = TFACSDIR//'cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL' &
- ,HourlyFacFile  = TFACSDIR//'cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL' &
+ ,MonthlyFacFile = TFACSDIR//'cams_tempo_v5_1/cams_tempo_v5_1_month.POLL' &
+ ,DailyFacFile   = TFACSDIR//'cams_tempo_v5_1/cams_tempo_v5_1_week.POLL' &
+ ,HourlyFacFile  = TFACSDIR//'cams_tempo_v5_1/cams_tempo_v5_1_hour.POLL' &
  ,HourlyFacSpecialsFile = 'NOTSET'
 
 type, public :: domain_settings_t
@@ -235,10 +263,10 @@ type, public :: emep_useconfig
     ,DUST             = .true.  &! Only EECCA?
     ,NO2_COMPENSATION_PT = .false. & ! allows
     ,SOILNOX          = .true.  &! See SOILNOx_Method below.
-    ,DYNAMIC_SOILNO   = .false.  &! 
     ,OCEAN_DMS        = .true. &!
     ,OCEAN_NH3        = .false. &!
     ,SOILNH3          = .false. &! DUMMY VALUES, DO NOT USE!
+    ,GravSettling     = .false. &! Gravitational settling for wb coarse dust
     ,ASH          = .true.  &! Ash from historical Volcanic Eruption
     ,PreADV       = .false. &! Column Emissions are preadvected when winds are very strong
     ,NOCHEM       = .false. &! Turns off chemistry for emergency runs
@@ -265,17 +293,25 @@ type, public :: emep_useconfig
     ,EtaCOORDINATES   = .true.  &! default since October 2014
     ,WRF_MET_NAMES    = .false. &!to read directly WRF metdata
     ,ZREF             = .false. &! testing
+   ! Apply a 1m limit on the surface roughness, z0.
+    ,z0limit          = .false.  &! limits z0 to 1m 
     ,RH_FROM_NWP      = .true.  &! Use rh2m, not LE in Submet
-    ,TLEAF_FROM_HD    = .false.  &! TESTING Tleaf. Cannot use both _HD and _Rn
-    ,TLEAF_FROM_RN    = .false.  &! TESTING Tleaf
+   !  Estimate the subgrid cell leaf temperature
+   ! following Li et al., 2018 DOI:10.1029/2018JG004401
+    ,TLEAF_IBM        = .false. &! Tleaf estimated using IBM method , see also TLEAF_MAXDIFF
+   ! Estimate the subgrid ustar conserving the grid eddy diffusivity
+   ! following Walcek et al., 1986 DOI:10.1016/0004-6981(86)90279-9
+    ,Walcek_ustar     = .false. &! STILL IN TESTING (so far too high).
     ,EFFECTIVE_RESISTANCE = .true. &! Drydep method designed for shallow layer
     ,FUNGAL_SPORES    = .false. & !For including fungal spores (part of PBAP) Prelim. See Ch.7 2024 EMEP report
-    ,BACTERIA         = .false. & !For including bacteria (part of PBAP) 
+    ,BACTERIA         = .false. & !For including bacteria (part of PBAP)
     ,MARINE_OA        = .false. & !For including MarineOA (part of PBAP)
-    ,MEAN_MASK_OUTPUT = .false.   !Mean output over (city) mask instead of Derived/LF fields
+    ,MEAN_MASK_OUTPUT = .false. & !Mean output over (city) mask instead of Derived/LF fields
+    ,SMOOTH_pH        = .true.   !use a smoother function for pH as function of ion concentration 
   real :: biofac_BVOC = 1.0 !  !JAN2025 TESTING
 !  real :: SURF_AREA_RHLIMITS  = -1  ! Max RH (%) in Gerber eqns. -1 => 100%
-  real :: SEASALT_fFrac = 0.3       ! 0 = "< rv4_39", 0.3 = new suggestion
+  real :: SEASALT_fFrac = 0.0      !  fraction of interim bin sent to fine mode. Zero seems better
+  real :: TLEAF_MAXDIFF     = 0.0    ! Tleaf estimated using IBM method 
 ! cloud liquid water (vol-H2O/vol-Air) ?
 ! if  FIXED_CLW > 0, this value is used for clouds. Otherwise calculated
 ! from NWP values. (In future NWP will be used by default, but we are
@@ -290,7 +326,7 @@ type, public :: emep_useconfig
 !DUMMY FOR TESTING NOW!!! Set to 'NO3' to put all NO3 into _c
 !Species where we want to include "tail" of  course mode into PM25
 ! outputs, as calculated in Derived_mod
-  character(len=TXTLEN_SHORT), public, dimension(2) :: fPMc_specs = '-'
+  character(len=TXTLEN_SHORT), public, dimension(2) :: fPMc_specs = 'NO3'  ! '-'
 
  ! If USES%EMISTACKS, need to set:
   character(len=4)  :: PlumeMethod    = "PVDI" !MKPS:"ASME","NILU","PVDI"
@@ -311,8 +347,6 @@ type, public :: emep_useconfig
 
 ! Selection of method for Whitecap calculation for Seasalt
   character(len=15) :: WHITECAPS  = 'Callaghan'  ! Norris , Monahan
-  character(len=20) :: SOILNOX_METHOD = "NOTSET" ! Needs choice: Total or NoFert or ACP2012EURO (deprecated)
-  character(len=20) :: ACPSOILNOX_METHOD = "NoFert" ! Needs choice: Total or NoFert. Use NoFert for EMEP emis, Total for CAMS-REG
 
 ! Selection of Emissions parameterization for fungal
   character(len=4) :: FUNGAL_METHOD  = 'HS_5'  !HS_3, HS_5, SD, HS, JS (see PBAP module)
@@ -378,16 +412,6 @@ type(lf_out_type), public, save :: lf_spec_out(Max_lf_out)
 integer, public, save :: &
   FREQ_HOURLY = 1  ! 3Dhourly netcdf special output frequency
 
-
-! If using SOILNOX_METHOD=ACP2012 Soil NOx method (Europe only, deprecated)
-! The Euro soil NO emissions are based upon average Nr-deposition calculated
-!  for the 2000s, as given in the AnnualNdep.nc files. For future years a
-!  new AnnualNdep.nc could be pre-calculated. A simpler but approximate
-!  way is to scale with some other factor, e.g. the ratio of emissions over
-!  some area (EMEP, or EU) in year YYYY divided by year 2005 values.
-! Remember, soil-NO emissions are *very* uncertain.
-
-  real, public, save :: ACP2012_SOILNOX_DEPSCALE = 1.0 !
 
 !NB: *OCEAN*  are internal variables. Cannot be set manually.
 !See DMS_t  logical, public, save ::  FOUND_OCEAN_DMS = .false. !set automatically true if found
@@ -456,6 +480,7 @@ type(date), public :: NEST_outdate(OUTDATE_NDUMP_MAX)=date(-1,-1,-1,-1,-1)
 
 character(len=TXTLEN_FILE),public, save :: NEST_MET_inner ='NOTSET' !path to metdata for inner grid
 integer, save, public :: NEST_RUNDOMAIN_inner(4)=-1 ! RUNDOMAIN used for run in inner grid
+integer, save, public :: NEST_thick_inner=1 ! Thickness of the BC regien (minimum)
 ! Limit output, e.g. for NMC statistics (3DVar)
 character(len=TXTLEN_SHORT), public, save :: &
   NEST_WRITE_SPC(NSPEC_ADV)="", NEST_WRITE_GRP(size(chemgroups))=""
@@ -479,9 +504,8 @@ character(len=TXTLEN_FILE),public, target, save :: &
 !Output_config variables
 
 integer, public, parameter ::       &
+  MAX_NUM_DDEP_ECOS = 30,           & ! Outputs for Grid, Conif, etc. 
   MAX_NUM_DERIV2D = 600,            &
-  MAX_NUM_DDEP_ECOS = 25,            & ! Grid, Conif, etc.  !increase from 9 to
-                                       ! 9+16 for first 16 LC
   MAX_NUM_NEWMOS  = 30,             & !New system.
   ! Older system
   MAX_NUM_MOSCONCS  = 10,           & !careful here, we multiply by next:
@@ -489,13 +513,24 @@ integer, public, parameter ::       &
   MAX_NUM_DDEP_WANTED = NSPEC_ADV,  & !plenty big
   MAX_NUM_WDEP_WANTED = NSPEC_ADV     !plenty big
 
+! same order as in Inputs_LandDefs !
+!integer, private :: iEco
+!character(len=TXTLEN_SHORT),public,dimension(MAX_NUM_DDEP_ECOS),save :: &
+!  ECOSYSTEM_OUTPUTS  = 'NOTSET' !
+!  [character(len=TXTLEN_SHORT):: &
+!   "Grid","NeedleLeaf","BroadLeaf","Crops","Seminat",&
+!   "Forest","Water_D","nonForest", "CF", "DF",&
+!   "NF", "BF", "TC", "MC", "RC",&
+!   "SNL", "GR", "MS", "WE","TU",&
+!    "DE", "W", "ICE", "U", ('NOTSET',iEco=1,MAX_NUM_DDEP_ECOS-24) ]  
+
 
 integer, public, parameter :: &
    NSITES_MAX =        99     & ! Max. no surface sites allowed
   ,FREQ_SITE  =         1     & ! Interval (hrs) between outputs
   ,NSHL_SITE_MAX  =    10     & ! No. short-lived species
   ,NXTRA_SITE_MISC =    2     & ! No. Misc. met. params  ( e.g. T2, d_2d)
-  ,NXTRA_SITE_D2D  =   18       ! No.  params from d_2d fields
+  ,NXTRA_SITE_D2D  =   16     ! No.  params from d_2d fields
 integer, public, parameter :: NSONDES_MAX = 99 ! Max. no sondes allowed
 
 !**** Sonde outputs   (used in Sites_mod)
@@ -539,7 +574,6 @@ character(len=24), public, parameter, dimension(NXTRA_SITE_D2D) :: &
                                           !'met2d_v10','met2d_rh2m', &
     'met2d_SMI_uppr', 'met2d_SMI_deep',&
     'met2d_ustar_nwp', 'met2d_LH_Wm2', 'met2d_SH_Wm2',&
-    'USTAR_DF','INVL_DF', &
     'met2d_PARdbh', 'met2d_PARdif' &
 ]
 character(len=10), public, parameter, dimension(NXTRA_SONDE) :: &
@@ -708,6 +742,7 @@ real, public, save :: BIC_S_FAC=1.0
 real, public, save :: BIC_A_FAC=1.0
 real, public, save :: BIC_V_FAC=1.0
 real, public, save :: DMS_S_FAC=1.0
+real, public, save :: FF_FAC=1.0 !scaling of forest fires (all emissions)
 
 ! Compress NetCDF output? (nc4 feature, 1-9 GZIP compress, 0 no compress, -1 for netcdf3 output)
 integer, public, save :: NETCDF_DEFLATE_LEVEL=4
@@ -857,12 +892,11 @@ character(len=TXTLEN_FILE), target, save, public :: DMSFile = 'DataDir/DMS_SOLAS
 character(len=TXTLEN_FILE), target, save, public :: OceanNH3File = 'DataDir/geia_emissions_nh3_ocean_0.5x0.5.nc'
 !Zahle2011:
 !character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = 'DataDir/nox_emission_1996-2005.nc'
-!CAMS81:
-!rv4.50+: use this climatological file for all years, since year-to-year variation is small and uncertain
-!character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = 'DataDir/cams81_monthly_SoilEmissions_v2.4a_GLOBAL05_Clim2000_2020.nc'
+!CAMS2-61bis:
+!rv4.50+: use a climatological file for all years, since year-to-year variation is small and uncertain
 !ECCAD format:
 character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = &
-   'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc'
+   'DataDir/SoilNOxInputs/cams4emep_v3.nc'
 !
 ! Chemical schemes have specific files:
 !character(len=*), parameter :: ZCMDIR= 'DataDir/ZCM_CRI-R5-emep/'
@@ -899,8 +933,8 @@ integer, public, save :: SO2_ix, O3_ix, NO2_ix, SO4_ix, NH4_f_ix, NO3_ix,&
      NO3_f_ix, NO3_c_ix, NH3_ix, HNO3_ix, C5H8_ix, APINENE_ix, NO_ix, HO2_ix, OH_ix,&
      HONO_ix,OP_ix,CH3O2_ix,C2H5O2_ix,CH3CO3_ix,C4H9O2_ix,MEKO2_ix,ETRO2_ix,&
      PRRO2_ix,OXYO2_ix,C5DICARBO2_ix,ISRO2_ix,MACRO2_ix,TERPO2_ix,H2O2_ix,&
-     N2O5_ix, OM_ix, SSf_ix, SSc_ix, Dustwbf_ix, DustSahf_ix,&
-     ASOC_ug1e3_ix, non_C_ASOA_ng1e2_ix
+     N2O5_ix, OM_ix, SSf_ix, SSc_ix, Dustwbf_ix, DustSahf_ix,DustSahc_ix,&
+     Dust_wb_c_ix,ASOC_ug1e3_ix, non_C_ASOA_ng1e2_ix
 
 
 !----------------------------------------------------------------------------
@@ -926,7 +960,6 @@ subroutine Config_Constants(iolog)
    ,LandCoverInputs    &  ! for CLM, etc
    ,DEBUG  & !
    ,CONVECTION_FACTOR &
-   ,ACP2012_SOILNOX_DEPSCALE &
    ,lf_src & !Local Fractions
    ,lf_set & !Local Fractions
    ,lf_species &
@@ -938,6 +971,7 @@ subroutine Config_Constants(iolog)
    ,ANALYSIS, SOURCE_RECEPTOR, VOLCANO_SR &
    ,BIC_S_FAC,BIC_N_FAC,BIC_V_FAC,BIC_A_FAC,BIC_O3_FAC & !scaling variables for SR reduction runs for BIC
    ,DMS_S_FAC             & ! scaling variable for SR reduction runs for DMS
+   ,FF_FAC                & ! scaling variable for SR reduction runs for FOrest Fires
    ,SEAFIX_GEA_NEEDED     & ! only if problems, see text above.
    ,BGND_CH4              & ! Can reset background CH4 values
    ,SKIP_RCT              & ! Can  skip some rct
@@ -974,6 +1008,7 @@ subroutine Config_Constants(iolog)
    ,DMSFile&
    ,OceanNH3File&
    ,soilnox_emission_File&
+   ,SOILNOX&     ! Modified system May 2026
    ,OceanChlorophyll_File&
    ,GriddedMonthlyFacFile&
    ,MonthlyFacFile&
@@ -1013,11 +1048,13 @@ subroutine Config_Constants(iolog)
    ,NEST_template_read_3D,NEST_template_read_BC,NEST_template_write&
    ,NEST_template_dump,BC_DAYS,NEST_save_append,NEST_save_overwrite&
    ,NEST_native_grid_3D,NEST_native_grid_BC,NEST_omit_zero_write,NEST_out_DOMAIN&
-   ,NEST_MET_inner,NEST_RUNDOMAIN_inner&
+   ,NEST_MET_inner,NEST_RUNDOMAIN_inner,NEST_thick_inner&
    ,NEST_WRITE_SPC,NEST_WRITE_GRP,NEST_OUTDATE_NDUMP,NEST_outdate&
    ,USE_EXTERNAL_BIC,EXTERNAL_BIC_NAME,EXTERNAL_BIC_VERSION,TOP_BC,filename_eta&
    ,OutputMisc,OutputConcs,OutputVegO3&
    ,DDEP_ECOS, DDEP_WANTED, WDEP_WANTED,SDEP_WANTED&
+   !,ECOSYSTEM_OUTPUTS &
+   !,DDEP_WANTED, WDEP_WANTED,SDEP_WANTED&
    ,NewMosaic, MOSAIC_METCONCS, MET_LCS, Mosaic_timefmt&
    ,fullrun_DOMAIN,month_DOMAIN,day_DOMAIN&
    ,hour_DOMAIN, out_startdate, spinup_enddate&
@@ -1127,7 +1164,7 @@ subroutine Config_Constants(iolog)
    case('EMEPDOMAIN')
      domain_setup = EMEP_DOMAIN_SETUP
      if (Vertical_levelsFile == 'NOTSET') Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
-     USES%PFT_MAPS           = domain_setup%USES_PFTMAPS 
+     USES%PFT_MAPS           = domain_setup%USES_PFTMAPS
      USES%CONVECTION         = domain_setup%USES_CONVECTION
      USES%DEGREEDAY_FACTORS  = domain_setup%USES_DEGREEDAYS
      USES%ROADDUST           = domain_setup%USES_ROADDUST
@@ -1135,7 +1172,7 @@ subroutine Config_Constants(iolog)
    case('GenericDOMAIN')
      domain_setup = GENERIC_DOMAIN_SETUP
      if (Vertical_levelsFile == 'NOTSET') Vertical_levelsFile = 'DataDir/Vertical_levels19_EC.txt'
-     USES%PFT_MAPS           = domain_setup%USES_PFTMAPS 
+     USES%PFT_MAPS           = domain_setup%USES_PFTMAPS
      USES%CONVECTION         = domain_setup%USES_CONVECTION
      USES%DEGREEDAY_FACTORS  = domain_setup%USES_DEGREEDAYS
      USES%ROADDUST           = domain_setup%USES_ROADDUST
@@ -1307,6 +1344,8 @@ subroutine define_chemicals_indices()
   SSc_ix = find_index('SeaSalt_c' ,species(:)%name)
   Dustwbf_ix = find_index('Dust_wb_f' ,species(:)%name)
   DustSahf_ix = find_index('Dust_sah_f' ,species(:)%name)
+  DustSahc_ix = find_index('Dust_sah_c' ,species(:)%name)
+  Dust_wb_c_ix = find_index('Dust_wb_c' ,species(:)%name)
 
   HONO_ix = find_index('HONO' ,species(:)%name)
   OP_ix = find_index('OP' ,species(:)%name)
@@ -1326,8 +1365,8 @@ subroutine define_chemicals_indices()
   N2O5_ix = find_index('N2O5' ,species(:)%name)
   ASOC_ug1e3_ix = find_index('ASOC_ug1e3' ,species(:)%name)
   non_C_ASOA_ng1e2_ix = find_index('non_C_ASOA_ng1e2' ,species(:)%name)
-  
-  
+
+
 end subroutine define_chemicals_indices
 
 end module Config_module

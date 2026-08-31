@@ -35,12 +35,12 @@ use AeroConstants_mod,only: AERO,NSAREA_DEF   ! for aerosol surface area
 use AeroFunctions_mod,only: GerberWetRad, pmSurfArea, cMolSpeed, UptakeRate
 use AeroFunctions_mod,only: pmH2O_gerber, LewisSchwartz  ! H2O from Gerber
 use AirEmis_mod,      only: airn, airlig   ! airborne NOx emissions
-use Biogenics_mod,    only: SoilNOx
+use Biogenics_mod,    only: SoilNOxEmis
 use Biogenics_mod,    only: EMIS_BioNat, EmisNat
 use ChemDims_mod,     only: NSPEC_SHL, NSPEC_ADV, NCHEMRATES, NEMIS_File
 use ChemFields_mod,   only: SurfArea_um2cm3, xn_adv,xn_bgn,xn_shl, &
                              pmH2Ogb, & !pH2O TMP
-                               NSPEC_COL, NSPEC_BGN, xn_2d_bgn, PM25_water
+                             NSPEC_COL, NSPEC_BGN, xn_2d_bgn, PM25_water, PMco_water
 use ChemGroups_mod,   only:  chemgroups, PM10_GROUP
 use ChemFunctions_mod, only: HydrolysisN2O5
 use ChemSpecs_mod  !,           only:  SO4,C5H8,NO,NO2,SO2,CO,
@@ -77,7 +77,8 @@ use Io_Progs_mod,     only: datewrite !MASS
 use Landuse_mod,      only: water_fraction, ice_landcover
 use LocalVariables_mod, only: Grid
 use LocalFractions_mod, only: lf_fullchem,lf_Nvert,lf_SurfArea_pre,lf_SurfArea_pos,&
-                         spec2lfspec,lf_rcemis_nat,makeDMS,ix_DMS!,rctAk_lf,rctBk_lf
+                              spec2lfspec,lf_rcemis_nat,makeDMS,ix_DMS,&
+                              ix_nat_VOL,makeVOL_lf,rcemis_lf_nat_3D
 use MassBudget_mod,   only: totem    ! sum of emissions
 use MetFields_mod,    only: ps,sst
 use MetFields_mod,    only: roa, th, q, t2_nwp, cc3dmax, zen, z_bnd,ws_10m
@@ -99,7 +100,7 @@ use ZchemData_mod,    only: &
   ,cNO2, cNO3              &  ! mol speeds, m/s, kHetero tests
   ,gamN2O5                 &  ! kHetero test - for printout
   ,DpgNw, S_m2m3           &  ! for wet diameter and surf area
-  ,aero_fom, aero_fbc, aero_fss, aero_fdust
+  ,aero_fom, aero_fbc, aero_fss, aero_fdust,xh2o_f,xh2o_c
 use BoundaryConditions_mod, only: METHBGN
 
 
@@ -264,8 +265,10 @@ contains
    cO3(:)   = cMolSpeed(temp(:), 48.0)
    cNO3(:)  = cMolSpeed(temp(:), 62.0)
    cNO2(:)  = cMolSpeed(temp(:), 46.0)
-
-    do k = KCHEMTOP, KMAX_MID
+   xh2o_f(:) = PM25_water(i,j,KCHEMTOP:KMAX_MID)
+   xh2o_c(:) = PMco_water(i,j,KCHEMTOP:KMAX_MID)
+   
+   do k = KCHEMTOP, KMAX_MID
 
   !- to_number_cm3 - to scale from  density (roa, kg/m3) to  molecules/cm3
   ! (kg/m3 = 1000 g/m3 = 0.001 * Avog/Atw molecules/cm3)
@@ -318,10 +321,10 @@ contains
            niter = 1
            !NB: temporarily disable LF, since it is broken (?).
            !please do not delete.
-           !           if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 4
-           !in the LF case, we construct S_m2m3 for 4 "scenarios", in order to get derivatives
+           if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = 5
+           !in the LF case, we construct S_m2m3 for 4 extra "scenarios", in order to get derivatives
            do iter=1, niter !iter loop only for LocalFractions
-!              call lf_SurfArea_pre(k,iter) !only used for LocalFractions
+              call lf_SurfArea_pre(k,iter) !only used for LocalFractions
 
            S_m2m3(:,k) = 0.0  !! Allow max 6000 um2/cm3
 
@@ -346,11 +349,11 @@ contains
 
            do ipm = 1, size( PM10_GROUP )
              ispec = PM10_GROUP(ipm)
-
              ugtmp  = xn_2d(ispec,k)*species(ispec)%molwt*1.0e12/AVOG
              if (.false. .and. lf_fullchem) then
 !             if (.true.) then
                 !For LF test remove all O3-active species
+               if( species(ispec)%name == 'OM25_p' ) cycle
                 if (  species(ispec)%name == 'SO4' ) then
                    ugtmp = 0
                 else if ( index( species(ispec)%name, 'NO3_f' )>0) then
@@ -631,7 +634,7 @@ contains
             S_m2m3(AERO%PM_F,k) = S_m2m3(AERO%PM_F_EQUI,k) 
            end if
 
-           !call lf_SurfArea_pos(S_m2m3(AERO%PM,k),i,j,k,iter) !only used for LocalFractions
+           call lf_SurfArea_pos(S_m2m3(AERO%PM,k),k,iter) !only used for LocalFractions
 
           end do 
 
@@ -815,6 +818,10 @@ subroutine setup_rcemis(i,j)
     rcemis(:,:)=rcemis(:,:)+ColumnRate(i,j,REDUCE_VOLCANO=0.85)
   else
     rcemis(:,:)=rcemis(:,:)+ColumnRate(i,j)
+    if (makeVOL_lf) then
+       !save for use in LF
+       rcemis_lf_nat_3D(:,:,ix_nat_VOL) = rcemis_lf_nat_3D(:,:,ix_nat_VOL) + ColumnRate(i,j)
+    end if
   end if
 
   ! lightning and aircraft ... Aerial NOx emissions if required:

@@ -34,7 +34,7 @@ use Config_module,     only: MasterProc, NLANDUSEMAX, IOU_INST,IOU_KEY, OutputVe
                              USES, nOutputVegO3
 use Debug_module,      only: DEBUG   ! -> DEBUG%MOSAICS
 use DerivedFields_mod, only: f_2d, d_2d
-use EcoSystem_mod,     only: NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS, EcoSystemFrac, &
+use EcoSystem_mod,     only: nEcoSysOutputs, EcoSystemFrac, ECOSYSTEM_OUTPUTS,&
                             FULL_ECOGRID, FULL_LCGRID, Is_EcoSystem
 use GasParticleCoeffs_mod,  only:  DDspec
 use GridValues_mod,    only: debug_proc, i_fdom, j_fdom
@@ -360,10 +360,14 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
   logical :: first_call = .true.     ! reset each subroutine call
 
   ! Variables added for ecosystem dep
-  real, dimension(NDEF_ECOSYSTEMS) :: invEcoFrac, EcoFrac
+  real, dimension(:), allocatable, save :: invEcoFrac, EcoFrac
   real :: Fflux, Gs, Gns, O3
   logical :: dbg, dbghh
 
+  if ( my_first_call) then 
+    allocate(invEcoFrac(nEcoSysOutputs))
+    allocate(EcoFrac(nEcoSysOutputs))
+  end if
   cdep = -99                      ! set on first_vgr_call
   dbg   = DEBUG%MOSAICS.and.debug_flag
   dbghh = dbg .and. current_date%seconds == 0
@@ -377,7 +381,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
 
   EcoFrac(:)    = EcoSystemFrac(:,i,j)
   invEcoFrac(:) = 0.0
-  do n=1,NDEF_ECOSYSTEMS
+  do n=1,nEcoSysOutputs
     if(EcoFrac(n)>1.0e-39) invEcoFrac(n)=1.0/EcoFrac(n)
   end do
 
@@ -398,9 +402,9 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
 
     if(dbg)then
       write(*,*)  dtxt//"ECOAREAS ", i,j
-      do n=1,NDEF_ECOSYSTEMS
+      do n=1,nEcoSysOutputs
         write(*,"(a,i3,a,f14.4,g12.3)")  dtxt//"ECOCHECK ", n, &
-          DEF_ECOSYSTEMS(n), EcoFrac(n), invEcoFrac(n)
+          ECOSYSTEM_OUTPUTS(n), EcoFrac(n), invEcoFrac(n)
       end do
       write(*,*) dtxt//"Done ECOCHECK ========================"
     end if
@@ -430,7 +434,7 @@ subroutine Add_MosaicOutput(debug_flag,i,j,convfac,itot2Calc,fluxfrac,&
     select case(subclass)
     case("DDEP")
       ! Eco landcovers can include several land-cover classes, see EcoSystem_mod
-      iEco = find_index(MosaicOutput(imc)%txt,DEF_ECOSYSTEMS)
+      iEco = find_index(MosaicOutput(imc)%txt,ECOSYSTEM_OUTPUTS)
       call CheckStop(iEco<0,dtxt//"iECO NEG! "//trim(MosaicOutput(imc)%txt))
       select case(nadv)
       case(1:NSPEC_ADV)                 ! normal advected species

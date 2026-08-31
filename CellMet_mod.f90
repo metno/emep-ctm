@@ -35,10 +35,11 @@ module CellMet_mod
 !  for calculating sub-grid meteorology for each land-use.
 !=============================================================================
 
+use BiDir_module,      only: BiDir
 use CheckStop_mod,     only: CheckStop
-use Config_module,    only: KMAX_MID, KMAX_BND, PT, USES, IOU_INST, PBL
+use Config_module,     only: KMAX_MID, KMAX_BND, PT, USES, IOU_INST, PBL
 use DerivedFields_mod, only: d_2d, f_2d
-use Functions_mod, only : Tpot_2_T
+use Functions_mod,     only : Tpot_2_T
 use GridValues_mod,    only: dA,dB, glat, glon
 use Landuse_mod,       only: LandCover, ice_landcover ! Provides SGS,hveg,LAI,...
 use Landuse_mod,       only: mainly_sea
@@ -48,8 +49,8 @@ use MicroMet_mod,      only: PsiH, PsiM, AerRes       ! functions
 use MetFields_mod,     only: ps, u_ref, cc3dmax, sdepth, surface_precip, &
                             ice_nwp,fh, fl, z_mid, z_bnd, q, roa, rh2m, sst, &
                             rho_surf, th, pzpbl, t2_nwp, ustar_nwp, zen,&
-                            coszen
-use PhysicalConstants_mod, only: PI, CP, GRAV, KARMAN
+                            coszen, dTleaf, Tleaf
+use PhysicalConstants_mod, only: PI, CP, GRAV, KARMAN, CHARNOCK
 use SoilWater_mod,     only: fSW40, fSW50, fSW90 ! Not we have fSW50, fSW90 also now
 use SubMet_mod,        only: Get_SubMet, Sub
 use ZchemData_mod, only : pp, temp   ! TLEAF testing
@@ -71,11 +72,11 @@ subroutine Get_CellMet(i,j,debug_flag)
   integer, intent(in) :: i,j
   logical, intent(in) :: debug_flag  ! DEBUG%RUNCHEM + wanted i,j
   integer :: lu, ilu, nlu
-  real :: land_frac
+  real :: land_frac, sum_logz0
   character(len=*), parameter :: dtxt='GetCell:'
 !---------------------------------------------------------------
 
-     if(z0_out_ix>0) d_2d(z0_out_ix,i,j,IOU_INST) = 0.0
+  if(z0_out_ix>0 .or. USES%Walcek_ustar) d_2d(z0_out_ix,i,j,IOU_INST) = 0.0
 
 ! We assume that the area of grid which is wet is proportional to
 ! cloud-cover. To avoid some compiler/numerical issues when
@@ -174,7 +175,7 @@ subroutine Get_CellMet(i,j,debug_flag)
   Grid%ustar = max( Grid%ustar, PBL%MIN_USTAR_LAND)
 
   !NB: invL_nwp is already defined, with similar defintion 
-  Grid%invL  = -1* KARMAN * GRAV * Grid%Hd & ! -Grid%Hd disliked by gfortran
+  Grid%invL  = -1.0* KARMAN * GRAV * Grid%Hd & ! -Grid%Hd disliked by gfortran
             / (CP*Grid%rho_s * Grid%ustar*Grid%ustar*Grid%ustar * Grid%t2 )
 
   !.. we limit the range of 1/L to prevent numerical and printout problems
@@ -200,8 +201,9 @@ subroutine Get_CellMet(i,j,debug_flag)
   Sub(:)%SAI      = 0.0
   Sub(:)%hveg     = 0.0
 
-  
-  LULOOP: do ilu= 1, nlu
+  land_frac=0.0  
+  Grid%dTleaf = 0.0
+  PRELULOOP: do ilu= 1, nlu
     lu = LandCover(i,j)%codes(ilu)
 
     if((.not. LandType(lu)%is_water) .and. LandCover(i,j)%fraction(ilu)>0.0) Grid%is_allsea = .false. 
@@ -210,15 +212,99 @@ subroutine Get_CellMet(i,j,debug_flag)
     Sub(lu)%LAI      = LandCover(i,j)%LAI(ilu)
     Sub(lu)%SAI      = LandCover(i,j)%SAI(ilu)
     Sub(lu)%hveg     = LandCover(i,j)%hveg(ilu)
-
-    !=======================
-    call Get_SubMet(lu, debug_flag )
-        
-    Sub(lu)%SWP = 0.0  ! Not yet implemented
+    Sub(lu)%g_sto    = LandCover(i,j)%g_sto(ilu) !DSJ13
+    Sub(lu)%dTleaf   = LandCover(i,j)%dTleaf(ilu) !DSJ13
     
-    !=======================
-  end do LULOOP
+    Sub(lu)%is_water  = LandType(lu)%is_water
+    Sub(lu)%is_forest = LandType(lu)%is_forest
+    Sub(lu)%is_crop   = LandType(lu)%is_crop   
 
+    if ( Sub(lu)%is_water ) then ! water
+       Sub(lu)%d  = 0.0
+       Sub(lu)%z0 = CHARNOCK * Grid%ustar * Grid%ustar/GRAV
+      ! We use the same restriction on z0 as in Berge, 1990 
+      ! (Tellus,42B,389-407)
+      Sub(lu)%z0 = max( Sub(lu)%z0 ,1.5e-5)
+    else if ( Sub(lu)%is_forest ) then ! forest
+   !  We restrict z0 to 1.0m, since comparison with CarboEurope
+   !  results shows that this provides better u* values for
+   !  forests.
+       Sub(lu)%d  =  0.78 * Sub(lu)%hveg   ! Jarvis, 1976
+       if(USES%z0limit) then
+          Sub(lu)%z0 =  min( 0.07 * Sub(lu)%hveg, 1.0 )
+       else 
+          Sub(lu)%z0 =  0.07 * Sub(lu)%hveg
+       end if
+!BIDIR TMP FIXME to solve thin layer issues:
+! Assuming grid centre is relative to forest's displacement ht.
+       if ( BiDir%skipForestDisp) then
+          Sub(lu)%d  =  0.0
+       end if
+!END BIDIR TMP FIXME
+    else
+       Sub(lu)%d  =  0.7 * Sub(lu)%hveg
+       Sub(lu)%z0 = max( 0.1 * Sub(lu)%hveg, 0.001) !  Fix for deserts, 
+      ! ice, snow (where, for bare ground, h=0 and hence z0=0)
+    end if
+          
+    if ( USES%ZREF ) then  !EXPERIMENTAL. Not recommended so far
+       Sub(lu)%z_refd = Grid%z_ref
+    else
+       Sub(lu)%z_refd = Grid%z_ref - Sub(lu)%d  !  minus displacement height
+    end if
+  end do PRELULOOP
+
+  !if requested, make weighted average for output  
+  if(USES%Walcek_ustar)then
+     !we need a separate loop, beacause Grid%is_allsea is set in the first one
+     land_frac = 0.0
+     sum_logz0 = 0.0
+     do ilu= 1, nlu        
+        lu = LandCover(i,j)%codes(ilu)
+       if(Grid%is_allsea)then
+           sum_logz0 = log(Sub(lu)%z0)
+        else if(.not.LandType(lu)%is_water) then
+           land_frac = land_frac+LandCover(i,j)%fraction(ilu)
+           sum_logz0 = &
+                sum_logz0 + log(Sub(lu)%z0)*LandCover(i,j)%fraction(ilu)           
+        endif
+     enddo
+     if(.not.Grid%is_allsea)then
+        !renormalize to land
+        if(land_frac >= 1.E-9)then
+           sum_logz0 = &
+                sum_logz0/land_frac
+        else
+           write(*,*) dtxt//'WARNING: found grid with no sea and no land',&
+                     i,j,nlu,land_frac
+           do ilu= 1, nlu  
+              lu = LandCover(i,j)%codes(ilu)
+              write(*,*)dtxt, lu,LandCover(i,j)%fraction(ilu),LandType(lu)%is_water
+          enddo
+       endif
+    endif     
+
+  endif
+  if(USES%Walcek_ustar) Grid%z0 = exp(sum_logz0)
+  LULOOP: do ilu= 1, nlu
+    lu = LandCover(i,j)%codes(ilu)
+    call Get_SubMet(lu, debug_flag )        
+    Sub(lu)%SWP = 0.0  ! Not yet implemented
+
+    if( USES%TLEAF_IBM ) then
+       if(Sub(lu)%LAI > 0.0 ) then
+          land_frac = land_frac+LandCover(i,j)%fraction(ilu)
+          Grid%dTleaf = Grid%dTleaf + Sub(lu)%coverage * Sub(lu)%dTleaf        
+       end if
+    end if
+  end do LULOOP  
+  if( USES%TLEAF_IBM ) then
+     if( land_frac > 0.0 ) then
+        Grid%dTleaf = Grid%dTleaf / land_frac
+     end if
+     dTleaf(i,j) = Grid%dTleaf
+     Tleaf(i,j) = Grid%T2 + Grid%dTleaf
+  end if
 
   !if requested, make weighted average for output
   if(z0_out_ix>0 .or. invL_out_ix>0)then
@@ -253,10 +339,8 @@ subroutine Get_CellMet(i,j,debug_flag)
           enddo
        endif
     endif
-     
   endif
   
-
 end subroutine Get_CellMet
 !=======================================================================
 

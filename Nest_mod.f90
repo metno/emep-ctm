@@ -66,7 +66,7 @@ module Nest_mod
 use ExternalBICs_mod,     only: set_extbic, icbc, ICBC_FMT,&
       EXTERNAL_BIC_SET, EXTERNAL_BC, &
       iw, ie, js, jn, kt ! i West/East bnd; j North/South bnd; k Top
-      
+
 !----------------------------------------------------------------------------!
 use CheckStop_mod,           only: CheckStop,check=>CheckNC
 use Chemfields_mod,          only: xn_adv    ! emep model concs.
@@ -80,7 +80,7 @@ use Config_module, only: Pref,PT,KMAX_MID,MasterProc,NPROC,DataDir,&
      NEST_template_read_3D,NEST_template_read_BC,NEST_template_write,&
      NEST_template_dump,BC_DAYS,NEST_save_append,NEST_save_overwrite,&
      NEST_native_grid_3D,NEST_native_grid_BC,NEST_omit_zero_write,NEST_out_DOMAIN,&
-     NEST_MET_inner,NEST_RUNDOMAIN_inner,&
+     NEST_MET_inner,NEST_RUNDOMAIN_inner,NEST_thick_inner,&
      NEST_WRITE_SPC,NEST_WRITE_GRP,NEST_OUTDATE_NDUMP,NEST_outdate,OUTDATE_NDUMP_MAX,&
      EXTERNAL_BIC_NAME, TOP_BC, filename_eta, lf_set
 use Debug_module,            only: DEBUG ! %NEST,DEBUG_ICBC=>DEBUG_NEST_ICBC
@@ -90,7 +90,7 @@ use Io_mod,                  only: open_file,IO_TMP
 use Io_RunLog_mod,           only: PrintLog
 use InterpolationRoutines_mod, only : grid2grid_coeff,point2grid_coeff
 use MetFields_mod,           only: roa
-use MPI_Groups_mod  
+use MPI_Groups_mod
 use netcdf,                  only: nf90_open,nf90_write,nf90_close,nf90_inq_dimid,&
                                   nf90_inquire,nf90_inquire_dimension,nf90_inq_varid,&
                                   nf90_inquire_variable,nf90_get_var,nf90_get_att,&
@@ -126,7 +126,7 @@ character(len=TXTLEN_FILE),private, save ::  &
   filename_read_3D = 'template_read_3D',& ! Overwritten in readxn and wrtxn.
   filename_read_BC = 'template_read_BC',& ! Filenames are updated according to date
   filename_write   = 'template_write'  ,& ! following respective templates
-  filename_dump   = 'template_dump'     ! 
+  filename_dump   = 'template_dump'     !
 
 
 character(len=TXTLEN_FILE),private ::  filename
@@ -174,6 +174,7 @@ subroutine Config_Nest()
   call RestrictDomain(NEST_out_DOMAIN)
 
   mydebug = DEBUG%NEST.and.MasterProc
+!  if(mydebug)write(*,*) 'DSBCs', trim(NEST_MODE_READ)//trim(NEST_template_read_BC)
 
   NEST_WRITE_SPC = ""  ! If these variables remain ""
   NEST_WRITE_GRP = ""  ! all advected species will be written out.
@@ -226,6 +227,7 @@ subroutine readxn(indate)
   logical :: fexist_3D=.false.,fexist_BC=.false.
   integer, save :: oldmonth=0
 
+!  if(MasterProc)write(*,*) 'DSBCsA', NEST_MODE_READ, trim(NEST_template_read_BC)
   call Config_Nest()
   if(mydebug) write(*,*)'Nest:Read BC, NEST_MODE=',NEST_MODE_READ
   if(NEST_MODE_READ=='NONE')return
@@ -263,7 +265,7 @@ subroutine readxn(indate)
                                mode='YMDH',debug=mydebug)
   inquire(file=filename_read_3D,exist=fexist_3D)
   inquire(file=filename_read_BC,exist=fexist_BC)
-
+  if(DEBUG%NEST.and.MasterProc) write(*,*) 'DSBC file: ', fexist_BC, trim(filename_read_BC)
   if(first_call)then
     first_call=.false.
     if(fexist_3D)then
@@ -401,7 +403,7 @@ subroutine wrtxn(indate, End_of_run)
     call init_wanted_adv(filename_write,debug=mydebug)
     if(NEST_MET_inner /= "NOTSET")then
        ! find region that is really needed, i.e. boundaries of inner grid
-       !find lon and lat of inner grid restricted to BC 
+       !find lon and lat of inner grid restricted to BC
        call init_mask_restrict(NEST_MET_inner,NEST_RUNDOMAIN_inner)
     endif
   end if
@@ -521,7 +523,7 @@ end subroutine init_wanted_adv
 function is_nest_dump_date() result(is_dump)
   logical :: is_dump
 
-  if(NEST_OUTDATE_NDUMP<=0)then 
+  if(NEST_OUTDATE_NDUMP<=0)then
     is_dump = .false.
   else
     is_dump = compare_date(NEST_OUTDATE_NDUMP,indate,NEST_outdate(:NEST_OUTDATE_NDUMP),&
@@ -1108,7 +1110,9 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
   integer, allocatable, dimension(:,:) ::IIij_rstrct,JJij_rstrct
   real, allocatable, dimension(:) ::lon_rstrct,lat_rstrct
   integer :: N_rstrct_BC,n4,N_rstrct_BC_per_proc
+  integer :: ii, jj, thick !number of gridcell in the EXTERNAL grid to include
 
+  thick = NEST_thick_inner
   allocate(mask_restrict(limax,ljmax))
 
   !Read dimensions (global)
@@ -1186,7 +1190,7 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
            !wrf metdata
            call check(nf90_inq_varid(ncFileID,trim(iDName),varID),"dim:"//trim(iDName))
            call check(nf90_get_var(ncFileID,varID,lon_ext),"get:lon")
-           
+
            call check(nf90_inq_varid(ncFileID,trim(jDName),varID),"dim:"//trim(jDName))
            call check(nf90_get_var(ncFileID,varID,lat_ext),"get:lat")
         else
@@ -1213,13 +1217,14 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
 
      call check(nf90_close(ncFileID))
 
-     !N_rstrct_BC = number of points on boundaries in the inner grid 
+     !N_rstrct_BC = number of points on boundaries in the inner grid
      if(rundomain_ext(1)<1)rundomain_ext(1)=1
      if(rundomain_ext(2)<1 .or. rundomain_ext(2)>GIMAX_ext) rundomain_ext(2)=GIMAX_ext
      if(rundomain_ext(3)<1)rundomain_ext(3)=1
      if(rundomain_ext(4)<1 .or. rundomain_ext(4)>GJMAX_ext) rundomain_ext(4)=GJMAX_ext
+
      N_rstrct_BC=2*(rundomain_ext(2)-rundomain_ext(1)+1)+2*(rundomain_ext(4)-rundomain_ext(3)-1)
-     N_rstrct_BC=2*(rundomain_ext(2)-rundomain_ext(1)+1)+2*(rundomain_ext(4)-rundomain_ext(3)-1)
+
      allocate(lon_rstrct(N_rstrct_BC))
      allocate(lat_rstrct(N_rstrct_BC))
 
@@ -1285,10 +1290,10 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
   CALL MPI_ALLREDUCE(MPI_IN_PLACE, glat_rundom, GIMAX*GJMAX, &
        MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
 
-  
+
   !divide the work among processors
   N_rstrct_BC_per_proc=(N_rstrct_BC+NPROC-1)/NPROC
-  
+
   ! find the four closest points
 !  call grid2grid_coeff( &
 !       lon_rstrct,lat_rstrct,         &
@@ -1312,15 +1317,24 @@ subroutine init_mask_restrict(filename_read,rundomain_ext)
        MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_CALC, IERROR)
 
   mask_restrict = .false. !default: do not include
-  do n=1, N_rstrct_BC
-     do n4=1, 4
-        i=IIij_rstrct(n4,n)
-        j=JJij_rstrct(n4,n)
-        if(i>=gi0 .and. i<=gi1 .and. j>=gj0 .and. j<=gj1)then
-           if(abs(Weight_rstrct(n4,n))> 1.0E-6)then !contribute little, probably noise
+  do n = 1, N_rstrct_BC
+     do n4 = 1, 4
+        if(abs(Weight_rstrct(n4,n))< 1.0E-6) cycle !contribute little, probably noise
+
+        ii=IIij_rstrct(n4,n)
+        jj=JJij_rstrct(n4,n)
+
+        !add an extra area around each point with global indices ii, jj
+        !will also work for odd thick
+        !will also work across subdomains
+        do i = ii-int(thick/2), ii-int(thick/2) + thick - 1
+        do j = jj-int(thick/2), jj-int(thick/2) + thick - 1
+           if(i>=gi0 .and. i<=gi1 .and. j>=gj0 .and. j<=gj1)then
               mask_restrict(i-gi0+1,j-gj0+1)= .true.
            endif
-        endif
+        enddo
+        enddo
+
      enddo
   enddo
   deallocate(IIij_rstrct,JJij_rstrct,Weight_rstrct)
@@ -1379,7 +1393,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
   real :: scale_factor,add_offset
   logical :: time_exists,divbyroa
   integer ::KMAX_nest
-  
+
   KMAX_BC=KMAX_MID
   if(mydebug)write(*,*)'Nest: read_newdata_LATERAL, first?', first_call
   if(first_call)then
@@ -1443,7 +1457,7 @@ subroutine read_newdata_LATERAL(ndays_indate)
         call init_nest(ndays_indate,filename_read_BC,NEST_native_grid_BC,&
                    IIij,JJij,Weight,k1_ext,k2_ext,weight_k1,weight_k2,&
                    N_ext_BC,KMAX_ext_BC,GIMAX_ext,GJMAX_ext)
-        
+
      endif
   end if
 
@@ -1698,9 +1712,9 @@ subroutine reset_3D(ndays_indate)
   call check(nf90_open(trim(fileName_read_3D),nf90_nowrite,ncFileID))
   status = nf90_get_att(ncFileID,nf90_global,"restricted",restricted)
   call check(nf90_close(ncFileID))
-  
-  if(status/=nf90_noerr .or. trim(restricted)/="BC_restricted") then     
-     
+
+  if(status/=nf90_noerr .or. trim(restricted)/="BC_restricted") then
+
      allocate(data(GIMAX_ext,GJMAX_ext,KMAX_ext), stat=status)
      if(MasterProc)then
         call check(nf90_open(trim(fileName_read_3D),nf90_nowrite,ncFileID))
@@ -1722,9 +1736,9 @@ subroutine reset_3D(ndays_indate)
         end if
         itime=n
      end if
-     
+
      if(mydebug)write(*,*)'Nest: overwrite 3D'
-     
+
      DO_SPEC: do n= 1, NSPEC_ADV
         if(.not.(adv_ic(n)%wanted.and.adv_ic(n)%found)) cycle DO_SPEC
         if(MasterProc)then
@@ -1783,7 +1797,7 @@ subroutine reset_3D(ndays_indate)
                    +WeightData(i,j,k2_ext(k))*weight_k2(k)
            end if
         end if
-        
+
      end do DO_SPEC
 
      deallocate(data)

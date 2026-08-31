@@ -26,11 +26,12 @@
 !*****************************************************************************!
 module LandDefs_mod
  use CheckStop_mod, only : CheckStop, StopAll
- use Config_module, only : NLANDUSEMAX, MasterProc
+ use Config_module, only : NLANDUSEMAX, MasterProc, MAX_NUM_LANDCOVER_PFTs,&
+                           LandCoverInputs
  use Debug_module,  only:  DEBUG   ! -> DEBUG%LANDDEFS
  use Io_mod, only : IO_TMP, open_file, ios, Read_Headers, read_line
  use KeyValueTypes, only :  KeyVal
- use LandPFT_mod,  only : N_PFTS, PFT_CODES, MapPFT_Init
+ use LandPFT_mod,  only : N_PFTS, LAIMAP_CODES, MapPFT_Init
  use SmallUtils_mod, only : find_index, trims
   implicit none
   private
@@ -110,6 +111,7 @@ end interface Check_LandCoverPresent
      logical :: is_crop 
      logical :: is_desert 
      logical :: is_seminat 
+     logical :: is_grass    ! lower subclass of seminat
      logical :: is_water
      logical :: is_ice
      logical :: is_veg
@@ -121,7 +123,7 @@ end interface Check_LandCoverPresent
                                                !##############
   type(land_type), public,  dimension(NLANDUSEMAX) :: LandType
                                                !##############
-     
+
 
 contains
 !=======================================================================
@@ -164,15 +166,27 @@ contains
       type(KeyVal), dimension(2) :: KeyValues ! Info on units, coords, etc.
       character(len=50) :: errmsg
       character(len=*), parameter :: dtxt='Ini-LandDefs:'
-      integer :: n, nn, NHeaders, NKeys
-      logical :: dbg
+      integer :: i, n, nn, NHeaders, NKeys
+      logical :: dbg, header
       logical, dimension(ncodes) :: wanted_found
 
       dbg = ( DEBUG%LANDDEFS .and. MasterProc ) 
 
-      ! First, get PFT_CODES
+
+      if (LandCoverInputs%system == 'EmLC17') then
+         LandCoverInputs%PFTs  = [ character(len=len(LandCoverInputs%PFTs(1))):: &
+           "CF", "DF", "NF", "BF", "TC", "MC", "RC", "SNL", "GR", "MS", &
+           "WE", "TU", "DE", "W", "ICE", "U", ('NOTSET', i=17,MAX_NUM_LANDCOVER_PFTs) ]  
+      end if
+      do i = 1, MAX_NUM_LANDCOVER_PFTs
+        if ( LandCoverInputs%PFTs(i)  == "NOTSET") exit
+        LandCoverInputs%nLC_PFTs  = i
+        if (MasterProc) write(*,*) dtxt//'PFTs:',i, trim(LandCoverInputs%PFTs(i))
+      end do
+      call CheckStop( LandCoverInputs%nLC_PFTs < 1,dtxt//'No LandCoverInputs%PFTs:'//LandCoverInputs%system)
+
+      ! First, get LAIMAP_CODES from LPJ if wanted
       call MapPFT_Init()
-      if ( dbg ) write(*,*) dtxt//"PFT_CODES? ",  PFT_CODES(1:N_PFTS)
 
       do n = 1, size(wanted_codes)
          wanted_found(n) = .false.
@@ -186,6 +200,7 @@ contains
       ! Read data
       ! fname = "Inputs_LandDefs.csv"
       if ( MasterProc ) then
+         write(*,*) dtxt//"LAIMAP_CODES? ",  LAIMAP_CODES(1:N_PFTS)
          write(*,*) dtxt//" for Ncodes= ", ncodes
          do n = 1, ncodes
             write(*,*) dtxt//"LC  wants ",n, trim(wanted_codes(n))
@@ -204,11 +219,12 @@ contains
       !       comments and skipped
 
        nn = 0     
+       header = .true.
        do
             call read_line(IO_TMP,txtinput,ios)
 
             if ( ios /= 0 ) exit   ! likely end of file
-            if ( dbg ) write(*,*) nn,  dtxt//' READLINE: ------ '// trim(txtinput)
+            if ( MasterProc ) write(*,*) nn,  dtxt//' READLINE: ------ '// trim(txtinput)
             if ( txtinput(1:4) == "#END" ) then
               if(dbg) write(*,*) dtxt//"ENDofData"
               exit
@@ -220,7 +236,6 @@ contains
             end if
 
             read(unit=txtinput,fmt=*,iostat=ios) LandInput
-            if( dbg ) write(*,*) dtxt//'DBG', LandInput%code, LandInput%BiomassD
 
             call CheckStop ( ios, fname // " txt error:" // trim(txtinput) )
             n = find_index( LandInput%code, wanted_codes )!index in map data?
@@ -232,8 +247,6 @@ contains
            !############################
             LandDefs(n) = LandInput
             wanted_found(n) = .true.
-            if(MasterProc) write(*,"(a,2i3,1x,2a20)") dtxt//'MATCHA:',nn, n, &
-                    LandInput%code, wanted_codes(n)
             nn = nn + 1
            !############################
 
@@ -243,12 +256,12 @@ contains
            LandDefs(n)%LAImax   = max( LandDefs(n)%LAImax,   0.0)
 
 
-            if ( dbg ) then
+            if ( MasterProc ) then
                  write(*,"(a)") trim(txtinput)
-                 write(unit=*,fmt="(a,3i3,2a,2i5,f7.3,f10.3)") dtxt//"MATCHB :=> ", &
-                  n,nn, ncodes, trim(LandInput%name), trim(LandInput%code),&
+                 write(unit=*,fmt="(a,3i3,a,2i5,f7.3,2f10.3)") dtxt//"MATCH :=> ", &
+                  n,nn, ncodes, trim(LandInput%name)//":"//trim(LandInput%code),&
                     LandDefs(n)%SGS50,LandDefs(n)%EGS50, &
-                    LandDefs(n)%LAImax, LandDefs(n)%Emtp
+                    LandDefs(n)%LAImax, LandInput%BiomassD, LandDefs(n)%Emtp
             end if
             call CheckStop(  LandInput%code, wanted_codes(n), &
                                            dtxt//"MATCHING CODES")
@@ -267,11 +280,7 @@ contains
                 (  LandDefs(n)%hveg_max > 4.0 .and. &    !  Simpler definition 
                    LandDefs(n)%LAImax > 0.5           )  ! Excludes Urban
 
-            LandType(n)%pft = find_index( LandDefs(n)%laiVar, PFT_CODES)
-
-            if ( dbg ) write(unit=*,fmt='(a,i3,a20,2a9,i5,L2)') dtxt//"isPFT? ", n,&
-                  trim(  wanted_codes(n) ), trim(LandInput%type), &
-                  trim( LandDefs(n)%laiVar ), LandType(n)%pft
+            LandType(n)%pft = find_index( LandDefs(n)%laiVar, LAIMAP_CODES)
 
            !is_BDLF, is_NDLF used mainly for BVOC and soil-NO. Not essential
            ! for IAM-type landcover
@@ -279,11 +288,32 @@ contains
             LandType(n)%is_BDLF = ( LandInput%type == "EBF"  )
             LandType(n)%is_crop  = ( LandInput%type == "ECR"  )
             LandType(n)%is_seminat  = ( LandInput%type == "SNL"  )
+           ! The IAM_SNL is very short, 0.2m! Count as grass also
+            LandType(n)%is_grass  = ( LandType(n)%is_seminat .and. LandDefs(n)%hveg_max < 0.4 )
             LandType(n)%is_bulk   =  LandInput%type == "BLK"
             LandType(n)%is_desert = ( LandInput%code == "DE"  )
-            LandType(n)%is_veg    =  LandInput%code /= "U" .and. &
+            LandType(n)%is_veg    =  LandInput%code(1:1) /= "U" .and. & ! also Urb 
+                  .not.LandType(n)%is_water .and. &
                   LandInput%hveg_max > 0.01   ! Excludes water, ice_nwp, desert 
             if( LandInput%code(1:2) == "GR" ) iLC_grass =  n ! for eg clover
+
+            if ( MasterProc ) then
+               if (header) write(unit=*,fmt='(a,a3,a15,2a9,a5,12a2)') dtxt//"isPFT? ", 'n',&
+                    'code','type','laiVar','pft','F','N','D','C','S','G','V','D','W'
+               write(unit=*,fmt='(a,i3,a15,2a9,i5,12L2)') dtxt//"isPFT? ", n,&
+                  trim(  wanted_codes(n) ), trim(LandInput%type), &
+                  trim( LandDefs(n)%laiVar ), LandType(n)%pft, &
+                  LandType(n)%is_forest,&
+                  LandType(n)%is_NDLF,&
+                  LandType(n)%is_BDLF,&
+                  LandType(n)%is_crop,&
+                  LandType(n)%is_seminat,&
+                  LandType(n)%is_grass,&
+                  LandType(n)%is_veg,&
+                  LandType(n)%is_desert,&
+                  LandType(n)%is_water
+               header = .false.
+            end if ! dbg
        end do
        if ( MasterProc ) then 
           close(unit=IO_TMP)

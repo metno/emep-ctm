@@ -75,10 +75,25 @@ private
     ,PM25_water(:,:,:)    &  !3D PM water
     ,PMco_water(:,:,:)    &  !3D PM water ! Added JUN21AERO
     ,PM25_water_rh50(:,:) &   !gravimetric PM water
+    ,PM25_water_noOrg(:,:)&   !gravimetric PM water without organics
+    ,PM25_water_noSS(:,:) &   !gravimetric PM water without Sea Spray
+    ,PM25_water_floss(:,:)&   !gravimetric PM water with NH4NO3 evaporative loss
     ,pmH2Ogb(:,:,:)       &   !2D PM water from GERBER, for fine & coarse
     ! Added PMco_water and Gerber_water from JUN21AERO. Overlap with pmH2O?
     ,PMco_water_rh50(:,:) &   !gravimetric PM water
-    ,Gerber_water(:,:,:)   !3D PM water from GERBER
+    ,no3_floss(:,:)       &   !Nitrate filter loss (ug m-3)
+    ,nh4_floss(:,:)       &   !Ammonium filter loss (ug m-3)
+    ,Gerber_water(:,:,:)  &   !3D PM water from GERBER
+    ,yn2o5(:)             &   ! 3D output for coarse-mode rate
+    ,gammaN2O5f(:)        &   ! 3D output for fine-mode gamma
+    ,gammaN2O5c(:)        &   ! 3D output for coarse-mode gamma
+    ,rateN2O5f(:)         &   ! 3D output for fine-mode rate
+    ,rateN2O5c(:)         &   ! 3D output for coarse-mode rate
+    ,yieldN2O5(:,:,:)     &   ! 3D output for fine-mode gamma
+    ,cf_gammaN2O5f(:,:,:) &   ! 3D output for fine-mode gamma
+    ,cf_gammaN2O5c(:,:,:) &   ! 3D output for coarse-mode gamma
+    ,cf_rateN2O5f(:,:,:)  &   ! 3D output for fine-mode rate
+    ,cf_rateN2O5c(:,:,:)      ! 3D output for coarse-mode rate
 
 
   real, save, allocatable, public :: &
@@ -119,12 +134,20 @@ contains
     PM25_water=0.0
     allocate(PM25_water_rh50(LIMAX,LJMAX))
     PM25_water_rh50=0.0
-    if ( AERO%JUN21AERO ) then
-      allocate(PMco_water(LIMAX,LJMAX,KMAX_MID))
-      PMco_water=0.0
-      allocate(PMco_water_rh50(LIMAX,LJMAX))
-      PMco_water_rh50=0.0
-    end if 
+    allocate(PMco_water(LIMAX,LJMAX,KMAX_MID))
+    PMco_water=0.0
+    allocate(PMco_water_rh50(LIMAX,LJMAX))
+    PMco_water_rh50=0.0
+    allocate(PM25_water_noSS(LIMAX,LJMAX))
+    PM25_water_noSS=0.0
+    allocate(PM25_water_noOrg(LIMAX,LJMAX))
+    PM25_water_noOrg=0.0
+    allocate(PM25_water_floss(LIMAX,LJMAX))
+    PM25_water_floss=0.0
+    allocate(no3_floss(LIMAX,LJMAX))
+    no3_floss=0.0
+    allocate(nh4_floss(LIMAX,LJMAX))
+    nh4_floss=0.0
     allocate(cfac(NSPEC_ADV,LIMAX,LJMAX))
     cfac=1.0
     allocate(so2nh3_24hr(LIMAX,LJMAX))
@@ -171,6 +194,7 @@ contains
     allocate(methane(KCHEMTOP:KMAX_MID),hydrogen(KCHEMTOP:KMAX_MID))
     allocate(n2(KCHEMTOP:KMAX_MID),h2o(KCHEMTOP:KMAX_MID),temp(KCHEMTOP:KMAX_MID))
     allocate(tinv(KCHEMTOP:KMAX_MID),pp(KCHEMTOP:KMAX_MID))
+    allocate(xh2o_f(KCHEMTOP:KMAX_MID),xh2o_c(KCHEMTOP:KMAX_MID))
     allocate(itemp(KCHEMTOP:KMAX_MID))
     CHEMSIZE = KMAX_MID-KCHEMTOP+1
 
@@ -207,7 +231,27 @@ contains
 
     allocate(gamN2O5(KCHEMTOP:KMAX_MID)) ! kHet  for output
     allocate(cNO2(KCHEMTOP:KMAX_MID),cNO3(KCHEMTOP:KMAX_MID)) ! kHet test
-  
+    allocate(yn2o5(KMAX_MID)) ! fine-mode gamma
+    allocate(gammaN2O5f(KMAX_MID)) ! fine-mode gamma
+    yn2o5 = 0.0
+    allocate(gammaN2O5c(KMAX_MID)) ! corae-mode gamma
+    allocate(rateN2O5f(KMAX_MID)) ! fine-mode hydrolysis rate
+    allocate(rateN2O5c(KMAX_MID)) ! coarse-mode hydrolysis rate
+    gammaN2O5f = 0.0
+    gammaN2O5c = 0.0
+    rateN2O5f = 0.0
+    rateN2O5c = 0.0
+    allocate(yieldN2O5(LIMAX,LJMAX,KMAX_MID))
+    yieldN2O5 = 0.0
+    allocate(cf_gammaN2O5f(LIMAX,LJMAX,KMAX_MID))
+    allocate(cf_gammaN2O5c(LIMAX,LJMAX,KMAX_MID))
+    allocate(cf_rateN2O5f(LIMAX,LJMAX,KMAX_MID))
+    allocate(cf_rateN2O5c(LIMAX,LJMAX,KMAX_MID))
+    cf_gammaN2O5f = 0.0
+    cf_gammaN2O5c = 0.0
+    cf_rateN2O5f = 0.0
+    cf_rateN2O5c = 0.0
+
 
   end subroutine alloc_ChemFields
 

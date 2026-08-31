@@ -41,7 +41,9 @@ module AerosolCalls
  use ChemDims_mod,          only: NSPEC_SHL
  use ChemSpecs_mod,         only: species
  use Chemfields_mod,        only: PM25_water, PM25_water_rh50, & !H2O_eqsam, & !PMwater 
-                                   cfac, pH
+                                   cfac, pH, PM25_water_noSS, PM25_water_noOrg, &
+                                   no3_floss, nh4_floss, PM25_water_floss,      &
+                                   PMco_water, PMco_water_rh50
  use Config_module,         only: KMAX_MID, KCHEMTOP, MasterProc, USES,&
                                   SO4_ix, HNO3_ix, NO3_f_ix, NH3_ix, NH4_f_ix, OM_ix, &
                                   SSf_ix, SSc_ix, Dustwbf_ix, DustSahf_ix
@@ -55,6 +57,7 @@ module AerosolCalls
  use SmallUtils_mod,        only: find_index
  use ZchemData_mod,         only: xn_2d, temp, rh, pp
  use Par_mod,               only: me
+ use hetp_mod
  implicit none
  private
 
@@ -63,6 +66,7 @@ module AerosolCalls
  public :: AerosolEquilib
  public :: emep2MARS, emep2EQSAM,  Aero_Water_MARS ! , Aero_Water  , Aero_Water_rh50
  private :: emep2isorropia
+ private :: emep2hetp
                     
 !    logical, public, parameter :: AERO_DYNAMICS     = .false.  &  
 !                                , EQUILIB_EMEP      = .false.  & !old Ammonium stuff
@@ -86,17 +90,19 @@ module AerosolCalls
 
   real :: RH_thermodynamics ! used as RH input to therm. equilibrium modules, based on limitsset by AERO%RH_UPLIM_AERO, LOLIM
   real :: OM_mass ! variable to hold organic matter mass for wateruptake calculations
-  integer :: k ! for looping over the vertical
-
+  integer :: k, kmin ! for looping over the vertical
+  logical :: only_surf = .false.
 contains
 
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  subroutine AerosolEquilib(i,j,debug_flag)
+  subroutine AerosolEquilib(i,j,only_surf_in,debug_flag)
     logical, intent(in) :: debug_flag
+    logical, intent(in) :: only_surf_in
     integer, intent(in)  :: i, j
     logical, save :: my_first_call=.true.
     character(len=*),parameter:: dtxt='AeroEqui:'
-    
+
+    only_surf = only_surf_in
     if( my_first_call ) then
       iSeaSalt = find_index('SeaSalt_f',species(:)%name )
       call CheckStop(USES%SEASALT.and.iSeaSalt<1,dtxt//"iSeaSalt neg")
@@ -115,6 +121,8 @@ contains
         call emep2EQSAM(i, j, debug_flag)
       case ( 'ISORROPIA' )
         call emep2Isorropia(i,j,debug_flag)
+      case ( 'HETP' )
+        call emep2hetp( i, j, debug_flag )
       case default
         if( my_first_call .and. MasterProc ) then
           write(*,*) 'WARNING! AerosolEquilib, nothing valid chosen: '//AERO%EQUILIB
@@ -125,9 +133,209 @@ contains
   end subroutine AerosolEquilib
 
  !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ ! HETP - Inorganic aerosol partitioning module
+ ! 
+ ! HETP module was developed by Environment and Climate Change Canada (ECCC)
+ ! in 2023. The module is documented in:
+ !    Miller et al., Geoscientific Model Development, 17, 2197+2219, 2024.
+ !      https://doi.org/10.5194/gmd-17-2197-2024
+ ! See Readme_HETP.txt and hetp_mod.f90 for details
+ !
+  subroutine emep2hetp( i, j, debug_flag )
+    integer, intent(in) :: i, j
+    logical, intent(in) :: debug_flag
+  
+    ! INPUT VARIABLES (total gas + aerosol, input as mol/m3 air)
+    real :: TS          ! Total available sulfate
+    real :: TA          ! Total avaiable ammonium
+    real :: TN          ! Total available nitrate
+    real :: TNa         ! Total available sodium
+    real :: TCl         ! Total available chloride 
+    real :: TCa         ! Total available calcium
+    real :: TK          ! Total available potassium
+    real :: TMg         ! Total available magnesium
+    !real :: rh          ! Relative humidity (0-1 scale, zero allowed)
+    !real :: temp        ! Air temperature (K)
 
+    ! OUTPUT VARIABLES (output as mol/m3 air)
+    real :: so4         ! SO4--     (aq) 
+    real :: hso4        ! HSO4-     (aq)
+    real :: caso4       ! CaSO4     (s)
+    real :: nh4         ! NH4+      (aq)
+    real :: nh3         ! NH3       (g)
+    real :: no3         ! NO3-      (aq)
+    real :: hno3        ! HNO3      (g)
+    real :: cl          ! Cl-       (aq)
+    real :: hcl         ! HCl       (g)
+    real :: na          ! Na+       (aq)
+    real :: ca          ! Ca2+      (aq)
+    real :: ptsm        ! K+        (aq) ! changed name to avoid conflict with layer index
+    real :: mg          ! Mg2+      (aq)
+    real :: h           ! H+
+    real :: oh          ! OH-
+    real :: lwc         ! Aerosol liquid water
+    real :: frso4       ! Free SO4 
+    real :: frna        ! Free Na
+    real :: frca        ! Free Ca
+    real :: frk         ! Free K
+    real :: frmg        ! Free Mg
+    real :: case_number ! Chemical subspace case number 
+
+    ! EMEP declarations
+    integer :: n
+    real, parameter :: CONMIN = 1.0e-30   ! Concentration lower limit [mole/m3]
+    real, parameter :: MWCL   = 35.453,   MWNA   = 22.9897 ! MW Chloride, Sodium
+    real, parameter :: MWCA   = 40.078,   MWK    = 39.0973 ! MW Calcium, Potassium
+    real, parameter :: MWH2O  = 18.0153,  MWMG   = 24.305  ! MW Water, Magnesium
+  
+    real :: tmpno3, tmpnh3, tmpnhx, tmphno3, therm_temp
+    logical, save :: first_isor = .true.
+    integer :: lf_iter, niter
+           
+    !  Initalize variables 
+    so4    = 0.0
+    hso4   = 0.0
+    caso4  = 0.0
+    nh4    = 0.0
+    nh3    = 0.0
+    no3    = 0.0
+    hno3   = 0.0
+    cl     = 0.0
+    hcl    = 0.0
+    na     = 0.0
+    ca     = 0.0
+    ptsm   = 0.0
+    mg     = 0.0
+    h      = 0.0
+    oh     = 0.0
+    lwc    = 0.0
+    case_number = 0.0
+
+    ! Begin aerosol partitioning for each grid cell
+      
+    kmin = KCHEMTOP
+    if (only_surf) kmin = KMAX_MID
+    do n = 1,1 ! (fine, coarse) -- optional. Only fine for now; coarse needs tinkering.                                  
+      do k = kmin,KMAX_MID
+
+        niter = 1
+        if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = Nsia_deriv
+        do lf_iter=1, niter !only used for LocalFractions, otherwise just one "iteration"
+          call lf_sia_pre(i,j,k,lf_iter) !only used for LocalFractions
+          
+          if ( AERO%INTERNALMIXED .and. SSf_ix > 0 ) then
+            ! if internally mixed is assumed, Na and Cl as mass-fraction of seasalt aerosol.
+            TNa = max(0., xn_2d(SSf_ix ,k) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.30 / MWNA )
+            TCl = max(0., xn_2d(SSf_ix ,k) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.55 / MWCL )
+          else
+            TNa  = 0.0
+            TCl  = 0.0
+          endif
+          
+          TS  = MAX(  xn_2d(SO4_ix  ,k) * Ncm3_to_molesm3, CONMIN )
+          TA  = MAX(( xn_2d(NH3_ix  ,k) + xn_2d(NH4_f_ix,k) ) * Ncm3_to_molesm3, CONMIN ) ! NH3, NH4
+          TN  = MAX(( xn_2d(NO3_f_ix,k) + xn_2d(HNO3_ix, k) ) * Ncm3_to_molesm3, CONMIN )
+          
+          if ( AERO%INTERNALMIXED .and. AERO%CATIONS .and. SSf_ix > 0) then
+            ! mass percentages of sea salt for below species taken from GEOS-Chem
+            TCa = max(0., xn_2d(SSf_ix ,k) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.0116 / MWCA )
+            TK  = max(0., xn_2d(SSf_ix ,k) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.0110 / MWK  )
+            TMg = max(0., xn_2d(SSf_ix ,k) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.0369 / MWMG )
+          else
+            TCa = 0.0
+            TK  = 0.0
+            TMg = 0.0
+          end if
+          
+          ! contributions from dust using values for 'other' crustal species from Karydis et al. 2015 Table 2
+          if (AERO%CATIONS .and. Dustwbf_ix > 0) then 
+            TNa = TNa + max(0., xn_2d(Dustwbf_ix ,k) * Ncm3_to_molesm3 * species(Dustwbf_ix)%molwt * 0.012 / MWNA )
+            TCa = TCa + max(0., xn_2d(Dustwbf_ix ,k) * Ncm3_to_molesm3 * species(Dustwbf_ix)%molwt * 0.024 / MWCA )
+            TK  = TK  + max(0., xn_2d(Dustwbf_ix ,k) * Ncm3_to_molesm3 * species(Dustwbf_ix)%molwt * 0.015 / MWK  )
+            TMg = TMg + max(0., xn_2d(Dustwbf_ix ,k) * Ncm3_to_molesm3 * species(Dustwbf_ix)%molwt * 0.009 / MWMG )
+          endif
+          
+          if (AERO%CATIONS .and. DustSahf_ix > 0) then 
+            TNa = TNa + max(0., xn_2d(DustSahf_ix ,k) * Ncm3_to_molesm3 * species(DustSahf_ix)%molwt * 0.012 / MWNA )
+            TCa = TCa + max(0., xn_2d(DustSahf_ix ,k) * Ncm3_to_molesm3 * species(DustSahf_ix)%molwt * 0.024 / MWCA )
+            TK  = TK  + max(0., xn_2d(DustSahf_ix ,k) * Ncm3_to_molesm3 * species(DustSahf_ix)%molwt * 0.015 / MWK  )
+            TMg = TMg + max(0., xn_2d(DustSahf_ix ,k) * Ncm3_to_molesm3 * species(DustSahf_ix)%molwt * 0.009 / MWMG )
+          endif
+          
+          ! for NOV22 testing:
+          tmpnh3  = xn_2d(NH3_ix,k)
+          tmpnhx  = tmpnh3 + xn_2d(NH4_f_ix,k)
+          tmphno3 = xn_2d(HNO3_ix,k)
+          tmpno3  = tmphno3 + xn_2d(NO3_f_ix,k)
+          
+          ! OM25_p is the sum of the particle-phase OM25, and currently has MW 1 for simplicity
+          !if ( AERO%ORGANIC_WATER ) then
+          !  wo(1) = xn_2d(OM_ix,k) * Ncm3_to_molesm3 * species(OM_ix)%molwt * 1e-3 ! kg/m3 organic matter 
+          !else 
+          !  wo(1) = 0.
+          !endif
+          !wo(2) = AERO%OM_KAPPA ! always set tot non-zero just in case it causes trouble
+          !wo(3) = AERO%OM_RHO
+          
+          call mach_hetp_main_15cases ( TS, TA, TN, TNa, TCl, TCa, TK, TMg,  &
+                                        temp(k), rh(k), so4, hso4, caso4, nh4, nh3, no3, &
+                                        hno3, cl, hcl, na, ca, ptsm, mg, h, oh, lwc,  &
+                                        frna, frca, frk, frmg, frso4, case_number)
+  
+          ! pH = -log10([H+]/M) where M = mol dm-3 in the solution. mol/m3 h2o to kg/m3 as 1e-3 * MWH20.
+          ! 1 liter water ~ 1 kg, such that pH = -log10( [H+] / ([H2O] * MWH2O * 1e-3) )
+          if ( k == KMAX_MID) &
+            pH(i,j) = -SAFELOG10( h / ( lwc * MWH2O) ) - 3
+         
+          ! gas outputs are in moles/m3(air)
+          xn_2d(NH3_ix ,k) = max( nh3, CONMIN ) * molesm3_to_Ncm3
+          xn_2d(HNO3_ix,k) = max( hno3, CONMIN ) * molesm3_to_Ncm3
+          !xn_2d(HCl,k) = gas(3) * molesm3_to_Ncm3
+         
+          ! aerosol outputs are in moles/m3(air)
+          xn_2d(NH4_f_ix,k) = max( TA - nh3, CONMIN ) * molesm3_to_Ncm3
+          
+          ! aerosol water (ug/m**3) -- 18.01528 MW H2O
+          PM25_water(i,j,k) = max( lwc * MWH2O * 1e6, CONMIN )
+         
+          ! QUERY: Is NaNO3 always solid? Ans = No!
+         
+          !xn_2d(NO3_c,k ) = aeroHCl * molesm3_to_Ncm3 ! assume all HCl from NaNO3 formation?
+          !FINE xn_2d(NO3_f,k ) = tmpno3 - xn_2d(NO3_c,k ) - xn_2d(HNO3,k)
+         
+          !tmpno3 = wt(4) * molesm3_to_Ncm3  ! NOV22  wt4=nitrate
+          !xn_2d(NO3_f_ix,k ) = tmpno3 - xn_2d(HNO3_ix,k)
+          !NOV22 - get some v.small neg., so use max below. Test properly later.
+          xn_2d(NO3_f_ix,k ) = max( TN - hno3, CONMIN )  * molesm3_to_Ncm3 
+         
+          if (k == KMAX_MID ) then
+            ! at Rh=50% and T=20C (comparison with gravimentric PM)
+            call mach_hetp_main_15cases ( TS, TA, TN, TNa, TCl, TCa, TK, TMg,  &
+                                          293.15, 0.5, so4, hso4, caso4, nh4, nh3, no3, &
+                                          hno3, cl, hcl, na, ca, ptsm, mg, h, oh, lwc,  &
+                                          frna, frca, frk, frmg, frso4, case_number)
+         
+            ! aerosol water (ug/m**3) -- 18.01528 MW H2O
+            PM25_water_rh50(i,j) =  max( 0., lwc * MWH2O * 1e6 )
+            call lf_sia_pos(i,j,k,lf_iter,2,0)
+          end if 
+         
+          if( debug_flag ) then 
+            write(*, "(a,2f8.3,99g12.3)") "HETP ", rh(k), temp(k), nh3, hno3, hcl
+          end if
+         
+          call lf_sia_pos(i,j,k,lf_iter,0,0)
+        end do ! lf_iter
+    
+      end do ! k = KCHEMTOP, KMAX_MID
+    end do ! n = 1,2 (fine, coarse)
+  end subroutine emep2hetp
+ !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ 
+ !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+ ! ISORROPIA
  ! Adapted from List 10, p130, Isoropia manual
-
+ !
   subroutine emep2isorropia(i,j,debug_flag)
     integer, intent(in) :: i, j
     logical, intent(in) :: debug_flag
@@ -148,9 +356,11 @@ contains
     real, parameter :: MWCA   = 40.078,   MWK    = 39.0973 ! MW Calcium, Potassium
     real, parameter :: MWH2O  = 18.0153,  MWMG   = 24.305  ! MW Water, Magnesium
   
-    real :: tmpno3, tmpnh3, tmpnhx, tmphno3, therm_temp
+    real :: tmpno3, tmpnh3, tmpnhx, tmphno3, therm_temp, tmpw_org, tmpw_nh4, tmpw_no3
     logical, save :: first_isor = .true.
     integer :: lf_iter, niter
+
+    real :: T, rhf, P1, P2, P3, a, K1, K2, no3, DRH
     
   !  INPUT:
   !  1. [WI]
@@ -220,18 +430,20 @@ contains
   !     AERSLD(18) - Mg(NO3)2(s)
   !     AERSLD(19) - MgCl2(s)
   
-     
+    kmin = KCHEMTOP
+    if (only_surf) kmin = KMAX_MID 
     do n = 1,1 ! (fine, coarse) -- optional. Only fine for now; coarse needs tinkering.
          
-      do k = KCHEMTOP,KMAX_MID 
+      do k = kmin,KMAX_MID 
         niter = 1
         if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = Nsia_deriv
         do lf_iter=1, niter !only used for LocalFractions, otherwise just one "iteration"
-        call lf_sia_pre(i,j,k,lf_iter) !only used for LocalFractions
  
         ! isorropia only for when T > 250 K and P > 200 hPa (CMAQ and GEOS-Chem; Shannon Capps discussion)
         if (pp(k) > 20000.0 .and. temp(k) > 250.0) then 
-  
+
+          call lf_sia_pre(i,j,k,lf_iter) !only used for LocalFractions
+           
           if ( AERO%INTERNALMIXED .and. SSf_ix > 0 ) then
             ! if internally mixed is assumed, Na and Cl as mass-fraction of seasalt aerosol.
             WI(1) = max(0., xn_2d(SSf_ix ,k) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.30 / MWNA )
@@ -313,7 +525,6 @@ contains
           
           ! aerosol water (ug/m**3) -- 18.01528 MW H2O
           PM25_water(i,j,k) = max( aerliq(8) * MWH2O * 1e6, CONMIN )
-  
           ! QUERY: Is NaNO3 always solid? Ans = No!
   
           !xn_2d(NO3_c,k ) = aeroHCl * molesm3_to_Ncm3 ! assume all HCl from NaNO3 formation?
@@ -340,6 +551,8 @@ contains
           !   stop
           !end if
  
+          ! Calculate Coarse-Mode Liquid Water 
+          ! Placeholder -- add later
 
     !      H2O_eqsam(i,j,KCHEMTOP:KMAX_MID) = max(0., aH2Oout(KCHEMTOP:KMAX_MID) )
           
@@ -350,7 +563,63 @@ contains
   
             ! aerosol water (ug/m**3) -- 18.01528 MW H2O
             PM25_water_rh50(i,j) =  max( 0., aerliq(8) * MWH2O * 1e6 )
+
+            ! Calculate NO3 and NH4 filter loss
+            T = therm_temp
+            rhf = rh_thermodynamics
+            K1 = exp( 118.87 - 24084/T - 6.025*log(T) )
+            P1 = exp( 8763/T + 19.12*log(T) - 135.94 )
+            P2 = exp( 9969/T + 16.22*log(T) - 122.65 )
+            P3 = exp( 13875/T + 24.46*log(T) - 182.61 )
+            a = 1 - rhf
+            DRH = 0.618 * exp( 16254.84 / 8.31 * ( 4.298 * (1/T-1/298.13) &
+                                                  -3.623e-2 * log(T/298.13) &
+                                                  -7.853e-5 * (T-298.13) ) )
+            if ( rhf <= DRH ) then
+              K2 = K1 ** 0.5
+            else
+              K2 = ( K1 * ( P1 - P2*a + P3*a*a ) * ( a**1.75 )) ** 0.5
+            end if
+            no3 = xn_2d(NO3_f_ix,k) * Ncm3_to_molesm3 * species(NO3_f_ix)%molwt * 1.0e6
+            no3_floss(i,j) = min( 745.7/T*K2, no3)
+            nh4_floss(i,j) = no3_floss(i,j) * 18.0 / 62.0
+
+            ! Calculate water again with filter loss of NH4NO3
+            ! at Rh=50% and T=20C (comparison with gravimentric PM)
+            tmpw_nh4 = wi(3)
+            tmpw_no3 = wi(4)
+            wi(3) = wi(3) - nh4_floss(i,j) / species(NH4_f_ix)%molwt * 1.0e-6
+            wi(4) = wi(4) - no3_floss(i,j) / species(NO3_f_ix)%molwt * 1.0e-6
+            call isoropia ( wi, wo, 0.5, 293.15, CNTRL, &       
+                            wt, gas, aerliq, aersld, scase, other) 
+            ! aerosol water (ug/m**3) -- 18.01528 MW H2O
+            PM25_water_floss(i,j) =  max( 0., aerliq(8) * MWH2O * 1e6 )
+            wi(3) = tmpw_nh4
+            wi(4) = tmpw_no3
             call lf_sia_pos(i,j,k,lf_iter,2,0)
+
+            ! Calculate water again without organics
+            ! at Rh=50% and T=20C (comparison with gravimentric PM)
+            !tmpw_org = wo(1)
+            !wo(1) = 0.0  ! Organic
+            !call isoropia ( wi, wo, 0.5, 293.15, CNTRL, &       
+            !                wt, gas, aerliq, aersld, scase, other) 
+            !! aerosol water (ug/m**3) -- 18.01528 MW H2O
+            !PM25_water_noOrg(i,j) =  max( 0., aerliq(8) * MWH2O * 1e6 )
+            !wo(1) = tmpw_org
+
+            !! Calculate water again with externally mixed sea-spray, so no water uptake
+            !! to sea-spray portion.
+            !! at Rh=50% and T=20C (comparison with gravimentric PM)
+            !wi(1) = 0.0  ! Sodium
+            !wi(5) = 0.0  ! Chloride
+            !call isoropia ( wi, wo, 0.5, 293.15, CNTRL, &       
+            !                wt, gas, aerliq, aersld, scase, other) 
+            !! aerosol water (ug/m**3) -- 18.01528 MW H2O
+            !PM25_water_noSS(i,j) =  max( 0., aerliq(8) * MWH2O * 1e6 )
+
+            ! Calculate Coarse-Mode Liquid Water at 50% RH
+            ! Placeholder -- add later
           end if 
   
           !if ( xn_2d(NO3_f_ix,k )  < 0.0 .or.  xn_2d(NH4_f_ix,k) < 0.0 ) then
@@ -368,10 +637,11 @@ contains
             write(*, "(a,2f8.3,99g12.3)") "ISORROPIA ", rh(k), temp(k), gas
           end if
           !call StopAll("ISOR")
+
+          call lf_sia_pos(i,j,k,lf_iter,0,0)
   
        endif ! > 200 hPa and > 250 K
 
-       call lf_sia_pos(i,j,k,lf_iter,0,0)
        end do ! lf_iter
     
       end do ! k = KCHEMTOP, KMAX_MID
@@ -405,7 +675,9 @@ contains
 
   coef = 1.e12 / AVOG
 
-  do k = KCHEMTOP, KMAX_MID
+    kmin = KCHEMTOP
+    if (only_surf) kmin = KMAX_MID 
+    do k = kmin, KMAX_MID
       niter = 1
       if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) niter = Nsia_deriv
       do iter=1,niter !only used for LocalFractions
@@ -455,9 +727,6 @@ contains
 
  end subroutine emep2MARS
 
- !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
- !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
  subroutine emep2EQSAM(i, j, debug_flag)
 
@@ -663,12 +932,9 @@ contains
 
  end subroutine emep2EQSAM
 
- !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-
- !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-      subroutine Aero_water_MARS(i,j, debug_flag)
+ !------------------------------------------------------------------
+ subroutine Aero_water_MARS(i,j, debug_flag)
 
  !..................................................................
  ! Pretty old F. Binkowski code from EPA CMAQ-Models3
@@ -697,7 +963,9 @@ contains
    rlhum(:) = max( AERO%RH_LOLIM_AERO, rlhum(:) )
    tmpr(:)  = temp(:)
 
-    do k = KCHEMTOP, KMAX_MID
+    kmin = KCHEMTOP
+    if (only_surf) kmin = KMAX_MID 
+    do k = kmin, KMAX_MID
   
 !//.... molec/cm3 -> ug/m3
       so4in  = xn_2d(SO4_ix,k) * species(SO4_ix)%molwt  *coef

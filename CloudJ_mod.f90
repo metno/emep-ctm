@@ -80,6 +80,7 @@ MODULE CloudJ_mod
     integer, save :: photo_out_ix_GLYOXA_fj = -1
     integer, save :: photo_out_ix_GLYOXB_fj = -1 
     integer, save :: photo_out_ix_GLYOXC_fj = -1 
+    integer, save :: photo_out_ix_clno2_fj  = -1
 
     integer, save :: sulph_i, dustfroad_i, dustfwb_i, dustfsah_i
     integer, save :: dustcroad_i, dustcwb_i, dustcsah_i
@@ -329,6 +330,7 @@ SUBROUTINE setup_phot_cloudj(i_emep,j_emep,errcode,mode)
             photo_out_ix_GLYOXA_fj = find_index("D3_J(GLYOXA)", f_3d(:)%subclass)
             photo_out_ix_GLYOXB_fj = find_index("D3_J(GLYOXB)", f_3d(:)%subclass)
             photo_out_ix_GLYOXC_fj = find_index("D3_J(GLYOXC)", f_3d(:)%subclass)
+            photo_out_ix_clno2_fj  = find_index("D3_J(ClNO2)",  f_3d(:)%subclass)
             if(MasterProc)write(*,*) 'Outputting CloudJ J-values specified in config.'
           endif
 
@@ -785,6 +787,7 @@ SUBROUTINE setup_phot_cloudj(i_emep,j_emep,errcode,mode)
         if ('NO3b      ' .eq. JLABEL(I)(:10) ) IDNO3_NO2 = I 
         if ('CH3COCH3a ' .eq. JLABEL(I)(:10) ) IDACETON  = I ! only a-channel
         if ('N2O5      ' .eq. JLABEL(I)(:10) ) IDN2O5    = I
+        if ('ClNO2     ' .eq. JLABEL(I)(:10) ) IDClNO2   = I
 
         ! duplicates with different names for historical reasons
         if ('CHOCHOa   ' .eq. JLABEL(I)(:10) ) IDCHOCHO_2CHO = I
@@ -855,6 +858,11 @@ subroutine write_jvals(i_emep,j_emep)
     integer, intent(in) :: i_emep,j_emep
     
     ! CloudJ (_fj) photolysis rate output
+    
+    if(photo_out_ix_clno2_fj>0)then
+          d_3d(photo_out_ix_clno2_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &
+            rcphot(IDClNO2,max(KCHEMTOP,lev3d(1:num_lev3d))) 
+    endif
 
     if(photo_out_ix_no2_fj>0)then
           d_3d(photo_out_ix_no2_fj,i_emep,j_emep,1:num_lev3d,IOU_INST) = &

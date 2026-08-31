@@ -35,21 +35,21 @@ module SubMet_mod
 !  The sub-grid part of this module is also undergoing constant change!!
 !=============================================================================
 
-!F21 use BLPhysics_mod, only: MIN_USTAR_LAND
 use BiDir_module, only: BiDir
 use CheckStop_mod, only: StopAll, CheckStop
-use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES, PBL &
+use Config_module, only:  NLANDUSEMAX, FluxPROFILE, LANDIFY_MET, USES, PBL, TINY &
                       , Zmix_ref !height at which concentration above different landuse are considered equal 
 use Debug_module,  only: DEBUG     !Needs DEBUG_RUNCHEM and DEBUG%SUBMET to get debug_flag
 use DO3SE_mod, only: do3se
+use Radiation_mod, only: CanopyPar, PARFrac
 use Functions_mod, only: T_2_Tpot  !needed if FluxPROFILE == Ln95
 use LandDefs_mod,   only: LandType, LandDefs
 use Landuse_mod,    only: LandCover
-use LocalVariables_mod, only: Grid, SubDat
-use MetFields_mod, only: ps, fSW40, fSW50, fSW90        !needed if FluxPROFILE == Ln95
+use LocalVariables_mod, only: Grid, L, SubDat
+use MetFields_mod, only: ps, fSW40, fSW50, fSW90, PARdbh, PARdif, SoilTempL1, fcloud        !needed if FluxPROFILE == Ln95
 use MicroMet_mod, only:  PsiM, AerRes    !functions
 use MicroMet_mod, only:  Launiainen1995
-use PhysicalConstants_mod, only: PI, RGAS_KG, CP, GRAV, KARMAN, CHARNOCK, T0
+use PhysicalConstants_mod, only: PI, RGAS_KG, CP, GRAV, KARMAN, CHARNOCK, T0, LAMBDA_W 
 use TimeDate_mod, only : current_date
 
 implicit none
@@ -98,78 +98,84 @@ contains
    ! IMPORTANT - ASSUMES INITIAL VALUES SET FOR USTAR, INVL, ....
 
 !.. Local
-    real :: rho_surf               ! Density at surface (2 m), kg/m3
-    real :: z_1m                   !  1m above vegetation
-    real :: z_3m                   !  3m above ground, or top of trees
-    real :: z_3md                  !  minus displacemt ht.
-    real :: Zmix_refd              !  Zmix_ref minus displacemt
+   real :: rho_surf               ! Density at surface (2 m), kg/m3
+   real :: z_1m                   !  1m above vegetation
+   real :: z_3m                   !  3m above ground, or top of trees
+   real :: z_3md                  !  minus displacemt ht.
+   real :: Zmix_refd              !  Zmix_ref minus displacemt
     
-    logical, save ::  my_first_call = .true.
-    integer, parameter ::  NITER = 1           ! no. iterations to be performed
+   logical, save ::  my_first_call = .true.
+   integer, parameter ::  NITER = 1           ! no. iterations to be performed
 
-    integer :: iter                ! iteration variable
+   integer :: iter, i, j                ! iteration variable
 
    ! For vapour pressure calculations
 
-    real, parameter :: ESAT0=611.0   ! saturation vapour pressure at 
+   real, parameter :: ESAT0=611.0   ! saturation vapour pressure at 
                                      ! T=0 deg. C (Pa)
       
-    real :: qw                       ! specific humidity (kg/kg) corrected  
+   real :: qw                       ! specific humidity (kg/kg) corrected  
                                      ! down to z_0+d metres above the ground 
-    real :: esat    ! saturation vapour pressure  (Pa)
-    real :: e       ! vapour pressure at surface
-    real :: Ra_2m   ! to get 2m qw
-    real :: theta2
-    character(len=*), parameter :: dtxt = 'GetSub:' ! debug text
-    logical :: dbg
+   real :: esat    ! saturation vapour pressure  (Pa)
+   real :: e       ! vapour pressure at surface
+   real :: Ra_2m   ! to get 2m qw
+   real :: theta2
+! IBM leaf temperature variables   
+   real :: Rabs_sun, Rabs_shade   ! absorbed radiation (W/m2)
+   real :: em_atm, V_ALBEDO, IR_ALBEDO, Tdp
+   real :: PsiM_x, zoverL, z0overL
+   real :: fftrm, r_o, lambda_o, Rnet, lambda, desatdT  
+   real, parameter :: TWOTHIRDS = 2.0/3.0 
+   ! length of a sidereal day [ sec ]  (Source: CRC76 p. 14-6 )
+   real, parameter :: SIDAY = 86164.09
+   real, parameter :: SBC   = 5.67e-8 ! Sefan-Boltzmann constant
+   real, parameter :: CV     = 8.0e-6  ! Resistance to soil heat conductance under vegetation [s/m] WRF PX adjusted from 1 to 7 cm layer one soil depth
+   character(len=*), parameter :: dtxt = 'GetSub:' ! debug text
+   logical :: dbg
 
-    dbg=.false.
-    if (  DEBUG%SUBMET > 0 .and. debug_flag ) then
+   dbg=.false.
+   if (  DEBUG%SUBMET > 0 .and. debug_flag ) then
       if(  DEBUG%SUBMET == iL ) dbg=.true.         ! debug just this iL
       if(  DEBUG%SUBMET > NLANDUSEMAX ) dbg=.true. ! debug all iL
-    end if
-if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
+   end if
+   if ( dbg) write(*,"(a,i3,9f8.3)") 'SUBB CellH', iL, Grid%Hd, Sub(iL)%LAI, Sub(iL)%g_sto
 
 
     ! initial guesses for u*, t*, 1/L
-        Sub(iL)%ustar  = Grid%ustar      ! First guess = NWP value
-        Sub(iL)%invL   = 0.0       ! Start at neutral...
-        Sub(iL)%Hd     = Grid%Hd         ! First guess = NWP value
-        Sub(iL)%LE     = Grid%LE         ! First guess = NWP value
-        Sub(iL)%t2     = Grid%t2         ! First guess = NWP value
-        Sub(iL)%t2C    = Grid%t2C        ! First guess = NWP value
-        Sub(iL)%is_veg = LandType(iL)%is_veg
-        Sub(iL)%is_ice = LandType(iL)%is_ice
+   Sub(iL)%ustar  = Grid%ustar      ! First guess = NWP value
+   Sub(iL)%invL   = 0.0       ! Start at neutral...
+   Sub(iL)%Hd     = Grid%Hd         ! First guess = NWP value
+   Sub(iL)%LE     = Grid%LE         ! First guess = NWP value
+   Sub(iL)%t2     = Grid%t2         ! First guess = NWP value
+   Sub(iL)%t2C    = Grid%t2C        ! First guess = NWP value
+   Sub(iL)%is_veg = LandType(iL)%is_veg
+   Sub(iL)%is_ice = LandType(iL)%is_ice
 
-        Sub(iL)%is_water  = LandType(iL)%is_water
-        Sub(iL)%is_forest = LandType(iL)%is_forest
-        Sub(iL)%is_crop   = LandType(iL)%is_crop   
-
-        Sub(iL)%fSW    = Grid%fSW50 ! probably  not needed, but safest
+   Sub(iL)%fSW    = Grid%fSW50 ! probably  not needed, but safest
 
        ! For Mills et al, GCB, 2018 we used irrigated wheat:
-        if( index( LandDefs(iL)%name , '_Irrig' ) > 0 ) then
-          Sub(iL)%fSW = 1.0
-        else if ( do3se(iL)%SMICrit > 0.6 ) then
-          Sub(iL)%fSW = Grid%fSW90
-        else if ( do3se(iL)%SMICrit < 0.49) then
-          Sub(iL)%fSW = Grid%fSW40
-          if ( dbg) write(*,*) 'SUBSW40 ', iL, do3se(iL)%SMICrit, Sub(iL)%fSW
-        end if
+   if( index( LandDefs(iL)%name , '_Irrig' ) > 0 ) then
+      Sub(iL)%fSW = 1.0
+   else if ( do3se(iL)%SMICrit > 0.6 ) then
+      Sub(iL)%fSW = Grid%fSW90
+   else if ( do3se(iL)%SMICrit < 0.49) then
+       Sub(iL)%fSW = Grid%fSW40
+      if ( dbg) write(*,*) 'SUBSW40 ', iL, do3se(iL)%SMICrit, Sub(iL)%fSW
+   end if
 
 
-     ! If NWP thinks this is a sea-square, but we anyway have land,
-     ! the surface temps will be wrong and so will stability gradients.
-     ! Use of LANDIFY_MET should have corrected this to some extent. If
-     ! not in use, as a simple substitute, we assume neutral conditions for these
-     ! situations.
+   ! If NWP thinks this is a sea-square, but we anyway have land,
+   ! the surface temps will be wrong and so will stability gradients.
+   ! Use of LANDIFY_MET should have corrected this to some extent. If
+   ! not in use, as a simple substitute, we assume neutral conditions for these
+   ! situations.
 
-      if ( .not. LANDIFY_MET .and. &
-              Grid%is_mainlysea  .and. (.not. Sub(iL)%is_water) ) then
-           Sub(iL)%invL = 0.0
-           Sub(iL)%Hd   = 0.0
-           if ( dbg) write(*,*) 'SUBB CellH NEUTRAL!', Grid%is_mainlysea, Sub(iL)%is_water
-      end if
+   if ( .not. LANDIFY_MET .and. &
+         Grid%is_mainlysea  .and. (.not. Sub(iL)%is_water) ) then
+      Sub(iL)%invL = 0.0
+      Sub(iL)%Hd   = 0.0
+      if ( dbg) write(*,*) 'SUBB CellH NEUTRAL!', Grid%is_mainlysea, Sub(iL)%is_water
+   end if
 
 
 !    The zero-plane displacement (d) is the height that
@@ -196,162 +202,174 @@ if ( dbg) write(*,*) 'SUBB CellH', iL, Grid%Hd
 
 
 
-        if ( Sub(iL)%is_water ) then ! water
-             Sub(iL)%d  = 0.0
-             Sub(iL)%z0 = CHARNOCK * Sub(iL)%ustar * Sub(iL)%ustar/GRAV
-           ! We use the same restriction on z0 as in Berge, 1990 
-           ! (Tellus,42B,389-407)
-             Sub(iL)%z0 = max( Sub(iL)%z0 ,1.5e-5)
-             z_1m   = 1.0       ! 1m above sea surface
-             z_3m   = 3.0       ! 3m above sea surface
+   if ( Sub(iL)%is_water ) then ! water
+!      Sub(iL)%d  = 0.0
+!      Sub(iL)%z0 = CHARNOCK * Sub(iL)%ustar * Sub(iL)%ustar/GRAV
+      ! We use the same restriction on z0 as in Berge, 1990 
+      ! (Tellus,42B,389-407)
+      Sub(iL)%z0 = max( Sub(iL)%z0 ,1.5e-5)
+      z_1m   = 1.0       ! 1m above sea surface
+      z_3m   = 3.0       ! 3m above sea surface
 
-        else if ( Sub(iL)%is_forest ) then ! forest
-           ! We restrict z0 to 1.0m, since comparison with CarboEurope
-           ! results shows that this provides better u* values for
-           ! forests.
-             Sub(iL)%d  =  0.78 * Sub(iL)%hveg   ! Jarvis, 1976
-             Sub(iL)%z0 =  min( 0.07 * Sub(iL)%hveg, 1.0 )
-             z_1m   = (Sub(iL)%hveg + 1.0) - Sub(iL)%d
-             z_3m   = max(3.0,Sub(iL)%hveg)
+   else if ( Sub(iL)%is_forest ) then ! forest
+   ! We restrict z0 to 1.0m, since comparison with CarboEurope
+   ! results shows that this provides better u* values for
+   ! forests.
+!      Sub(iL)%d  =  0.78 * Sub(iL)%hveg   ! Jarvis, 1976
+!      Sub(iL)%z0 =  min( 0.07 * Sub(iL)%hveg, 1.0 )
+!      Sub(iL)%z0 =  0.07 * Sub(iL)%hveg
+      z_1m   = (Sub(iL)%hveg + 1.0) - Sub(iL)%d
+      z_3m   = max(3.0,Sub(iL)%hveg)
 !BIDIR TMP FIXME to solve thin layer issues:
 ! Assuming grid centre is relative to forest's displacement ht.
-            if ( BiDir%skipForestDisp) then
-                Sub(iL)%d  =  0.0
-            end if
+!      if ( BiDir%skipForestDisp) then
+!         Sub(iL)%d  =  0.0
+!      end if
 !END BIDIR TMP FIXME
-        else
-             Sub(iL)%d  =  0.7 * Sub(iL)%hveg
-             Sub(iL)%z0 = max( 0.1 * Sub(iL)%hveg, 0.001) !  Fix for deserts, 
-               ! ice, snow (where, for bare ground, h=0 and hence z0=0)
+   else
+!      Sub(iL)%d  =  0.7 * Sub(iL)%hveg
+!      Sub(iL)%z0 = max( 0.1 * Sub(iL)%hveg, 0.001) !  Fix for deserts, 
+      ! ice, snow (where, for bare ground, h=0 and hence z0=0)
 
-           !Heights relative to displacement height, d:
+      !Heights relative to displacement height, d:
 
-             z_1m   = (Sub(iL)%hveg + 1.0) - Sub(iL)%d
-             z_3m   = max(3.0,Sub(iL)%hveg)
+      z_1m   = (Sub(iL)%hveg + 1.0) - Sub(iL)%d
+      z_3m   = max(3.0,Sub(iL)%hveg)
 
-        end if
+   end if
           
-        if ( USES%ZREF ) then  !EXPERIMENTAL. Not recommended so far
-           Sub(iL)%z_refd = Grid%z_ref
-        else
-           Sub(iL)%z_refd = Grid%z_ref - Sub(iL)%d  !  minus displacement height
-        end if
-        z_3md  = z_3m  - Sub(iL)%d               !  minus displacement height
+!   if ( USES%ZREF ) then  !EXPERIMENTAL. Not recommended so far
+!      Sub(iL)%z_refd = Grid%z_ref
+!   else
+!      Sub(iL)%z_refd = Grid%z_ref - Sub(iL)%d  !  minus displacement height
+!   end if
+   z_3md  = z_3m  - Sub(iL)%d               !  minus displacement height
 
 
-        rho_surf = Grid%psurf/(RGAS_KG * Sub(iL)%t2 )
+   rho_surf = Grid%psurf/(RGAS_KG * Sub(iL)%t2 )
 
 
-        if( Grid%is_allsea ) then
-          Sub(iL)%ustar = Grid%ustar
-          Sub(iL)%invL  = Grid%invL  
-        else  ! Calculate ustar, invL for each landcover
+   if( Grid%is_allsea ) then
+      Sub(iL)%ustar = Grid%ustar
+      Sub(iL)%invL  = Grid%invL  
+   else  ! Calculate ustar, invL for each landcover
 
-    !NITER = 1
-    !TEST if ( Grid%Hd > -1 ) NITER = 2  ! Almost neutral to unstable
-    !TEST if ( Grid%Hd > 1  ) NITER = 4  ! more unstable
+   !NITER = 1
+   !TEST if ( Grid%Hd > -1 ) NITER = 2  ! Almost neutral to unstable
+   !TEST if ( Grid%Hd > 1  ) NITER = 4  ! more unstable
 
-     if ( FluxPROFILE == "Ln95") then !TESTING
+      if ( FluxPROFILE == "Ln95") then !TESTING
 
-        call StopAll(dtxt//"Ln95 disabled. Not working well.")
+         call StopAll(dtxt//"Ln95 disabled. Not working well.")
 
-        !theta2 = Grid%t2 * T_2_Tpot( Grid%psurf )
-        !call Launiainen1995( Grid%u_ref, Sub(iL)%z_refd, Sub(iL)%z0, Sub(iL)%z0, &
-        ! theta2, Grid%theta_ref, Sub(iL)%invL )
+      !theta2 = Grid%t2 * T_2_Tpot( Grid%psurf )
+      !call Launiainen1995( Grid%u_ref, Sub(iL)%z_refd, Sub(iL)%z0, Sub(iL)%z0, &
+      ! theta2, Grid%theta_ref, Sub(iL)%invL )
 
-        !Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
-        ! (log( Sub(iL)%z_refd/Sub(iL)%z0 ) - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)&
-        !   + PsiM( Sub(iL)%z0*Sub(iL)%invL ) )
+      !Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
+      ! (log( Sub(iL)%z_refd/Sub(iL)%z0 ) - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)&
+      !   + PsiM( Sub(iL)%z0*Sub(iL)%invL ) )
 
-       !if( DEBUG%SUBMET .and.  (Sub(iL)%invL > 10.0 &
-       !   .or. Sub(iL)%invL < -10.0) ) call CheckStop(dtxt//"Ln95 STOP")
+      !if( DEBUG%SUBMET .and.  (Sub(iL)%invL > 10.0 &
+      !   .or. Sub(iL)%invL < -10.0) ) call CheckStop(dtxt//"Ln95 STOP")
 
-   else if ( FluxPROFILE == "Iter" ) then
+      else if ( FluxPROFILE == "Iter" ) then
 
-if ( PBL%NEUTRAL_USTAR_START ) then
-        Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
-         (log( Sub(iL)%z_refd/Sub(iL)%z0 ))
-end if
+         if ( PBL%NEUTRAL_USTAR_START ) then
+            Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
+                 (log( Sub(iL)%z_refd/Sub(iL)%z0 ))
+         end if
+      
+         do iter = 1, NITER 
 
-    do iter = 1, NITER 
+   ! ****
+   !   PsiM calculates the stability functions for momentum
+   !   at heights z_ref (about 45m) & z0
+   ! ****               
+   !..calculate friction velocity based first on NWP-model PsiM-values 
+   !..and u_ref. The NWP-model PsiM-values are used despite the fact that
+   !..L=F(u*), since we do not know the EMEP subgrid averaged 
+   !..z0-values ...
 
-        ! ****
-        !   PsiM calculates the stability functions for momentum
-        !   at heights z_ref (about 45m) & z0
-        ! ****               
-        !..calculate friction velocity based first on NWP-model PsiM-values 
-        !..and u_ref. The NWP-model PsiM-values are used despite the fact that
-        !..L=F(u*), since we do not know the EMEP subgrid averaged 
-        !..z0-values ...
-
-       if ( dbg ) write(6,"(a12,i2,i3,5f8.3,2f12.3)") dtxt//" ITER", iter,iL,&
-           Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, Sub(iL)%z_refd, z_3md, &
+            if ( dbg ) write(6,"(a12,i2,i3,5f8.3,2f12.3)") dtxt//" ITER", iter,iL,&
+            Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, Sub(iL)%z_refd, z_3md, &
             Sub(iL)%invL, Sub(iL)%ustar
 
-    !  We must use L (the Monin-Obukhov length) to calculate deposition,
-    ! Thus, we calculate T* and then L, based on sub-grid data. 
+   !  We must use L (the Monin-Obukhov length) to calculate deposition,
+   ! Thus, we calculate T* and then L, based on sub-grid data. 
 
-    ! New 1/L value ....
+   ! New 1/L value ....
 
-        Sub(iL)%invL =  -KARMAN * GRAV * Sub(iL)%Hd / &
-           ( CP * rho_surf * Sub(iL)%ustar**3 * Sub(iL)%t2)
+            Sub(iL)%invL =  -KARMAN * GRAV * Sub(iL)%Hd / &
+                 ( CP * rho_surf * Sub(iL)%ustar**3 * Sub(iL)%t2)
 
-      !.. we limit the range of 1/L to prevent numerical and printout problems
-      !   This range is very wide anyway.
+   !.. we limit the range of 1/L to prevent numerical and printout problems
+   !   This range is very wide anyway.
 
-        ! Sub(iL)%invL  = max( -1.0, Sub(iL)%invL ) !! limit very unstable
-        ! Sub(iL)%invL  = min(  1.0, Sub(iL)%invL ) !! limit very stable
+   ! Sub(iL)%invL  = max( -1.0, Sub(iL)%invL ) !! limit very unstable
+   ! Sub(iL)%invL  = min(  1.0, Sub(iL)%invL ) !! limit very stable
 
-      ! To a good approx we could omit the PsiM(z0/L) term, but needed at ca. invL->-1
+            if( USES%Walcek_ustar ) then
+   ! Limit z/L to fall within the valid MOST range |z/L| < 1.0
+               Sub(iL)%invL  = max( -1.0/Sub(iL)%z_refd, Sub(iL)%invL ) !! limit very unstable z/L = -1
+               Sub(iL)%invL  = min(  1.0/Sub(iL)%z_refd, Sub(iL)%invL ) !! limit very stable   z/L =  1
 
-        Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
-         (log( Sub(iL)%z_refd/Sub(iL)%z0 ) &
-            - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)  &
-            + PsiM( Sub(iL)%z0*Sub(iL)%invL    )) 
+               zoverL = Sub(iL)%z_refd*sub(iL)%invL
+               z0overL = Sub(iL)%z0*sub(iL)%invL               
+               PsiM_x = PsiM(zoverL) - PsiM(z0overL)   
 
-           if ( dbg ) then
-              write(6,"(a12,i2,i3,6f7.1,2f12.3)") dtxt//"ITERi ", iter,iL, &
-                Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, &
-                  Sub(iL)%z_refd, z_3md, Sub(iL)%Hd, Sub(iL)%invL, Sub(iL)%ustar
-              !write(6,"(a12,i3,3f7.1,20g11.3)") dtxt//"ITERA ",iL, &
-              !  Sub(iL)%z0, Sub(iL)%d, &
-              !  Sub(iL)%z_refd, 0.001*Grid%psurf, Sub(iL)%t2, rho_surf, &
-              ! Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%invL , &
-              ! log( Sub(iL)%z_refd/Sub(iL)%z0 ), &
-              !  PsiM( Sub(iL)%z_refd*Sub(iL)%invL )
-           end if
+               Sub(iL)%ustar = Grid%ustar * sqrt((log(Sub(iL)%z_refd/Grid%z0)-PsiM_x)/&
+                                                 (log(Sub(iL)%z_refd/Sub(iL)%z0)-PsiM_x))     
+   ! Recalcuate invL                                                  
+               Sub(iL)%invL  =  -KARMAN * GRAV * Sub(iL)%Hd / &
+                               ( CP * Grid%rho_s * Sub(iL)%ustar**3 * Sub(iL)%t2)
+            else 
+   ! To a good approx we could omit the PsiM(z0/L) term, but needed at ca. invL->-1
+               Sub(iL)%ustar = Grid%u_ref * KARMAN/ &
+                      (log( Sub(iL)%z_refd/Sub(iL)%z0 ) &
+                     - PsiM( Sub(iL)%z_refd*Sub(iL)%invL)  &
+                     + PsiM( Sub(iL)%z0*Sub(iL)%invL    )) 
+                     
+            end if
+            if ( dbg ) then
+               write(6,"(a12,i2,i3,6f7.1,2f12.3)") dtxt//"ITERi ", iter,iL, &
+                     Sub(iL)%hveg, Sub(iL)%z0, Sub(iL)%d, &
+                     Sub(iL)%z_refd, z_3md, Sub(iL)%Hd, Sub(iL)%invL, Sub(iL)%ustar
+            end if
+            ! If several iterations are used, need a safety catch to stop u* -> 0
+            if ( Sub(iL)%ustar < 1.0e-4 ) exit
 
-       Sub(iL)%ustar = max( Sub(iL)%ustar, PBL%MIN_USTAR_LAND )
-    end do ! iter
-  else
-     call StopAll(dtxt//"Incorrect FluxPROFILE")
+         end do ! iter
+         Sub(iL)%ustar = max( Sub(iL)%ustar, PBL%MIN_USTAR_LAND )
+      else
+      call StopAll(dtxt//"Incorrect FluxPROFILE")
 
-  end if ! FluxPROFILE
+      end if ! FluxPROFILE
 
- end if ! allsea
+   end if ! allsea
 
-     if ( dbg ) then ! way too much output ...
-        write(6,"(a12,i3,3L2,5f7.1,5f8.3)") dtxt//"MET" // trim(FluxProfile), iL, &
-         Sub(iL)%is_water, Sub(iL)%is_forest, Grid%is_allsea, &
-         Sub(iL)%z0, Sub(iL)%d, Sub(iL)%z_refd, 0.001*Grid%psurf, &
-         Sub(iL)%t2, rho_surf, &
-         Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%t2, Sub(iL)%invL
+   if ( dbg ) then ! way too much output ...
+      write(6,"(a12,i3,3L2,5f7.1,5f8.3)") dtxt//"MET" // trim(FluxProfile), iL, &
+            Sub(iL)%is_water, Sub(iL)%is_forest, Grid%is_allsea, &
+            Sub(iL)%z0, Sub(iL)%d, Sub(iL)%z_refd, 0.001*Grid%psurf, &
+            Sub(iL)%t2, rho_surf, &
+            Sub(iL)%Hd, Sub(iL)%ustar, Sub(iL)%t2, Sub(iL)%invL
 
-        if ( my_first_call ) then ! title line
-            write(unit=*, fmt="(a6,4a3, a6, 3a9,2a8, 2a7)") &
-             "SUBB ", "iL", "mm", "dd", "hh", "t2_C", "Hd", &
-             "L_nwp", "1/L  ", "z/L_nwp", "z/L ", "u*_nwp", "u*"
-            my_first_call = .false.
-        end if
+      if ( my_first_call ) then ! title line
+         write(unit=*, fmt="(a6,4a3, a6, 3a9,2a8, 2a7)") &
+                "SUBB ", "iL", "mm", "dd", "hh", "t2_C", "Hd", &
+                "L_nwp", "1/L  ", "z/L_nwp", "z/L ", "u*_nwp", "u*"
+         my_first_call = .false.
+      end if
 
-        write(*,"(a6,4i3, f6.1, 3f9.3, 2f8.3, 2f7.3)") "SUBB ", iL, &
+      write(*,"(a6,4i3, f6.1, 3f9.3, 2f8.3, 2f7.3)") "SUBB ", iL, &
            current_date%month, &
            current_date%day, &
            current_date%hour, &
            Sub(iL)%t2C, Sub(iL)%Hd, Grid%invL, Sub(iL)%invL, &
            Sub(iL)%z_refd*Grid%invL, Sub(iL)%z_refd*Sub(iL)%invL, &
               Grid%ustar, Sub(iL)%ustar
-    end if
+   end if
 
 
 
@@ -361,24 +379,24 @@ end if
 !      z0+d, respectively.
 !      Only Ra_ref and Ra_3m are used in main code.
       
-        Sub(iL)%Ra_ref = AerRes(Sub(iL)%z0,Sub(iL)%z_refd,Sub(iL)%ustar,&
-            Sub(iL)%invL,KARMAN)
-        Zmix_refd = max(Zmix_ref-Sub(iL)%d,Sub(iL)%z_refd)
-        !BIDIR FIXME Zmix_refd = max(Zmix_ref-Sub(iL)%d,Sub(iL)%z_refd)
-        if ( BIDIR%skipForestDisp) then
-          Zmix_refd = Zmix_ref-Sub(iL)%d
-        end if 
-        Sub(iL)%Ra_X = AerRes(Sub(iL)%z0,Zmix_refd,Sub(iL)%ustar,&
-            Sub(iL)%invL,KARMAN)
-        Sub(iL)%Ra_3m  = AerRes(Sub(iL)%z0,z_3md,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)
-        Ra_2m  = AerRes(Sub(iL)%z0,1.0+z_1m,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)
+   Sub(iL)%Ra_ref = AerRes(Sub(iL)%z0,Sub(iL)%z_refd,Sub(iL)%ustar,&
+                           Sub(iL)%invL,KARMAN)
+   Zmix_refd = max(Zmix_ref-Sub(iL)%d,Sub(iL)%z_refd)
+   !BIDIR FIXME Zmix_refd = max(Zmix_ref-Sub(iL)%d,Sub(iL)%z_refd)
+   if ( BIDIR%skipForestDisp) then
+      Zmix_refd = Zmix_ref-Sub(iL)%d
+   end if 
+   Sub(iL)%Ra_X = AerRes(Sub(iL)%z0,Zmix_refd,Sub(iL)%ustar,&
+                  Sub(iL)%invL,KARMAN)
+   Sub(iL)%Ra_3m  = AerRes(Sub(iL)%z0,z_3md,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)
+   Ra_2m  = AerRes(Sub(iL)%z0,1.0+z_1m,Sub(iL)%ustar,Sub(iL)%invL,KARMAN)
 
-    if (  dbg ) then
-       if ( Sub(iL)%Ra_ref < 0 .or. Sub(iL)%Ra_3m < 0 &
+   if (  dbg ) then
+      if ( Sub(iL)%Ra_ref < 0 .or. Sub(iL)%Ra_3m < 0 &
            .or. Ra_2m < 0  ) call CheckStop(dtxt//"RAREF NEG ")
       if ( Sub(iL)%Ra_3m > Sub(iL)%Ra_ref ) &
-           call CheckStop(dtxt//"ERROR!!! Ra_ref<Ra_3")
-    end if
+      call CheckStop(dtxt//"ERROR!!! Ra_ref<Ra_3")
+   end if
 
 
 !  *****  Calculate rh and vpd  *********
@@ -389,7 +407,7 @@ end if
 !heat of vaporization, respectively.
 
 
-     esat = ESAT0 * exp(0.622*2.5e6*((1.0/T0) - (1.0/Sub(iL)%t2))/RGAS_KG )
+   esat = ESAT0 * exp(0.622*2.5e6*((1.0/T0) - (1.0/Sub(iL)%t2))/RGAS_KG )
 
 !Calculating RH near veg, and VPD
 !Feb 2021 change. Just use NWP rh2m, instead of latent heat calculation
@@ -397,11 +415,11 @@ end if
 ! and as we have only grid-average LE to work with.
 
 
-    if ( USES%RH_FROM_NWP ) then 
-     e=Grid%rh2m * esat
-     Sub(iL)%rh = Grid%rh2m
+   if ( USES%RH_FROM_NWP ) then 
+      e=Grid%rh2m * esat
+      Sub(iL)%rh = Grid%rh2m
 
-    else ! Calculate RGH at 2m for each land-cover (original method)
+   else ! Calculate RGH at 2m for each land-cover (original method)
 
 !....The model has the specific humidity qw_ref for the lowest model layer as 
 !    an input obtained from the NWP model.  We now correct this down to 
@@ -414,15 +432,15 @@ end if
 
                        
 ! 2m qw:
-        qw = Grid%qw_ref  + Sub(iL)%LE/2.5e6 * ( Sub(iL)%Ra_ref - Ra_2m)  
+   qw = Grid%qw_ref  + Sub(iL)%LE/2.5e6 * ( Sub(iL)%Ra_ref - Ra_2m)  
 
-      !..   qw is in kg/kg  so  e = qw*psurf/epsilon
-      !..   to get e in Pascal.
+   !..   qw is in kg/kg  so  e = qw*psurf/epsilon
+   !..   to get e in Pascal.
 
-       e = qw * Grid%psurf/0.622
+   e = qw * Grid%psurf/0.622
 
 
-    if (  dbg ) write(*,"(a15,2f12.6,2f12.3)") dtxt//"water", Grid%qw_ref,&
+   if (  dbg ) write(*,"(a15,2f12.6,2f12.3)") dtxt//"water", Grid%qw_ref,&
       qw, Sub(iL)%LE, 100.0*e/esat
 
    ! Straighforward calculation sometimes gives rh<0 or rh>1.0 -
@@ -431,25 +449,70 @@ end if
    ! impossible rh values at least:
 
 
-     e = max(0.001*esat,e)    ! keeps rh >= 0.1%
+   e = max(0.001*esat,e)    ! keeps rh >= 0.1%
      !e = min(esat,e)          ! keeps rh <= 1
-     Sub(iL)%rh = e/esat
-     Sub(iL)%rh = min(1.0,Sub(iL)%rh)! keeps rh <= 1
+   Sub(iL)%rh = e/esat
+   Sub(iL)%rh = min(1.0,Sub(iL)%rh)! keeps rh <= 1
 
-    end if ! USES%RH_FROM_NWP 
+   end if ! USES%RH_FROM_NWP 
 
 ! Just use NWP rh
-    if (dbg) write(6,"(a22,2f12.4,2es12.4)") dtxt//"RH2", Sub(iL)%rh, Grid%rh2m, e,Grid%rh2m * esat
+   if (dbg) write(6,"(a22,2f12.4,2es12.4)") dtxt//"RH2", Sub(iL)%rh, Grid%rh2m, e,Grid%rh2m * esat
 
 !  ****  leaf sat. vapour pressure
 
-      Sub(iL)%vpd    =  0.001*(esat-e)     ! gives vpd in kPa !
-      Sub(iL)%vpd    =  max(Sub(iL)%vpd,0.0) 
+   Sub(iL)%vpd    =  0.001*(esat-e)     ! gives vpd in kPa !
+   Sub(iL)%vpd    =  max(Sub(iL)%vpd,0.0) 
+!--------------------------------------------------------------------------------------
+! TRM Estimation Liao et al., 2018  https://doi.org/10.1029/2018JG004401   
+!--------------------------------------------------------------------------------------
+!IN_PROGRESS::::
+!TMP   if( USES%TLEAF_IBM .and. Sub(iL)%LAI > 0.05 .and. .not.LandType(iL)%is_iam ) then
+!TMP! calculate the dew point as a minimum leaf temperature as dew will form preventing further cooling
+!TMP! may want to connect this to leaf moisture   
+!TMP      Tdp = 1.0 / (1.0/T0-RGAS_KG/(0.622*2.5e6)*log(e/ESAT0)) 
+!TMP      i   = Grid%i 
+!TMP      j   = Grid%j 
+!TMP      if(Grid%Zen < 89.0 .and. Grid%sdepth < (1.0+ max(Sub(iL)%hveg/10,0.01)) ) then
+!TMP         call CanopyPAR(Sub(iL)%LAI, Grid%coszen, PARdbh(i,j), PARdif(i,j), &
+!TMP                        Sub(iL)%PARsun, Sub(iL)%PARshade, Sub(iL)%LAIsunfrac)
+!TMP      else
+!TMP         Sub(iL)%PARsun  = 0.0
+!TMP         Sub(iL)%PARshade = 0.0       
+!TMP         Sub(iL)%LAIsunfrac = 0.0
+!TMP      end if
+!TMP! Brusaert 1975 as recommened by Morales-Salinas et al., 2023 https://doi.org/10.1038/s41598-023-40499-6
+!TMP      em_atm = (0.605+0.048*sqrt(0.01*e))*fcloud(i,j) + (1.0-fcloud(i,j))*0.98
+!TMP! Use DO3SE albedo
+!TMP      V_ALBEDO  = LandDefs(iL)%Albedo*0.01      
+!TMP
+!TMP      Rabs_sun       = (1.0-V_ALBEDO) * max( Sub(iL)%PARsun, 0.0 ) / PARFrac
+!TMP      Rabs_shade     = (1.0-V_ALBEDO) * max( Sub(iL)%PARshade, 0.0 ) / PARFrac
+!TMP      lambda_o       = 1.0/(4.0*0.98*SBC*Sub(iL)%t2**3)
+!TMP      r_o            = rho_surf * CP * lambda_o
+!TMP! IBM method  Lee et al., 2011 https://doi.org/10.1038/nature10588    
+!TMP!      Rnet           = Rabs_sun*L%LAIsunfrac + Rabs_shade*(1.0 - L%LAIsunfrac) + &
+!TMP!                       1.0/max(Sub(iL)%LAI,1.0) * ((1.0-IR_ALBEDO)*em_atm-0.98)*SBC*Sub(iL)%t2**4
+!TMP!      fftrm           = r_o/Sub(iL)%Ra_3m*(1.0+max(0.0,Sub(iL)%Hd/Sub(iL)%LE))
+!TMP! TRM method  Liao et al., 2018  https://doi.org/10.1029/2018JG004401   
+!TMP      Rnet           = (1.0-V_ALBEDO) * (PARdbh(i,j) + PARdif(i,j))/PARFrac + &
+!TMP                       (em_atm-0.98)*SBC*Sub(iL)%t2**4
+!TMP      desatdT         = ESAT0*0.622*2.5e6/(RGAS_KG*Sub(iL)%t2**2)*exp(0.622*2.5e6*(1.0/T0 - 1.0/Sub(iL)%t2)/RGAS_KG )
+!TMP      lambda          = CP*Grid%psurf/(0.622*LAMBDA_W)
+!TMP      fftrm           = r_o/Ra_2m*(1.0+desatdT/lambda*(Ra_2m/(Ra_2m+1.0/max(Sub(iL)%g_sto,TINY))))
+!TMP      Sub(iL)%dTleaf  = lambda_o * Rnet/(1.0+fftrm)
+!TMP      !DS Sub(iL)%dTleaf = max(Tdp - Sub(iL)%t2, min( 15.0, Sub(iL)%dTleaf))      
+!TMP      Sub(iL)%dTleaf = max(Tdp - Sub(iL)%t2, min( USES%TLEAF_MAXDIFF, Sub(iL)%dTleaf))      
+!TMP   else !!DSJ13
+! until new system in place:
+   Sub(iL)%dTleaf = 0.0
+!TMP   end if ! else default dTleaf of 0      
+   Sub(iL)%Tleaf  = Sub(iL)%t2 + Sub(iL)%dTleaf   
+   if (dbg) write(6,"(a22,2f12.4)") dtxt//" e/esat, rh", e/esat, Sub(iL)%rh
+   if (dbg) write(6,"(a22,i3,L2,f8.2,2f10.4,a)") dtxt//" SubTleaf", iL, LandType(iL)%is_bulk,&
+           Sub(iL)%LAI, Sub(iL)%g_sto, Sub(iL)%dTleaf, "  "//trim(LandDefs(iL)%name)
 
-
-    if (dbg) write(6,"(a22,2f12.4)") dtxt//" e/esat, rh", e/esat, Sub(iL)%rh
-
-  end subroutine Get_Submet
+   end subroutine Get_Submet
 ! =====================================================================
 
 end module SubMet_mod

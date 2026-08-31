@@ -733,7 +733,7 @@ contains
 
        write(unit=6,fmt="(a,I6,a,I5)")dtxt//" Time factors normalisation: ",&
                                         nydays,' days in ',year
-       if ( timeFacs%Day_of_Year ) call yearly_normalize(year)
+       if ( .not. timeFacs%Day_of_Year ) call yearly_normalize(year)
 
 !#########################################################################
 !

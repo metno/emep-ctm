@@ -89,6 +89,7 @@ module DefPhotolysis_mod
                         ! photolysis major sink for isoprene-derived carbonyl groups, doi:10.5194/acp-14-2497-2014
                         ! Bergstrom 2022 scaled MEK by 0.778.
 
-    ,IDPAN = -1  
+    ,IDPAN       = -1 &
+    ,IDClNO2     = -1 
 
 end module DefPhotolysis_mod

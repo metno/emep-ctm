@@ -83,7 +83,7 @@ program emep_Main
                     !          MasterPE,IERROR, MPI_world_init
   use Nest_mod,          only: wrtxn     ! write nested output (IC/BC)
   use NetCDF_mod,        only: Init_new_netCDF
-  use OutputChem_mod,    only: WrtChem, wanted_iou, set_output_defs 
+  use OutputChem_mod,    only: WrtChem, wanted_iou, set_output_defs
   use Par_mod,           only: me, GIMAX, GJMAX, Topology_io, Topology, parinit
   use PhyChem_mod,       only: phyche    ! Calls phys/chem routines each dt_advec
   use Sites_mod,         only: sitesdef  ! to get output sites
@@ -129,14 +129,14 @@ program emep_Main
   real :: tim_before0 !private
   character(len=*), parameter :: dtxt='eMain:'
 !NB: the value of giversion may be overwritten later by the cpp. Keep lower cases
-  character(len=200) :: gitversion='git version not set ' 
+  character(len=200) :: gitversion='git version not set '
 
   associate ( yyyy => current_date%year, mm => current_date%month, &
        dd => current_date%day,  hh => current_date%hour)
     !
     !     initialize the parallel topology
     !
-    
+
   call MPI_world_init(NPROC,ME)
 
   ! Set a logical from ModelConstants, which can be used for
@@ -152,7 +152,7 @@ program emep_Main
   call Config_Constants(IO_LOG)
 
   call assign_startandenddate()
- 
+
   if(MasterProc)then
     !Jan 2023: GITVERSION is set by Makefile on compile. Otherwise gitversion from above is default.
      call PrintLog(trim(GITVERSION)) !NB: the value may be set by the cpp. Keep upper cases
@@ -228,7 +228,7 @@ program emep_Main
   call Add_2timing(3,tim_after,tim_before,"Emissions read in")
 
   if(USES%LocalFractions) call lf_init
-  
+
   call MetModel_LandUse(1)   !
 
   call Init_EcoSystems()     ! Defines ecosystem-groups for dep output
@@ -307,7 +307,7 @@ program emep_Main
 
     ! daynumber needed for BCs
     daynumber=day_of_year(yyyy,mm,dd)
-     
+
     if(mm==1 .and. dd==1 .and. hh==0)call Init_nmdays(current_date, JUMPOVER29FEB)!new year starts
 
     call Code_timer(tim_before)

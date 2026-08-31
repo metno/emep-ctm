@@ -127,7 +127,7 @@ contains
 
 !* count days from dec.31,1973 
 
-    d = julian_date(year,month,day) - julian_date(1973,12,31) + 1 
+    d = julian_date(year,month,day) - julian_date(1973,12,31) !+ 1 Should be ommited according to Claude 
     d = d + hour/24.0
 
 

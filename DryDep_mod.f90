@@ -71,14 +71,14 @@ use ChemDims_mod,         only: NSPEC_ADV, NSPEC_SHL,NDRYDEP_ADV
 use ChemSpecs_mod,        only: species, IXADV_O3, FIRST_SEMIVOL, LAST_SEMIVOL
 use Config_module,        only: dt_advec,PT, K2=> KMAX_MID, NPROC, &
                               USES, MasterProc, PPBINV, IOU_INST,&
-                              KUPPER, NLANDUSEMAX,&
+                              KUPPER, NLANDUSEMAX, &
                               SO2_ix,NH3_ix,NH4_f_ix,NO3_f_ix,NO2_ix,O3_ix
 use Debug_module,         only: DEBUG
 use DerivedFields_mod,    only: d_2d, f_2d, VGtest_out_ix
 use DO3SE_mod,            only: do3se
-use EcoSystem_mod,        only: EcoSystemFrac, Is_EcoSystem,  &
-                                 NDEF_ECOSYSTEMS, DEF_ECOSYSTEMS
-use GasParticleCoeffs_mod         ! ... Init_GasCoeff, DRx, Rb_Cor, ...
+use EcoSystem_mod,        only: EcoSystemFrac, Is_EcoSystem, nEcoSysOutputs,&
+                                 ECOSYSTEM_OUTPUTS
+use GasParticleCoeffs_mod      ! ... Init_GasCoeff, DRx, Rb_Cor, ...
 use GridValues_mod ,      only: GRIDWIDTH_M,xmd,xm2, glat,dA,dB, glon, &
                              debug_proc, debug_li, debug_lj, i_fdom, j_fdom
 use Io_Progs_mod,         only: datewrite
@@ -87,7 +87,7 @@ use Landuse_mod,          only: SetLandUse, Land_codes  &
                              ,NLUMAX &  ! Max. no countries per grid
                              ,LandCover   ! Provides codes, SGS, LAI, etc,
 use LandDefs_mod,         only: LandType, LandDefs, STUBBLE
-use LocalFractions_mod,   only: lf_drydep
+use LocalFractions_mod,   only: lf_drydep_pre, lf_drydep_pos, Ndrydep_deriv, lf_fullchem
 use LocalVariables_mod,   only: Grid, L, iL & ! Grid and sub-scale Met/Veg data
                                 ,NLOCDRYDEP_MAX ! Used to store Vg
 use MassBudget_mod,       only: totddep
@@ -99,7 +99,7 @@ use Par_mod,              only: limax,ljmax, me,li0,li1,lj0,lj1
 use PhysicalConstants_mod, only: ATWAIR,PI,KARMAN,GRAV,RGAS_KG,CP,AVOG,NMOLE_M3
 use Rb_mod,               only: Rb_gas
 use Rsurface_mod,         only: Rsurface, Rinc
-use ZchemData_mod,        only: xn_2d,M, Fpart, Fgas
+use ZchemData_mod,        only: xn_2d,Mair => M, Fpart, Fgas
 use Sites_mod,            only: nlocal_sites, site_x, site_y, &
                                   site_name, site_gn
 use SmallUtils_mod,       only:  find_index
@@ -135,7 +135,7 @@ character(len=30),private, save :: errmsg = "ok"
 
 !logical, public, parameter :: COMPENSATION_PT = .false. 
 
-logical, public, dimension(NDRYDEP_ADV), save :: vg_set 
+logical, public, dimension(NDRYDEP_ADV), save :: vg_set = .false. !PW: init false
 
 !  A type container for big-leaf (bulk) resistances, used by esx
 !  A little confusing still, bt Vg_ref etc are part of Sub(iL)
@@ -221,12 +221,12 @@ contains
        LCLOOP: do ilc= 1, nlc
            lc       = LandCover(i,j)%codes(ilc)
            coverage = LandCover(i,j)%fraction(ilc)
-           ECOLOOP: do iEco= 1, NDEF_ECOSYSTEMS
+           ECOLOOP: do iEco= 1, nEcoSysOutputs
               if( Is_EcoSystem(iEco,lc) ) then
                  EcoSystemFrac(iEco,i,j) = EcoSystemFrac(iEco,i,j) + coverage
                 if( debug_flag ) then
                      write(6,"(a,2i4,a18,3f10.4)") "ECOSYS AREA ",&
-                     ilc, lc, "=> "//trim(DEF_ECOSYSTEMS(iEco)), &
+                     ilc, lc, "=> "//trim(ECOSYSTEM_OUTPUTS(iEco)), &
                          coverage, EcoSystemFrac(iEco,i,j)
                 end if
              end if
@@ -235,11 +235,6 @@ contains
       end do ! i
     end do ! j
 
-!     invEcoFrac(:) = 0.0
-!
-!     do n = 0, size(DEF_ECOSYSTEMS)-1
-!        if ( EcoFrac(n) > 1.0e-39 ) invEcoFrac(n) = 1.0/EcoFrac(n)
-!     end do
 !=============================================================================
   end if !  my_first_call
 
@@ -279,6 +274,7 @@ contains
     real :: c_hveg3m, o3_45m  ! TESTS ONLY
     logical :: first_ddep = .true.
     real :: r_dry, r_wet, rho_wet, Vs_dry, Vs_wet
+    integer :: lf_iter, niter
 !    real :: S ! saturation ration = e/es ~ fRH
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -333,11 +329,15 @@ contains
    !      pressure in kg m-1 s-2
    ! 
     convfac = (dA(K2) + dB(K2)*Grid%psurf)&!dP
-               *xmd(i,j)/(ATWAIR*GRAV*inv_gridarea)
+               *xmd(i,j)/(ATWAIR*GRAV*inv_gridarea)/Mair(K2)
+    
+    convfac2 = convfac * xm2(i,j) * inv_gridarea
+
+    dtz      = dt_advec/Grid%DeltaZ
 
    ! -----------------------------------------------------------------!
    ! convert molecules/cm3 to ppb for surface:
-    surf_ppb   = PPBINV /M(K2)
+    surf_ppb   = PPBINV /Mair(K2)
     if (DEBUG%AOT.and.debug_flag)write(*,"(a,es12.4)")dtxt//"PPB",surf_ppb
 
    ! -----------------------------------------------------------------!
@@ -349,14 +349,17 @@ contains
    !   kg_air_ij = (ps(i,j,1) - PT)*carea(K2) = dP*dx**2/g
    ! -----------------------------------------------------------------!
 
-    lossfrac = 1.0 !  Ratio of xn before and after deposition
-
-
-    dtz      = dt_advec/Grid%DeltaZ
 
     if ( dbghh ) call datewrite(dtxt//"DMET ", daynumber, (/ Grid%zen,  &
          1.0e-5*Grid%psurf, & !F21 Grid%PARsun, Grid%PARshade, &
          Grid%Hd, Grid%LE, Grid%invL, Grid%ustar /) )
+
+    niter = 1
+    if(USES%LocalFractions .and. lf_fullchem) niter = Ndrydep_deriv
+    do lf_iter = 1, niter !only used for LocaFractions
+    call lf_drydep_pre(i, j, lf_iter) !only used for LocalFractions
+
+    lossfrac = 1.0 !  Ratio of xn before and after deposition
       
    !/ Initialise Grid-avg Vg for this grid square:
      !call Init_GridMosaic(i,j)
@@ -429,8 +432,6 @@ contains
 
       if ( DDspec(icmp)%is_gas ) CYCLE
 
-
-
       r_dry = 0.5*DDspec(icmp)%DpgV
       r_wet = r_dry
 
@@ -469,7 +470,6 @@ contains
     end if
 
 
-
 !PW_____________________________________________________________________
 !Make effective resistance using formula:
 ! R_effective_i = (Ra_X_i+Rb_i+Rsur_i) * sum_j( coverage_j*(Ra_ref_j+Rb_j+Rsur_j)/(Ra_X_j+Rb_j+Rsur_j) )
@@ -480,6 +480,7 @@ contains
     eff_fac = 0.0
     LULOOP_PRE: do iiL= 1, nlu
       iL      = LandCover(i,j)%codes(iiL)
+      if (dbg) write(*,*) "DSJ13 in ", iiL, IL, LandCover(debug_li,debug_lj)%g_sto(iiL)
 
       iL_used (iiL) = iL    ! for eco dep
 
@@ -500,9 +501,10 @@ contains
 
       L = Sub(iL)    ! ! Assign e.g. Sub(iL)ustar to ustar
 
-     call Rb_gas(L%is_water, L%ustar, L%z0, BL(:)%Rb)
+      call Rb_gas(L%is_water, L%ustar, L%z0, BL(:)%Rb)
 
       call Rsurface(i,j,BL(:)%Gsto,BL(:)%Rsur,errmsg,debug_flag,fsnow)
+      if (dbg) write(*,"(a,2i4,2f8.4)") "DSJ13 ut1 ", iiL, IL, LandCover(debug_li,debug_lj)%g_sto(iiL), L%g_sto
 
 
       if ( USES%BIDIR ) then ! overwrites Rsur
@@ -563,15 +565,18 @@ contains
               [iL, j, daynumber, L%SGS, L%EGS] , [  L%LAI, glat(i,j),glon(i,j), L%t2C, fSW50(i,j),L%fSW,L%t2C ], &
             afmt="a34,TXTDATE,5i5,4f8.2,20es14.5")  ! just array
 
-         write(6,"(a,i4,3f7.2,7es10.2)") dtxt//"DMET SUB", &
+         write(6,"(a,i4,3f7.2,8es10.2)") dtxt//"DMET SUB", &
            iL, Grid%ustar, L%ustar, Grid%rh2m, L%rh,  Grid%invL, & !DS added rh2m
-             L%invL, L%Ra_ref, L%Ra_3m
+             L%invL, L%Ra_ref, L%Ra_3m,L%g_sto
       end if
 
 
       call Rb_gas(L%is_water, L%ustar, L%z0, BL(:)%Rb)
 
       call Rsurface(i,j,BL(:)%Gsto,BL(:)%Rsur,errmsg,debug_flag,fsnow)
+      if (dbg) write(*,"(a,2i4,2f8.4)") "DSJ13 ut2 ", iiL, IL, LandCover(debug_li,debug_lj)%g_sto(iiL), L%g_sto
+
+      LandCover(i,j)%g_sto(iiL) = L%g_sto  ! DSJ13
 
       if ( USES%BIDIR ) then ! overwrites Rsur for NH3
         call BiDir_ijRGs(2,iL,BL(idcmpNH3)%Rsur,BL(idcmpNH3)%Gsto)  ! DS call 1
@@ -725,9 +730,9 @@ contains
       if ( L%is_water ) then
          do icmp = 1, nddep
             if(USES%EFFECTIVE_RESISTANCE)then
-               sea_ratio(icmp) =  Vg_ref(icmp)/Vg_3m(icmp)
-            else
                sea_ratio(icmp) =  Vg_eff(icmp)/Vg_3m(icmp)
+            else
+               sea_ratio(icmp) =  Vg_ref(icmp)/Vg_3m(icmp)
             endif
          end do
       else
@@ -735,10 +740,10 @@ contains
          do icmp = 1, nddep
             if(USES%EFFECTIVE_RESISTANCE)then
                Vg_ratio(icmp) =  Vg_ratio(icmp) &
-                                 + L%coverage * Vg_ref(icmp)/Vg_3m(icmp)
+                                 + L%coverage * Vg_eff(icmp)/Vg_3m(icmp)
             else
                Vg_ratio(icmp) =  Vg_ratio(icmp)&
-                                + L%coverage * Vg_eff(icmp)/Vg_3m(icmp)
+                                + L%coverage * Vg_ref(icmp)/Vg_3m(icmp)
             endif
          end do
       end if
@@ -855,7 +860,7 @@ contains
          call StopAll(dtxt//'NOT CODED')
          !A2018 DepLoss(nadv) =   & ! Use directly set Vg
          !A2018( 1.0 - exp ( -DDepMap(icmp)%vg * dtz ) ) * xn_2d( ntot,K2)
-         cfac(nadv, i,j) = 1.0   ! Crude, for now.
+         cfac(nadv, i,j) = 1.0   ! Crude, for now. !PW: nadv is not defined here, or from previous iteration. 4th June 2026  
      end if
  
      DCMPLOOP: do ispec = 1, size(DDmapping(icmp)%advspecs)  ! Real species now
@@ -868,12 +873,12 @@ contains
            ! semi-volatile components as PMf and the gaseous part as
            ! specified in GenIn.species.
 
-          DepLoss(nadv) =  &
+           DepLoss(nadv) =  &
            Fgas(ntot,K2)*vg_fac( icmp ) * xn_2d(ntot,K2) + &
            Fpart(ntot,K2)*vg_fac( idcmpPMf ) * xn_2d(ntot,K2)
 
-           cfac(nadv, i,j) = Fgas(ntot,K2)*gradient_fac(icmp) + &
-                Fpart(ntot,K2)*gradient_fac( idcmpPMf )
+           cfac(nadv, i,j) = gradient_fac(icmp) !NB: only gas cfac: for particles, cfac from idcmpPMf is used
+
         else
 
             ! Deposition (per grid cell! Outside the LU loop)
@@ -916,12 +921,13 @@ contains
                 lossfrac, gradient_fac(icmp), L%StoFrac(ntot) /) )
           end if
         end if ! ntot==O3
+        
+        if (lf_iter == niter) then !last iteration
+           
+           ! the new concentrations are calculated:           
+           xn_2d( ntot,K2) = xn_2d( ntot,K2) - DepLoss(nadv)
 
-
-        ! the new concentrations are calculated:
-
-        xn_2d( ntot,K2) = xn_2d( ntot,K2) - DepLoss(nadv)
-
+        end if
 
         if ( ntot == O3_ix ) then
 
@@ -941,7 +947,6 @@ contains
                   c_hveg3m * surf_ppb, 100*Vg_ref(icmp), 100*Vg_3m(icmp) /) )
              end if
         end if ! not FLUXTOT
-
 
         !.. ecosystem specific deposition - translate from calc to adv 
         !  and normalise
@@ -1014,8 +1019,8 @@ contains
    end do DDEPLOOP ! n
   ! ===================================================================
 
-
-   convfac =  convfac/M(K2)
+   if(USES%LocalFractions) call lf_drydep_pos(i,j,DepLoss, convfac2, lf_iter, no3nh4ratio)
+   end do !lf_iter
 
     !  DryDep Budget terms  (do not include values on outer frame)
    if(.not.(i<li0.or.i>li1.or.j<lj0.or.j>lj1))then
@@ -1028,10 +1033,6 @@ contains
      end do ! icmp
    end if
 
-   convfac2 = convfac * xm2(i,j) * inv_gridarea
-
-   if(USES%LocalFractions) call lf_drydep(i,j,DepLoss, convfac2)
-   
    !.. Add DepLoss to budgets if needed:
 
    call Add_MosaicOutput(debug_flag,i,j,convfac2,&

@@ -64,26 +64,27 @@ Module Advection_mod
 ! The number of diffusion iterations can be chosen (ndiff).
 !
 !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+  use Aero_Vds_mod,       only: SettlingVelocity
   use Chemfields_mod,     only: xn_adv
-  use ChemDims_mod,       only: NSPEC_ADV
+  use ChemDims_mod,       only: NSPEC_ADV, NSPEC_SHL
   use ChemSpecs_mod,      only: species,species_adv
   use CheckStop_mod,      only: CheckStop,StopAll
   use Config_module,      only: EPSIL, dt_advec
   use Config_module, only : KMAX_BND,KMAX_MID,NMET, step_main, nmax, &
                   dt_advec, dt_advec_inv,  PT,Pref, KCHEMTOP, &
                   NPROCX,NPROCY,NPROC, &
-                  USES,ZERO_ORDER_ADVEC
+                  USES,ZERO_ORDER_ADVEC,Dust_wb_c_ix
   use Debug_module,       only: DEBUG
   use Convection_mod,     only: convection_Eta
   use EmisDef_mod,        only: NSECTORS
   use GridValues_mod,     only: GRIDWIDTH_M,xm2,xmd,xm2ji,xmdji,xm_i, Pole_Singular, &
                                 dhs1, dhs1i, dhs2i, &
                                 dA,dB,i_fdom,j_fdom,i_local,j_local,Eta_bnd,dEta_i,&
-                                extendarea_N
+                                extendarea_N,A_mid,B_mid,A_bnd,B_bnd,Eta_mid
   use Io_mod,             only: datewrite
   use Io_RunLog_mod,      only: PrintLog
   use MetFields_mod,      only: ps,Etadot,SigmaKz,EtaKz,u_xmj,v_xmi,cnvuf,cnvdf&
-                                ,uw,ue,vs,vn
+                                ,uw,ue,vs,vn,th,z_mid
   use MassBudget_mod,     only: fluxin_top,fluxout_top,fluxin,fluxout
   use My_Timing_mod,      only: Code_timer, Add_2timing, tim_before,tim_after,NTIMING
   !do not use "only", because MPI_IN_PLACE does not behave well on certain versions of gfortran(?)
@@ -95,7 +96,7 @@ Module Advection_mod
             li0,li1,lj0,lj1 ,limax,ljmax, gi0, IRUNBEG,gj0, JRUNBEG &
            ,neighbor,WEST,EAST,SOUTH,NORTH,NOPROC            &
            ,MSG_NORTH2,MSG_EAST2,MSG_SOUTH2,MSG_WEST2
-  use PhysicalConstants_mod, only: GRAV,ATWAIR ! gravity
+  use PhysicalConstants_mod, only: GRAV,ATWAIR,KAPPA
   use LocalFractions_mod, only: lf_adv_x, lf_adv_y, lf_adv_k, lf_adv_k_2nd, lf_diff, lf_conv, LF_SRC_TOTSIZE&
                                 , lf_Nvert, lf, loc_frac_src, loc_frac_src_1d,lf_fullchem
   use VerticalDiffusion_mod, only: vertdiffn
@@ -546,7 +547,7 @@ Module Advection_mod
                       call adv_vert_zero(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
                    else
                       !                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
-                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk,i,j)
+                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk,i,j,NSPEC_ADV)
                    endif
 
                    if(USES%LocalFractions)then
@@ -665,7 +666,7 @@ Module Advection_mod
                       call adv_vert_zero(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk)
                    else
                    !                   call adv_vert_fourth(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s)
-                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk,i,j)
+                      call advvk(xn_adv(1,i,j,1),dpdeta(i,j,1),Etadot(i,j,1,1),dt_s,fluxk,i,j,NSPEC_ADV)
                    endif
 
                    if(USES%LocalFractions)then
@@ -1005,7 +1006,7 @@ Module Advection_mod
     end do
     hscor1(KMAX_BND+1) = Eta_bnd(KMAX_BND)
 
-    hscor1(1) = - Eta_bnd(2)
+    hscor1(1) = 2.*Eta_bnd(1) - Eta_bnd(2)
     hscor1(KMAX_BND+2) = 2.*Eta_bnd(KMAX_BND) - Eta_bnd(KMAX_BND-1)
     hscor2(1) = 2.*Eta_mid(1) - Eta_mid(2)
     hscor2(KMAX_MID+2) = 2.*Eta_mid(KMAX_MID) - Eta_mid(KMAX_MID-1)
@@ -1106,15 +1107,18 @@ Module Advection_mod
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-  subroutine advvk(xn_adv,ps3d,sdot,dt_s,fluxk,i,j)
+  recursive subroutine advvk(xn_adv,ps3d,sdot,dt_s,fluxk,i,j,nspec_vertk,GravSettling_in)
 
 !     executes advection with a. bott's integreated flux-form
 !     using 2'nd order polynomial in the vertical.
 
 !    input
-    real,intent(in)::  sdot(0:LIMAX*LJMAX*KMAX_BND-1),dt_s
+    real,intent(in)::  dt_s
+    integer, intent(in):: i,j,nspec_vertk 
+    logical, optional, intent(in):: GravSettling_in
 
-!    input+output
+    !    input+output
+    real ,intent(inout):: sdot(0:LIMAX*LJMAX*KMAX_BND-1)! we overwrite, then reset to original values
     real ,intent(inout):: xn_adv(NSPEC_ADV,0:LIMAX*LJMAX*KMAX_MID-1)
     real ,intent(inout):: ps3d(0:LIMAX*LJMAX*KMAX_MID-1)
     real ,intent(inout)::fluxk(NSPEC_ADV,KMAX_MID)
@@ -1123,21 +1127,34 @@ Module Advection_mod
     real fluxps(KMAX_MID),fc(KMAX_MID)
 
 !    local
-    integer  n, k, n1k,k1,i,j
+    integer  n, k, n1k,k1, grav_ix
     integer klimlow,klimhig
-    real zzfl1,zzfl2,zzfl3,totk(NSPEC_ADV),totps
+    real zzfl1,zzfl2,zzfl3,totk(nspec_vertk),totps
     real fc1,fc2,fc3
-
-    if (USES%LocalFractions) then
+    logical :: GravSettling
+    real :: ps3d_1d(KMAX_MID),ps3d_1d_orig(KMAX_MID),sdot_save(KMAX_MID)
+    real :: sigma,diam,PMdens,etadot_grav,tsK,rho,Vsettling
+    
+    Gravsettling = .false.
+    if(present(GravSettling_in))Gravsettling = GravSettling_in
+    if (USES%GravSettling .and. .not.Gravsettling) then
+       !save xn values before vertical advection
+       do k = 1, KMAX_MID
+          do n = 1, nspec_vertk !NB: no shl included, (not same as in Setup_1d)
+             xn_2d(n,k) = xn_adv(n,(k-1)*LIMAX*LJMAX)
+          end do
+          ps3d_1d_orig(k) = ps3d((k-1)*LIMAX*LJMAX)       
+       end do
+    else if (USES%LocalFractions) then
        !save xn values before vertical advection
        !TODO: integrate to other loops?
        do k = max(KMAX_MID-lf_Nvert-1,KCHEMTOP),KMAX_MID
-          do n = 1, NSPEC_ADV !NB: no shl included, (not same as in Setup_1d)
+          do n = 1, nspec_vertk !NB: no shl included, (not same as in Setup_1d)
              xn_2d(n,k)=xn_adv(n,(k-1)*LIMAX*LJMAX)
           end do
        end do
     end if
-
+    
     do k = 1,KMAX_MID-1
       fc(k) = sdot(k*LIMAX*LJMAX)*dt_s
     end do
@@ -1150,7 +1167,7 @@ Module Advection_mod
     klimhig = KMAX_MID-1
     if(fc(KMAX_MID-1).lt.0.)klimhig = KMAX_MID-2
 
-        fluxk(:,1) = 0.
+        fluxk(1:nspec_vertk,1) = 0.
         fluxps(1) = 0.
 
         if(fc(1).ge.0.)then
@@ -1165,8 +1182,8 @@ Module Advection_mod
                 + alfnew(8,2,0)*fc2           &
                 + alfnew(9,2,0)*fc3
 
-          fluxk(:,2) = max(0.,xn_adv(:,0)*zzfl2    &
-               +xn_adv(:,LIMAX*LJMAX)*zzfl3)
+          fluxk(1:nspec_vertk,2) = max(0.,xn_adv(1:nspec_vertk,0)*zzfl2    &
+               +xn_adv(1:nspec_vertk,LIMAX*LJMAX)*zzfl3)
           fluxps(2)  = max(0.,ps3d(0)*zzfl2        &
                +ps3d(LIMAX*LJMAX)*zzfl3)
 
@@ -1199,10 +1216,10 @@ Module Advection_mod
               + alfnew(9,k+1,n1k)*fc3
 !zzfl2 always >=0 (n1k is the switch between fc>0 and fc<0)
         k1 = k-1+n1k
-        fluxk(:,k+1) = max(0.,                            &
-               xn_adv(:,(k1-1)*LIMAX*LJMAX)*zzfl1   &
-              +xn_adv(:, k1   *LIMAX*LJMAX)*zzfl2   &
-              +xn_adv(:,(k1+1)*LIMAX*LJMAX)*zzfl3)
+        fluxk(1:nspec_vertk,k+1) = max(0.,                            &
+               xn_adv(1:nspec_vertk,(k1-1)*LIMAX*LJMAX)*zzfl1   &
+              +xn_adv(1:nspec_vertk, k1   *LIMAX*LJMAX)*zzfl2   &
+              +xn_adv(1:nspec_vertk,(k1+1)*LIMAX*LJMAX)*zzfl3)
         fluxps(k+1) = max(0.,                             &
                ps3d((k1-1)*LIMAX*LJMAX)*zzfl1       &
               +ps3d( k1   *LIMAX*LJMAX)*zzfl2       &
@@ -1221,9 +1238,9 @@ Module Advection_mod
               + alfendnew(2)*fc2              &
               + alfendnew(3)*fc3
 
-        fluxk(:,KMAX_MID) =                                          &
-            max(0.,xn_adv(:,(KMAX_MID-2)*LIMAX*LJMAX)*zzfl1    &
-                  +xn_adv(:,(KMAX_MID-1)*LIMAX*LJMAX)*zzfl2)
+        fluxk(1:nspec_vertk,KMAX_MID) =                                          &
+            max(0.,xn_adv(1:nspec_vertk,(KMAX_MID-2)*LIMAX*LJMAX)*zzfl1    &
+                  +xn_adv(1:nspec_vertk,(KMAX_MID-1)*LIMAX*LJMAX)*zzfl2)
         fluxps(KMAX_MID) =                                           &
             max(0.,ps3d((KMAX_MID-2)*LIMAX*LJMAX)*zzfl1        &
                   +ps3d((KMAX_MID-1)*LIMAX*LJMAX)*zzfl2)
@@ -1232,18 +1249,18 @@ Module Advection_mod
     do while(k.lt.KMAX_MID)
       if(fc(k).lt.0.) then
         if(fc(k+1).ge.0.) then
-          totk(:) = min(xn_adv(:,k*LIMAX*LJMAX)*dhs1(k+2)       &
-               /(fluxk(:,k+1) + fluxk(:,k+2)+ EPSIL),1.)
+          totk(:) = min(xn_adv(1:nspec_vertk,k*LIMAX*LJMAX)*dhs1(k+2)       &
+               /(fluxk(1:nspec_vertk,k+1) + fluxk(1:nspec_vertk,k+2)+ EPSIL),1.)
           !Normally totk = 1, except when this would completely empty the cell
-          fluxk(:,k+1) = -fluxk(:,k+1)*totk(:)
-          fluxk(:,k+2) =  fluxk(:,k+2)*totk(:)
+          fluxk(1:nspec_vertk,k+1) = -fluxk(1:nspec_vertk,k+1)*totk(:)
+          fluxk(1:nspec_vertk,k+2) =  fluxk(1:nspec_vertk,k+2)*totk(:)
 
-          xn_adv(:,(k-1)*LIMAX*LJMAX) =                         &
-                 max(0.,xn_adv(:,(k-1)*LIMAX*LJMAX)             &
-                      -(fluxk(:,k+1) - fluxk(:,k))*dhs1i(k+1))
-          xn_adv(:, k   *LIMAX*LJMAX) =                         &
-                 max(0.,xn_adv(:,k*LIMAX*LJMAX)                 &
-                      -(fluxk(:,k+2) - fluxk(:,k+1))*dhs1i(k+2))
+          xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX) =                         &
+                 max(0.,xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX)             &
+                      -(fluxk(1:nspec_vertk,k+1) - fluxk(1:nspec_vertk,k))*dhs1i(k+1))
+          xn_adv(1:nspec_vertk, k   *LIMAX*LJMAX) =                         &
+                 max(0.,xn_adv(1:nspec_vertk,k*LIMAX*LJMAX)                 &
+                      -(fluxk(1:nspec_vertk,k+2) - fluxk(1:nspec_vertk,k+1))*dhs1i(k+2))
 
           totps = min(ps3d(k*LIMAX*LJMAX)*dhs1(k+2)             &
                     /(fluxps(k+1) + fluxps(k+2)+ EPSIL),1.)
@@ -1257,11 +1274,11 @@ Module Advection_mod
                     -(fluxps(k+2) - fluxps(k+1))*dhs1i(k+2))
           k = k+2
         else
-          fluxk(:,k+1) =                                                 &
-              -min(xn_adv(:,k*LIMAX*LJMAX)*dhs1(k+2),fluxk(:,k+1))
-          xn_adv(:,(k-1)*LIMAX*LJMAX) =                            &
-               max(0.,xn_adv(:,(k-1)*LIMAX*LJMAX)                  &
-                    -(fluxk(:,k+1) - fluxk(:,k))*dhs1i(k+1))
+          fluxk(1:nspec_vertk,k+1) =                                                 &
+              -min(xn_adv(1:nspec_vertk,k*LIMAX*LJMAX)*dhs1(k+2),fluxk(1:nspec_vertk,k+1))
+          xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX) =                            &
+               max(0.,xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX)                  &
+                    -(fluxk(1:nspec_vertk,k+1) - fluxk(1:nspec_vertk,k))*dhs1i(k+1))
           fluxps(k+1) =                                                  &
               -min(ps3d(k*LIMAX*LJMAX)*dhs1(k+2),fluxps(k+1))
           ps3d((k-1)*LIMAX*LJMAX) =                                &
@@ -1270,11 +1287,11 @@ Module Advection_mod
           k = k+1
         end if
       else
-        fluxk(:,k+1) =                                                   &
-            min(xn_adv(:,(k-1)*LIMAX*LJMAX)*dhs1(k+1),fluxk(:,k+1))
-        xn_adv(:,(k-1)*LIMAX*LJMAX) =                              &
-            max(0.,xn_adv(:,(k-1)*LIMAX*LJMAX)                     &
-                 -(fluxk(:,k+1) - fluxk(:,k))*dhs1i(k+1))
+        fluxk(1:nspec_vertk,k+1) =                                                   &
+            min(xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX)*dhs1(k+1),fluxk(1:nspec_vertk,k+1))
+        xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX) =                              &
+            max(0.,xn_adv(1:nspec_vertk,(k-1)*LIMAX*LJMAX)                     &
+                 -(fluxk(1:nspec_vertk,k+1) - fluxk(1:nspec_vertk,k))*dhs1i(k+1))
         fluxps(k+1) =                                                    &
             min(ps3d((k-1)*LIMAX*LJMAX)*dhs1(k+1),fluxps(k+1))
         ps3d((k-1)*LIMAX*LJMAX) =                                  &
@@ -1284,13 +1301,56 @@ Module Advection_mod
       end if
     end do
 
-    xn_adv(:,(KMAX_MID-1)*LIMAX*LJMAX) =               &
-            max(0.,xn_adv(:,(KMAX_MID-1)*LIMAX*LJMAX)  &
-                  +fluxk(:,KMAX_MID)*dhs1i(KMAX_MID+1))
+    xn_adv(1:nspec_vertk,(KMAX_MID-1)*LIMAX*LJMAX) =               &
+            max(0.,xn_adv(1:nspec_vertk,(KMAX_MID-1)*LIMAX*LJMAX)  &
+                  +fluxk(1:nspec_vertk,KMAX_MID)*dhs1i(KMAX_MID+1))
     ps3d((KMAX_MID-1)*LIMAX*LJMAX) =                   &
             max(0.,ps3d((KMAX_MID-1)*LIMAX*LJMAX)      &
-                  +fluxps(KMAX_MID)*dhs1i(KMAX_MID+1))
+            +fluxps(KMAX_MID)*dhs1i(KMAX_MID+1))
 
+    if (Gravsettling) then
+       return
+    else
+       if (USES%GravSettling) then
+
+          grav_ix = Dust_wb_c_ix-NSPEC_SHL !can be set in a loop over species later
+          if (grav_ix<0) return !species not defined
+          !hardcoded for now. Can use PM_t from AeroFunctions.f90 in the future
+          sigma = 2.2!geometric standard deviation of lognormal size distribution
+          diam = 5.0E-6 !diameter in meters
+          PMdens = 2600 !
+
+          !save original vertical wind                  
+          !reset concentration to values before vertical advection(!).
+          do k = 1, KMAX_MID
+             sdot_save(k) = sdot((k-1)*LIMAX*LJMAX)
+             xn_adv(grav_ix,(k-1)*LIMAX*LJMAX) = xn_2d(grav_ix,k)
+             ps3d_1d(k) = ps3d((k-1)*LIMAX*LJMAX)!save values for non-grav                
+             ps3d((k-1)*LIMAX*LJMAX) = ps3d_1d_orig(k)!will not get same for all species after advection!
+          end do
+
+          do k = 1, KMAX_MID - 1
+             !vertical speed in m/s
+             tsK = th(i,j,k,1) * exp(KAPPA*log((A_bnd(k)+B_bnd(k)*ps(i,j,1))*1.e-5))
+             rho = (A_mid(k)-A_mid(k+1)+(B_mid(k)-B_mid(k+1))*ps(i,j,1))/(GRAV*(z_mid(i,j,k)-z_mid(i,j,k+1))) !air density at layer boundary. = dP/dz/g
+             Vsettling = SettlingVelocity(tsK,rho,sigma,diam,PMdens)!in m/s . Vsettling is already negative!
+             !vertical speed in eta/s
+             etadot_grav = Vsettling*(Eta_mid(k)-Eta_mid(k+1))/(z_mid(i,j,k)-z_mid(i,j,k+1))!in "eta/s". Positive (towards surface)
+             !combine the gravitational and the regular vertical wind          
+             sdot((k-1)*LIMAX*LJMAX) = sdot_save(k) + etadot_grav
+          end do
+          
+          !vertical advection recalculated for one species with corrected sdot
+          call advvk(xn_adv(grav_ix,0),ps3d,sdot,dt_s,fluxk(grav_ix,1),i,j,1,GravSettling_in=.true.)
+          
+          !reset vertical wind to original values
+          do k = 1, KMAX_MID 
+             sdot((k-1)*LIMAX*LJMAX) = sdot_save(k)
+             ps3d((k-1)*LIMAX*LJMAX) = ps3d_1d(k) ! same for all species now!
+          end do               
+
+       end if
+    end if
   end subroutine advvk
 
 ! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

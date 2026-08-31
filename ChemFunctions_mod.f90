@@ -45,17 +45,22 @@ module ChemFunctions_mod
  use CheckStop_mod,         only: CheckStop, StopAll
  use ChemSpecs_mod,         only : species, species_adv
  use Config_module,  only : MasterProc, SO4_ix, NH4_f_ix, NO3_f_ix, NO3_c_ix,&
-         OH_ix, O3_ix  ! For ECage, Huang
+                            OH_ix, O3_ix, SSf_ix, SSc_ix   ! For ECage, Huang
  use Config_module,     only : K1  => KCHEMTOP, K2 => KMAX_MID, USES
  use Debug_module,      only : DebugCell, DEBUG
  use Io_Progs_mod,           only : datewrite
  use LocalVariables_mod,     only : Grid   ! => izen, is_mainlysea
+ use NumberConstants, only : UNDEF_R, UNDEF_I
  use PhysicalConstants_mod,  only : AVOG, RGAS_J, DAY_ZEN
  use SmallUtils_mod,     only : find_index
  use ZchemData_mod,     only : itemp, tinv, rh, x=> xn_2d, M, &
      h2o, & ! for HuangOXD
      aero_fom,aero_fss,aero_fdust, aero_fbc,  &
      gamN2O5, cN2O5, temp, DpgNw, S_m2m3 ! for gammas & surface area
+ use chemfields_mod, only : gammaN2O5f,gammaN2O5c &   
+                           ,rateN2O5f ,rateN2O5c, yn2o5      
+  use NumberConstants, only : UNDEF_R
+
   implicit none
   private
 
@@ -72,7 +77,6 @@ module ChemFunctions_mod
   public ::  kmt3      ! For 3-body reactions, from Robert OCt 2009
   public :: Chem2Index_adv, Chem2Index
 
-
 ! weighting factor for N2O5 hydrolysis. OLD SCHEME! NOT USED
 ! Some help factors (VOLFAC)  pre-defined here. 0.068e-6 is
 ! number median radius, assumed for fine aerosol
@@ -83,12 +87,12 @@ module ChemFunctions_mod
   real, parameter, public :: VOLFACNO3 = 62.0/(AVOG) * 1.2648  *0.02/0.068e-6
   real, parameter, public :: VOLFACNH4 = 18.0/(AVOG) * 1.2648  *0.02/0.068e-6
 
+  real, public, dimension(1:4), save :: YN2O5HYD=UNDEF_R
 
   !========================================
   contains
   !========================================
 
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   ! KMT3 uses air concenrtation (M) and inverse Temp (tinv) from Zmet
   !
   function kmt3(a1,c1,a3,c3,a4,c4) result (rckmt3)
@@ -101,7 +105,6 @@ module ChemFunctions_mod
        rckmt3 = k1 + (k3*M)/(1.0+(k3*M)/k4)
   end function kmt3
 
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   elemental function troe(k0,kinf,Fc,M) result (rctroe)
 
   !+ Calculates Troe expression
@@ -142,7 +145,6 @@ module ChemFunctions_mod
      rctroe = k0M / ( 1.0 + y) * exp(x*log(Fc))
 
   end function troe
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   elemental function troeInLog(k0,kinf,LogFc,M) result (rctroe)
 
@@ -184,7 +186,6 @@ module ChemFunctions_mod
 
   end function troeInLog
 
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   elemental function IUPAC_troe(k0,kinf,Fc,M,N) result (rctroe)
 
   !+ Calculates Troe expression
@@ -224,7 +225,6 @@ module ChemFunctions_mod
      rctroe = k0M / ( 1.0 + y) * exp(x*log(Fc))
 
   end function IUPAC_troe
-  !<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 !DEPRECATED
 ! N2O5 -> aerosol based upon  based on Riemer 2003 and
@@ -336,8 +336,7 @@ module ChemFunctions_mod
    character(len=20) :: gtxt         ! for Gamma:xxxx values
    real, parameter :: EPSIL = 1.0  ! One mol/cm3 to stop div by zero
    integer :: k
-   real :: xNO3  ! As the partitioning between fine and coarse is so difficult
-                 ! we include both in the nitrate used here.
+   real :: xNO3, xSO4, fine_rate, coarse_rate, yld
    logical, save :: first_call = .true.
    character(len=*), parameter :: dtxt = 'HydrolN2O5:'
    integer :: SO4, NH4_f, NO3_f, NO3_c
@@ -395,34 +394,50 @@ module ChemFunctions_mod
 
        if ( rh(k)  > 0.4) then ! QUERY???
 
-            xNO3 = x(NO3_f,k) + 0.27 * x(NO3_c,k)  ! fracPM25, crude...
-            f = 96*x(SO4,k)/( 96*x(SO4,k) + 62* xNO3  + EPSIL )
+            xSO4 = x(SO4,k)
+            xNO3 = x(NO3_f,k) !just fine PM
+            f = 96*xSO4/( 96*xSO4 + 62* xNO3  + EPSIL )
 
-            S = S_m2m3(AERO%PM_F,k) !NOW all fine PM
+            S = S_m2m3(AERO%PM_F,k)
             gam = GammaN2O5(temp(k),rh(k),&
                    f,aero_fom(k),aero_fss(k),aero_fdust(k),aero_fbc(k))
 
 
             rate(k) = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
+            fine_rate = rate(k)
+            rateN2O5f(k) = rate(k)
+            gammaN2O5f(k) = gam
 
             !Add coarse model ! was SmixC
-                 S_ss = S_m2m3(AERO%SS_C,k)
-                 gamSS=GammaN2O5_EJSS(rh(k))
-                 S_du = S_m2m3(AERO%DU_C,k)
-                ! gamDU=0.01 ! for dust
-               ! same as UptakeRate(cN2O5,gam,S), but easier to code here:
-                 rate(k) = rate(k) + cN2O5(k)*(gamSS*S_ss+0.01*S_du)/4
-                 ! ToDo update gam for export. Currently at fine-mod only
+            S_ss = S_m2m3(AERO%SS_C,k)
+            gamSS=GammaN2O5_EJSS(rh(k))
+            S_du = S_m2m3(AERO%DU_C,k)
+            ! gamDU=0.01 ! for dust
+            ! same as UptakeRate(cN2O5,gam,S), but easier to code here:
+            coarse_rate = cN2O5(k)*(gamSS*S_ss+0.01*S_du)/4
+            rateN2O5c(k) = cN2O5(k)*(gamSS*S_ss+0.01*S_du)/4
+            rate(k) = rate(k) + coarse_rate
+            gammaN2O5c(k) = gamSS
+            
+            ! ToDo update gam for export. Currently at fine-mod only
             !Coarse end
             if( method == "SmixTen") then
               gam = 0.1 * gam ! cf Brown et al, 2009!
               rate(k) = 0.1 * rate(k)
+              fine_rate = 0.1 * fine_rate
+              coarse_rate = 0.1 * coarse_rate
             end if
        else
             gam = 0.0 ! just for export
             rate(k) = 0.0
+            fine_rate = 0.0
+            coarse_rate = 0.0
        end if
        gamN2O5(k) = gam ! just for export
+
+       ! Calculate HNO3 and ClNO2 Yields
+       call HydrolysisN2O5_Yields( k, fine_rate, coarse_rate, yld )
+       yn2o5(k) = yld
     end do
 
 
@@ -498,16 +513,26 @@ module ChemFunctions_mod
 
           S = S_m2m3(AERO%PM_F,k) !fine SIA +OM + ...
           rate(k) = UptakeRate(cN2O5(k),gam,S)
-      else
+       else
          rate(k) = 0.0
          gam     = 0.0 ! just for export
-      end if
-      gamN2O5(k) = gam ! just for export
+       end if
+       gamN2O5(k) = gam ! just for export
+       gammaN2O5f(k) = gam
+       rateN2O5f(k) = rate(k)
+       gammaN2O5c(k) = 0.0
+       rateN2O5c(k) = 0.0
 
-    end do ! k
+       fine_rate = rateN2O5f(k)
+       coarse_rate = 0.0
 
-     case default
-       call StopAll("Unknown N2O5 hydrolysis"//method )
+       ! Calculate HNO3 and ClNO2 Yields
+       call HydrolysisN2O5_Yields( k, fine_rate, coarse_rate, yld )
+       yn2o5(k) = yld
+     end do ! k
+
+    case default
+      call StopAll("Unknown N2O5 hydrolysis"//method )
 
    end select
    first_call = .false.
@@ -576,16 +601,12 @@ module ChemFunctions_mod
   !---------------------------------------
    case ( "Smix", "SmixTen" )
 
-!if ( DEBUG%RUNCHEM .and. DebugCell ) then
-!  write(*,*) dtxt//trim(method), rh(K2), S_m2m3(AERO%PM_F,K2) , S_m2m3(AERO%DU_C,K2)
-!end if
-
        if ( rh(k)  > 0.4) then ! QUERY???
 
-            xNO3 = x(NO3_f,k) + 0.27 * x(NO3_c,k)  ! fracPM25, crude...
+            xNO3 = x(NO3_f,k) !just fine PM
             f = 96*x(SO4,k)/( 96*x(SO4,k) + 62* xNO3  + EPSIL )
 
-            S = S_m2m3(AERO%PM_F,k) !NOW all fine PM
+            S = S_m2m3(AERO%PM_F,k)
             gam = GammaN2O5(temp(k),rh(k),&
                    f,aero_fom(k),aero_fss(k),aero_fdust(k),aero_fbc(k))
 
@@ -593,13 +614,13 @@ module ChemFunctions_mod
             rate = UptakeRate(cN2O5(k),gam,S) !1=fine SIA ! +OM
 
             !Add coarse model ! was SmixC
-                 S_ss = S_m2m3(AERO%SS_C,k)
-                 gamSS=GammaN2O5_EJSS(rh(k))
-                 S_du = S_m2m3(AERO%DU_C,k)
-                ! gamDU=0.01 ! for dust
-               ! same as UptakeRate(cN2O5,gam,S), but easier to code here:
-                 rate = rate + cN2O5(k)*(gamSS*S_ss+0.01*S_du)/4
-                 ! ToDo update gam for export. Currently at fine-mod only
+             S_ss = S_m2m3(AERO%SS_C,k)
+             gamSS=GammaN2O5_EJSS(rh(k))
+             S_du = S_m2m3(AERO%DU_C,k)
+           ! gamDU=0.01 ! for dust
+           ! same as UptakeRate(cN2O5,gam,S), but easier to code here:
+             rate = rate + cN2O5(k)*(gamSS*S_ss+0.01*S_du)/4
+            ! ToDo update gam for export. Currently at fine-mod only
             !Coarse end
             if( method == "SmixTen") then
               gam = 0.1 * gam ! cf Brown et al, 2009!
@@ -619,8 +640,6 @@ module ChemFunctions_mod
 
          !Unfortunate hard-coding. Will fix in later stages
          if( method == "RiemerSIA" ) then
-            !M24  S = S_m2m3(AERO%SIA_F,k)
-            !M24 Rwet = 0.5*DpgNw(AERO%SIA_F,k)
             call StopAll(dtxt//'Deprecated:'//method)
          else if( method == "RiemerSIAc3" ) then
             !M24 S = S_m2m3(AERO%SIA_F,k)
@@ -838,5 +857,92 @@ module ChemFunctions_mod
     enddo
   end subroutine Chem2Index
 
+!-------------------------------------------------------------------  
+  subroutine HydrolysisN2O5_Yields(k, fine_rate, coarse_rate, yld)
+!
+! Calculate the yield of HNO3, ClNO2, and particulate NO3 from 
+! the hydrolysis of N2O5. The well-known N2O5 hydrolysis on wet 
+! aerosols may be written as:
+!
+!        N2O5 --(PM_H2O)-->  2 HNO3
+!
+! EMEP predicts the rate of this reaction with an uptake coefficient
+! (gamma) that may be calculated with several optional approaches.
+! However, particulate chloride can react with the N2O5 and yield a
+! different product distribution:
+!
+!        N2O5 + Cl-  --->  ClNO2 + NO3-
+!
+! Particulate nitrate ion is formed in this reaction but the ClNO2
+! product efficiently photolyzes and reduces the net nitrate formed 
+! from N2O5 hydrolysis.
+!
+! The branching ratio for these to products may be calculated as:
+!
+!        F_ClNO2 = [Cl-] / ([Cl-] + [H2O]/450)
+!
+! Thornton et al. (2010), Nature, "A large atomic chlorine source 
+! inferred from mid-continental reactive nitrogen chemistry."
+!
+! The array YN2O5HYD is of length 4 and specifies the yield of 
+! each product from the N2O5 hydrolysis:
+!    YN2O5HYD(1) =: Y_HNO3 (include the factor of 2 here)
+!    YN2O5HYD(2) =: Y_ClNO2 
+!    YN2O5HYD(3) =: Y_NO3_f (Fine-mode nitrate)
+!    YN2O5HYD(4) =: Y_NO3_c (coarse-mode nitrate) 
+!-------------------------------------------------------------------
+  
+  use ZchemData_mod, only : x => xn_2d, xh2o_f, xh2o_c
+
+  implicit none
+
+  real, intent(in)    :: fine_rate, coarse_rate ! Hydrolysis Rates [s-1]
+  integer, intent(in) :: k ! model layer
+  real                :: yld
+  real, parameter :: Ncm3_to_molesm3 = 1.0e6 / AVOG    ! #/cm3 to moles/m3
+  real, parameter :: MWCL   = 35.453
+  real :: xCl, xH2O, F_ClNO2_f, F_ClNO2_c, f_fine
+
+  call CheckStop( SSf_ix<1, "CL_f not defined" )
+  call CheckStop( SSc_ix<1, "CL_c not defined" )
+
+  ! Fine-Mode ClNO2 Yield
+  xCl = x( SSf_ix,k ) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.55 / MWCL
+  xH2O = xh2o_f(k) / 1.0e6 / 18.0153 ! ug/m3 -> mol/m3
+  if ( xCl + xH2O > 1e-15 ) then
+    F_ClNO2_f = xCl / ( xCl + xH2O/450. )
+  else
+    F_ClNO2_f = 0.0
+  end if
+
+  ! Coarse-Mode ClNO2 Yield
+  xCl = x( SSc_ix,k ) * Ncm3_to_molesm3 * species(SSf_ix)%molwt * 0.55 / MWCL
+  xH2O = xh2o_c(k) / 1.0e6 / 18.0153 ! ug/m3 -> mol/m3
+  if ( xCl + xH2O > 1e-15 ) then
+    F_ClNO2_c = xCl / ( xCl + xH2O/450. )
+  else
+    F_ClNO2_c = 0.0
+  end if
+  
+  if ( fine_rate + coarse_rate > 0.0 ) then
+    ! Fraction of Rate in Fine Mode
+    f_fine = fine_rate / (fine_rate + coarse_rate)
+
+    ! Calculate total yield of ClNO2
+    YN2O5HYD(2) = f_fine * F_ClNO2_f + (1.-f_fine) * F_ClNO2_c
+
+    ! Calculate total yield of Fine and Coarse Nitrate
+    YN2O5HYD(3) = f_fine * F_ClNO2_f 
+    YN2O5HYD(4) = (1.-f_fine) * F_ClNO2_c
+
+    ! Calculate total yield of HNO3
+    YN2O5HYD(1) = 2.0 * ( f_fine * (1.-F_ClNO2_f) + (1.-f_fine) * (1.-F_ClNO2_c) )
+  else
+    YN2O5HYD(:) = 0.0
+  end if
+
+  yld = YN2O5HYD(1)
+
+  end subroutine HydrolysisN2O5_Yields    
 
 end module ChemFunctions_mod

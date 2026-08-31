@@ -34,7 +34,7 @@ module LandPFT_mod
 
 use CheckStop_mod,   only: CheckStop, StopAll
 !HICKS use Config_module,   only: MasterProc, PFT_MAPPINGS,GLOBAL_LAInBVOCFile
-use Config_module,   only: MasterProc, GLOBAL_LAInBVOCFile
+use Config_module,   only: MasterProc, GLOBAL_LAInBVOCFile, USES
 use Config_module,   only: LandCoverInputs ! for LAIsrc    = 'LPJ-EMEP' or 'ECOSG-ENORM' or ECOSG-ELAI
 use Debug_module,    only:  DEBUG   ! -> DEBUG%PFT_MAPS
 use GridValues_mod,  only: debug_proc, debug_li, debug_lj, glon, glat
@@ -59,10 +59,11 @@ private
  ! PFTs available from smoothed LPJ fields
 
   integer, public, save :: N_PFTS 
-  character(len=15),public, save, dimension(10) :: PFT_CODES 
+  character(len=15),public, save, dimension(10) :: LAIMAP_CODES 
+  character(len=20), private, save ::  lai_src
 
   !integer, public, parameter :: N_PFTS = 6
-  !character(len=5),public, parameter, dimension(N_PFTS) :: PFT_CODES = &
+  !character(len=5),public, parameter, dimension(N_PFTS) :: LAIMAP_CODES = &
   !      (/ "CF   ", "DF   ", "NF   ", "BF   ", "C3PFT", "C4PFT" /)
 
    ! Variables available:
@@ -80,26 +81,29 @@ contains
  subroutine MapPFT_Init()
 
     logical :: dbgProc
-    character(len=20) :: varname, lai_src
+    character(len=20) :: varname
 
     dbgProc = ( DEBUG%PFT_MAPS > 0 .and. MasterProc )
     lai_src = LandCoverInputs%LAIsrc
 
-    if ( lai_src == 'LPJ-EMEP' ) then
+    ! LPJ-EMEP uses LPJ to normalise EMEP LC values
+    ! LPJ-raw uses LPJ LAI values directly
+    if ( lai_src(1:4) == 'LPJ-' ) then  ! LPJ-EMEP or LPJ-raw or 
       n_pfts = 6
-      PFT_CODES(1:n_pfts) = &
+      LAIMAP_CODES(1:n_pfts) = &
          [ "CF   ", "DF   ", "NF   ", "BF   ", "C3PFT", "C4PFT" ]
 
     else if ( lai_src(1:7) == 'ECOSG-E' ) then! either ECOSG-ENORM or ECOSG-ELAI
       n_pfts = 6
-      !note: gfortran requires that all elements in PFT_CODES have the same number 
+      !note: gfortran requires that all elements in LAIMAP_CODES have the same number 
       !      of characters
-      PFT_CODES(1:n_pfts) = &
+      LAIMAP_CODES(1:n_pfts) = &
          [ "BrDeTr  ", "NeDeTr  ", "Crops_C3", "Crops_C4", "Crops   ", "LowVeg  " ]
     else
       call StopAll('LAIsrc not set!'  // lai_src )
     end if
-    if (dbgProc) write(*,*) 'MapPFT_Init PFTs:',PFT_CODES(1:n_pfts)
+    if (dbgProc) write(*,"(a,6a6)") 'MapPFT_Init PFTs:'//trim(lai_src),LAIMAP_CODES(1:n_pfts)
+    if (dbgProc) write(*,"(a,L2)")  'MapPFT_Init MAP?:', USES%PFT_MAPS
 
  end subroutine MapPFT_Init
 
@@ -121,7 +125,7 @@ contains
     logical :: update_needed, dbgProc
     integer :: pft, month, day, iday10
     integer, save :: nrecord = 0, old_nrecord=-99
-    character(len=20) :: varname, lai_src
+    character(len=20) :: varname
     character(len=*), parameter :: dtxt='MapPFT_LAI:'
 
 !     if ( my_first_call ) then
@@ -132,12 +136,12 @@ contains
 !     end if
 
     dbgProc = ( DEBUG%PFT_MAPS > 0 .and. MasterProc )
-    lai_src = LandCoverInputs%LAIsrc
 
     update_needed = .false.
-    if ( lai_src == 'LPJ-EMEP' ) then
+    if ( LandCoverInputs%LAIsrc(1:4)  == 'LPJ-' ) then
 
       nrecord = current_date%month
+      if(dbgProc) write(*,"(a,i5,L2)") 'inpft4 '//print_date(), nrecord
 
     else if ( lai_src(1:7) == 'ECOSG-E' ) then
      ! have new data on 5, 15 and 25th of each month, so 3 per month
@@ -149,6 +153,7 @@ contains
     else
       call StopAll('LAIsrc not set!'  // lai_src )
     end if
+    if(dbgProc) write(*,"(a,i5,L2)") 'inpftB '//trim(lai_src)//print_date(), nrecord
 
     if ( my_first_call ) then
        allocate ( pft_lai(LIMAX,LJMAX,n_pfts) )
@@ -159,31 +164,35 @@ contains
       update_needed = .true.
       old_nrecord = nrecord
     end if 
-    if(dbgProc) write(*,"(a,i5,L2)") 'inpftB '//print_date(), nrecord, update_needed
+    if(dbgProc) write(*,"(a,i5,L2)") 'inpftC '//print_date(), nrecord, update_needed
 
     ! Get LAI data:
 
      if ( .not. update_needed ) then
-       if( dbgProc ) write(*,*) trim(dtxt//lai_src), print_date()
+       if( dbgProc ) write(*,*) trim(dtxt//lai_src)//' skips:', print_date()
        return
      end if
 
      do pft =1, N_PFTS
-           varname = trims( "Normed_" // LAI_VAR // PFT_CODES(pft) )
 
-           if ( dbgProc ) write(*,"(a,3i5,L2)") 'pftGET'// trim(varname), &
+           varname = trims( "Normed_" // LAI_VAR // LAIMAP_CODES(pft) )
+
+           if ( LandCoverInputs%LAIsrc  == 'LPJ-raw' ) &
+             varname = trims( LAI_VAR // "_" // LAIMAP_CODES(pft) )
+
+           if ( dbgProc ) write(*,"(a,3i5,L2)") 'pftGET:'// trim(varname), &
                     me, nrecord, DEBUG%PFT_MAPS, debug_proc
            if (nrecord > 36 .or. nrecord < 1 ) then
-               print "(a,i5,L2)", dtxt//'XXinpftB '//print_date(), nrecord, update_needed, month, day
+               print "(a,i5,L2)", dtxt//'XXinpftERR '//print_date()//trim(varname), nrecord, update_needed, month, day
                call StopAll('NREC')
            end if
            call ReadField_CDF(GLOBAL_LAInBVOCFile,varname,&
-              lpj,nrecord,interpol='zero_order',needed=.true.,debug_flag=.true.)
+              lpj,nrecord,interpol='zero_order',needed=.true.,debug_flag=dbgProc)
 
            pft_lai(:,:,pft ) = lpj(:,:)
            if( dbgProc ) then 
-             write(*,"(a20,i3,3f8.3)") dtxt//"PFT_DEBUG "//print_date()//&
-                 trim(varname), pft, maxval(lpj)
+             write(*,"(a,i3,f8.3,a)") dtxt//"PFT_DEBUG "//print_date(),&
+                 pft, maxval(lpj), trim(varname)
                  !glon(debug_li, debug_lj), glat(debug_li, debug_lj), &
                  !lpj(debug_li, debug_lj)
            end if
@@ -228,7 +237,7 @@ return ! JAN31TEST
 
      do pft =1, N_PFTS
        do ivar =1, nbvoc ! size( BVOC_USED )
-           varname = trim(BVOC_VAR(ivar)) // trim(PFT_CODES(pft))
+           varname = trim(BVOC_VAR(ivar)) // trim(LAIMAP_CODES(pft))
 
            call ReadField_CDF(GLOBAL_LAInBVOCFile,varname,&
               lpj,month,interpol='zero_order',needed=.true.,debug_flag=.false.)

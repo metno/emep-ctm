@@ -550,7 +550,6 @@ subroutine tabulate_aqueous()
 end subroutine tabulate_aqueous
 !-----------------------------------------------------------------------
 
-
 subroutine setup_aqurates(b ,cloudwater,incloud,pres)
 !-----------------------------------------------------------------------
 ! DESCRIPTION
@@ -581,9 +580,7 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
     fso3        ! only so2.h2o part (not so2aq and hso3-)
 
 ! PH
-  real, dimension(KUPPER:KMAX_MID) :: &
-    phfactor, &
-    h_plus
+  real, dimension(KUPPER:KMAX_MID) :: h_plus
 
   real, parameter :: CO2conc_ppm = 392 !mix ratio for CO2 in ppm
   real :: CO2conc !Co2 in mol/l
@@ -593,7 +590,8 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
   real, parameter :: Hplus55=3.162277660168379e-06! 10.0**-5.5
   integer k, iter, lf_niter, lf_iter
   integer :: SO2, SO4, NO3_f, NH4_f, NH3, HNO3
-  real :: pH1,pH2,pHnew,pHout1,pHout2,pHoutnew,h_plusnew
+  real :: pH1,pH2,pHnew,pHout1,pHout2,pHoutnew,h_plusnew,phfactor
+  real :: h_plusnew1,h_plusnew2,phfactor1,phfactor2,sumion
   
   integer, parameter:: N_ITER=45 !each iteration divides the error in two
   real, parameter :: phThres1 = 1.0E-6 !still acceptable
@@ -640,7 +638,7 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
         cycle ! Vf > 1.0e-10)
      end if
      lf_niter = 1
-     if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) lf_niter = 5
+     if(USES%LocalFractions .and. k>=KMAX_MID-lf_Nvert+1 .and. lf_fullchem) lf_niter = 13
      do lf_iter=1, lf_niter !only used for LocalFractions, otherwise just one "iteration"
      call lf_aqu_pre(k,lf_iter) !only used for LocalFractions
      
@@ -718,17 +716,24 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
        hso3_aq(k)= so2_aq(k) * K1(itemp(k))/h_plusnew
        so32_aq(k)= hso3_aq(k) * K2(itemp(k))/h_plusnew
        
-       phfactor(k)=hco3_aq(k)+2.*so4_aq(k)+hso3_aq(k)+2.*so32_aq(k)+no3_aq(k)-nh4_aq(k)-nh3_aq(k)
-       h_plusnew=0.5*(phfactor(k) + sqrt(phfactor(k)*phfactor(k)+4.*1.e-14) )
-       h_plusnew=min(1.e-1,max(h_plusnew,1.e-7))! between 1 and 7
+       phfactor=hco3_aq(k)+2.*so4_aq(k)+hso3_aq(k)+2.*so32_aq(k)+no3_aq(k)-nh4_aq(k)-nh3_aq(k)
+       if (USES%SMOOTH_pH) then
+          !assume concentrations are in two regions: one with 10% extra , one with 10% less
+          sumion = hco3_aq(k)+2.*so4_aq(k)+hso3_aq(k)+2.*so32_aq(k)+no3_aq(k)+nh4_aq(k)+nh3_aq(k)
+          phfactor1= phfactor + 0.1 * sumion
+          phfactor2= phfactor - 0.1 * sumion
+          !we do a harmonic average
+          h_plusnew1=0.5*(phfactor1 + sqrt(phfactor1*phfactor1+4.*1.e-14) )
+          h_plusnew2=0.5*(phfactor2 + sqrt(phfactor2*phfactor2+4.*1.e-14) )
+          h_plusnew=2.0/(1.0/h_plusnew1+1.0/h_plusnew2)
+       else
+          !not smooth: (extremely large gradient at phfactor=0 <-> pH=7)
+          h_plusnew=0.5*(phfactor + sqrt(phfactor*phfactor+4.*1.e-14) )
+       end if
+       h_plusnew=min(1.e-1,max(h_plusnew,1.e-7))! pH between 1 and 7
        pHoutnew=-log(h_plusnew)/log(10.)
 
-       !commented out: fixed number of iterations
-       !       if(abs(pHnew-pHoutnew)< phThres)then       
-       !we have converged enough
-       !exit
-       !       end if       
- 
+       
        if (iter==1) then
           pHout1=pHoutnew
        else if (iter==2) then
@@ -739,7 +744,7 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
              !check that we are close to the solution
              if(abs(pHnew-pHoutnew)>pHThres1)then
                 write(*,*)'Warning: pH did not converge properly ',pH1,pHout1,pH2,pHout2,pHnew,pHoutnew
-                write(*,*)'input values: k, T, phfactor, clw ',k,itemp(k),phfactor(k),cloudwater(k)
+                write(*,*)'input values: k, T, phfactor, clw ',k,itemp(k),phfactor,cloudwater(k)
              end if
           end if
           if(abs(pHout2-pHout1)<phThres2)then
@@ -839,7 +844,7 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
                        * H_plus(k) / cloudwater(k)                   !  only HSO3-
                                                                       ! skip 1/(1+Hplus*K), see S&P 2016
                                                                       ! as only significant pH < 2
-!!  Incloud oxidation of Siv to Svi by O3
+     !!  Incloud oxidation of Siv to Svi by O3
     aqrck(ICLRC2,k)   = ( aqrcC_O3 * fso2aq(k)    &  ! with SO2aq
                       +   aqrcT(S2_O3,itemp(k)) * fhso3(k)     &  ! with HSO3-
                       +   aqrcT(S3_O3,itemp(k)) * fso3(k) )    &  ! with SO3--
@@ -854,7 +859,7 @@ subroutine setup_aqurates(b ,cloudwater,incloud,pres)
 !  Incloud oxidation of Siv to Svi by O2 
     aqrck(ICLRC3,k)   = 3.3e-10 *  fso2grid(k)/ cloudwater(k) * MASSTRLIM
 
-    call lf_aqu_pos(k,lf_iter, aqrck)
+    call lf_aqu_pos(k,lf_iter, aqrck, pH(k))
     end do
     
 !!!!!! (so2aq + hso3-) + o2 ( + Fe ) --> so4, see documentation below

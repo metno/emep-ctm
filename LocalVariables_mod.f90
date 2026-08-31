@@ -90,6 +90,7 @@ integer, public, save :: iL = INOT_SET              ! Landuse index
   real    :: u_ref        ! wind speed at ref. height
   real    :: Ra_2m        !
   real    :: Ra_3m        !
+  real    :: z0           !
   real    :: dTleafRn     !TESTING Tleaf for IAM_DF
   real    :: dTleaf       !TESTING Tleaf - Tair 
   real    :: Dair         !TESTING Tleaf

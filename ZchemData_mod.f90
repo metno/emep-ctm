@@ -83,15 +83,19 @@
       ,h2o                 & ! water
       ,methane             & ! ch4
       ,hydrogen            & ! hydrogen gas
-      ,temp                & ! temperature
-      ,tinv                & ! inverse temp
+      ,temp                & ! temperature (K)
+      ,tinv                & ! inverse temp (1/K)
+      ,pp                  & ! pressure (Pa)
+      ,area                & ! grid-cell area (m2)
       ,cN2O5               & ! mol speed, N2O5
       ,cHNO3               & ! mol speed, HNO3 
       ,cHO2                & ! mol speed, HO2  
       ,cNO2                & ! mol speed, NO2    ! kHet tests
       ,cNO3                & ! mol speed, NO2    ! kHet tests
       ,cO3                 & ! mol speed, O3   
-      ,gamN2O5               ! jAero gamma values for output
+      ,gamN2O5             & ! jAero gamma values for output
+      ,xh2o_f              & ! Particle-phase water in fine mode
+      ,xh2o_c                ! Particle-phase water in coarse mode
 
    real, public, allocatable, dimension(:,:), save :: &
        DpgNw  & ! wet diameter,           dim:NSAREA,k
@@ -99,12 +103,11 @@
 
    real, public, allocatable, dimension(:), save :: &
        deltaZcm             & ! layer thickness, cm
-      ,aero_fom, aero_fss, aero_fdust, aero_fbc &! fractions
-      ,pp                     !pressure
+      ,aero_fom, aero_fss, aero_fdust, aero_fbc !&! fractions
+      ! ,pp                     !pressure
 !         ,ugdryPM             & ! for wet radius from Gerber, etc.
 
    integer, public, allocatable, dimension(:), save :: &
        itemp                  ! int of temperature
 
- 
  end module ZchemData_mod

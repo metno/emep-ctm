@@ -241,7 +241,8 @@ real, public, allocatable, dimension(:,:,:,:), save :: &
 real, public, allocatable, dimension(:,:,:), save :: EmisOut!per emitted species
 real, public, allocatable, dimension(:,:,:), save :: SplitEmisOut!per splitted species
 real, public, allocatable, dimension(:,:,:,:), save :: SecEmisOut !per sector and species
-
+real, public, allocatable, dimension(:,:,:), save :: SpecSecEmisOut!per sector and splitted species
+integer, public, allocatable, dimension(:), save :: itot2SpecSecOut
 character(len=TXTLEN_NAME), public, save :: mask2name(1000) = 'NOTSET' !name of mask id number
 
 !Ocean variables

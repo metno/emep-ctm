@@ -137,8 +137,8 @@ end type defBIC_t
 ! Define concs where a simple  specification based on lat/mm
 ! etc. will be given
 type(defBIC_t), parameter, dimension(21) :: defBIC = [&
-    !                           surf   dmax   amp   hz    vmin  hmin conv_fac!ref
-    !                            ppb          ppb   km   hmin,vmin:same units as input data=conv_fac
+    !                  surf   dmax   amp   hz    vmin  hmin conv_fac!ref
+    !                   ppb          ppb   km   hmin,vmin:same units as input data=conv_fac
    defBIC_t('SO2  '  ,  0.15 , 15.0, 0.05, 999.9, 0.03, 0.03,PPB)&!W99, bcKz vmin
   ,defBIC_t('SO4  '  ,  0.15 ,180.0, 0.00, 999.9, 0.05, 0.03,PPB)&!W99
   ,defBIC_t('NO   '  ,  0.1  , 15.0, 0.03, 4.0  , 0.03, 0.02,PPB)&
@@ -1071,7 +1071,7 @@ real :: trend_o3=1.0, trend_co, trend_voc
   !---------------------------------------------------------------------------
   ! Mace Head ozone concentrations for backgroudn sectors
   ! from Fig 5.,  Derwent et al., 1998, AE Vol. 32, No. 2, pp 145-157
-  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2024
+  integer, parameter :: MH_YEAR1 = 1990, MH_YEAR2 = 2025
   real, dimension(12,MH_YEAR1:MH_YEAR2), parameter :: macehead_year=reshape(&
    [35.3,36.3,38.4,43.0,41.2,33.4,35.1,27.8,33.7,36.2,28.4,37.7,& !1990
     36.1,38.7,37.7,45.8,38.8,36.3,29.6,33.1,33.4,35.7,37.3,36.7,& !1991
@@ -1119,7 +1119,8 @@ real :: trend_o3=1.0, trend_co, trend_voc
     37.2,42.1,42.4,45.2,42.0,30.4,25.7,31.2,36.0,37.1,40.6,40.6,& !2021
     41.3,44.1,42.9,43.7,41.9,34.6,26.0,30.9,37.1,37.1,40.0,41.9,& !2022
     40.7,42.4,44.2,44.3,39.6,34.3,30.4,33.0,34.8,36.0,39.4,40.6,& !2023
-    40.4,42.9,44.5,43.5,42.8,34.4,29.2,33.9,35.2,36.5,33.2,41.3]& !2024
+    40.4,42.9,44.5,43.5,42.8,34.4,29.2,33.9,35.2,36.5,33.2,41.3,& !2024
+    39.8,44.3,42.1,44.0,40.4,36.3,29.6,31.4,32.9,37.5,38.8,41.7]& !2025
     ,[12,MH_YEAR2-MH_YEAR1+1])
   real, dimension(12), parameter :: macehead_default=&
   ! Defaults from 1998-2010 average

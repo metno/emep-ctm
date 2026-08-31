@@ -58,9 +58,11 @@ use Chemfields_mod,    only: xn_adv, xn_shl, cfac,xn_bgn, AOD,  &
                             SurfArea_um2cm3, &
                             Fgas3d, & ! FSOA
                             Extin_coeff, PM25_water, PM25_water_rh50 &
-                          , PMco_water_rh50   !JUN21AERO
+                          , PMco_water_rh50, PM25_water_noSS, PM25_water_noOrg, PM25_water_floss &  !JUN21AERO
+                          , cf_gammaN2O5f, cf_gammaN2O5c, cf_rateN2O5f, cf_rateN2O5c, yieldN2O5 &
+                          , no3_floss, nh4_floss
 use Chemfields_mod ,   only: so2nh3_24hr,Grid_snow, Dobson, pH
-use ChemDims_mod,      only: NSPEC_ADV, NSPEC_SHL,NEMIS_File
+use ChemDims_mod,      only: NSPEC_ADV, NSPEC_SHL,NSPEC_TOT,NEMIS_File
 use ChemGroups_mod          ! SIA_GROUP, PMCO_GROUP -- use tot indices
 use ChemSpecs_mod           ! IXADV_ indices etc
 use Config_module,     only: &
@@ -83,10 +85,11 @@ use Config_module,     only: &
 use Debug_module,      only: DEBUG   ! -> DEBUG%DERIVED and COLSRC
 use DerivedFields_mod, only: MAXDEF_DERIV2D, MAXDEF_DERIV3D, &
                             def_2d, def_3d, f_2d, f_3d, d_2d, d_3d, VGtest_out_ix
-use EcoSystem_mod,     only: DepEcoSystem, NDEF_ECOSYSTEMS, &
+use EcoSystem_mod,     only: DepEcoSystem, nEcoSysOutputs, &
                             EcoSystemFrac,FULL_ECOGRID
 use EmisDef_mod,       only: NSECTORS, EMIS_FILE, O_DMS, O_NH3&
                             ,SecEmisOut, EmisOut, SplitEmisOut, &
+                            SpecSecEmisOut, itot2SpecSecOut,&
                             isec2SecOutWanted,SECTORS, Emis_CO_Profile
 use EmisGet_mod,       only: nrcemis,iqrc2itot
 use Functions_mod,      only: Tpot_2_T    ! Conversion function
@@ -98,7 +101,7 @@ use MetFields_mod,     only: roa,Kz_m2s,th,zen, ustar_nwp, u_ref, hmix,&
                             met, derivmet,  q, &
                             ws_10m, rh2m, z_bnd, z_mid, u_mid,v_mid,ps, t2_nwp, &
                             cc3dmax, & ! SEI
-                            dTleafHd, dTleafRn, & ! TLEAF
+                            dTleaf, Tleaf, & ! TLEAF
                             SoilWater_deep, SoilWater_uppr ,invL_nwp, PARdbh, PARdif, fCloud
 use Radiation_mod,     only: Wm2_uE
 use MosaicOutputs_mod,     only: nMosaic, MosaicOutput
@@ -189,15 +192,17 @@ character(len=100), private :: errmsg
 character(len=*), private, parameter :: HORIZ_LINE =repeat('=',78) !f2003://new_line('a') 
 
 ! NB global use of these common variables is dangerous!
-integer, private :: i,j,k,l,n, iou, isec   ! Local loop variables
+integer, private :: i,j,k,l,n, iou, isec, itot   ! Local loop variables
 
 ! Avoid hard codded IXADV_SPCS
  integer, private, save :: iadv_O3=-999, &
   iadv_OM25p=-999, igrp_OM25=-999, iadv_PMf=-999,     &
-  iadv_NO3_C=-999,iadv_EC_C_WOOD=-999,iadv_EC_C_FFUEL=-999,iadv_POM_C_FFUEL=-999
+  iadv_NO3_C=-999,iadv_EC_C_WOOD=-999,iadv_EC_C_FFUEL=-999,iadv_POM_C_FFUEL=-999, &
+  iadv_NO3_F=-999,iadv_NH4_F
 
 real, private, save ::                      & ! Avoid hard codded molwt
-  ug_NO3_C=-999.0,ug_EC_C_WOOD=-999.0,ug_EC_C_FFUEL=-999.0,ug_POM_C_FFUEL=-999.0
+  ug_NO3_C=-999.0,ug_EC_C_WOOD=-999.0,ug_EC_C_FFUEL=-999.0,ug_POM_C_FFUEL=-999.0, &
+  ug_NH4=-999.0
 
 contains
 
@@ -248,6 +253,8 @@ subroutine Init_Derived()
   ! Avoid hard codded IXADV_SPCS
   iadv_O3         =find_index('O3'         ,species_adv(:)%name, any_case=.true. )
   iadv_NO3_C      =find_index('NO3_c'      ,species_adv(:)%name, any_case=.true. )
+  iadv_NO3_F      =find_index('NO3_f'      ,species_adv(:)%name, any_case=.true. )
+  iadv_NH4_F      =find_index('NH4_f'      ,species_adv(:)%name, any_case=.true. )
   iadv_EC_C_WOOD  =find_index('EC_C_WOOD'  ,species_adv(:)%name, any_case=.true. )
   iadv_EC_C_FFUEL =find_index('EC_C_FFUEL' ,species_adv(:)%name, any_case=.true. )
   iadv_POM_C_FFUEL=find_index('POM_C_FFUEL',species_adv(:)%name, any_case=.true. )
@@ -261,9 +268,11 @@ subroutine Init_Derived()
   ! units scaling
   ! e.g. ug_NO3_C = 1.0+e9 * MW(NO3)/MW(air)
   if(iadv_NO3_C      >0)call Units_Scale('ug',iadv_NO3_C      ,ug_NO3_C      )
+  if(iadv_NH4_F      >0)call Units_Scale('ug',iadv_NH4_F      ,ug_NH4      )
   if(iadv_EC_C_WOOD  >0)call Units_Scale('ug',iadv_EC_C_WOOD  ,ug_EC_C_WOOD  )
   if(iadv_EC_C_FFUEL >0)call Units_Scale('ug',iadv_EC_C_FFUEL ,ug_EC_C_FFUEL )
   if(iadv_POM_C_FFUEL>0)call Units_Scale('ug',iadv_POM_C_FFUEL,ug_POM_C_FFUEL)
+  call Units_Scale('ug',iadv_NH4_F      ,ug_NH4      )
 
   call Define_Derived()
 
@@ -271,6 +280,7 @@ subroutine Init_Derived()
   !associate ( D=> DDdefs(iddefPMc) ) !does not work with gfortran
   fracPM25 = LogNormFracBelow(DDdefs(iddefPMc)%umDpgV, &
        DDdefs(iddefPMc)%sigma, 2.5, 0.001*DDdefs(iddefPMc)%rho_p)
+  !fracPM25 = 0.0
   if(MasterProc) write(*,"(a,4(1x,a,f7.3))") dtxt//"fracPM25 ",&
      "umDpgV", DDdefs(iddefPMc)%umDpgV, &
      "sig", DDdefs(iddefPMc)%sigma, &
@@ -364,7 +374,7 @@ subroutine Define_Derived()
   character(len=*), parameter:: dtxt="DefDerived:"
   character(len=TXTLEN_IND)  :: outind
 
-  integer :: ind, iadv, ishl, idebug, n, igrp, iout, isec_poll
+  integer :: ind, iadv, ishl, idebug, n, igrp, iout, isec_poll, nout, itot
 
   if(dbg0) write(6,*) " START DEFINE DERIVED "
   !   same mol.wt assumed for PPM25 and PPMCOARSE
@@ -413,11 +423,11 @@ if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
 !END BIDIR
 
 
-  if ( USES%TLEAF_FROM_HD )  &
-    call AddNewDeriv( "dTleafHd","dTleafHd",  "-","-",   "deg. C", &
+!  if ( USES%TLEAF_IBM )  &
+    call AddNewDeriv( "dTleaf","dTleaf",  "-","-",   "deg. C", &
                -99,  -99, F, 1.0,  T,  'YMDH' )
-  if ( USES%TLEAF_FROM_RN ) & 
-    call AddNewDeriv( "dTleafRn","dTleafRn",  "-","-",   "deg. C", &
+!  if ( USES%TLEAF_IBM ) & 
+    call AddNewDeriv( "Tleaf","Tleaf",  "-","-",   "deg. K", &
                -99,  -99, F, 1.0,  T,  'YMDH' )
 
 !CRUDE for SEI Feb 2021:
@@ -450,7 +460,10 @@ if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
         unittxt="m"
         Is3D=.true.
       case('SIA25','PM25','PM25X','PM25_rh50','PM25X_rh50','PM10_rh50',&
-           'PM25water','PMco_water','PM25_wet','PM10_wet','PM_coarse')
+           'PM25water','PMco_water','PM25_wet','PM10_wet','PM_coarse',&
+           'gammaN2O5f','gammaN2O5c','rateN2O5f','rateN2O5c','PM25water_noSS',&
+           'PM25water_noOrg','yieldN2O5','PM25_rh50_floss','PM10_rh50_floss',&
+           'NO3_F_FLOSS','NH4_F_FLOSS','NO3_FLOSS','NH4_FLOSS')
         iadv = -1 ! Units_Scale(iadv=-1) returns 1.0
                   ! group_calc gets the unit conversion factor from Group_Units
         call Units_Scale(outunit,iadv,unitscale,unittxt)
@@ -662,28 +675,47 @@ if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
   end do ! OutputFields
   if(MasterProc)write(*,"(a,/,4a)") HORIZ_LINE, dtxt//": End OutputFields"
 
-!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  nout = 0
+  allocate(itot2SpecSecOut(NSPEC_TOT*(NSECTORS+1)))
+  itot2SpecSecOut = -1
   do n = 1, nOutputMisc
     Is3D=(OutputMisc(n)%class=="MET3D").or.(OutputMisc(n)%name(1:2)=='D3')&
          .or.(OutputMisc(n)%subclass(1:2)=='D3')
     if(MasterProc) write(*,"(3(A,1X),L1)") &
       dtxt//'ADDMISC',trim(OutputMisc(n)%name),'Is3D',Is3D
     call AddDeriv(OutputMisc(n),Is3D=Is3D)
-  end do
 
-!-------------------------------------------------------------------------------
+    if (OutputMisc(n)%class=="SpecSecEmis") then
+       itot = find_index(OutputMisc(n)%subclass, species(:)%name, any_case=.true.)
+       if(itot<=0)then
+          if(me==0)write(*,*)'OutputMisc: did not find any species with name '//trim(OutputMisc(n)%subclass)
+          cycle  
+       end if
+       nout = nout + 1
+       isec = OutputMisc(n)%index
+       itot2SpecSecOut(itot*NSECTORS+isec) = nout
+       call AddDeriv(OutputMisc(n))
+    end if
+  end do
+  if(nout>0)then
+     allocate(SpecSecEmisOut(LIMAX,LJMAX,nout))
+  else
+     allocate(SpecSecEmisOut(1,1,1))
+  end if
+  SpecSecEmisOut = 0.0
+
+     !-------------------------------------------------------------------------------
   do n = 1, nMosaic
     if ( dbg0 ) write(*,*) dtxt//"DEBUG MOSAIC AddDeriv ", n, MosaicOutput(n)
     call AddDeriv( MosaicOutput(n) )
   end do
 !-------------------------------------------------------------------------------
 ! Areas of deposition-related ecosystems. Set externally
-  do n = 1, NDEF_ECOSYSTEMS
+  do n = 1, nEcoSysOutputs
      if(dbg0) write(*,*) dtxt//"ECODEF ",n, trim( DepEcoSystem(n)%name )
      call AddDeriv( DepEcoSystem(n) )
   end do
 !!-------------------------------------------------------------------------------
-!<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   do ind = 1, size(WDEP_WANTED(1:nOutputWdep)%txt1)
     dname = "WDEP_"//trim(WDEP_WANTED(ind)%txt1)
@@ -818,9 +850,52 @@ if( dbgP ) write(*,*) 'DBGUREF', u_ref(debug_li,debug_lj)
   call AddNewDeriv("SURF_PM25water", "PM25water", "-", "-","ug/m3", &
                        -99 , -99, F, 1.0,   T,  'YMD' )
 
-  if(AERO%JUN21AERO .and. &
-     find_index("SURF_PMco_water",def_2d(:)%name,any_case=.true.)<1)&
+  if(find_index("SURF_PMco_water",def_2d(:)%name,any_case=.true.)<1)&
   call AddNewDeriv("SURF_PMco_water", "PMco_water", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+  
+  if(find_index("SURF_PM25water_noSS",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_PM25water_noSS", "PM25water_noSS", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+  
+  if(find_index("SURF_PM25water_noOrg",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_PM25water_noOrg", "PM25water_noOrg", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+  
+  if(find_index("SURF_yieldN2O5",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_yieldN2O5", "yieldN2O5", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_gammaN2O5f",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_gammaN2O5f", "gammaN2O5f", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_gammaN2O5c",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_gammaN2O5c", "gammaN2O5c", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_rateN2O5f",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_rateN2O5f", "rateN2O5f", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_rateN2O5c",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_rateN2O5c", "rateN2O5c", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_NO3_FLOSS",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_NO3_FLOSS", "NO3_FLOSS", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_NH4_FLOSS",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_NH4_FLOSS", "NH4_FLOSS", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_NO3_F_FLOSS",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_NO3_F_FLOSS", "NO3_F_FLOSS", "-", "-","ug/m3", &
+                       -99 , -99, F, 1.0,   T,  'YMD' )
+
+  if(find_index("SURF_NH4_F_FLOSS",def_2d(:)%name,any_case=.true.)<1)&
+  call AddNewDeriv("SURF_NH4_F_FLOSS", "NH4_F_FLOSS", "-", "-","ug/m3", &
                        -99 , -99, F, 1.0,   T,  'YMD' )
 
 ! As for GRIDAOT, we can use index for the threshold
@@ -1033,7 +1108,15 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
     ind2d_pmfine=-999 ,ind3d_pmfine=-999,   &
     ind2d_pmwater=-999,ind3d_pmwater=-999,  &
     ind2d_pm10=-999   ,ind3d_pm10=-999,     &
-    ind2d_pm25=-999   ,ind2d_pmcowater=-999
+    ind2d_pm25=-999   ,ind2d_pmcowater=-999,&
+    ind2d_pm25water_noSS=-999,              &
+    ind2d_pm25water_noOrg=-999,             &
+    ind2d_pm25water_floss=-999,             &
+    ind2d_yieldN2O5=-999,                   &
+    ind2d_gammaN2O5f=-999,ind2d_gammaN2O5c=-999,&
+    ind2d_rateN2O5f=-999,ind2d_rateN2O5c=-999,&
+    ind2d_NO3_f_floss=-999,ind2d_NO3_floss=-999,&
+    ind2d_NH4_f_floss=-999,ind2d_NH4_floss=-999
 
   integer :: imet_tmp, ind, iadvDep
   real, pointer, dimension(:,:,:) :: met_p => null()
@@ -1056,6 +1139,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
   integer, save :: count_AvgMDA8_m=0,count_AvgMDA8_y=0
   integer, save :: count_AvgMDA8AprSep_m=0,count_AvgMDA8AprSep_y=0
   real :: w_m,w_y !weights
+  real :: K1, P1, P2, P3, K2, a, no3, T, RH
 
   if(.not. date_is_reached(spinup_enddate))return ! we do not average during spinup
 
@@ -1281,17 +1365,17 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
       end if
 !END BIDIR
 
-    case ( "dTleafHd" )
-      if ( USES%TLEAF_FROM_HD ) then
+    case ( "dTleaf" )
+      if ( USES%TLEAF_IBM ) then
         forall ( i=1:limax, j=1:ljmax )
-          d_2d( n, i,j,IOU_INST) = dTleafHd(i,j)
+          d_2d( n, i,j,IOU_INST) = dTleaf(i,j)
         end forall
-        if ( dbgP ) call write_debug(n,ind, "dTleafHd")
+        if ( dbgP ) call write_debug(n,ind, "dTleaf")
       end if
-    case ( "dTleafRn" )
-      if ( USES%TLEAF_FROM_RN ) then
+    case ( "Tleaf" )
+      if ( USES%TLEAF_IBM ) then
         forall ( i=1:limax, j=1:ljmax )
-          d_2d( n, i,j,IOU_INST) = dTleafRn(i,j)
+          d_2d( n, i,j,IOU_INST) = Tleaf(i,j)
         end forall
       end if
 
@@ -1538,6 +1622,69 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d( n, i,j,IOU_INST) = PMco_water_rh50(i,j)
       ind2d_pmcowater = n
 
+    case ( "PM25water_noSS" )      !water
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = PM25_water_noSS(i,j)
+      ind2d_pm25water_noSS = n
+
+    case ( "PM25water_noOrg" )      !water
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = PM25_water_noOrg(i,j)
+      ind2d_pm25water_noOrg = n
+
+    case ( "PM25water_floss" )      !water
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = PM25_water_floss(i,j)
+      ind2d_pm25water_floss = n
+
+    case ( "yieldN2O5" )     
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = yieldN2O5(i,j,KMAX_MID)
+      ind2d_yieldN2O5 = n
+
+    case ( "gammaN2O5f" )     
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = cf_gammaN2O5f(i,j,KMAX_MID)
+      ind2d_gammaN2O5f = n
+
+    case ( "gammaN2O5c" )     
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = cf_gammaN2O5c(i,j,KMAX_MID)
+      ind2d_gammaN2O5c = n
+
+    case ( "rateN2O5f" )      
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = cf_rateN2O5f(i,j,KMAX_MID)
+      ind2d_rateN2O5f = n
+
+    case ( "rateN2O5c" )      
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n, i,j,IOU_INST) = cf_rateN2O5c(i,j,KMAX_MID)
+      ind2d_rateN2O5c = n
+
+    case ( "NO3_FLOSS" ) 
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n,i,j,IOU_INST ) = no3_floss(i,j)*cfac(iadv_NO3_f,i,j)
+      ind2d_NO3_floss = n
+
+    case ( "NH4_FLOSS" )      
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n,i,j,IOU_INST ) = nh4_floss(i,j)*cfac(iadv_NO3_f,i,j)
+      ind2d_NH4_floss = n
+
+    case ( "NO3_F_FLOSS" ) 
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n,i,j,IOU_INST ) = xn_adv(iadv_NO3_F,i,j,KMAX_MID) &
+           * ug_NO3_C * cfac(iadv_NO3_F,i,j) * density(i,j) - no3_floss(i,j)*cfac(iadv_NO3_f,i,j)
+      ind2d_NO3_f_floss = n
+
+    case ( "NH4_F_FLOSS" )      
+      forall ( i=1:limax, j=1:ljmax ) &
+        d_2d( n,i,j,IOU_INST ) = xn_adv(iadv_NH4_F,i,j,KMAX_MID) &
+            !note that nh4_floss is computed from no3_floss(i,j), therefore use its cfac
+           * ug_NH4 * cfac(iadv_NH4_F,i,j) * density(i,j) - nh4_floss(i,j)*cfac(iadv_NO3_f,i,j)
+      ind2d_NH4_f_floss = n
+
     case ( "PM25" )      ! Need to add PMFINE + fraction NO3_c
       if(first_call)then
         call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
@@ -1547,9 +1694,9 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
 
       forall(i=1:limax,j=1:ljmax) &
         d_2d(n,i,j,IOU_INST) = d_2d(ind2d_pmfine,i,j,IOU_INST) + &
-                               fracPM25 * &
+                               fracPM25 *  &
             ( xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
-            ) * cfac(iadv_NO3_C,i,j) * density(i,j)
+              * cfac(iadv_NO3_C,i,j) * density(i,j) )  
         ind2d_pm25 = n
 
     case ( "PM_coarse" )      !
@@ -1570,12 +1717,12 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
       end if
 
-      forall(i=1:limax,j=1:ljmax) & ! SUBTRACT, CAREFUL!
-        d_2d(n,i,j,IOU_INST) = d_2d(ind2d_sia,i,j,IOU_INST) - &
+      forall(i=1:limax,j=1:ljmax) & 
+      ! SUBTRACT fracPM25, CAREFUL! If no SIA_f species present, can give very tiny numerical noise negative numbers if fracPM25 = 0; force >= 0.0.
+        d_2d(n,i,j,IOU_INST) = max(0.0, d_2d(ind2d_sia,i,j,IOU_INST) - &
                                (1-fracPM25)  * &
             ( xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
-            ) * cfac(iadv_NO3_C,i,j) * density(i,j)
-      call CheckStop( minval(d_2d(n,:,:,IOU_INST)) < 0.0 , dtxt//'ERROR NEG SIA!')
+            ) * cfac(iadv_NO3_C,i,j) * density(i,j))
       if ( dbgP )  then
         write(*,*) "FRACTION SIA25 2d", n, ind2d_sia
         i= debug_li; j=debug_lj
@@ -1598,7 +1745,34 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
                                + d_2d(ind2d_pmwater,i,j,IOU_INST) &
                                + fracPM25 * &
             ( xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
-            ) * cfac(iadv_NO3_C,i,j) * density(i,j)
+              * cfac(iadv_NO3_C,i,j) * density(i,j) )
+      end forall
+
+      if( dbgP )  then
+        write(*,*) "FRACTION PM25 2d", n, ind2d_pmfine, ind2d_pmwater
+        i= debug_li; j=debug_lj
+        write(*,"(a,4es12.3)") "Adding PM25 FRACTIONS:", &
+          d_2d([ind2d_pmwater,ind2d_pmfine,n],i,j,IOU_INST), &
+          fracPM25 * xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
+                   * cfac(iadv_NO3_C,i,j) * density(i,j)
+      end if
+ 
+    case ( "PM25_rh50_floss" )      ! Need to add PMFINE + fraction NO3_c
+      if(first_call)then
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
+        call CheckStop(ind2d_pmfine <1,"Missing PMFINE output for "//trim(class))
+        call CheckStop(ind2d_pmwater<1,"Missing PM25water output for "//trim(class))
+        call CheckStop(iadv_NO3_C <1,"Unknown specie NO3_C")
+      end if
+
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = d_2d(ind2d_pmfine ,i,j,IOU_INST) &
+                               + d_2d(ind2d_pmwater,i,j,IOU_INST) &
+                               + fracPM25 * &
+            ( xn_adv(iadv_NO3_C,i,j,KMAX_MID) * ug_NO3_C &
+            * cfac(iadv_NO3_C,i,j) * density(i,j) )    &
+            !note that nh4_floss is computed from no3_floss(i,j), therefore use same cfac
+              - (no3_floss(i,j) + nh4_floss(i,j))*cfac(iadv_NO3_f,i,j)
       end forall
 
       if( dbgP )  then
@@ -1660,16 +1834,32 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
         call CheckStop(ind2d_pm10   <1,"Missing PM10 output for "//trim(class))
         call CheckStop(ind2d_pmwater<1,"Missing PM25water output for "//trim(class))
+        call CheckStop(ind2d_pmcowater<1,"Missing PMco_water output for "//trim(class))
       end if
 
       forall(i=1:limax,j=1:ljmax) &
         d_2d(n,i,j,IOU_INST) = d_2d(ind2d_pm10   ,i,j,IOU_INST) &
                              + d_2d(ind2d_pmwater,i,j,IOU_INST)
-      if ( AERO%JUN21AERO ) then
         forall(i=1:limax,j=1:ljmax) &
          d_2d(n,i,j,IOU_INST) = d_2d(n,i,j,IOU_INST) + &
            d_2d(ind2d_pmcowater,i,j,IOU_INST)   !ST EQSAM
+ 
+    case("PM10_rh50_floss")      ! Need to add PMFINE + fraction NO3_c
+      if(first_call)then
+        call CheckStop(f_2d(n)%unit,"ug/m3","Wrong unit for "//trim(class))
+        call CheckStop(ind2d_pm10   <1,"Missing PM10 output for "//trim(class))
+        call CheckStop(ind2d_pmwater<1,"Missing PM25water output for "//trim(class))
+        call CheckStop(ind2d_pmcowater<1,"Missing PMco_water output for "//trim(class))
       end if
+
+      forall(i=1:limax,j=1:ljmax) &
+        d_2d(n,i,j,IOU_INST) = d_2d(ind2d_pm10   ,i,j,IOU_INST) &
+                             + d_2d(ind2d_pmwater,i,j,IOU_INST)
+        forall(i=1:limax,j=1:ljmax) &
+         d_2d(n,i,j,IOU_INST) = d_2d(n,i,j,IOU_INST) &
+           + d_2d(ind2d_pmcowater,i,j,IOU_INST) &   !ST EQSAM
+            !note that nh4_floss is computed from no3_floss(i,j), therefore use same cfac
+           - (no3_floss(i,j) + nh4_floss(i,j))*cfac(iadv_NO3_f,i,j)           
 
     case("AOD","AOD:GROUP","AOD:SPEC")  !/ Aerosol Optical Depth (new system)
       if(first_call)call AOD_init("Derived:"//trim(class))
@@ -1723,7 +1913,7 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d(n,:,:,IOU_MON )  = d_2d(n,:,:,IOU_MON )  + d_2d(n,:,:,IOU_DAY)
         nav_2d(n,IOU_MON) = nav_2d(n,IOU_MON) + 1
         if(    current_date%month >= 4 &
-           .or.current_date%month <= 9 )then
+           .and. current_date%month <= 9 )then
         d_2d(n,:,:,IOU_YEAR ) = d_2d(n,:,:,IOU_YEAR ) + d_2d(n,:,:,IOU_DAY)
         nav_2d(n,IOU_YEAR) = nav_2d(n,IOU_YEAR) + 1
         end if
@@ -2250,7 +2440,14 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
         d_2d( n, i,j,IOU_INST) = SplitEmisOut(i,j,f_2d(n)%Index)
       end forall
 
-    case ( "EXT" )
+   case ( "SpecSecEmis" )      ! Single species (after split) sector emissions
+      itot = find_index(f_2d(n)%subclass, species(:)%name, any_case=.true.)
+      isec = f_2d(n)%Index
+      forall ( i=1:limax, j=1:ljmax )
+        d_2d( n, i,j,IOU_INST) = SpecSecEmisOut(i,j,itot2SpecSecOut(itot*NSECTORS+isec))
+      end forall
+
+   case ( "EXT" )
     ! Externally set for IOU_INST (in other routines); so no new work
     ! needed except decision to accumalate to yearly or not.
       if(dbgP) write(*,"(a18,i4,a12,a4,es12.3)")"EXT d_2d",&
@@ -2459,10 +2656,10 @@ subroutine Derived(dt,End_of_Day,ONLY_IOU)
            do k=1, num_lev3d
            do j=1, ljmax
            do i=1, limax
-              pp = A_mid(k) + B_mid(k)*ps(i,i,1)
-              itemp= nint(th(i,i,k,1) * Tpot_2_T(pp))
+              pp = A_mid(k) + B_mid(k)*ps(i,j,1)
+              itemp= nint(th(i,j,lev3d(k),1) * Tpot_2_T(pp))
               qsat = 0.622 * tab_esat_Pa( itemp ) / pp
-              d_3d(n,i,j,k,IOU_INST)=min(q(i,i,k,1)/qsat,1.0)       
+              d_3d(n,i,j,k,IOU_INST)=min(q(i,j,lev3d(k),1)/qsat,1.0)       
            end do
            end do
            end do

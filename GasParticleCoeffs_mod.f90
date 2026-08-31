@@ -84,7 +84,7 @@ module GasParticleCoeffs_mod
  !OLD DH2O    = 21.0e-6 &! comp old  m2/s at STP, Massman
 
   integer, public, parameter ::&
-        NDRYDEP_GASES = 14+67  &! no. of gases in Wesely tables, DDdefs below
+        NDRYDEP_GASES = 14+68  &! no. of gases in Wesely tables, DDdefs below
        ,NDRYDEP_AERO  = 16     &! no. of particles in DDdefs below
        ,NDRYDEP_DEF   = NDRYDEP_GASES + NDRYDEP_AERO ! gases + aerosol defs
      !mafor ,NDRYDEP_DEF   = 17      ! gases + aerosol defs ! MSK 26.01.2015 start
@@ -230,6 +230,7 @@ type(DD_t), public, dimension(NDRYDEP_DEF), parameter :: DDdefs = [ &
  ,DD_t( 'CO2C3PAN', DH2O/3.5, 3.5, 1.3e4, 9999, 1.0E+04, 0.5, 0.,-1,-1,-1,-1)& ! CH3C(O)CH2C(O)ONO3
  ,DD_t( 'PINONIC',DH2O/4.6 , 4.6, 1.3E+07, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! pinonic acid
  ,DD_t( 'HCC7CO',DH2O/3.7 , 3.7, 3.9E+05, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& 
+ ,DD_t( 'ClNO2',DH2O/2.0 , 2.0, 2.4E-02, 9999, 0., 0.,  0.,  -1,-1,-1,-1)& 
 ! additions for Hodzic VBS-scheme semivolatile species:
  ,DD_t( 'LVASOA',DH2O/3.9 , 3.9, 1.3E+07, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! LVASOA - to model Hodzics 0.01 anthropogenic VSOA bin
  ,DD_t( 'SVASOA',DH2O/3.1 , 3.1, 1.3E+05, 9999, 1.0E+04, 0.,  0.,  -1,-1,-1,-1)& ! SVASOA - to model Hodzics 10, 100 and 1000ug/m3 Anthropogenic VSOA bins
@@ -277,7 +278,7 @@ type, private :: WD_t
   real :: W_sub
 end type WD_t
 
-integer, parameter :: NWETDEP_DEF = 22+2
+integer, parameter :: NWETDEP_DEF = 22+4
 type(WD_t), public, dimension(NWETDEP_DEF),parameter :: WDdefs = [ &
   WD_t('SO2'  , 0.3,  0.15)  &! Berge+Jakobsen
  ,WD_t('SO4'  , 1.0,  EFF25) &! Berge+Jakobsen
@@ -289,6 +290,8 @@ type(WD_t), public, dimension(NWETDEP_DEF),parameter :: WDdefs = [ &
  ,WD_t('SSf'  , 1.6,  EFF25) &
  ,WD_t('SSc'  , 1.6,  EFFCO) &
  ,WD_t('SSg'  , 1.6,  EFFGI) &
+ ,WD_t('DUf'  , 0.3,  EFF25) &!!
+ ,WD_t('DUc'  , 0.05,  EFFCO) &!!
  ,WD_t('PMf'  , 1.0,  EFF25) &!!
  ,WD_t('PMc'  , 1.0,  EFFCO) &!!
  ,WD_t('POLLw', 1.0,  SUBCLFAC) &! pollen
@@ -547,7 +550,7 @@ if(MasterProc) print *, "DDDEF ", DDdefs(2)%name, DDdefs(2)%Dx
        DDspec(icmp)%is_gas  = .true.
 
        ! Sc and Rb_cor same for all T
-       DDspec(icmp)%Schmidt = NU_AIR0 / DDdefs(icmp)%Dx
+       DDspec(icmp)%Schmidt = NU_AIR0 / DDdefs(idef)%Dx
        DDspec(icmp)%Rb_cor  = (DDspec(icmp)%Schmidt/PRANDTL)**(2.0/3.0)
 
 !       if(MasterProc) write(*,'(a,3i4,es10.3)') 'DD_ind', icmp, idef, io3, DxO3

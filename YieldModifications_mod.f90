@@ -39,10 +39,12 @@
   use ChemFields_mod             ! => cell_tinv,  NSPEC_TOT, O3, NO2, etc.
   use ChemSpecs_mod ,   only : species
   use Config_module,   only : MasterProc,YieldModifications &! JPCIsoYield
-                             , C5H8_ix, NO_ix, HO2_ix
+                             , C5H8_ix, NO_ix, HO2_ix, USES
   use Debug_module,    only : DebugCell, DEBUG  !-> DEBUG%SOA
+  use LocalFractions_mod,   only: lf_yield_pre, lf_yield_pos, Nyield_deriv, lf_fullchem
   use NumberConstants, only : UNDEF_R, UNDEF_I
   use SmallUtils_mod,  only : find_index, trims
+  use PhysicalConstants_mod, only: AVOG
 
   implicit none
   private
@@ -75,8 +77,7 @@
    ,YNALK6=UNDEF_R,   YNALK7=UNDEF_R  & 
    ,YNALK8=UNDEF_R,   YNALK9=UNDEF_R  &
    ,YNARO3=UNDEF_R,   YNPAH1=UNDEF_R  &
-   ,YNPAH2=UNDEF_R
-
+   ,YNPAH2=UNDEF_R   
 
    type, private :: vbs_t
      character(len=8)   :: name    = 'UNSET'
@@ -115,31 +116,45 @@
   !! for each grid-cell (to reset yields for this cell), then after each iteration 
   !! to update the yields based.
 
-  subroutine doYieldModifications(txt)
+  subroutine doYieldModifications(txt, k)
      character(len=*), intent(in) :: txt
+     integer, intent(in) :: k
      logical, save :: my_first_call = .true.
-
+     integer :: niter, lf_iter
+     
      dbgYields = ( DEBUG%SOA>0 .and. DebugCell )
 
-     if ( YieldModifications(1:3) == 'VBS' ) then
-       if( my_first_call .and. txt=='init' ) then
-         YieldModificationsInUse = .true.
-         call init_VBSyields()
-       end if
-       
-       call update_VBSyields()
-
-     else if ( YieldModifications(1:3) == 'JPC' ) then
-       if( my_first_call .and. txt=='init' ) then
-          YieldModificationsInUse = .true.
-          call init_JPCyields(txt)
-       ! QUERY if update needed on 1st call... do LATER
-       else if ( YieldModifications(1:6) == 'JPC-VY' .and. txt == 'run' )  then
-         call update_JPCyields()  ! OH impact
-       end if
-     else
-       RETURN ! no yield modifications
+     if( my_first_call .and. txt=='init' ) then
+        if ( YieldModifications(1:3) == 'VBS' ) then
+           call init_VBSyields()
+           YieldModificationsInUse = .true.
+        else if ( YieldModifications(1:3) == 'JPC' ) then
+           YieldModificationsInUse = .true.
+           call init_JPCyields(txt)
+        else
+           RETURN ! no yield modifications
+        end if          
      end if
+     if(txt=='init' ) return
+
+     niter = 1
+     if (USES%LocalFractions .and. lf_fullchem) niter = Nyield_deriv
+     do lf_iter = 1, niter !only in use for Local Fractions runs
+        call lf_yield_pre(lf_iter, k) !only used for LocalFractions
+        
+        if ( YieldModifications(1:3) == 'VBS' ) then
+           call update_VBSyields()
+        else if (.not.( my_first_call .and. txt=='init' ) .and. &
+             ! QUERY if update needed on 1st call... do LATER
+             & ( YieldModifications(1:3) == 'JPC-VY' .and. txt == 'run' ))  then
+           call update_JPCyields()  ! OH impact
+        else
+           RETURN ! no yield modifications
+        end if
+        
+        call lf_yield_pos(lf_iter, Yemep(1:9)%ratio, k, YCOXY,YCALK,YCOLE,&
+             YCISOP,YCTERP,YCBENZ,YCTOL,YCIVOC) !only used for LocalFractions
+     end do
 
      my_first_call = .false.
   end subroutine doYieldModifications
@@ -612,7 +627,7 @@
     end if
 
   end subroutine update_JPCyields
-
+      
  end module YieldModifications_mod
 !TSTEMX program testr
 !TSTEMX use Config_module, only :  YieldModifications

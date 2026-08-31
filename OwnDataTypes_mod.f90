@@ -366,13 +366,15 @@ type, public :: lf_set_type
   !for fullchem settings
   integer :: dist = -1
   logical :: full_chem =.false.
-  logical :: relative =.false. ! compute also grid to grid values 
-  integer :: Nfullchem_emis = -1 ! number of emission types to track: 1 {nox+voc+nh3+sox}, 2 {nox,voc}, 4 {nox,voc,nh3,sox} 
+  logical :: relative =.false. ! compute grid to grid values, for distances defined by dist
+  logical :: relative_out_Int2 =.false. ! Output the local fractions for "relative" as short integer (2 bytes)
+  integer :: Nfullchem_emis = -1 ! number of emission types to track: 1 {nox+voc+nh3+sox}, 2 {nox,voc}, 4 {nox,voc,nh3,sox}
   logical :: EmisDer_all =.false. ! reduce voc, sox, nox, nh3 together. Overwritten if Nfullchem_emis is set
   logical :: MDA8 = .false. ! if MDA8 and SOMO35 are to be outputed (if full_chem)
   logical :: restart =.false.
   logical :: Nestsave =.true. !if nesting and LF are used, save also lf values each time Nest is saving 3D
   logical :: saveatend =.false.
+  logical :: saveall_cdf =.false. !default is to save in separate binary file for each MPI process
 end type lf_set_type
 
 
@@ -392,7 +394,8 @@ type, public :: lf_sources
   integer :: iem_lf ! index of emitted internal for LF (1 for nox, 2 for voc, ...)
   integer :: Npos = 0 ! number of position indices in lf_src (set by model)
   integer :: nhour = -1 ! number of hours between timestamps, and resets. Not used if <0. Must be <=24
-  integer :: time_ix = 0 ! start of hour at which the emissions are set (set by model)
+  integer :: nnhour = 0 ! number of distinct nhour periods to track
+  integer :: age = 0 ! age of the data in units of nhour. (only used when nhour>0)
   integer :: Nsplit = 0 ! into how many species the emitted pollutant is split into (set by model)
   integer :: species_ix = -1 !species index, if single pollutant (for example NO or NO2, instead of nox)
   integer :: iqrc = -1 !index for emissplits, if single pollutant (for example NO or NO2, instead of nox)

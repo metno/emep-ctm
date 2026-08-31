@@ -48,13 +48,16 @@
 
     use Aqueous_mod,        only: aqrck, ICLOHSO2, ICLHO2H2O2, ICLRC1, ICLRC2, ICLRC3
     use CheckStop_mod,      only: CheckStop, StopAll
-    use ChemFunctions_mod,  only: VOLFACSO4,VOLFACNO3,VOLFACNH4 !TEST TTTT
+    use ChemFunctions_mod,  only: VOLFACSO4,VOLFACNO3,VOLFACNH4,YN2O5HYD !TEST TTTT
     use ChemGroups_mod !,     only: RO2_POOL, RO2_GROUP
     use ChemDims_mod               ! => NSPEC_TOT, O3, NO2, etc.
     use ChemSpecs_mod              ! => NSPEC_TOT, O3, NO2, etc.
     use ChemFields_mod,     only: x, xold ,xnew  & ! Work arrays [molec./cm3]
-                             ,cell_tinv & ! tmp location, for Yields
-                             ,NSPEC_BGN  ! => IXBGN_  indices and xn_2d_bgn
+                             ,cell_tinv  & ! tmp location, for Yields
+                             ,NSPEC_BGN  & ! => IXBGN_  indices and xn_2d_bgn
+                             ,PM25_water &
+                             ,PMco_water
+    use ChemFunctions_mod,  only: YN2O5HYD
     use Config_module,      only: KMAX_MID, KCHEMTOP, dt_advec,dt_advec_inv &
                                 ,MasterProc, USES, NATBIO, YieldModifications,SO4_ix
     use Debug_module,       only: DebugCell, DEBUG  ! DEBUG%DRYRUN
@@ -67,7 +70,10 @@
                                   spec2lfspec,lf_chem_pre, lf_chem_mid, &
                                   rcemis_lf, lf_rcemis,&
                                   NSPEC_deriv_lf, N_lf_derivemis, NSOA,&
-                                  lf_chem_pos,AQRCK_lf,fgasso2_lf!rctA_lf, rctB_lf
+                                  lf_chem_pos,AQRCK_lf,fgasso2_lf,rctA_lf, rctB_lf,&
+        YCOXY_lf,YNOXY_lf,YCALK_lf,YNALK_lf,YCOLE_lf,YNOLE_lf, YCISOP_lf,YNISOP_lf,&
+        YCTERP_lf,YNTERP_lf,YCBENZ_lf,YNBENZ_lf,YCTOL_lf,YNTOL_lf,YCIVOC_lf,YNIVOC_lf
+
     use Par_mod,            only: me, LIMAX, LJMAX
     use PhysicalConstants_mod, only:  RGAS_J
     use Precision_mod, only:  dp
@@ -194,7 +200,7 @@ contains
        if ( first_call .or. YieldModificationsInUse ) then
           cell_tinv = tinv(k)
           if( DebugCell ) write(*,*) 'YIELD INIT ', me, k, 1/cell_tinv
-          call doYieldModifications('init')
+          call doYieldModifications('init', k)
        end if
 
        if( DebugCell ) then
@@ -208,9 +214,9 @@ contains
 
           do n=1,NSPEC_TOT
              if ( x(n) < 0.0  .or. xnew(n) < 0.0 ) then
-               print '(a,3i4,a10,9es12.3)', dtxt//'NCHEM', me,  n, ichem,&
+               print '(a,3i4,a10,15es12.3)', dtxt//'NCHEM', me,  n, ichem,&
                  species(n)%name, x(n), xnew(n), Dchem(n,k,i,j),  &
-                 minval(rcemis), maxval(rcemis)
+                 minval(rcemis), maxval(rcemis),YN2O5HYD
                call StopAll('NCHEM')
              end if
 
@@ -269,7 +275,7 @@ contains
                !OLD if( DebugCell ) write(*,*) 'YIELD RUN  ', me, k, &
                !OLD   1/cell_tinv, iter, toiter(k)
                !OLD: if( iter == toiter(k) ) & ! runlabel='lastFastChem'
-               call doYieldModifications('run')
+               call doYieldModifications('run', k)
             end if
 
             !xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
