@@ -7,8 +7,13 @@
   enddate   = 2018,12,31,24,
 !------------------------------
   DataPath(1) = '../input',
+  ! Nebula and Atos paths for testing
+  DataPath(2) = '/nobackup/forsk/sm_petwi/Data',
+  DataPath(3) = '/ec/res4/hpcperm/fan/Data',
 !------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
+  ! Nebula and Atos paths for testing
+  meteo                 = 'DataDir/GRID/metdata_EC/YYYY/meteoYYYYMMDD.nc',
 
   DegreeDayFactorsFile  = 'MetDir/HDD18-GRID-YYYY.nc',
   Monthly_timezoneFile  = 'DataDir/Timefactors/monthly_timezones_GLOBAL05.nc',
@@ -47,8 +52,8 @@
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
   AircraftEmis_FLFile   = 'DataDir/AircraftEmis_FL.nc',
- !from ECCAD:
-  soilnox_emission_File = 'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc',
+! CAMS-GLOB-SOIL v3.0 from ECCAD: see https://emep-ctm.readthedocs.io/en/latest/Input.html
+  soilnox_emission_File = 'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim2000-2023_monthly.nc',
 !------------------------------
   ZCMDIR                     = 'DataDir/ZCM_DIRS/ZCM_EmChem19',
   SplitDefaultFile           = 'ZCMDIR/emissplits_gnfr/CAMS-REG-v5_1_with_Ref2_0_1_year2018_DT_rnr/emissplit_defaults_POLL.csv',

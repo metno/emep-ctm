@@ -896,7 +896,8 @@ character(len=TXTLEN_FILE), target, save, public :: OceanNH3File = 'DataDir/geia
 !rv4.50+: use a climatological file for all years, since year-to-year variation is small and uncertain
 !ECCAD format:
 character(len=TXTLEN_FILE), target, save, public :: soilnox_emission_File = &
-   'DataDir/SoilNOxInputs/cams4emep_v3.nc'
+!  'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v2.4clim_monthly.nc           ! CAMS-GLOB-SOIL v2.4
+   'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim2000-2023_monthly.nc' ! CAMS-GLOB-SOIL v3.0
 !
 ! Chemical schemes have specific files:
 !character(len=*), parameter :: ZCMDIR= 'DataDir/ZCM_CRI-R5-emep/'
