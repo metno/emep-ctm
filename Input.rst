@@ -299,7 +299,7 @@ However, before using these data a protocol has to be signed, which is why
 the data file can not be provided directly on the EMEP MSC-W Open Source
 website.
 Since rv4.39, CAMS-GLOB-AIR has been the default dataset. Registering
-at the Atmosphere Data Store is straightforward
+at the Atmosphere Data Store (ADS) is straightforward
 (https://ads.atmosphere.copernicus.eu/user/register?destination=/cdsapp)
 (If you rather want to use older QUANTIFY dataset go to
 http://www.pa.op.dlr.de/quantify, click on
@@ -310,6 +310,14 @@ click 'Login' and provide user name and password. On the new page,
 search for 'Emissions for EMEP', which links directly to the ``Readme`` file
 and the emission data file in NetCDF format. Download the emission data
 file and place it in the input folder.)
+
+Soil NO emissions
+~~~~~~~~~~~~~~~~~
+
+The latest CAMS-GLOB-SOIL emissions (CAMS-GLOB-SOIL
+v3.0), and earlier versions, can be downloaded from ECCAD
+(https://eccad.aeris-data.fr/). With some delay, these data should become
+available also on ADS - see above.
 
 Natural |SO2|
 ~~~~~~~~~~~~~

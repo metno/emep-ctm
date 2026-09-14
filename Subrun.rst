@@ -790,16 +790,27 @@ from the global CAMS-TEMPO data set.
 config: SOILNOX
 ---------------
 
+As of EMEP version 5.8, a new config system is used for soil NO emissions:
 
 .. code-block:: text
-  :caption: Soil-NO settings.
+  :caption: emep v5.8 Soil-NO settings.
+
+  SOILNOX%METHOD = 'NoFert',  ! If using ECLIPSEv6 or EMEP European
+  SOILNOX%METHOD = 'Total',   ! If using ECLIPSEv5
+  SOILNOX%TYPE   = 'CLIM',    ! If using CAMS-GLOB-SOIL climatology (default)
+
+whereas in earlier EMEP model versions we had:
+
+.. code-block:: text
+  :caption: older emep Soil-NO settings.
 
   USES%SOILNOX_METHOD = 'NoFert',  ! If using ECLIPSEv6 or EMEP European
   USES%SOILNOX_METHOD = 'Total',   ! If using ECLIPSEv5
 
-By default the model makes use of global 0.5 degree data from the CAMS2-61 project (cf Simpson et al., Ch.8 in
-Denier van der Gon, 2023, doi:10.24380/q2si-ti6i,
-https://atmosphere.copernicus.eu/node/1054), but the user needs
+By default the model makes use of global 0.5 degree data from the CAMS2-61 and
+CAMS2-61bis projects (cf Simpson et al., Ch.9 in Denier van der Gon, H., Gauss, M., and Granier, C., eds.: Documentation of CAMS emission inventory products, Copernicus Atmosphere Monitoring Service, doi:10.24380/uag-0svt,
+https://atmosphere.copernicus.eu/node/1365, 2025)
+but the user needs
 to specify the data to be used from this system. 
 The choice, between ``Total``  and ``NoFert`` depends
 on the anthropogenic emission inventory in use.
@@ -823,7 +834,8 @@ can be set using:
 .. code-block:: text
   :caption: Alternative (ACP 2012) Soil-NO settings, for European runs.
 
-  USES%SOILNOX_METHOD = 'ACP2012',  !  Europe only
+  USES%SOILNOX_METHOD = 'ACP2012',      !  Europe only,for older emep
+  SOILNOX%TYPE        = 'ACP2012EURO',  !  Europe only,for emep v5.8 (NEW system, 2026)
   NdepFile            = 'DataDir/AnnualNdep_PS50x_EECCA2005_2009.nc',
 
 
