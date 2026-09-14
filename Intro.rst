@@ -2,7 +2,7 @@ Welcome to EMEP
 ================
 
 This guide gives a brief documentation of the EMEP/MSC-W model version
-rv5.6. It is intended primarily as a guide on how to run the model, and
+rv5.6 (ONGOING - UPDATE TO v5.8). It is intended primarily as a guide on how to run the model, and
 to help users wishing to understand or change the model in terms of
 domains, outputs, chemistry, etc.
 
