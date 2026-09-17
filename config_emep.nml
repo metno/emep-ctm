@@ -52,8 +52,8 @@
   soilnox_emission_File = 'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim2000-2023_monthly.nc',
 !------------------------------
   ZCMDIR                     = 'DataDir/ZCM_DIRS/ZCM_EmChem19',
-  SplitDefaultFile           = 'ZCMDIR/emissplits_gnfr/CAMS-REG-v5_1_with_Ref2_0_1_year2018_DT_rnr/emissplit_defaults_POLL.csv',
-  SplitSpecialsFile          = 'ZCMDIR/emissplits_gnfr/CAMS-REG-v5_1_with_Ref2_0_1_year2018_DT_rnr/emissplit_specials_POLL.csv',
+  SplitDefaultFile           = 'ZCMDIR/emissplits_gnfr/emissplits_gnfr_EASVOLEE2019_June2026/emissplit_defaults_EmChem26_2019_POLL.csv',
+  SplitSpecialsFile          = 'ZCMDIR/emissplits_gnfr/emissplits_gnfr_EASVOLEE2019_June2026/emissplit_specials_EmChem26_2019_POLL.csv',
   cmxbicDefaultFile          = 'ZCMDIR/CMX_BoundaryConditions.txt',
   cmxBiomassBurning_FINN     = 'ZCMDIR/CMX_BiomassBurning_FINNv2p5.txt',
   cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1a.txt',
