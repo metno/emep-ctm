@@ -2,27 +2,22 @@
   GRID      = 'EMEP0302',
   iyr_trend = 2018,
   runlabel1 = 'Base',
-  runlabel2 = 'Opensource_Setup_2025',
+  runlabel2 = 'Opensource_Setup_2026',
   startdate = 2018,01,01,00,
   enddate   = 2018,12,31,24,
 !------------------------------
   DataPath(1) = '../input',
-  ! Nebula and Atos paths for testing
-  DataPath(2) = '/nobackup/forsk/sm_petwi/Data',
-  DataPath(3) = '/ec/res4/hpcperm/fan/Data',
 !------------------------------
   meteo                 = '../meteoYYYY/GRID/meteoYYYYMMDD.nc',
-  ! Nebula and Atos paths for testing
-  meteo                 = 'DataDir/GRID/metdata_EC/YYYY/meteoYYYYMMDD.nc',
-
   DegreeDayFactorsFile  = 'MetDir/HDD18-GRID-YYYY.nc',
+
   Monthly_timezoneFile  = 'DataDir/Timefactors/monthly_timezones_GLOBAL05.nc',
 
   Emis_sourceFiles(1)%filename    = 'DataDir/emis_EMEPreport_2023/GNFREmis_EMEP01_2020_27062023.nc',
 
-  MonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
-  DailyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_week.POLL',
-  HourlyFacFile  = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_hour.POLL',
+  MonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v5_1/cams_tempo_v5_1_month.POLL',
+  DailyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v5_1/cams_tempo_v5_1_week.POLL',
+  HourlyFacFile  = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v5_1/cams_tempo_v5_1_hour.POLL',
   GriddedMonthlyFacFile = 'DataDir/Timefactors/CAMS_TEMPO/CAMS_TEMPO_GLOB4emep_v2024-1.nc',
 
 ! GNFR sector definitions needed for use with the above CAMS_TEMPO time factors
@@ -51,8 +46,9 @@
   TopoFile              = 'DataDir/GRID/topography.nc',
   SitesFile             = 'DataDir/sites.dat',
   SondesFile            = 'DataDir/sondes.dat',
+! CAMS-GLOB-AIR or QUANTIFY: see https://emep-ctm.readthedocs.io/en/latest/Input.html#aircraft-emissions
   AircraftEmis_FLFile   = 'DataDir/AircraftEmis_FL.nc',
-! CAMS-GLOB-SOIL v3.0 from ECCAD: see https://emep-ctm.readthedocs.io/en/latest/Input.html
+! CAMS-GLOB-SOIL v3.0 from ECCAD: see https://emep-ctm.readthedocs.io/en/latest/Input.html#soil-no-emissions
   soilnox_emission_File = 'DataDir/CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim2000-2023_monthly.nc',
 !------------------------------
   ZCMDIR                     = 'DataDir/ZCM_DIRS/ZCM_EmChem19',
@@ -60,7 +56,7 @@
   SplitSpecialsFile          = 'ZCMDIR/emissplits_gnfr/CAMS-REG-v5_1_with_Ref2_0_1_year2018_DT_rnr/emissplit_specials_POLL.csv',
   cmxbicDefaultFile          = 'ZCMDIR/CMX_BoundaryConditions.txt',
   cmxBiomassBurning_FINN     = 'ZCMDIR/CMX_BiomassBurning_FINNv2p5.txt',
-  cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1.txt',
+  cmxBiomassBurning_GFASv1   = 'ZCMDIR/CMX_BiomassBurning_GFASv1a.txt',
 !------------------------------
   LandCoverInputs%LandDefs  = 'DataDir/LandInputs_Oct2024/Inputs_LandDefs.csv',
   LandCoverInputs%Do3seDefs = 'DataDir/LandInputs_Oct2024/Inputs_DO3SE.csv',
@@ -73,14 +69,13 @@
   USES%DOMAIN_SETUP_TYPE = 'EMEPDOMAIN',
   USES%OCEAN_DMS         = T,
 
-! 2021-2022 updates:
-! CAMS81-based SOILNOX DANGER - some inventories already have fertilizer-induced soil NOx.
+! CAMS-GLOB-SOIL Warning - some inventories already have fertilizer-induced soil NOx.
 ! Choose one of:
-!   USES%SOILNOX_METHOD = 'Total'  for CAMS-REG,  ECLIPSE v5
-!   USES%SOILNOX_METHOD = 'NoFert' for EMEP/CEIP, ECLIPSE v6, HTAPv3
-  USES%SOILNOX_METHOD = 'NoFert',
+!   SOILNOX%METHOD = 'Total'  for CAMS-REG,  ECLIPSE v5
+!   SOILNOX%METHOD = 'NoFert' for EMEP/CEIP, ECLIPSE v6, HTAPv3
+  SOILNOX%METHOD = 'NoFert',
 !------------------------------
-! For open-source the user has to download aircraft data: see https://emep-ctm.readthedocs.io/en/latest/Input.html
+! Download aircraft data: see https://emep-ctm.readthedocs.io/en/latest/Input.html#aircraft-emissions
   USES%AIRCRAFT_EMIS    = F,
   USES%SEASALT          = T,
   USES%LIGHTNING_EMIS   = T,
@@ -98,11 +93,11 @@
   FLUX_IGNORE = 'W', 'D', 'DE', 'ICE', 'BARE',  ! Ignore these for FLUX calcs.
 
 !-------- volcanic emissions from passive degassing and historical eruptions
-  flocdef='DataDir/columnsource_location.csv_2023',
-  femsdef='DataDir/columnsource_emission.csv_2023',
+  flocdef='DataDir/columnsource_location.csv_2026',
+  femsdef='DataDir/columnsource_emission.csv_2026',
 
 !-------- ForestFire emissions
-! For open-source the user has to download forest-fire data: see https://emep-ctm.readthedocs.io/en/latest/Input.html
+! Download forest-fire data: see https://emep-ctm.readthedocs.io/en/latest/Input.html#forest-fire
   USES%FOREST_FIRES = F,
   BBMAP = 'FINN', ! FINN, GFAS or GFED
   FINN_PATTERN = 'DataDir/FINN_ForestFireEmis_YYYY.nc',
