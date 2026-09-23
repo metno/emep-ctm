@@ -14,7 +14,8 @@ which supports the development of air quality polices in the European Union.
 [GPLv3]:    http://www.gnu.org/copyleft/gpl.html
 [netCDF_CF]:http://www.unidata.ucar.edu/software/netcdf/conventions.html
 [guide]:    http://emep-ctm.readthedocs.io/en/latest
-[publ2025]: http://emep.int/publ/emep2025_publications.html
+[publ2026]: http://emep.int/publ/emep2026_publications.html
+[rel5.8]:   http://github.com/metno/emep-ctm/releases/tag/5.8
 [rel5.6]:   http://github.com/metno/emep-ctm/releases/tag/5.6
 [rel5.5]:   http://github.com/metno/emep-ctm/releases/tag/5.5
 [rel5.0]:   http://github.com/metno/emep-ctm/releases/tag/5.0
@@ -46,8 +47,8 @@ The Open Source releases are intended to:
 
 ## Releases
 
-The latest Open Source EMEP MSC-W model version ([5.6][rel5.6])
-is based on the version used on the [EMEP status reporting of the year 2025][publ2025].
+The latest Open Source EMEP MSC-W model version ([5.8][rel5.8])
+is based on the version used on the [EMEP status reporting of the year 2026][publ2026].
 The source code, together with a set of input data,
 an updated user guide and a full year model results for the year 2018,
 under [GPL license v3][GPLv3].
@@ -59,6 +60,7 @@ Information on use of the model can be found in the [EMEP MSC-W model User Guide
 
 #### Previous releases (YYYYMM - date of release)
 
+* [OpenSource v5.6 (202511)][rel5.6].
 * [OpenSource v5.5 (202412)][rel5.5].
 * [OpenSource v5.0 (202310)][rel5.0].
 * [OpenSource rv4.45 (202203)][rel445].
@@ -83,7 +85,7 @@ The EMEP MSC-W model is very flexible with regard to the horizontal resolution
 and vertical resolutions. In 2008 the EMEP domain was extended to include EECCA countries.
 In 2017 the vertical resolution increased from 20 to 34 model levels.
 Together wit the latest release gridded input and output data are provided on the `EMEP0302` model domain
-with a 0.3x0.2 degrees on long-lat projection and 34 vertical levels.
+with 0.3x0.2 degrees resolution on long-lat projection and 34 vertical levels.
 
 ### Input data
 
@@ -214,6 +216,15 @@ The reports can be found under the following links:
   pages = {7825--7865},
   doi = {10.5194/acp-12-7825-2012},
   url = {https://www.atmos-chem-phys.net/12/7825/2012/}
+}
+
+@misc{emep-ctm_v5.8,
+  author       = {EMEP MSC-W},
+  title        = {Open Source EMEP/MSC-W model v5.8 (202609)},
+  month        = sep,
+  year         = 2026,
+  doi          = {10.5281/zenodo.22915437},
+  url          = {https://doi.org/10.5281/zenodo.22915437}
 }
 
 @misc{emep-ctm_v5.6,
