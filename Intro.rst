@@ -1,8 +1,8 @@
 Welcome to EMEP
 ================
 
-This guide gives a brief documentation of the EMEP/MSC-W model version
-rv5.6 (ONGOING - UPDATE TO v5.8). It is intended primarily as a guide on how to run the model, and
+This guide gives a brief documentation of the EMEP/MSC-W model version 5.8.
+It is intended primarily as a guide on how to run the model, and
 to help users wishing to understand or change the model in terms of
 domains, outputs, chemistry, etc.
 
@@ -98,11 +98,11 @@ Model code
 ----------
 
 
-The latest release Open Source of the EMEP/MSC-W model is `version 5.6`__.
+The latest release Open Source of the EMEP/MSC-W model is `version 5.8`__.
 This and previous releases can be found on the `releases section`__
 of the EMEP/MSC-W Open Source `github page`__.
 
-.. __: https://github.com/metno/emep-ctm/releases/tag/5.6
+.. __: https://github.com/metno/emep-ctm/releases/tag/5.8
 .. __: https://github.com/metno/emep-ctm/releases
 .. __: https://github.com/metno/emep-ctm
 
@@ -120,12 +120,12 @@ the release page, the preferred retrieval method is via the `catalog tool`_ as f
     # make it executable and run it
     chmod +x catalog.py
 
-    # download the source code for 5.6 release
-    catalog.py -R 5.6 --source
+    # download the source code for 5.8 release
+    catalog.py -R 5.8 --source
 
 
 The model source code, makefiles, and a copy of the license file
-will be placed under the directory ``EMEP_MSC-W_model.rv4.45.OpenSource/source/``.
+will be placed under the directory ``emep-ctm-5.8/``.
 An overview of the files is given in :numref:`tab-modelfiles`.
 
 .. csv-table:: Model source files
@@ -140,9 +140,8 @@ An overview of the files is given in :numref:`tab-modelfiles`.
    a copy of the license, ``gpl.txt``
 
 
-In addition there is a run script called ``modrun.sh``, which will be
-placed in the ``EMEP_MSC-W_model.rv4.45.OpenSource`` directory. The run script,
-``modrun.sh``, can easily be modified to work on your computer system.
+In addition there is a run script called ``modrun.sh``, which
+can easily be modified to work on your computer system.
 
 .. _`sec-modelgrid`:
 

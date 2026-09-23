@@ -6,34 +6,43 @@ Input files
 This chapter provides an overview on the necessary input files to run
 the EMEP/MSC-W model. A complete set of input files is provided as part of the
 EMEP/MSC-W Open Source release to allow model runs for the meteorological
-year 2015. :numref:`tab-inputdata` lists the input files.
+year 2018. :numref:`tab-inputdata` lists the input files.
 
-In the latest release, meteorology is provided for 2 different model domains and resolutions:
-
+Since version 5.5 release meteorology for 2018 is provided for the `EMEP0302` model domain.
+Previous releases provided meteorology for 2015 for the `EECCA` and `EMEP01` model domain.
 - `EECCA` domain with a horizontal resolution of 50x50 km2 (at 60°N), 
   on polar stereographic projection, and 20 vertical levels;
-- `EMEP01` domain with a 0.1x0.1 degrees on long-lat projection,
+- `EMEP01` domain with 0.1x0.1 degrees resolution on long-lat projection,
+  and 34 vertical levels.
+- `EMEP0302` domain with 0.3x0.2 degrees resolution on long-lat projection,
   and 34 vertical levels.
 
 Download the input via the catalog tool (:numref:`sec-ModelCode`) as follows:
 
 .. code-block:: bash
 
-    # download 2018 meteorology for the EMEP01 domain
-    catalog.py -Y 2018 -m --met-domain EMEP0201
+    # download 2018 meteorology for the EMEP0302 domain
+    catalog.py -Y 2018 -m --met-domain EMEP0302
+
+    # (optional) download 2015 meteorology for the EECCA domain
+    catalog.py -Y 2015 -m --met-domain EECCA
+
+    # (optional) download 2015 meteorology for the EMEP01 domain
+    catalog.py -Y 2015 -m --met-domain EMEP01
 
     # download other input files
     catalog.py --input
 
 The meteorology files will be placed under
-``EMEP_MSC-W_model.v5.6.OpenSource/meteo2018/EMEP0201/``,
+``EMEP_MSC-W_model.v5.8.OpenSource/meteo2018/EMEP0302/``,
 and the remaining input files will be placed under
-``EMEP_MSC-W_model.v5.6.OpenSource/input/``
+``EMEP_MSC-W_model.v5.8.OpenSource/input/``
 
 This are all input files needed to run the EMEP/MSC-W model,
 except the aircraft emissions (``AircraftEmis_FL.nc``),
+soil |NOx| emissions (``CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim2000-2023_monthly.nc```)
 and forest fire emissions (``FINN_ForestFireEmis_2018.nc``).
-See sections :numref:`emisair` and :numref:`emisff`
+See sections :numref:`emisair`, :numref:`emissoil` and :numref:`emisff`
 for details about these emissions data.
 
 IMPORTANT:
@@ -55,7 +64,7 @@ IMPORTANT:
     Global Ozone      & ``Logan_P.nc``                                & netCDF [#O3]_
     BVOC emissions    & ``EMEP_EuroBVOC.nc``                          & netCDF
     Landuse           & ``glc2000xCLMf18.nc`` and ``Landuse_PS_5km_LC.nc``& netCDF
-    Soil NO emissions & ``CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim_monthly.nc`` & netCDF
+    Soil |NOx| emissions & ``CAMS-GLOB-SOIL_Glb_0.5x0.5_soil_nox_v3.0clim2000-2023_monthly.nc`` & netCDF
     N depositions     & ``AnnualNdep_PS50x_EECCA2005_2009.nc`` (deprecated) & netCDF
     Road dust         & ``RoadMap.nc`` and ``AVG_SMI_2005_2010.nc``   & netCDF [#Optional]_
     Aircraft emissions& ``AircraftEmis_FL.nc``                        & netCDF [#Optional]_
@@ -311,6 +320,8 @@ click 'Login' and provide user name and password. On the new page,
 search for 'Emissions for EMEP', which links directly to the ``Readme`` file
 and the emission data file in NetCDF format. Download the emission data
 file and place it in the input folder.)
+
+.. _`emissoil`:
 
 Soil NO emissions
 ~~~~~~~~~~~~~~~~~
