@@ -21,14 +21,14 @@ import tarfile
 import warnings
 from collections import defaultdict
 from collections.abc import Collection, Iterator
-from contextlib import closing
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import NamedTuple
 
 assert sys.version_info >= (3, 10), "This script requires python3.10 or better"
-warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
+if not hasattr(tarfile, "data_filter"):
+    warnings.filterwarnings("ignore", r".*CVE-2007-4559", RuntimeWarning, "tarfile")
 
 DEFAULT = SimpleNamespace(
     # script version
@@ -416,20 +416,18 @@ class DataPoint:
         if tarfile.is_tarfile(self.dst):
             logging.info(f"Untar    {self}")
             logging.debug(f"{output = }")
-            output.parent.mkdir(parents=True, exist_ok=True)
-            with closing(tarfile.open(self.dst, "r")) as file:
-                if user_consent("  See the contents first?", inspect, "no"):
-                    file.list(verbose=logging.getLogger().level <= logging.INFO)
-                    if not user_consent("  Do you wish to proceed?", inspect):
-                        logging.info("OK, skipping files")
-                        return
-
-                try:
-                    file.extractall(output)
-                except EOFError as error:
-                    logging.error(f"  Failed unpack '{self.dst}':\n    {error}.")
-                    if not user_consent("    Do you wish to continue?", inspect, "yes"):
-                        sys.exit(-1)
+            output.mkdir(parents=True, exist_ok=True)
+            try:
+                untar(
+                    self.dst,
+                    output,
+                    inspect=inspect,
+                    verbose=logging.getLogger().level <= logging.INFO,
+                )
+            except EOFError as error:
+                logging.error(f"  Failed unpack '{self.dst}':\n    {error}.")
+                if not user_consent("    Do you wish to continue?", inspect, "yes"):
+                    sys.exit(-1)
 
         else:
             outfile = output / self.key / self.dst.name
@@ -484,6 +482,30 @@ def download(local: Path, /, remote: str, *, quiet: bool):
     except subprocess.CalledProcessError:
         logging.error(f"Could not download {remote}")
         sys.exit(-1)
+
+
+def untar(file: Path, /, output: Path, *, inspect: bool, verbose: bool):
+    assert tarfile.is_tarfile(file), f"{file} not tarfile"
+    assert output.is_dir(), f"{output} not a directory"
+    with tarfile.open(file) as tar:
+        if user_consent("  See the contents first?", inspect, "no"):
+            tar.list(verbose=verbose)
+            if not user_consent("  Do you wish to proceed?", inspect):
+                logging.info("OK, skipping files")
+                return
+
+        if hasattr(tarfile, "data_filter"):
+            tar.extractall(path=output, filter="data")
+        else:
+            tar.extractall(path=output)
+
+        if output == DEFAULT.output:
+            return
+
+        for member in tar.getmembers():
+            logging.debug(f"{member.name} --> {output}/")
+            path = output.joinpath(member.name)
+            path.rename(output.joinpath(path.name))
 
 
 def read_catalog(filename: Path, /) -> Iterator[DataSet]:
