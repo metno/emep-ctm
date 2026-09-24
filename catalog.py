@@ -381,7 +381,7 @@ class DataPoint:
             }:
                 raise
 
-    def check(self, *, cleanup: bool = False, quiet: bool = False):
+    def check(self, *, cleanup: bool = False, quiet: bool = False) -> bool:
         """Check download against md5sum"""
         if not self.local.is_file():
             return False
@@ -395,7 +395,7 @@ class DataPoint:
                 self.cleanup()
             return False
 
-        if self.md5sum != hashlib.md5(self.local.read_bytes()).hexdigest():
+        if md5sum(self.local) != self.md5sum:
             logging.info(f"  md5 /= {self.md5sum}")
             if cleanup:  # remove broken file
                 self.cleanup()
@@ -413,7 +413,7 @@ class DataPoint:
         quiet |= logging.getLogger().level > logging.INFO
         download(self.local, remote=self.remote, quiet=quiet)
 
-    def unpack(self, inspect: bool = False, output: Path = DEFAULT.output):
+    def unpack(self, output: Path, /, *, inspect: bool = False):
         """Unpack download"""
         if not self.check():
             return
@@ -487,6 +487,11 @@ def download(local: Path, /, remote: str, *, quiet: bool):
     except subprocess.CalledProcessError:
         logging.error(f"Could not download {remote}")
         sys.exit(-1)
+
+
+def md5sum(path: Path) -> str:
+    with path.open(mode="rb") as f:
+        return hashlib.md5(f.read()).hexdigest()
 
 
 def untar(file: Path, /, output: Path, *, inspect: bool, verbose: bool):
@@ -628,7 +633,7 @@ def main(
     # download files
     for x in downloads:
         x.download()
-        x.unpack(ask)
+        x.unpack(DEFAULT.output, inspect=ask)
         if cleanup:
             x.cleanup()
 
