@@ -137,12 +137,12 @@ C. Richter, V. S. Semeena, S. Tsyro, J.-P. Tuovinen, Á. Valdebenito, and P. Win
 Atmos. Chem. Phys., 12, 7825-7865, 2012
 http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html
 
-... but many changes (some major) have been made since then. These changes are reported each year in the "updates" chapter of EMEP Status reports. The latest update concerns v5.6, and is:
+... but many changes (some major) have been made since then. These changes are reported each year in the "updates" chapter of EMEP Status reports. The latest update concerns v5.8, and is:
 
-Simpson, D., Hood, C., van Caspel, W., Vieno, M. and Wind, P.: Updates to the EMEP/MSC-W model, 2024–2025, 
+Simpson, D., Bash, J., Klein, H., Murphy, B., Tsyro, S., van Caspel, W., Wind, P., and Valdebenito, Á.: Updates to the EMEP/MSC-W model, 2025–2026, 
 in: Transboundary particulate matter, photo-oxidants, acidifying and eutrophying components. 
-EMEP Status Report 1/2025, The Norwegian Meteorological Institute, Oslo, Norway, 195–203, 2025.
-https://emep.int/publ/reports/2025/EMEP_Status_Report_1_2025.pdf
+EMEP Status Report 1/2025, The Norwegian Meteorological Institute, Oslo, Norway, 269-279, 2026.
+https://emep.int/publ/reports/2025/EMEP_Status_Report_1_2026.pdf
 
 Please, when referring to the EMEP model, use the appropriate updates reference as well as the 2012 paper, e.g. Simpson et al., (2012, 2025, and references therein).
 
