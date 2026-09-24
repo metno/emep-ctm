@@ -76,18 +76,18 @@ Simpson *et al.*, 2012
 
 Simpson *et al.*, 2017
     Simpson, D., Bergström, R., Imhof, H. and Wind, P.,
-    Updates to the EMEP/MSC-W model, 2016-2017, in 
+    Updates to the EMEP/MSC-W model, 2016-2017, in
     EMEP Status Report 1/2017, pp115-122,
-    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int,
     2017
- 
+
 Simpson *et al.*, 2020a
     Simpson, D., Bergström, R., Tsyro, S. and Wind, P.,
-    Updates to the EMEP/MSC-W model, 2019-2020, in 
+    Updates to the EMEP/MSC-W model, 2019-2020, in
     EMEP Status Report 1/2020, pp155-165,
-    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int,
     2020
-  
+
 Simpson *et al.*, 2020b
     Simpson, D., Bergström, R.,Briolat, A., Imhof, H., Johansson, J.,
     Priestley, M., Valdebenito, A., GenChem v1.0 - a chemical pre-processing and testing system for
@@ -97,17 +97,17 @@ Simpson *et al.*, 2020b
 Simpson *et al.*, 2023
     Simpson, D., van Caspel, W., Benedictow, A., Fagerli, H., Jonson, J.E.,
     Tsyro, S., Valdebenito, A, and Wind P.
-    Updates to the EMEP/MSC-W model, 2022-2023, in 
+    Updates to the EMEP/MSC-W model, 2022-2023, in
     EMEP Status Report 1/2023, pp159-179,
-    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int,
     2023
 
 Simpson *et al.*, 2024
     Simpson, D., van Caspel, W., Benedictow, A., Fagerli, H., Guevara, M.,
     Jonson, J.E., Klein, H., Nyíri, Á., Tsyro, S. and Wind, P.,
-    Updates to the EMEP/MSC-W model, 2023-2024, in 
+    Updates to the EMEP/MSC-W model, 2023-2024, in
     EMEP Status Report 1/2024, pp147-164,
-    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int, 
+    The Norwegian Meteorological Institute, Oslo, Norway, www.emep.int,
     2024
 
 Tuovinen *et al.*, 2004
@@ -121,28 +121,28 @@ Wiedinmyer *et al.*, 2011
     from NCAR (FINN): a high resolution global model to estimate the
     emissions from open burning, *Geosci. Model Dev.*, 4,
     625–641,doi:10.5194/gmd-4-625-2011, 2011
-    
+
 Wind *et al.*, 2020
     Wind, P., Rolstad Denby, B. and Gauss, M.,
-    Local fractions -- a method for the calculation of local source contributions to air pollution, 
+    Local fractions -- a method for the calculation of local source contributions to air pollution,
     illustrated by examples using the EMEP MSC-W model (rv4\_33),
     *Geosci. Model Devel.*, 13, 3, 1623-1634, https://www.geosci-model-dev.net/13/1623/2020/, 2020
 
 Prather, 2015
-    Prather, M. J.: Photolysis rates in correlated overlapping cloud fields: Cloud-J 7.3c, 
-    *Geosci. Model Devel.*, 8, 2587–2595, https://doi.org/10.5194/gmd-8-2587-2015, 2015. 
+    Prather, M. J.: Photolysis rates in correlated overlapping cloud fields: Cloud-J 7.3c,
+    *Geosci. Model Devel.*, 8, 2587–2595, https://doi.org/10.5194/gmd-8-2587-2015, 2015.
 
 van Caspel *et al.*, 2023
-    van Caspel, W. E., Simpson, D., Jonson, J. E., Benedictow, 
-    A. M. K., Ge, Y., di Sarra, A., Pace, G., Vieno, M., Walker, H. L., 
-    and Heal, M. R.: Implementation and evaluation of updated photolysis rates in the EMEP MSC-W 
-    chemistry-transport model using Cloud-J v7.3e, Geosci. Model Dev., 
-    16, 7433–7459, https://doi.org/10.5194/gmd-16-7433-2023, 2023. 
+    van Caspel, W. E., Simpson, D., Jonson, J. E., Benedictow,
+    A. M. K., Ge, Y., di Sarra, A., Pace, G., Vieno, M., Walker, H. L.,
+    and Heal, M. R.: Implementation and evaluation of updated photolysis rates in the EMEP MSC-W
+    chemistry-transport model using Cloud-J v7.3e, Geosci. Model Dev.,
+    16, 7433–7459, https://doi.org/10.5194/gmd-16-7433-2023, 2023.
 
 
 Sofieva *et al.*, 2021
-    Sofieva, V. F., Szeląg, M., Tamminen, J., Kyrölä, E., Degenstein, D., Roth, C., Zawada, D., 
-    Rozanov, A., Arosio, C., Burrows, J. P., Weber, M., Laeng, A., Stiller, G. P., von Clarmann, T., 
-    Froidevaux, L., Livesey, N., van Roozendael, M., and Retscher, C.: Measurement report: regional 
-    trends of stratospheric ozone evaluated using the MErged GRIdded Dataset of Ozone Profiles 
-    (MEGRIDOP), Atmos. Chem. Phys., 21, 6707–6720, https://doi.org/10.5194/acp-21-6707-2021, 2021. 
+    Sofieva, V. F., Szeląg, M., Tamminen, J., Kyrölä, E., Degenstein, D., Roth, C., Zawada, D.,
+    Rozanov, A., Arosio, C., Burrows, J. P., Weber, M., Laeng, A., Stiller, G. P., von Clarmann, T.,
+    Froidevaux, L., Livesey, N., van Roozendael, M., and Retscher, C.: Measurement report: regional
+    trends of stratospheric ozone evaluated using the MErged GRIdded Dataset of Ozone Profiles
+    (MEGRIDOP), Atmos. Chem. Phys., 21, 6707–6720, https://doi.org/10.5194/acp-21-6707-2021, 2021.

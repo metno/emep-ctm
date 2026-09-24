@@ -58,8 +58,8 @@ supercomputers (Itanium2 cluster, Intel Xeon cluster, Cray XT4, IBM
 power5+). It is compatible with all compilers tested so far: Intel, PGI,
 gfortran, XL Fortran. A Makefile is included, the path to NetCDF (``INCL``
 and ``LLIB``) have to be adapted to your machine, and the Fortran compiler
-(``F90``) and flags (``F90FLAGS``) to the compiler you are using. 
-Then the command ``make`` should comple the model and produce the executable 
+(``F90``) and flags (``F90FLAGS``) to the compiler you are using.
+Then the command ``make`` should comple the model and produce the executable
 ``emepctm``
 
 The code has been tested with 1 to 1024 CPUs, and scales well (for large
@@ -144,5 +144,3 @@ In addition there is a run script called ``modrun.sh``, which
 can easily be modified to work on your computer system.
 
 .. _`sec-modelgrid`:
-
-

@@ -10,7 +10,7 @@ In general the parameters and pathes to the input files can all be set in the co
 ``config_emep.nml``
 -------------------
 
-The default parameter, constants and flags are defined in ``Config_module.f90``, and they can be overwritten by ``config_emep.nml`` settings. 
+The default parameter, constants and flags are defined in ``Config_module.f90``, and they can be overwritten by ``config_emep.nml`` settings.
 
 Here is an example of content of the most important parameters:
 
@@ -55,7 +55,7 @@ To set a smaller domain, use ``RUNDOMAIN`` variable in the ``Model_config``
 namelist to indicate the sub-domain indexes. In the config_emep extract above,
 ``RUNDOMAIN`` defines a subdomain with :math:`x=36,\ldots,100; y=50,\ldots,150`\ .
 The indices refer always to the meteo grid (starting from 1).
-If the indices are outside the grid, only the portion within the full grid is taken into account. 
+If the indices are outside the grid, only the portion within the full grid is taken into account.
 
 
 Base run
@@ -83,7 +83,7 @@ see :numref:`ch-output`.
 
 If for some reason the model crashed, please check both the log and the
 error file for any clue of the crash. After fixing the problem the job
-can be submitted again. 
+can be submitted again.
 
 The variables wanted in the output are specified in the
 ``OutputConcs``, ``DDEP_ECOS``, ``DDEP_WANTED``, ``WDEP_WANTED`` and ``OutputVegO3``
@@ -91,8 +91,8 @@ parameters for surface concentrations, depositions and other miscellaneous outpu
 
 The main ouput files are
  - Base_fullrun.nc gives values averaged over the entire simulation.
-   This file has always 1 record and the data is an average over the the period startdate to enddate. 
- - Base_month.nc average over each calendar month (12 records for a yearly run) 
+   This file has always 1 record and the data is an average over the the period startdate to enddate.
+ - Base_month.nc average over each calendar month (12 records for a yearly run)
  - Base_day.nc averages over 24 hours, starting at 06:00 UTC (each record gives average values between 06:00 and 06:00 the next day.
    The first time step is written out at 06:00 hr on 2Jan (i.e the first 6 hours are “lost”).
    The last record may also be averaged only until the end of the run, and not at 06:00.)
@@ -123,7 +123,7 @@ of |SOx|\ , |NOx|\ , CO, VOC, |NH3|, |PM25| and |PMco| from all sectors in the U
 
 -  The first column of the second line represents the country code. (27
    is the code for UK.) The codes for all countries can be found in
-   Fortran module ``Country_mod.f90`` or at (http://www.emep.int/grid/country_numbers.txt). 
+   Fortran module ``Country_mod.f90`` or at (http://www.emep.int/grid/country_numbers.txt).
    The country code must be the same as in the emission files for the given country. Some
    countries and areas are divided into sub-areas in the emission files.
    In this case, one line for each sub-area has to be included into the
@@ -187,10 +187,10 @@ Emissions of |NH3| from country with code 17 only, will be removed from the rect
 Separate hourly outputs
 -----------------------
 
-The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` files can become very large. It is possible to split them into one file per day by adding 
+The ``Base_hour.nc`` and ``Base_uEMEP_hour.nc`` files can become very large. It is possible to split them into one file per day by adding
 the keyword ```HOURLYFILE_ending    = 'JJJ.nc' ```, in the configuration file. ```JJJ```,
 will be automatically replaced by the corresponding day of the year (i.e. a number from 1 to 366 giving for instance ``Base_hour_001.nc``).
-The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```. 
+The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOURLYFILE_ending    = 'YYYYMMDD.nc' ,```.
 
 
 .. _`sec-emission-cv-format`:
@@ -198,10 +198,10 @@ The full date as in ``Base_hour_20180101.nc`` can be obtained by defining ```HOU
 Using and combining gridded emissions: Country Variable (CV) format
 -------------------------------------------------------------------
 
-The gridded emission files are controlled via the ``config_emep.nml`` file. 
+The gridded emission files are controlled via the ``config_emep.nml`` file.
 
 In the CV format, emissions are organised in a number of files (Emis_sourceFiles(i_file)), each files containing a number of sources (Emis_sourceFiles(i_file)%source(j_source)).
-A source can be any 2D field. It can also be a 3D field, if the third dimension is the sector. The sources are associated to country through a country code or a country code. 
+A source can be any 2D field. It can also be a 3D field, if the third dimension is the sector. The sources are associated to country through a country code or a country code.
 The file must have a ‘lon’ and a ‘lat’ variable, showing longitude and latitudes of each grid point. ‘lon’ and ‘lat’ must be 1D variables if the projection is ‘lon lat’, 2D otherwise.
 
 The code directory contain a Python script that can create an emission file in this format: ``emissions_TXT2ncCV.py``
@@ -212,11 +212,11 @@ The file and sources can be characterized by a set of variables. In general thes
   3. Variable attribute read in the netcdf file
   4. Value set for Emis_sourceFiles(i)%XXX in config_emep.nml
   5. Value set for Emis_sourceFiles(i)%source(s)%XXX in config_emep.nml
-  
+
 Exceptions to the priority rule are:
   * maskID cannot be set by attributes in the netcdf file
   * the file and source 'factor' are on top of each other, not replaced
-  * boolean parameters (like apply_femis), are used as "and" (i.e. if any is false, the result is false) 
+  * boolean parameters (like apply_femis), are used as "and" (i.e. if any is false, the result is false)
 
 List of file attributes (default in parenthesis):
   - filename (‘NOTSET’) Name of the file (with path)
@@ -226,12 +226,12 @@ List of file attributes (default in parenthesis):
     It does not need to be exact (cannot be exact on a sphere anyway!).
     This grid_resolution steers the interpolation algorithm;
     A large value will force the code to subdivide each emission gridcell in large number of pieces,
-    that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time. 
+    that are assigned to the model grid. Larger values means smoother interpolation, but more cpu time.
   - periodicity (‘time’) How often the values are updated.
     Can be ‘yearly’, ‘monthly’, ‘hourly’ or ‘time’. ‘hourly’ or ‘time’ means that the time as defined in the netcdf is used to define when to fetch a new record.
     The timestamp must correspond to the end of the time period of validity.
     For ‘yearly’ monthly timefactors are applied, if a sector is defined.
-    For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied. 
+    For ‘monthly’ and ‘yearly’, an hourly timefactor is applied if a sector is defined. For ‘hourly’ or ‘time’, no additional timefactors are applied.
   - factor (1.0) multiplicative factor for all sources in the file
   - units ('NOTSET') will be used as default for sources units if set.
   - apply_femis (true) whether to apply the femis reductions to the sources of this file.
@@ -248,9 +248,9 @@ List of file attributes (default in parenthesis):
 
 List of source attributes:
   - varname (‘NOTSET’) The name as used in the netcdf file
-  - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc) 
+  - species (‘NOTSET’) Either one of the emission group species, as defined in CM_EmisFile.inc (generally sox, nox, pm25, pmco, nh3, co, voc)
   - factor (1.0) multiplicative factor. Can be used to change units to model definitions. Comes on top of the file multiplicative factors and possibly other factors.
-  - units (‘mg/m2/h’) Units *after* the factor multiplication. 
+  - units (‘mg/m2/h’) Units *after* the factor multiplication.
   - countrycode (-1) will be used as default for sources country code if set. Use rather country_ISO if you can.
   - country_ISO (‘N/A’) the country code, as defined in Country_mod.f90 (for example ‘FR’ for France). ‘N/A’ is a valid code, but it does not correspond to any country.
   - apply_femis (true) whether to apply the femis reductions to this source.
@@ -272,7 +272,7 @@ Note about species: These can be interpreted in one of three categories
   3. individual species (SO2, APINENE, O3 ...) without sector (<=0, or not specified).
      No timefactors, vertical realease heights or splits are applied.
      In this case the emissions are summed up in setup_rcemis (not in EmisSet)
-     
+
      Example:
 
 .. code-block:: text
@@ -281,7 +281,7 @@ Note about species: These can be interpreted in one of three categories
   Emis_sourceFiles(1)%filename = '/path/ECLIPSE_V6a_CLE_base_PM25.nc',
   Emis_sourceFiles(1)%sectorsName = 'GNFR',
   Emis_sourceFiles(1)%projection = 'lon lat',
-  Emis_sourceFiles(1)%periodicity = 'yearly',  
+  Emis_sourceFiles(1)%periodicity = 'yearly',
   Emis_sourceFiles(1)%source(1)%varname='emis_tra',
   Emis_sourceFiles(1)%source(1)%species='pm25',
   Emis_sourceFiles(1)%source(1)%sector=6,
@@ -290,7 +290,7 @@ Note about species: These can be interpreted in one of three categories
 
 If two CV emission files are wished to be combined in a single simulation, for example so that different
 emission scenarios can be applied inside and outside of the EMEP region (UNECE excl. NA), one can use
-the Emis_sourceFiles(1)%country_ISO_excl(1:) and Emis_sourceFiles(1)%country_ISO_incl(1:) options. 
+the Emis_sourceFiles(1)%country_ISO_excl(1:) and Emis_sourceFiles(1)%country_ISO_incl(1:) options.
 The below dummy example applies a 2015 baseline scenario inside the EMEP region and 2050 MFR scenario in the rest of the world (ROW),
 based on 0.5 degree emission input data files.
 
@@ -301,28 +301,28 @@ based on 0.5 degree emission input data files.
   Emis_sourceFiles(2)%filename = '/path_to_global_0.5deg_2050_MFR.nc',
   Emis_sourceFiles(1)%country_ISO_incl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
                                                "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
-                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
+                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI",
                                                "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
                                                "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
 
   Emis_sourceFiles(2)%country_ISO_excl(1:48) = "AL", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "CY", "CZ", "DE",
                                                "DK", "EE", "FI", "FR", "GE", "GR", "HR", "HU", "IS", "IE", "IT",
-                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI", 
+                                               "LV", "LT", "LU", "MT", "NL", "NO", "PL", "PT", "MD", "RO", "SI",
                                                "ES", "SE", "CH", "MK", "TR", "SK", "UA", "RS", "ME", "GB", "KG",
                                                "RUSS_EURO", "RUSS_ASIA", "KZT", "FSUA",
 .. code-block:: Fortran
     :caption: TEST.
-    
+
   Why does this not show?
   Because it is not indented enough!
 
 
-   
+
 Masks
 -----
 
 Typically you have got fine scale emissions for a small region of interest, a city for instance. You may want to remove that area from the coarse scale emissions, and replace it with your own. The mask allows you to define a specific region (the mask).
-To define which gridcells to include in your local region, you must find a suitable variable that shows the region of interest. It could be for example the PM emissions in your local area. 
+To define which gridcells to include in your local region, you must find a suitable variable that shows the region of interest. It could be for example the PM emissions in your local area.
 
 A "mask" can be defined for instance with:
 
@@ -353,22 +353,22 @@ A "mask" can be defined for instance with:
     EmisMask(1)%threshold_max = 100, ! ... and smaller than the threshold_max value (default 1E60)
     EmisMask(1)%fac = 0.85, ! muliplicative factor to use. Default 0.0
 
-    
+
 Several masks can be defined. Each mask is identified by their "ID". If you want to include in the region also the gridcell which are zero, you can set the threshold slightly negative (-1.0E-10), to include the entire region covered by the variable (otherwise zero values would be defined equivalently to outside of region). To include for example all values=23, but not 24, set EmisMask(1)%threshold = 22.5 and EmisMask(1)%threshold_max = 23.5
 
-A mask defines only a region. It is not directly related to any pollutant. 
+A mask defines only a region. It is not directly related to any pollutant.
 
 The masks defined here, will also be applied on files from emis_inputlist (old format), if use_mask is set (but the multiplicative factor is always 0.0 for old format emissions). It is however not possible to set masks by both systems simultaneously. In the old format only one mask can be used at a time. It will be the reunion of all masks produced by the system above (the ID is meaningless and cannot be specified in old format).
 
-To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER: 
+To be used with the Local Fractions (see below), one can also define a set of regions defined by integer numbers. For this one must define the ID with the keyword NUMBER:
 
 .. code-block:: Fortran
     :caption: Define a set of masks with integers, example
-    
+
     EmisMask(1)%filename = '/mypath/myfile.nc', !name of the netcdf file to read from
     EmisMask(1)%cdfname  = 'region_id',  !name of the variable to read from the file. The variable must be an integer!
     EmisMask(1)%type     = 'NUMBER',
-    EmisMask(1)%ID       = 'specific-mask-name', 
+    EmisMask(1)%ID       = 'specific-mask-name',
 
 .. _`sec-nesting`:
 
@@ -378,7 +378,7 @@ Nesting
 The model can be run in a large domain and all the concentrations of pollutants stored at fixed intervalls (3 hours typically).
 Then we can define a smaller region within the large domain, and rerun the model in the smaller region, using the stored concentrations at the domain boundaries.
 It is then possible to make a simulation in a restricted region with fine resolution, but still taking account the effect of pollutants from outside the small region.
-This is called nesting. 
+This is called nesting.
 The large domain defines the Boundary Conditions (BC, which are only used at the boundaries of the small domain),
 and possibly the Initial Conditions (IC, which must be defined everywhere in the small domain, but only for the start date).
 
@@ -393,9 +393,9 @@ The mode options are:
         read at the start of run.
     'RESTART'
         read at the start of run, but do not overwrite BC. Use this option when you restart a run
-without changing the domain size ("checkpoint-restart"). The difference with "START" is only that BC are not overwritten. 
+without changing the domain size ("checkpoint-restart"). The difference with "START" is only that BC are not overwritten.
 (This is important in the case of restarting exactly at the start of a month (at time 00:00, the 1st),
-because the nest file contains the BC from preceding month, and if 'START' is used it will use those for the new month, 
+because the nest file contains the BC from preceding month, and if 'START' is used it will use those for the new month,
 i.e. overwrite new BC with old ones.)
     ‘NHOUR’
         read at given ``NEST_NHOURREAD`` hourly intervals, if the file is found.
@@ -430,7 +430,7 @@ In addition, 3D outputs can be asked for at specific date. Example:
       NEST_outdate(1)= 2019,01,01,00,     ! save at end of the 2018 year
       NEST_outdate(2)= 2018,05,17,00,     ! save also 17th of May 2018
     &end
- 
+
 
 Example write BCs
 ~~~~~~~~~~~~~~~~~
@@ -457,7 +457,7 @@ If no ``NEST_out_DOMAIN`` is given, the entire model rundomain will be written o
       !-------- Sub domain for write modes
       NEST_out_DOMAIN       = 60,107,11,58,    ! istart,iend,jstart,jend
     &end
-    
+
 
 Read BCs produced by a previous EMEP MSC-W model run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -500,10 +500,10 @@ it will only be used to define the projection parameters of the inner grid (i.e.
     [...]
       NEST_MET_inner = 'inner_domain/wrfout_d03_2015-01-01_00:00:00',
       NEST_RUNDOMAIN_inner = 12, 136, 100, 300,
-      NEST_thick_inner = 3, 
+      NEST_thick_inner = 3,
     &end
-        
-You cannot use the implicit dates ("YYYY" etc.); you must put explicit numbers. 
+
+You cannot use the implicit dates ("YYYY" etc.); you must put explicit numbers.
 Nest_thick_inner gives the minimum thickness of the non-zero region. default is 1.
 Note that the file will have the same dimensions, but zeros are put into the unused parts.
 The NetCDF internal compression will take care of reducing the actual size, as measured by used disc space.
@@ -519,7 +519,7 @@ Read external BCs
 So far only BC created by the model itself have been used.Reading external BCs,
 i.e. produced by other means (another model for example) is more involved.
 The chemical species may be different and the vertical levels also.
-The vertical axis and variables in the file need then to be mapped to the corresponding model variables. 
+The vertical axis and variables in the file need then to be mapped to the corresponding model variables.
 
 :numref:`nest-mybc-config` shows an example to read every 3 hours from an external
 BC file. The model will read 3 variables from ``MyBC.nc``: |O3|, NO, and |NO2|.
@@ -724,7 +724,7 @@ settings. For the EMEP grid, the relevant USES config flag settings are
 
   USES%DEGREEDAY_FACTORS = T,    ! though F is okay too
   USES%PFT_MAPS = F,
-  USES%CONVECTION = F, 
+  USES%CONVECTION = F,
   USES%ROADDUST = F,
   Vertical_levelsFile = 'DataDir/Vertical_levels20_EC.txt'
 
@@ -740,19 +740,19 @@ while for the generic domain settings these are
   Vertical_levelsFile = 'DataDir/Vertical_levels19_EC.txt',
   timefacs%Monthly = 'GRIDDED',
 
-While the meaning of the above flags is described in more detail below, since EMEP model version 
+While the meaning of the above flags is described in more detail below, since EMEP model version
 rv5.4 the sets of above flags are controlled by the USES%DOMAIN_SETUP_TYPE flag, and no longer included
 as separate USES flags in the config namelist. The DOMAIN_SETUP_TYPE flag currently
 has three options: 'EMEPDOMAIN', 'GenericDOMAIN', and 'Custom_Config'. The 'EMEPDOMAIN' and 'GenericDOMAIN' flags
 trigger their respective USES options described above, and overwrite any USES settings for these flags
-included in the config namelist (by default, these flags are therefore not included in the namelist). If a user wishes 
+included in the config namelist (by default, these flags are therefore not included in the namelist). If a user wishes
 to use custom domain settings, using the 'Custom_Config' domain setting re-activates the use of the above USES
 flags in the config namelist (i.e., these are not overwritten with what would be specified through the 'EMEPDOMAIN'
 and 'GenericDOMAIN' flags). Alternatively, one could for example use 'EMEPDOMAIN', while also specifying
-EMEP_DOMAIN_SETUP%USES_PFTMAPS = T in the config namelist, if the plan is to use PFT maps for European scale modelling. 
+EMEP_DOMAIN_SETUP%USES_PFTMAPS = T in the config namelist, if the plan is to use PFT maps for European scale modelling.
 Additionally, one may specify EMEP_DOMAIN_SETUP%USES_DEGREEDAYS = F to run the simulation without degreedays.
 To avoid confusion as to which domain settings are applied, users are forced to choose either one of the three
-above domain settings. 
+above domain settings.
 
 The ``DEGREEDAY_FACTORS`` setting triggers the use of degree-days in
 controlling residential combustion (GNFR C/SNAP2) emissions. This requires pre-processed files of heating degree days.
@@ -778,9 +778,9 @@ which may be changed to allow more or less influence of this variable.
 covering the EMEP modelling domain (see Input section). However, this input is now deprecated
 and both the Generic and EMEP domain setups set this flag to False.
 
-``Vertical_levelsFile`` controls the number of verticl levels, with the Generic domain 
-setting employing 19 vertical levels rather than 20 for the EMEP domain. For regions outside 
-of Europe high orography and tall trees can make it more scientifically sound to use a 
+``Vertical_levelsFile`` controls the number of verticl levels, with the Generic domain
+setting employing 19 vertical levels rather than 20 for the EMEP domain. For regions outside
+of Europe high orography and tall trees can make it more scientifically sound to use a
 thicker surface layer, with the bottom two layers of the 20-level file being combined
 into a single layer being approximately 90 m thick.
 
@@ -811,7 +811,7 @@ By default the model makes use of global 0.5 degree data from the CAMS2-61 and
 CAMS2-61bis projects (cf Simpson et al., Ch.9 in Denier van der Gon, H., Gauss, M., and Granier, C., eds.: Documentation of CAMS emission inventory products, Copernicus Atmosphere Monitoring Service, doi:10.24380/uag-0svt,
 https://atmosphere.copernicus.eu/node/1365, 2025)
 but the user needs
-to specify the data to be used from this system. 
+to specify the data to be used from this system.
 The choice, between ``Total``  and ``NoFert`` depends
 on the anthropogenic emission inventory in use.
 
@@ -857,7 +857,7 @@ Normally this partioning is done such that the X and Y direction are divided int
 For runs in lat lon projection containing poles the Y division is done into one or two parts,
 so that each processor has the same share of pole regions.
 The default partitioning can be overrided using the ``DOMAIN_DECOM_MODE`` parameter in ``config_emep.nml``.
-Recognized values are: 
+Recognized values are:
 `'X*Y'`, `'XY'`, `'X*1'`, `'Y=1'`, `'X'`, `'1*Y'`, `'X=1'`, `'Y'`, `'2*Y'`, `'X=2'`, `'X*2'`, `'Y=2'`.
 See also in ``Par_mod.f90`` for details.
 
@@ -933,23 +933,23 @@ Here is an example of how to define a new sector with a new height distribution,
     :caption: Settings for defining the pm 2.5 emissions from the file MyEmis.nc with variable name 'pm25_MyCar', with emission released between 20 and 50 meters.
 
     Emis_Zlevels(1:)20.0,   50.0,   92.0,  184.0,  324.0,  522.0,  781.0, 1106.0,
-    Emis_h(1:,1) = 0.000,  0.000,  0.000,  0.003,  0.147,  0.400,  0.300,  0.150, 
+    Emis_h(1:,1) = 0.000,  0.000,  0.000,  0.003,  0.147,  0.400,  0.300,  0.150,
     Emis_h(1:,2) = 1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
-    Emis_h(1:,3) = 0.060,  0.067,  0.093,  0.750,  0.030,  0.000,  0.000,  0.000, 
-    Emis_h(1:,4) = 0.050,  0.063,  0.087,  0.700,  0.100,  0.000,  0.000,  0.000, 
+    Emis_h(1:,3) = 0.060,  0.067,  0.093,  0.750,  0.030,  0.000,  0.000,  0.000,
+    Emis_h(1:,4) = 0.050,  0.063,  0.087,  0.700,  0.100,  0.000,  0.000,  0.000,
     Emis_h(1:,5) = 0.020,  0.034,  0.046,  0.600,  0.300,  0.000,  0.000,  0.000,
     Emis_h(1:,6) = 0.000,  0.000,  0.000,  0.410,  0.570,  0.020,  0.000,  0.000,
-    Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153, 
-    Emis_h(1:,8) = 0.000,  1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000, 
-      
+    Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153,
+    Emis_h(1:,8) = 0.000,  1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
+
     emis_inputlist(1)%name='GNFR.nc',
     emis_inputlist(2)%name='MyEmis.nc',
     emis_inputlist(2)%sector='MyNewSector',
     SECTORS_ADD(1) = 'MyNewSector', 'MyTestSector',  'MyCar',  7, 8,  6, 'Special car exhaust', 'pm25',
- 
+
 Note that if you define new splits, you must include defaults values in all the default files (even if they are overwritten by the specials).
 
-    
+
 
 Technical
 =========
@@ -963,6 +963,4 @@ There are three types of timesteps in the model: ``METSTEP``, ``dt_advec`` and `
 ``dt_advec`` is the "time splitting" interval, i.e. the time between two sequences of advection-chemsitry/emissions-deposition. (Note that the name is misleading, the advection can have a smaller internal timestep if it is requird by the Courant number). The value of dt_advec must be an entire fraction of one hour (units seconds). It is determined by the model using the grid resolution. For a grid resolution larger than 61 km it is 1800s, or 1200s if larger than 21km, or 900s if larger than 11km, or 600s if larger than 6km, or 300s if larger than 2km or 100s if smaller than 2km. Those value can be overriden by defining it in ``config_emep.nml``. You can check the value in the standard output ("advection time step (dt_advec) set to: 1200 seconds").
 
 
-The values of ``dtchem`` are the internal Chemistry timesteps. It is variable: usually the first 5 steps last 20 seconds, then followed by 10 larger timesteps, so that the sum of all ``dtchem`` timesteps is exactly equal to ``dt_advec``. They are printed out in standard output. Note that emissions are included as a source in  the Chemistry, and thus have the same timesteps. 
-
-
+The values of ``dtchem`` are the internal Chemistry timesteps. It is variable: usually the first 5 steps last 20 seconds, then followed by 10 larger timesteps, so that the sum of all ``dtchem`` timesteps is exactly equal to ``dt_advec``. They are printed out in standard output. Note that emissions are included as a source in  the Chemistry, and thus have the same timesteps.

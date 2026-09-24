@@ -98,7 +98,7 @@ IMPORTANT:
 .. [#Optional] Optional, in most cases.
 .. [#POLL] ``POLL``: pollutant type (|NH3|\ , CO, |NOx|\ , |SOx|\ , NMVOC, |PM25| and |PMco|\ ).
 .. [#MONTHLY] ``MONTHLY``: monthly mean gridded stratospheric ozone and temperature data for years between 2005-2021. Also includes monthly climatologies constructed based on the years of available measurements.
-.. [#MOLECULAR] ``MOLECULAR``: spectral data on aerosol and cloud radiative scattering and absorption, as well as molecular data on reaction-specific cross-section and quantum yields. 
+.. [#MOLECULAR] ``MOLECULAR``: spectral data on aerosol and cloud radiative scattering and absorption, as well as molecular data on reaction-specific cross-section and quantum yields.
 
 NetCDF files
 ------------
@@ -231,7 +231,7 @@ potenitals for these 4 categories. These emission potentials have unit
 forest category.
 
 On the global scale, new landcover maps were created as a combination of
-GLC2000 and Community Land Model (CLM) data as described in 
+GLC2000 and Community Land Model (CLM) data as described in
 Simpson *et al.*, 2017.
 The default emission potentials
 are given for these extra CLM categories, and for any non-forest land-cover on
@@ -292,7 +292,7 @@ emissions is global. Hence road dust emissions can currently only be calculated
 for the European domain. However, some countries for which road dust is important
 (e.g., Scandinavian countries), reported emissions already include road dust. By
 default we therefore set ``USES%ROADDUST=F``, with road dust as a separate
-emission source effectively being deprecated. 
+emission source effectively being deprecated.
 
 .. _`emisair`:
 
@@ -439,7 +439,7 @@ The emission time factors can be changed in ``config_emep.nml``.
 For runs outsude Europe, :numref:`cams-tempo-gridded` shows how configure the model
 for using gridded montly factors from CAMS-TEMPO v3.2/v4.1 descrived on Simpson *et al.*, 2023.
 
-Monthly, daily and hourly emission time factors can be specified on serparate ASCII files 
+Monthly, daily and hourly emission time factors can be specified on serparate ASCII files
 for the 7 compounds (CO, |NH3|\ , |NOx|\ , |PM25|\ , |PMco|\ , |SOx| and VOC).
 On all time factor files the first two columns in the files contrain the country code
 (ISO02, http://www.emep.int/grid/country_numbers.txt)
@@ -475,7 +475,7 @@ see Simpson et al. (2012) section 6.1.2.
   :name: cams-tempo
   :caption: Default configuration for CAMS-TEMPO emission time factors.
 
-    timeFacs%Monthly = 'CAMS_TEMPO_CLIM', 
+    timeFacs%Monthly = 'CAMS_TEMPO_CLIM',
     MonthlyFacFile   = 'DataDir/Timefactors/CAMS_TEMPO/cams_tempo_v3_2/GapFilled/cams_tempo_v3_2_month.POLL',
 
     timeFacs%Daily   = 'CAMS_TEMPO_CLIM',
@@ -510,14 +510,14 @@ see Simpson et al. (2012) section 6.1.2.
 Emission heights
 ~~~~~~~~~~~~~~~~
 
-In previous versions the emission height distributions was given in a separate file. Now it is 
+In previous versions the emission height distributions was given in a separate file. Now it is
 part of the code, and can also be modified by the users using config_emep.nml setting
 (see section "defining own sectors).
 
-A set of vertical distribution for different sectors are predefined in the model. 
+A set of vertical distribution for different sectors are predefined in the model.
 The release heights are defined as a set of fractions released into predefined layers.
 
-The release height definitions are independent of the layers used by the model. 
+The release height definitions are independent of the layers used by the model.
 
 There are 8 predefined release heights distributions. Those can also be defined through the config_emep.nml setting. The following will give exactly the same distributions as the predefined. You can then modify the values, or add new defined distributions.
 
@@ -525,20 +525,20 @@ There are 8 predefined release heights distributions. Those can also be defined 
     :caption: Default definition of emission height distributions
 
     Emis_Zlevels(1:)20.0,   50.0,   92.0,  184.0,  324.0,  522.0,  781.0, 1106.0,
-    Emis_h(1:,1) = 0.000,  0.000,  0.000,  0.003,  0.147,  0.400,  0.300,  0.150, 
+    Emis_h(1:,1) = 0.000,  0.000,  0.000,  0.003,  0.147,  0.400,  0.300,  0.150,
     Emis_h(1:,2) = 1.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
-    Emis_h(1:,3) = 0.060,  0.067,  0.093,  0.750,  0.030,  0.000,  0.000,  0.000, 
-    Emis_h(1:,4) = 0.050,  0.063,  0.087,  0.700,  0.100,  0.000,  0.000,  0.000, 
+    Emis_h(1:,3) = 0.060,  0.067,  0.093,  0.750,  0.030,  0.000,  0.000,  0.000,
+    Emis_h(1:,4) = 0.050,  0.063,  0.087,  0.700,  0.100,  0.000,  0.000,  0.000,
     Emis_h(1:,5) = 0.020,  0.034,  0.046,  0.600,  0.300,  0.000,  0.000,  0.000,
     Emis_h(1:,6) = 0.000,  0.000,  0.000,  0.410,  0.570,  0.020,  0.000,  0.000,
-    Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153, 
+    Emis_h(1:,7) = 0.200,  0.300,  0.020,  0.044,  0.066,  0.094,  0.123,  0.153,
     Emis_h(1:,8) = 0.200,  0.800,  0.000,  0.000,  0.000,  0.000,  0.000,  0.000,
 
-The ``Emis_Zlevels`` defines the height of the layer boundaries for emissions in meters. (Standard atmosphere is assumed to transform those in Pressure by the model). The first layers is from surface to 20 meters, the second layer from 20 to 50 m... until the eigth and last layer which runs from 781 to 1106 meters. 
+The ``Emis_Zlevels`` defines the height of the layer boundaries for emissions in meters. (Standard atmosphere is assumed to transform those in Pressure by the model). The first layers is from surface to 20 meters, the second layer from 20 to 50 m... until the eigth and last layer which runs from 781 to 1106 meters.
 
-For example sectors defined with the height index "1", will release nothing in the three lowest layers, 0.3% into the fourth layer, 14.7% into the fifth layer etc. 
+For example sectors defined with the height index "1", will release nothing in the three lowest layers, 0.3% into the fourth layer, 14.7% into the fifth layer etc.
 
-The layers defined in Emis_h are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified. 
+The layers defined in Emis_h are independent from the layers used in the model run and do not need to be adapted if the number of model layers is modified.
 The actual resulting distribution of emissions into model layers is computed by the model and will be shown in the standard output.
 
 
@@ -578,7 +578,7 @@ these the gridded files is given in files labelled
 ``emissplit.defaults.POLL`` or ``emissplit.specials.POLL``,
 where ``POLL`` can be |NOx|\ , VOC, etc.
 
-The defaults file give the emission split for each sector split index 
+The defaults file give the emission split for each sector split index
 (one per row, with second index being the sector split index), which is applied to all
 countries by default. For VOC this split was derived from the UK
 inventory of Passant (2002), as part of the chemical comparison project
@@ -653,24 +653,24 @@ Photo-dissociation rates
 
 The photo-dissociation rates (J-values) are calculated using the online
 Cloud-J v7.3e radiative transfer code (Prather, 2015), with the old system based on tabulated
-values being deprecated. Cloud-J calculates aerosol and cloud radiative 
-scattering and reaction-specific photolysis rates at model run time, based 
-on the instantaneous modeled abundance of radiatively active species. 
-The implemention of Cloud-J in the EMEP model and the input files are described 
+values being deprecated. Cloud-J calculates aerosol and cloud radiative
+scattering and reaction-specific photolysis rates at model run time, based
+on the instantaneous modeled abundance of radiatively active species.
+The implemention of Cloud-J in the EMEP model and the input files are described
 in detail in van Caspel *et al.* (2023).
 
-The input files include molecular cross-section and quantum yield data (``FJX_spec``), 
+The input files include molecular cross-section and quantum yield data (``FJX_spec``),
 determining the reaction rates of each individual photolysis reaction.
 For the photo-dissociation of tropospheric ozone, absorption of the relevant
 wavelengths by stratospheric ozone is important. Monthly mean overhead
-stratospheric ozone concentrations based on the MEGRIDOP dataset (Sofieva *et al.*, 2021) are 
-provided as separate input files, which are read in automatically when the model is 
-configured to use these files (available between 2005-2021). However, by default the 
+stratospheric ozone concentrations based on the MEGRIDOP dataset (Sofieva *et al.*, 2021) are
+provided as separate input files, which are read in automatically when the model is
+configured to use these files (available between 2005-2021). However, by default the
 EMEP model uses climatological monthly mean files, which are provided as separate inputs.
 
-Input files further include cloud and aerosol radiative scattering and 
-absorption phase functions, as well as parameter fields representative of 
-a climatological background atmosphere. Lastly, the input files include 
+Input files further include cloud and aerosol radiative scattering and
+absorption phase functions, as well as parameter fields representative of
+a climatological background atmosphere. Lastly, the input files include
 a file describing the mapping of photolysis rates to reactions present
 in the EMEP model chemistry (``FJX_j2j.dat``).
 
@@ -756,5 +756,3 @@ separated files that can be read by excel. netcdf versions of these files
 are also provided, ``sites_2018.nc`` and ``sondes_2018.nc``.
 If you include the whole year, or the 31\ :sup:`st` December,
 ``sites_2019.csv`` and ``sondes_2019.csv`` are also included in the output.
-
-

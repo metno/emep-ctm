@@ -165,18 +165,18 @@ Emission outputs
 
 ``Emis_mgm2_XX`` fields in the output, give all emissions used by the model (accumulated over the relevant period). ``Sec_Emis_mgm2_XX`` are "sector emissions" as defined in the sector emission files, i.e. includes only contributions from the files defined in Emis_sourceFiles. ``Sec_Emis_mgm2_XX`` do not include emissions such as volcanoes, forest fires, DMS, lightning, aircraft etc.
 Note that for VOC, some emissions from the sector file are set as "unreactive"; those will show under ``Sec_Emis_mgm2_voc`` but not under ``Emis_mgm2_voc``.
-For hourly outputs of emissions set 
+For hourly outputs of emissions set
 
 .. code-block:: fortran
 
   HourlyEmisOut = T,
 
-For daily outputs of emissions set 
+For daily outputs of emissions set
 
 .. code-block:: fortran
 
   DailyEmisOut = T,
-  
+
 Detailed emissions by sectors can be obtained with the keyword ``SecEmisOutWanted`` for the wanted sectors. For example adding the lines:
 
 .. code-block:: fortran
@@ -211,7 +211,7 @@ The meteorological fields defined in the ``met`` array in the ``MetFields_mod.f9
 If you want an array that does not fit in any category, or even make your own special field, you can get it in the output using the procedure shown below; this will however require that you write in the code and recompile.
 For instance in config_emep.nml OutputMisc define:
 
-``  'J(NO2)'  ,'USET','D3_J(NO2)'  ,'photorate','1/s' ,-99,-99,F,1.0,T,'H',`` 
+``  'J(NO2)'  ,'USET','D3_J(NO2)'  ,'photorate','1/s' ,-99,-99,F,1.0,T,'H',``
 
 - The first column (name) is the name as shown in the output
 - The second column (class) must be 'USET'
@@ -230,7 +230,7 @@ In the code you must define the indice of your new ouput. The requested outputs 
 .. code-block:: fortran
 
     photo_out_ix = find_index("D3_J(NO2)", f_3d(:)%subclass)
-    
+
 and the values of the field must be put into the d_2d or d_3d array, using this index, for instance:
 
 .. code-block:: fortran
@@ -284,10 +284,10 @@ as shown in :numref:`output-deps`.
       'HNO3'                ,'ugN' ,'2d','AIR_CONCS','SPEC' ,'YMD',
       'NH3'                 ,'ugN' ,'2d','AIR_CONCS','SPEC' ,'YMD',
       'SO2'                 ,'ugS' ,'2d','AIR_CONCS','SPEC' ,'YMD',
-      'SO4'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',    
+      'SO4'                 ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
       'NO3_F'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
       'NO3_C'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
-      'PNO3'                ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',    
+      'PNO3'                ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
       'NH4_F'               ,'ug'  ,'2d','AIR_CONCS','SPEC' ,'YMD',
       'SIA'                 ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
       'ECFINE'              ,'ug'  ,'2d','AIR_CONCS','GROUP','YMD',
@@ -362,5 +362,3 @@ as shown in :numref:`output-deps`.
       'RDN'      ,'GROUP','mgN','YMD',
       'SO2'      ,'SPEC' ,'mgS','YMD',
       'HNO3'     ,'SPEC' ,'mgN','YMD',
-
-
