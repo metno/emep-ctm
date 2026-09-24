@@ -51,7 +51,7 @@ DEFAULT = SimpleNamespace(
     output=Path("."),
 )
 
-_CONST = {
+_CONST: dict[str, str] = {
     "THREDDS": "https://projects.met.no/emep/Thredds_Meteo",
     "FTP": "https://projects.met.no/emep",
     "GIT": "https://github.com/metno/emep-ctm/",
@@ -287,19 +287,23 @@ class DataPoint:
         key: str,
         year: str | int,
         model: str,
-        src: str,
-        dst: str | Path = "",
-        byteSize: str | int = 0,
-        md5sum: str | None = None,
+        remote: str,
+        local: str,
+        byteSize: str | int,
+        md5sum: str,
     ):
         """Initialize object"""
 
         self.release: int = int(release)  # release date (YYYYMM)
         self.key: str = key
-        self.tag: str = {  # eg 'rv4_8source'
-            "other": "{KEY}{REL}",
-            "meteo": "{KEY}{YEAR}",
-        }.get(self.key, "{MOD}{KEY}")
+        self.tag: str  # eg 'rv4_8source'
+        match self.key:
+            case "other":
+                self.tag = f"{key}{release}"
+            case "meteo":
+                self.tag = f"{key}{year}"
+            case _:
+                self.tag = f"{model}{key}"
 
         self.year: int | None
         try:
@@ -313,44 +317,45 @@ class DataPoint:
         except ValueError:
             self.model = None
 
-        self.src: str  # single source url/file
-        self.dst: Path  # path for uncompressed self.dst
-        self.size: int = int(byteSize)  # self.src file size [bytes]
-        self.md5sum = md5sum  # self.src checksum
+        self.remote: str  # single source url/file
+        self.local: Path  # local path for self.remote
+        self.size: int = int(byteSize)  # self.local file size [bytes]
+        self.md5sum: str = md5sum  # self.local checksum
 
         # replace keywords
-        kwargs: dict[str, str | int | None] = _CONST.copy()  # type:ignore[assignment]
-        kwargs.update(REL=self.release, KEY=self.key, YEAR=self.year, MOD=self.model)
-        self.tag = self.tag.format_map(kwargs)
-        kwargs.update(TAG=self.tag)
-        self.src = src.format_map(kwargs)
-        if isinstance(dst, Path):
-            self.dst = dst
-        elif not dst:
+        kwargs: dict[str, str | int | None] = {
+            "REL": self.release,
+            "KEY": self.key,
+            "YEAR": self.year,
+            "MOD": self.model,
+            **_CONST,
+        }
+        self.remote = remote.format_map(kwargs)
+
+        if not local:
             assert isinstance(DEFAULT.downloads, Path)
-            self.dst = DEFAULT.downloads / self.tag / Path(self.src).name
+            self.local = DEFAULT.downloads / self.tag / Path(self.remote).name
         else:
-            self.dst = Path(dst.format_map(kwargs))
-        if self.dst.name == "pdf":
-            self.dst = self.dst.with_name("emep-ctm.pdf")
-        if not self.dst.suffix and self.dst.name != "README":
-            self.dst /= Path(self.src).name
+            self.local = Path(local.format_map(kwargs))
+        if self.local.name == "pdf":
+            self.local = self.local.with_name("emep-ctm.pdf")
+        if not self.local.suffix and self.local.name != "README":
+            self.local /= Path(self.remote).name
 
     def __str__(self) -> str:
-        return f"{self.tag:>14} {self.file_size:>6} {self.dst}"
+        return f"{self.tag:>14} {self.file_size:>6} {self.local}"
 
     def __repr__(self) -> str:
-        return f"{self.file_size:>6} {self.dst.name}"
+        return f"{self.file_size:>6} {self.local.name}"
 
     def __hash__(self) -> int:
-        """find unique self.src occurrences"""
-        return hash(repr(self.src))
+        """find unique self.remote occurrences"""
+        return hash(repr(self.remote))
 
     def __eq__(self, other) -> bool:
         if isinstance(other, DataPoint):
-            return self.src == other.src
-        else:
-            return False
+            return self.remote == other.remote
+        return False
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
@@ -361,14 +366,14 @@ class DataPoint:
 
     def cleanup(self):
         """Remove (raw) downloads"""
-        if not self.dst.is_file():
+        if not self.local.is_file():
             return
         logging.info(f"Cleanup  {self}")
 
         try:
-            self.dst.unlink()
-            if self.dst.parent != "":
-                self.dst.parent.rmdir()
+            self.local.unlink()
+            if self.local.parent != Path("."):
+                self.local.parent.rmdir()
         except OSError as error:
             if error.errno not in {
                 errno.EPERM,  # operation not permitted (permissions)
@@ -378,19 +383,19 @@ class DataPoint:
 
     def check(self, *, cleanup: bool = False, quiet: bool = False):
         """Check download against md5sum"""
-        if not self.dst.is_file():
+        if not self.local.is_file():
             return False
 
         if not quiet:
             logging.info(f"Check    {self}")
 
-        if self.dst.stat().st_size == 0:
+        if self.local.stat().st_size == 0:
             logging.info("  empty file")
             if cleanup:  # remove empty file
                 self.cleanup()
             return False
 
-        if self.md5sum != hashlib.md5(self.dst.read_bytes()).hexdigest():
+        if self.md5sum != hashlib.md5(self.local.read_bytes()).hexdigest():
             logging.info(f"  md5 /= {self.md5sum}")
             if cleanup:  # remove broken file
                 self.cleanup()
@@ -406,35 +411,35 @@ class DataPoint:
         logging.info(f"Download {self}")
         quiet = self.size < 1_048_576 * 128  # 128M
         quiet |= logging.getLogger().level > logging.INFO
-        download(self.dst, remote=self.src, quiet=quiet)
+        download(self.local, remote=self.remote, quiet=quiet)
 
     def unpack(self, inspect: bool = False, output: Path = DEFAULT.output):
         """Unpack download"""
         if not self.check():
             return
 
-        if tarfile.is_tarfile(self.dst):
+        if tarfile.is_tarfile(self.local):
             logging.info(f"Untar    {self}")
             logging.debug(f"{output = }")
             output.mkdir(parents=True, exist_ok=True)
             try:
                 untar(
-                    self.dst,
+                    self.local,
                     output,
                     inspect=inspect,
                     verbose=logging.getLogger().level <= logging.INFO,
                 )
             except EOFError as error:
-                logging.error(f"  Failed unpack '{self.dst}':\n    {error}.")
+                logging.error(f"  Failed unpack '{self.local}':\n    {error}.")
                 if not user_consent("    Do you wish to continue?", inspect, "yes"):
                     sys.exit(-1)
 
         else:
-            outfile = output / self.key / self.dst.name
+            outfile = output / self.key / self.local.name
             logging.info(f"Copy     {self}")
             logging.debug(f"{outfile = }")
             outfile.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(self.dst, outfile)
+            shutil.copyfile(self.local, outfile)
 
 
 class DataSet(NamedTuple):
