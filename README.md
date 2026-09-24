@@ -144,7 +144,7 @@ in: Transboundary particulate matter, photo-oxidants, acidifying and eutrophying
 EMEP Status Report 1/2026, The Norwegian Meteorological Institute, Oslo, Norway, 269-279, 2026.
 https://emep.int/publ/reports/2025/EMEP_Status_Report_1_2026.pdf
 
-Please, when referring to the EMEP model, use the appropriate updates reference as well as the 2012 paper, e.g. Simpson et al., (2012, 2025, and references therein).
+Please, when referring to the EMEP model, use the appropriate updates reference as well as the 2012 paper, e.g. Simpson et al., (2012, 2026, and references therein).
 
 ## Running the model
 
