@@ -11,6 +11,7 @@ simplified access to the source code, input data and benchmark results.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import logging
 import shutil
@@ -369,9 +370,10 @@ class DataPoint:
             if self.dst.parent != "":
                 self.dst.parent.rmdir()
         except OSError as error:
-            #  1: operation not permitted (permissions?)
-            # 39: directory was not empty
-            if error.errno not in {1, 39}:
+            if error.errno not in {
+                errno.EPERM,  # operation not permitted (permissions)
+                errno.ENOTEMPTY,  # non-empty directory
+            }:
                 raise
 
     def check(self, *, cleanup: bool = False, quiet: bool = False):
