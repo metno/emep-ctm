@@ -3,6 +3,10 @@
 Open Source EMEP/MSC-W model
 simplified access to the source code, input data and benchmark results.
 """
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 
 from __future__ import annotations
 
@@ -365,12 +369,10 @@ class DataPoint:
             if self.dst.parent != "":
                 self.dst.parent.rmdir()
         except OSError as error:
-            if error.errno == 1:  # operation not permitted (permissions?)
-                pass
-            elif error.errno == 39:  # directory was not empty
-                pass
-            else:
-                raise error
+            #  1: operation not permitted (permissions?)
+            # 39: directory was not empty
+            if error.errno not in {1, 39}:
+                raise
 
     def check(self, *, cleanup: bool = False, quiet: bool = False):
         """Check download against md5sum"""
@@ -465,8 +467,7 @@ class DataSet(NamedTuple):
         for src in self.source:
             if src.model is not None:
                 return src.model
-        else:
-            raise ValueError("no sources in DataSet")
+        raise ValueError("no sources in DataSet")
 
     @property
     def year(self) -> int:
@@ -474,8 +475,7 @@ class DataSet(NamedTuple):
         for met in self.meteo:
             if met.year is not None:
                 return met.year
-        else:
-            raise ValueError("no meteo in DataSet")
+        raise ValueError("no meteo in DataSet")
 
     def __str__(self):
         return f"{self.tag:>8} (release:{self.release}, meteo:{self.year})"
