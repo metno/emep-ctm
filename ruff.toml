@@ -1,0 +1,9 @@
+line-length = 99
+fix = true
+show-fixes = true
+
+
+[lint]
+ignore = [
+    "LOG015", # https://docs.astral.sh/ruff/rules/root-logger-call/
+]
