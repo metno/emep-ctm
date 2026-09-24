@@ -10,7 +10,8 @@ year 2018. :numref:`tab-inputdata` lists the input files.
 
 Since version 5.5 release meteorology for 2018 is provided for the `EMEP0302` model domain.
 Previous releases provided meteorology for 2015 for the `EECCA` and `EMEP01` model domain.
-- `EECCA` domain with a horizontal resolution of 50x50 km2 (at 60°N), 
+
+- `EECCA` domain with a horizontal resolution of 50x50 km2 (at 60°N),
   on polar stereographic projection, and 20 vertical levels;
 - `EMEP01` domain with 0.1x0.1 degrees resolution on long-lat projection,
   and 34 vertical levels.
