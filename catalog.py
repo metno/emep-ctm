@@ -406,18 +406,7 @@ class DataPoint:
         logging.info(f"Download {self}")
         quiet = self.size < 1_048_576 * 128  # 128M
         quiet |= logging.getLogger().level > logging.INFO
-
-        self.dst.parent.mkdir(parents=True, exist_ok=True)
-        if quiet:
-            cmd = f"curl -sLo {self.dst} {self.src}"
-        else:
-            cmd = f"curl -#Lo {self.dst} {self.src}"
-        try:
-            logging.debug(cmd)
-            subprocess.check_call(cmd.split())
-        except subprocess.CalledProcessError:
-            logging.error(f"Could not download {self.src}")
-            sys.exit(-1)
+        download(self.dst, remote=self.src, quiet=quiet)
 
     def unpack(self, inspect: bool = False, output: Path = DEFAULT.output):
         """Unpack download"""
@@ -483,13 +472,27 @@ class DataSet(NamedTuple):
         return f"{self.tag:>8} (release:{self.release}, meteo:{self.year})"
 
 
-def read_catalog(filename: Path) -> Iterator[DataSet]:
+def download(local: Path, /, remote: str, *, quiet: bool):
+    local.parent.mkdir(parents=True, exist_ok=True)
+    if quiet:
+        cmd = f"curl -sLo {local} {remote}"
+    else:
+        cmd = f"curl -#Lo {local} {remote}"
+    try:
+        logging.debug(cmd)
+        subprocess.check_call(cmd.split())
+    except subprocess.CalledProcessError:
+        logging.error(f"Could not download {remote}")
+        sys.exit(-1)
+
+
+def read_catalog(filename: Path, /) -> Iterator[DataSet]:
     """releases read from catalog csv-file"""
     from csv import reader
 
     # download catalog if file not found
     if not filename.is_file():
-        DataPoint(0, "catalog", 0, "", DEFAULT.remote, filename).download()
+        download(filename, DEFAULT.remote, quiet=True)
 
     # catalog file should be present at this point
     with open(filename) as file:
