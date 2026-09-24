@@ -142,7 +142,7 @@ http://www.atmos-chem-phys.net/12/7825/2012/acp-12-7825-2012.html
 Simpson, D., Bash, J., Klein, H., Murphy, B., Tsyro, S., van Caspel, W., Wind, P., and Valdebenito, Á.: Updates to the EMEP/MSC-W model, 2025–2026, 
 in: Transboundary particulate matter, photo-oxidants, acidifying and eutrophying components. 
 EMEP Status Report 1/2026, The Norwegian Meteorological Institute, Oslo, Norway, 269-279, 2026.
-https://emep.int/publ/reports/2025/EMEP_Status_Report_1_2026.pdf
+https://emep.int/publ/reports/2026/EMEP_Status_Report_1_2026.pdf
 
 Please, when referring to the EMEP model, use the appropriate updates reference as well as the 2012 paper, e.g. Simpson et al., (2012, 2026, and references therein).
 
