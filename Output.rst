@@ -130,9 +130,9 @@ selected output parameters, see provided output NetCDF files, or
     ``SURF_ug_DUST``        & Mineral dust             [|ugm3|\ ] & From all sources
     ``SURF_ug_PM10``        & |PM10| dry [|ugm3|\ ]               &
     ``SURF_ug_PM10_rh50``   & |PM10| wet [|ugm3|\ ]               & |PM10| particle water at 50 %rh
-    ``SURF_ug_PM25``        & |PM25| dry [|ugm3|\ ]               & Includes fine PM and 27% of coarse |NO3|
+    ``SURF_ug_PM25``        & |PM25| dry [|ugm3|\ ]               & Includes fine PM
     ``SURF_ug_PM25_rh50``   & |PM25| wet [|ugm3|\ ]               & |PM25| particle water at 50 %rh
-    ``SURF_ug_PM25X``       & |PM25| dry [|ugm3|\ ]               & Includes fine PM and 27% of coarse |NO3|\ , EC and OM
+    ``SURF_ug_PM25X``       & |PM25| dry [|ugm3|\ ]               & Includes fine PM, EC and OM
     ``SURF_ug_PM25X_rh50``  & |PM25|     [|ugm3|\ ]               & As ``PM25X`` + particle water at 50 %rh
     ``SURF_ug_PMFINE``      & Fine PM [|ugm3|\ ]                  & Sum of all fine aerosols
     ``SURF_ug_PPM25``       & Primary |PM25| [|ugm3|\ ]           & Anthropogenic emissions
