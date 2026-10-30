@@ -36,12 +36,10 @@ for a whole year, and sometimes with a smaller test run for e.g. April.
                         & selection of compounds               &
    ``Base_fullrun.nc``  & Gridded yearly  values of a          & NetCDF
                         & selection of compounds               &
-   ``sites_YYYY.nc``    & Surface daily   values of a          & NetCDF [#YY]_
-                        & selection of stations and compounds  &
-   ``sondes_YYYY.nc``   & Vertical daily  values of a          & NetCDF [#YY]_
-                        & selection of stations and compounds  &
-   ``sites_YYYY.cvs``   & ASCII version of ``sites_YYYY.nc``   & ASCII
-   ``sondes_YYYY.csv``  & ASCII version of ``sondes_YYYY.nc``  & ASCII [#Old]_
+   ``sites_YYYY.nc``    & Single-level station samples, means or totals & NetCDF [#YY]_
+   ``sondes_YYYY.nc``   & Instantaneous vertical profiles              & NetCDF [#YY]_
+   ``sites_YYYY.csv``   & Optional station text output                 & CSV
+   ``sondes_YYYY.csv``  & Optional flattened profile text output       & CSV
    **Additional files**
    ``RunLog.out``       & Summary log of runs, including total emissions & ASCII
                         & of different air pollutants per country        &
@@ -239,27 +237,251 @@ and the values of the field must be put into the d_2d or d_3d array, using this 
 
 (for 2D output, write in d_2d and ommit the vertical index)
 
-.. _`sec-sitessondes-output`:
+.. _sec-sitessondes-output:
 
-ASCII outputs: sites and sondes
--------------------------------
+Site time series and sonde profiles
+----------------------------------
 
-As noted in :numref:`ec-sitessondes-input`, two
-main options are available for the output of ASCII files for
-comparison with measurements or detailed model analysis at specific sites. These are
+Station output writes selected model data directly at locations specified
+in the files described in :ref:`sec-sitessondes-input`.
 
-sites
-    output of surface concentrations for a set of specified measurement
-    site locations.
+Output files
+~~~~~~~~~~~
 
-sondes
-    output of concentrations for the vertical column above a set of
-    specified locations.
+The model writes:
 
-The output files ``sites_2015.csv`` and ``sondes_2015.csv`` are comma
-separated files that can be read by excel, python or fortran tools.
-If you include the whole year, or the 31\ :sup:`st` December,
-``sites_2016.csv`` and ``sondes_2016.csv`` are also included in the output.
+* ``sites_YYYY.nc``: single-level station data.
+* ``sondes_YYYY.nc``: vertical profiles at selected locations.
+* ``sites_YYYY.csv`` and ``sondes_YYYY.csv``: optional text output.
+
+These filenames do not include ``runlabel1``. Use separate run directories
+to avoid overwriting station output from another simulation.
+
+The standard output interval is one hour. Site files can contain
+instantaneous samples, interval means and interval totals in the same
+file. Sonde profiles are instantaneous samples.
+
+Station output is suppressed in source-receptor mode.
+
+NetCDF structure
+~~~~~~~~~~~~~~~
+
+In the usual NetCDF/CDL display order, site variables have dimensions
+``(time, station)`` and sonde profile variables have dimensions
+``(time, lev, station)``.
+
+Sonde levels are ordered from the lowest model layer upwards. All
+``KMAX_MID`` layers are included; the gridded-output ``lev3d`` selection
+does not restrict sonde profiles.
+
+Station identifiers and model-grid metadata accompany the data.
+Geographical location input supplies latitude and longitude; these are
+not inferred from ``IJKdown`` input.
+
+Sonde files contain surface pressure ``PS`` in hPa and hybrid-coordinate
+coefficients. Midpoint pressure can be reconstructed as:
+
+.. code-block:: text
+
+    pressure_hPa = hyam + hybm * PS
+
+The optional diagnostic ``p_mid`` writes midpoint pressure directly in Pa.
+
+Sampling and temporal statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Raw advected species
+    Instantaneous values in ppb. Site output at the lowest model layer
+    includes the existing surface correction. Higher-layer site samples
+    and sonde profiles use model-layer concentrations without that
+    lowest-layer site correction.
+
+Raw short-lived species
+    Instantaneous values in molecules/cm3 at the selected site layer
+    or throughout the sonde column.
+
+Direct site diagnostics
+    ``T2`` is instantaneous two-metre temperature in degrees Celsius.
+    ``th`` is instantaneous potential temperature in K at the selected
+    site layer.
+
+Two-dimensional derived site fields
+    Fields marked for averaging produce interval means. Accumulated
+    fields produce interval totals. Timestep scaling and unit conversion
+    follow the derived-field definition.
+
+A mapped two-dimensional field is sampled at the station's horizontal
+grid cell. Its own definition determines its vertical interpretation;
+the station's selected layer does not make it an arbitrary-height field.
+
+For example, ``O3`` selects instantaneous ozone at the chosen site layer,
+whereas ``SURF_ppb_O3`` selects an interval-mean derived surface field.
+
+Statistical products requiring dedicated handling, including supported
+rejection cases for daily maxima, rolling ozone metrics and fixed-hour
+diagnostics, cannot be obtained through the generic site accumulator.
+
+Sonde diagnostics
+~~~~~~~~~~~~~~~~
+
+Besides available chemical species, the direct profile diagnostics 
+available are:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Name
+     - Quantity
+     - Units
+   * - ``PM25``
+     - Fine particulate mass plus the implemented coarse contribution
+     - ug/m3
+   * - ``PMco``
+     - Coarse particulate mass
+     - ug/m3
+   * - ``NOy``
+     - Sum over the implemented oxidized-nitrogen group
+     - ppb
+   * - ``SH``
+     - Specific humidity
+     - kg/kg
+   * - ``RH``
+     - Relative humidity, capped at 1
+     - fraction
+   * - ``roa``
+     - Air density
+     - kg/m3
+   * - ``dz``
+     - Layer thickness
+     - m
+   * - ``z_mid``
+     - Model layer-midpoint height
+     - m
+   * - ``p_mid``
+     - Layer-midpoint pressure
+     - Pa
+   * - ``Kz_m2s``
+     - Vertical diffusivity diagnostic
+     - m2/s
+   * - ``th``
+     - Potential temperature
+     - K
+   * - ``T``
+     - Air temperature
+     - K
+   * - ``U``, ``V``
+     - Physical wind components along the model grid directions
+     - m/s
+
+``T`` and ``RH`` can be requested independently and in either order.
+
+``U`` and ``V`` include the model mapping-factor correction. They are
+not necessarily geographic eastward and northward components; rotated
+or projected grids require an additional rotation for that interpretation.
+
+General three-dimensional derived fields are not supported by the
+sonde writer.
+
+Timestamps
+~~~~~~~~~
+
+CSV and NetCDF use the same midpoint-oriented timestamp:
+
+.. code-block:: text
+
+    timestamp = output boundary - half the station output interval
+
+Hourly output written at 01:00 UTC is therefore labelled 00:30 UTC.
+The shift includes date changes across midnight.
+
+These labels align with gridded hourly-mean labels when both outputs
+use the same interval.
+
+.. important::
+
+    A midpoint label does not imply averaging.
+
+    Raw species, direct site diagnostics and sonde profiles remain
+    instantaneous samples taken at the output boundary. Their sampling
+    time is half an interval later than the stored timestamp.
+
+CSV dates use ``DD/MM/YYYY`` and times use ``hh:mm``.
+
+For a continuing run, the final New Year midnight record remains in
+the previous year's file. A first-ever station record at New Year
+creates its initial output file.
+
+Spin-up and output start
+~~~~~~~~~~~~~~~~~~~~~~
+
+Both destinations wait until ``spinup_enddate`` and ``out_startdate``
+have been reached.
+
+Derived site samples are not accumulated during spin-up. Site accumulators
+are reset at scheduled output boundaries where writing is suppressed.
+
+The first written mean or total can cover a partial interval, particularly
+when spin-up ends between output boundaries. Its label still uses half
+the nominal output interval; it does not identify the exact midpoint
+of a shortened accumulation period.
+
+If derived site output is requested but no valid samples have been
+accumulated, the writer stops rather than silently reporting zero.
+
+CSV output
+~~~~~~~~~
+
+CSV output is enabled by default. To retain NetCDF only, set:
+
+.. code-block:: fortran
+
+    WRITE_STATION_CSV = .false.,
+
+CSV files contain a descriptive preamble and station metadata before the
+time-series header. Readers must locate that header rather than treating
+the first line as an ordinary CSV table header.
+
+Site records contain:
+
+.. code-block:: text
+
+    site,code,date,hh,variable_1,variable_2,...
+
+Sonde records flatten profiles by variable, with levels ordered from
+the lowest layer upwards within each variable.
+
+.. note::
+
+    The current sonde CSV header lists variable names without expanding
+    them into separate level columns. NetCDF is recommended for profile
+    analysis.
+
+CSV numeric formatting preserves fewer digits than NetCDF. It should
+not be used to test exact numerical equality at full model precision.
+
+Comparison with gridded output
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For a like-for-like comparison:
+
+#. Select the same grid cell, rather than a bilinearly interpolated value.
+#. Match the field definition and units.
+#. Match vertical sampling and surface-correction treatment.
+#. Match averaging or accumulation intervals.
+#. Decode timestamps and compare the intervals they represent.
+
+For gridded hourly-mean surface ozone, select ``SURF_ppb_O3`` at sites,
+not the raw species ``O3``.
+
+For instantaneous comparisons, account for the difference between the
+stored midpoint label and actual output-boundary sampling time.
+
+Do not apply the historical extra one-hour correction to revised station
+timestamps. Rounding timestamps is not a substitute for matching their
+meaning.
+
+Exclude partial initial intervals when testing equality of complete
+hourly means or totals.
 
 .. _`ch-output-config`:
 
