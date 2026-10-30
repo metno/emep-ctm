@@ -674,85 +674,213 @@ a climatological background atmosphere. Lastly, the input files include
 a file describing the mapping of photolysis rates to reactions present
 in the EMEP model chemistry (``FJX_j2j.dat``).
 
-.. _`sec-sitessondes-input`:
+.. _sec-sitessondes-input:
 
-Site and Sonde files
-~~~~~~~~~~~~~~~~~~~~
+Site and sonde location files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The model provides a possibility for
-extra output data of surface concentration for a set of specified
-measurement site locations and concentrations for the vertical column
-above a set of specified locations. These site and sonde locations are
-listed in the ASCII files ``sites.dat`` and ``sondes.dat``
-files. These files can be changed by the user, and provide the outputs
-described in :numref:`sec-sitesonde`.
-
-Two main options are available for the output of ASCII files for
-comparison with measurements or detailed model analysis. These are
+The model can write data directly at selected locations without requiring
+extraction from full gridded output:
 
 sites
-    output of surface concentrations for a set of specified measurement
-    site locations.
+    Single-level chemical and meteorological data, together with supported
+    two-dimensional derived fields, sampled at selected locations.
 
 sondes
-    output of concentrations for the vertical column above a set of
-    specified locations.
+    Instantaneous vertical profiles above selected horizontal locations.
 
-Both sites and sondes are specified and handled in similar ways, in the
-module ``Sites_mod.f90``, so we treat them both together below.
-Locations are specified in the input files ``sites.dat`` and ``sondes.dat``.
-The files start with a description of its content followed by a list of
-the stations. For example, a sondes.dat input file may look like this:
-.. literalinclude:: sites.dat
-    :caption: Site location definition (``sites.dat``) example.
+Location files specify where output is required. Variable selections in
+the ``Model_config`` namelist specify what is written.
 
-.. literalinclude:: sitesLLHrel.dat
-    :caption: Site location definition, LatLonHrel Coords example.
+Location-file paths
+^^^^^^^^^^^^^^^^^^^
 
-.. literalinclude:: sitesLLZ.dat
-    :caption: Site location definition, LatLonZm Coords example.
+Set the paths in the existing ``Model_config`` namelist, for example:
 
-The first line in each file is a header with file content. Then, the
-contents are described in more detail. Text strings after ``#`` are just
-clarifying comments. 'Area', e.g., is the domain to which the stations
-belong, e.g. 'Northern Hemisphere'.
+.. code-block:: fortran
 
-Text after ``:`` is read in by the model:
+    SitesFile  = './sites.dat',
+    SondesFile = './sondes.dat',
 
-Units
-    Either 'deg' (degrees) or 'index' (model grid indices).
+The files are optional and independent. If one file is missing, its
+location count is zero and that destination produces no station output.
+Locations outside the computational domain or on its outer boundary
+are excluded.
 
-Coords
-    Vertical coordinate system that is used in the model - see below.
+Location-file format
+^^^^^^^^^^^^^^^^^^^
 
-The VertCoords system was changed in rv4.36, to allow several options.
-Specifying altitude rather than model coordinate is of course an obvious
-alternative to the model layer number that was previously used, but it is also easily mis-used and mis-understood too. For example, a site at 500m might need vertical profile and/or deposition correction if sitting on a 500m high plateau (hence it has a relative altitude of 0m, and should use iz=KMAX_MID), but if sitting on an isolated mountain in terrain of height 0m, the relative altitude would indeed to 500m and we should pick from some model level which represents that. Tricky! (Best might be to give station altitude and relative altitude in separate columns, so it is explicit at least.)
+Both files use the same header conventions. For example:
 
-Briefly though, one can now set the "Coords" parameter (in the header of the sites.dat input file, used to be just "LatLong") to be one of:
+.. code-block:: text
 
-  1. LatLonKdown  - same as older LatLong, with lat/lon coordinates, then k-number with ground level being e.g. 20
+    # Sites: names, codes and locations
+    : Units deg
+    : Coords LatLonHrel
+    : DomainName NA
+    name code lat lon height #HEADERS
+    - - deg deg m #SKIP
+    #DATA:
+    Keldsnor DK0005R 54.74650 10.73616 10
+    Birkenes_II NO0002R 58.38853 8.25200 109
 
-  2. LatLonZm - give lat, long, then altitude in metres. The model will then compare that altitude with the model's topography, to estimate a relative altitude (Hrel). It then calculates which model layer corresponds to that altitude.
+Five-column records contain a station name, station code and three
+coordinate values. Legacy four-column records omit the station code:
 
-  3. LatLonHrel - give lat, long, and then your own preferred relative altitude (Hrel). This relative altitude may be calculated by comparison to digital elevation model (see for example, Loibl, W.; Winiwarter, W.; Kopsca, A.; Zufger, J. & Baumann, R. Estimating the spatial distribution of ozone concentrations in complex terrain Atmos. Environ., 1994, 28, 2557-2566).
+.. code-block:: text
 
-  4. IJKdown - does everything in model's i, j and k coordinates
+    name lat lon height #HEADERS
+    - deg deg m #SKIP
+    #DATA:
+    Birkenes_II 58.38853 8.25200 109
 
-In principle (3) should produce the best results, with relative altitudes calculated compared to local topography (e.g. < 5km). Option (3) also allows the same Hrel to be used regardless of the underlying meteo resolution. One can also get Hrel from the TOAR database for some sites (Schultz, MG, et al 2017 Tropospheric Ozone Assessment Report: Database
-and metrics data of global surface ozone observations. Elem Sci Anth,
-5: 58, DOI: https://doi.org/10.1525/elementa.244).
+The header column count determines which format is read. Do not mix the
+two formats within one file. Omitted codes are represented as missing.
 
-However, testing of these systems against e.g. diunral profiles of ozone shows rather unpredictable results in some cases, and often just using the model's surface concentrations procudes results which are as good as those based upon altitude. The new systems are very fliexble thouhg, and allow the user to explore different methodologies.
+Use unique station names within each destination. Duplicate variable
+requests are supported, but duplicate station names are rejected.
+For portability, use short names and codes without commas.
 
-Both ``sites.dat`` and ``sondes.dat`` files are optional, but recommended.
-The species and meteorological data requested for site and sonde output are
-specified in ``Config_module.f90`` by the use of arrays.
-Only a few met fields are defined so far but more can be added into
-``Sites_mod.f90`` as required.
+Supported coordinate systems
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The output files ``sites_2018.csv`` and ``sondes_2018.csv`` are comma
-separated files that can be read by excel. netcdf versions of these files
-are also provided, ``sites_2018.nc`` and ``sondes_2018.nc``.
-If you include the whole year, or the 31\ :sup:`st` December,
-``sites_2019.csv`` and ``sondes_2019.csv`` are also included in the output.
+The ``Coords`` value selects the interpretation of the three numeric
+columns:
+
+``LatLonKdown``
+    Latitude, longitude and model-layer number. Layer 1 is at the model
+    top; ``KMAX_MID`` is the lowest layer.
+
+``LatLonZ``
+    Latitude, longitude and altitude above sea level, in metres.
+    The model estimates a sampling layer using the altitude and model
+    topography.
+
+``LatLonHrel``
+    Latitude, longitude and height relative to model terrain, in metres.
+    Negative relative heights are treated as zero.
+
+``IJKdown``
+    Full-grid model indices ``i``, ``j`` and ``k``. Horizontal indices
+    refer to the meteorological grid, not a renumbered subdomain.
+
+Coordinate-system names are case-sensitive. Use ``LatLonZ``, not
+``LatLonZm`` or the obsolete ``LatLong``.
+
+For geographical coordinates, the order is latitude, longitude, then
+vertical coordinate. Horizontal sampling selects a model grid cell;
+it does not perform bilinear interpolation.
+
+Altitude-based site selection estimates a model layer rather than
+interpolating to an exact measurement height. Representativeness in
+complex terrain depends on station altitude and model topography.
+
+For sondes, the horizontal position selects the column. The third input
+coordinate does not restrict the profile: all model layers are written.
+
+Explicit variable selection
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Select variables in ``Model_config``, for example:
+
+.. code-block:: fortran
+
+    SITE_names  = 'O3', 'NO2', 'T2', 'th',
+    SONDE_names = 'O3', 'NO2', 'T', 'RH', 'p_mid', 'z_mid',
+
+Chemical-species availability depends on the compiled mechanism.
+Variable lookup is case-insensitive. Repeated selections of the same
+resolved variable are merged into one output variable.
+
+Sites support chemical species, the direct diagnostics ``T2`` and ``th``,
+and supported two-dimensional derived fields.
+
+Derived fields are requested by their full output names, for example
+``SURF_ppb_O3``. A name must correspond to an available derived-field
+definition: listing an arbitrary name does not automatically generate 
+its calculation.
+
+The selections ``O3`` and ``SURF_ppb_O3`` are different. The former selects
+the raw species (at the center of the grid level); the latter selects a 
+derived surface concentration. Their sampling and temporal statistics are 
+described in
+:ref:`sec-sitessondes-output`.
+
+Optional diagnostics and SPECIAL_VARS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Optional site diagnostics historically associated with ``SPECIAL_VARS``
+can be available through the derived-field mechanism.
+
+For example, ``Emis_mgm2_nox`` can be selected when the corresponding
+emission-field definition exists. Emission names depend on the configured
+emission pollutants.
+
+A historical special-variable list is not a guarantee of availability
+for every mechanism or configuration. Unknown or unsupported selections
+are rejected during initialization.
+
+Automatic selection with T and N
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Output-indicator strings in ``OutputConcs`` and ``OutputMisc`` recognise
+two additional destination flags:
+
+* ``T`` requests site output.
+* ``N`` requests sonde output.
+
+These uppercase flags select destinations, not averaging intervals.
+They can be combined with gridded-output indicators:
+
+.. code-block:: fortran
+
+    OutputConcs =
+      'O3', 'ppb', '2d', 'AIR_CONCS', 'SPEC', 'HT',
+
+This selects ``SURF_ppb_O3`` for hourly gridded output and site output.
+
+Alternatively, retain the corresponding derived-field definition and
+include ``SURF_ppb_O3`` in ``SITE_names``. Both approaches select the same
+site variable. Requesting ``O3`` instead selects the raw species.
+
+Explicit lists and automatic requests are combined. Selecting the same
+variable through both methods produces one output variable, not two.
+
+.. important::
+
+    Destination flags do not add new calculations to a writer.
+    General derived-field profiles are not implemented for sondes.
+
+    For example, adding ``N`` to a three-dimensional concentration entry
+    registers a name such as ``D3_ppb_O3``. That name is unsupported by
+    the sonde writer; it is not equivalent to ``SONDE_names = 'O3'``.
+
+    Use explicit sonde names for chemical species and supported profile
+    diagnostics unless an automatic request resolves to a supported name.
+
+Output controls
+^^^^^^^^^^^^^^^
+
+CSV output is enabled by default for both destinations. Disable it
+without disabling NetCDF using:
+
+.. code-block:: fortran
+
+    WRITE_STATION_CSV = .false.,
+
+Existing CSV files are not removed. Location files are still read.
+
+The compiled ``FREQ_SITE`` and ``FREQ_SONDE`` constants control station
+output intervals; both currently equal one hour. They are not namelist
+parameters and are independent of the destination flags.
+
+Compiled array sizes are controlled by ``NSITES_MAX``, ``NSONDES_MAX``,
+``MAX_SITE_NAMES`` and ``MAX_SONDE_NAMES``. Increasing these limits requires
+recompilation.
+
+In the current implementation, keep variable names within 28 characters
+and station names within 36 characters to avoid truncation in intermediate
+selection arrays or NetCDF metadata.
+
+For file structure, timestamps, statistics and profile diagnostics,
+see :ref:`sec-sitessondes-output`.
