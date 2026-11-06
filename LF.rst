@@ -192,6 +192,7 @@ The cpu cost is high, approximatively 20 times the cost without this option (ind
 
     ! Specify which countries and sectors
     lf_country%sector_list(1:)=0,1,8,
+    lf_set%define_own_groups = T, ! Predefine sector 6 as a group also including 16,17,18,19 , and sector 1 including 14 and 15 (if GNFR_CAMS sectors). Default F
     lf_sector_groups(1)%name='Low', !any name you want to give to this group
     lf_sector_groups(1)%list(1:)=3,5,6,9,11,12,16,17,18,19, !the sector indices included in this group
     lf_country%list(1:20)='FR','IT','DE','ES','NO','NL','SE','PL','AT','BE','BG','DK','FI','GR','HU','PT','RO','CH','TR','GB',
