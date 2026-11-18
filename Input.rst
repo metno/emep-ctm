@@ -820,14 +820,13 @@ A historical special-variable list is not a guarantee of availability
 for every mechanism or configuration. Unknown or unsupported selections
 are rejected during initialization.
 
-Automatic selection with T and N
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Automatic site selection with S
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Output-indicator strings in ``OutputConcs`` and ``OutputMisc`` recognise
 two additional destination flags:
 
-* ``T`` requests site output.
-* ``N`` requests sonde output.
+* ``S`` requests site output.
 
 These uppercase flags select destinations, not averaging intervals.
 They can be combined with gridded-output indicators:
@@ -849,14 +848,6 @@ variable through both methods produces one output variable, not two.
 .. important::
 
     Destination flags do not add new calculations to a writer.
-    General derived-field profiles are not implemented for sondes.
-
-    For example, adding ``N`` to a three-dimensional concentration entry
-    registers a name such as ``D3_ppb_O3``. That name is unsupported by
-    the sonde writer; it is not equivalent to ``SONDE_names = 'O3'``.
-
-    Use explicit sonde names for chemical species and supported profile
-    diagnostics unless an automatic request resolves to a supported name.
 
 Output controls
 ^^^^^^^^^^^^^^^
