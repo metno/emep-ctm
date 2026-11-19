@@ -362,3 +362,11 @@ as shown in :numref:`output-deps`.
       'RDN'      ,'GROUP','mgN','YMD',
       'SO2'      ,'SPEC' ,'mgS','YMD',
       'HNO3'     ,'SPEC' ,'mgN','YMD',
+
+.. code-block:: Fortran
+  :name: output-mosaic
+  :caption: Example MOSAIC output configuration for grid-average values for leaf area index, and the stomatal and aerodynamic conductance. 
+
+     MOSAIC_METCONCS = 'LAI','Gsto','Gaer',
+     MET_LCS = 'Grid',
+
